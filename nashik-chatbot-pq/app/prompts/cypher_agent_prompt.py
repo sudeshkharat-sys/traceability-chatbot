@@ -330,6 +330,125 @@ ORDER BY total_rejections DESC
 LIMIT 20
 ```
 
+### END-TO-END TRACEABILITY (Complete Path)
+**Use this when user asks to "trace" a specific failure or wants complete traceability:**
+
+```cypher
+// Example: Trace a specific complaint end-to-end
+MATCH (wc:WarrantyClaim)
+WHERE toLower(wc.complaint_desc) CONTAINS toLower('steering')
+  AND wc.complaint_desc <> 'unknown'
+WITH wc LIMIT 5
+
+// Get the Part involved
+MATCH (wc)-[:INVOLVES_PART]->(p:Part)
+WHERE p.part_no <> 'unknown'
+
+// Get Batch information
+OPTIONAL MATCH (p)-[:FROM_BATCH]->(b:Batch)
+
+// Get Vendor and Cp/Cpk
+OPTIONAL MATCH (v:Vendor)-[:SUPPLIES]->(p)
+OPTIONAL MATCH (v)-[cpk:HAS_CPK]->(p)
+
+// Get ESQA concerns
+OPTIONAL MATCH (e:ESQAConcern)-[:RAISED_FOR]->(p)
+
+// Get Vehicle details
+MATCH (vh:Vehicle)-[:HAS_CLAIM]->(wc)
+
+RETURN
+  wc.claim_no AS claim,
+  wc.complaint_desc AS complaint,
+  wc.failure_date AS failure_date,
+  vh.vin AS vin,
+  p.part_no AS part,
+  collect(DISTINCT b.batch_code)[..3] AS sample_batches,
+  COUNT(DISTINCT b) AS batch_count,
+  v.name AS vendor,
+  cpk.cpk AS cpk_value,
+  cpk.cp AS cp_value,
+  COUNT(DISTINCT e) AS esqa_concerns,
+  SUM(e.rejection_qty) AS total_rejections
+LIMIT 10
+```
+
+**Traceability by Claim Number:**
+```cypher
+// User provides specific claim number
+MATCH (wc:WarrantyClaim {claim_no: 123456})
+MATCH (wc)-[:INVOLVES_PART]->(p:Part)
+MATCH (wc)<-[:HAS_CLAIM]-(v:Vehicle)
+
+OPTIONAL MATCH (p)-[:FROM_BATCH]->(b:Batch)
+OPTIONAL MATCH (vendor:Vendor)-[:SUPPLIES]->(p)
+OPTIONAL MATCH (vendor)-[cpk:HAS_CPK]->(p)
+OPTIONAL MATCH (esqa:ESQAConcern)-[:RAISED_FOR]->(p)
+
+RETURN {
+  claim: {
+    number: wc.claim_no,
+    complaint: wc.complaint_desc,
+    failure_date: wc.failure_date,
+    failure_kms: wc.failure_kms,
+    zone: wc.zone
+  },
+  vehicle: {
+    vin: v.vin,
+    model: v.model
+  },
+  part: {
+    part_no: p.part_no,
+    model: p.model,
+    characteristic: p.characteristic
+  },
+  batch: {
+    codes: collect(DISTINCT b.batch_code)[..5],
+    dates: collect(DISTINCT b.batch_date)[..5],
+    shifts: collect(DISTINCT b.shift)[..5]
+  },
+  vendor: {
+    name: vendor.name,
+    cpk: cpk.cpk,
+    cp: cpk.cp
+  },
+  quality: {
+    esqa_count: COUNT(DISTINCT esqa),
+    total_rejections: SUM(esqa.rejection_qty),
+    recent_esqa: collect(DISTINCT esqa.description)[..3]
+  }
+} AS traceability
+```
+
+**Batch-Centric Traceability:**
+```cypher
+// Find all failures from a specific batch
+MATCH (b:Batch {batch_code: '4SH078823'})
+MATCH (p:Part)-[:FROM_BATCH]->(b)
+
+OPTIONAL MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p)
+OPTIONAL MATCH (v:Vendor)-[:SUPPLIES]->(p)
+OPTIONAL MATCH (v)-[cpk:HAS_CPK]->(p)
+OPTIONAL MATCH (e:ESQAConcern)-[:RAISED_FOR]->(p)
+
+RETURN
+  b.batch_code AS batch,
+  b.batch_date AS mfg_date,
+  b.shift AS shift,
+  COUNT(DISTINCT p) AS parts_count,
+  COUNT(DISTINCT wc) AS failure_count,
+  collect(DISTINCT wc.complaint_desc)[..5] AS top_complaints,
+  v.name AS vendor,
+  cpk.cpk AS cpk_value,
+  COUNT(DISTINCT e) AS esqa_concerns
+```
+
+**Important Notes:**
+- Always use OPTIONAL MATCH for Batch, Vendor, Cpk, ESQA (not all parts have complete traceability)
+- Use `collect()[..3]` or `collect()[..5]` to limit array sizes
+- Current data covers: Dec-2024, Mar-2025, May-2025, Jul-2025 (filtered for complete traceability)
+- If batch is NULL, it means traceability data is not available for that part instance
+
 ---
 
 ## CRITICAL RULES

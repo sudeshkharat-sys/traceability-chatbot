@@ -67,6 +67,93 @@ warranty["vender"] = warranty["vender"].replace(["-", "", "N/A", " "], "unknown"
 trace["VIN_SHORT"] = trace["VINNumber"].str[-8:]
 
 
+# ═══════════════════════════════════════════════════════════
+# PART NUMBER NORMALIZATION (FIX ISSUE #1 & #5: Part mismatch & Duplicate nodes)
+# ═══════════════════════════════════════════════════════════
+def normalize_part_number(part_value):
+    """
+    Normalize part numbers to ensure consistency across datasets.
+
+    Valid format: ####AAA####A (13 characters)
+    Example: 2301AW503170N, 0107BW500561N
+
+    Returns:
+        - Standard format part if valid (e.g., "0107BW500561N")
+        - "unknown" if invalid or garbage text
+    """
+    import re
+
+    # Handle NaN, None, empty
+    if pd.isna(part_value) or part_value == "" or part_value == "unknown":
+        return "unknown"
+
+    # Convert to string and clean
+    part = str(part_value).strip()
+
+    # Remove common control characters
+    part = part.replace("_x000d_", "").replace("_X000D_", "")
+    part = part.replace("\r", "").replace("\n", "").replace("\t", "")
+    part = part.strip()
+
+    # Convert to uppercase for consistency
+    part = part.upper()
+
+    # Check if it matches valid part number pattern
+    # Pattern: 4 digits + 2-3 letters + 5 alphanumeric + 1 letter
+    pattern = r"^[0-9]{4}[A-Z]{2,3}[0-9]{5}[A-Z]$"
+
+    if re.match(pattern, part):
+        return part  # Valid standard format
+
+    # Check for alternative J-format (internal M&M codes)
+    # Format: J##-AAA-#### (e.g., J60-BOD-1920)
+    j_pattern = r"^J[0-9]{2}-[A-Z]{3}-[0-9]{4}$"
+    if re.match(j_pattern, part):
+        # Keep J-format as-is (may not match traceability but preserve for reference)
+        return part
+
+    # If it contains spaces or is too long, it's likely a description, not a part number
+    if len(part) > 50 or " " in part:
+        return "unknown"
+
+    # If too short, likely incomplete
+    if len(part) < 5:
+        return "unknown"
+
+    # Default: mark as unknown (invalid format)
+    return "unknown"
+
+
+print("\n🔧 Normalizing part numbers...")
+
+# Apply normalization to all datasets
+warranty["part_original"] = warranty["part"]  # Keep original for debugging
+warranty["part"] = warranty["part"].apply(normalize_part_number)
+
+ppcm["Part No"] = ppcm["Part No"].apply(normalize_part_number)
+esqa["Part No"] = esqa["Part No"].apply(normalize_part_number)
+trace["BOMPARTNO"] = trace["BOMPARTNO"].apply(normalize_part_number)
+
+# Report normalization results
+warranty_valid = (warranty["part"] != "unknown").sum()
+warranty_total = len(warranty)
+warranty_invalid = warranty_total - warranty_valid
+
+print(f"✅ Part number normalization complete:")
+print(f"   Warranty - Valid: {warranty_valid:,}/{warranty_total:,} ({warranty_valid/warranty_total*100:.1f}%)")
+print(f"   Warranty - Invalid/Unknown: {warranty_invalid:,} ({warranty_invalid/warranty_total*100:.1f}%)")
+
+# Show sample invalid entries (for debugging)
+invalid_samples = warranty[warranty["part"] == "unknown"]["part_original"].unique()[:5]
+if len(invalid_samples) > 0:
+    print(f"   Sample invalid entries (marked as 'unknown'):")
+    for sample in invalid_samples:
+        sample_str = str(sample)[:60]
+        if len(str(sample)) > 60:
+            sample_str += "..."
+        print(f"     - {sample_str}")
+
+
 # CRITICAL: Parse ScanValue (format: mfg_date:shift:batch_code)
 def parse_scan_value(scan_val):
     """Extract batch info from ScanValue: date:shift:batch
