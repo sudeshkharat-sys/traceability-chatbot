@@ -1,0 +1,41 @@
+/* Global Styles */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Smooth transitions for all interactive elements */
+button {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button:active {
+  transform: scale(0.96);
+}
+
+/* Remove default button styles */
+button:focus {
+  outline: none;
+}
+
+button:focus-visible {
+  outline: 2px solid rgba(255, 0, 0, 0.5);
+  outline-offset: 2px;
+}
+
+/* Ensure smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Improve text selection */
+::selection {
+  background-color: rgba(255, 0, 0, 0.2);
+  color: inherit;
+}
+
+::-moz-selection {
+  background-color: rgba(255, 0, 0, 0.2);
+  color: inherit;
+}

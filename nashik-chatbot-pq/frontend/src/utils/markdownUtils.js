@@ -1,0 +1,90 @@
+/**
+ * Utility functions for processing markdown content
+ * Minimal fixes for backend formatting issues
+ * React-markdown with remark-gfm handles tables natively and robustly
+ */
+
+/**
+ * Fixes critical backend markdown formatting issues
+ * Only fixes what's necessary - lets react-markdown handle the rest
+ * @param {string} markdown - The markdown text to process
+ * @param {boolean} isComplete - Whether the markdown is complete (not streaming)
+ * @returns {string} - Fixed markdown text
+ */
+export function fixMarkdownTables(markdown, isComplete = false) {
+  if (!markdown) return markdown;
+
+  let result = markdown;
+
+  // Fix 1: Split concatenated headings (## Heading### Subheading -> ## Heading\n\n### Subheading)
+  // This is the main issue: "## Detailed Analysis### Top Complaint Descriptions"
+  result = result.replace(/(^#{1,6}\s+[^\n]+?)(#{1,6}\s+)/gm, "$1\n\n$2");
+
+  // Fix 2: Split headings that end with a colon and have text continuing on the same line
+  // Pattern: ### Heading: text continues -> ### Heading:\n\ntext continues
+  // Handles cases like "### Vehicle-aligned traceability: part, batch, and shift for the vendor's claimsI traced..."
+  // BUT: Don't split if the continuing text looks like a bullet point (bullet points should be on next line)
+  result = result.replace(
+    /(^#{1,6}\s+[^\n:]+:)([^\n]+)/gm,
+    (match, headingWithColon, continuingText) => {
+      const trimmed = continuingText.trim();
+
+      // Don't split if:
+      // - Empty
+      // - Starts with pipe (table) - handled by Fix 4
+      // - Starts with # (another heading) - handled by Fix 1
+      // - Starts with bullet marker (bullets should be on next line, not same line)
+      // - Looks like a bullet list pattern
+      if (
+        trimmed &&
+        !trimmed.startsWith("|") &&
+        !trimmed.startsWith("#") &&
+        !trimmed.match(/^[-•*]\s/) // Don't split if it looks like a bullet point
+      ) {
+        return headingWithColon + "\n\n" + trimmed;
+      }
+      return match;
+    }
+  );
+
+  // Fix 3: Split headings that are immediately followed by bullet points on the same line
+  // Pattern: ### Heading- bullet or ### Heading - bullet or ### Heading* bullet -> ### Heading\n\n- bullet
+  // This handles cases where bullets are attached directly to headings (with or without space)
+  result = result.replace(
+    /(^#{1,6}\s+[^\n]+?)(\s*[-•*]\s+[^\n]+)/gm,
+    (match, heading, bulletContent) => {
+      const headingTrimmed = heading.trim();
+      const bulletTrimmed = bulletContent.trim();
+
+      // Skip if heading already ends with colon (handled by Fix 2)
+      // Skip if this looks like part of the heading text (e.g., "Vehicle-aligned" - dash in word)
+      // Only process if bulletContent starts with a bullet marker followed by space
+      if (
+        !headingTrimmed.endsWith(":") &&
+        bulletTrimmed.match(/^[-•*]\s/) &&
+        !headingTrimmed.match(/[-•*]\s*$/) // Don't split if heading ends with dash/bullet (part of word)
+      ) {
+        return headingTrimmed + "\n\n" + bulletTrimmed;
+      }
+      return match;
+    }
+  );
+
+  // Fix 4: Split headings that are on the same line as table headers
+  // Pattern: ### Heading| Column | Column | -> ### Heading\n\n| Column | Column |
+  result = result.replace(
+    /(^#{1,6}\s+[^\n|#]+)\s*\|([^\n]+)/gm,
+    (match, heading, tableContent) => {
+      return heading + "\n\n|" + tableContent;
+    }
+  );
+
+  // Fix 5: Ensure headings have blank lines before tables
+  // Pattern: ### Heading\n| Column | -> ### Heading\n\n| Column |
+  result = result.replace(/(^#{1,6}\s+[^\n]+)\n(\|[^\n]+\|)/gm, "$1\n\n$2");
+
+  // Fix 6: Normalize multiple consecutive blank lines (keep max 2)
+  result = result.replace(/\n{3,}/g, "\n\n");
+
+  return result;
+}

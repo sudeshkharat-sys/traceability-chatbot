@@ -1,0 +1,38 @@
+# Web Framework
+fastapi
+uvicorn[standard]
+websockets
+python-multipart
+pandas
+
+# LangChain & AI
+langchain
+langchain-openai
+langchain-neo4j
+langgraph
+langgraph-checkpoint-postgres
+openai
+
+# Database Connectors
+neo4j
+psycopg2-binary
+sqlalchemy
+
+# Configuration & Environment
+pydantic
+pydantic-settings
+python-dotenv
+
+# Task Management
+invoke
+
+# Utilities
+aiofiles
+python-json-logger
+
+# Development Tools
+pytest
+pytest-asyncio
+httpx
+black
+flake8
