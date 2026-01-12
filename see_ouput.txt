@@ -127,3 +127,137 @@ Trace VINs for the top batches (e.g.,200525 Shift01,290525 Shift01) to map vehic
 Perform lot-level containment and enhanced inspection for1701AW500091N and1701AW500101N in upcoming receipts; tighten incoming sampling for Shift01 output.
 Request supplier’s batch records for late May runs: sealant curing logs, photometric checks, lens-housing fit records, and any line changeover notes.
 If you want, I can provide a drill-down for one batch (e.g.,200525 Shift01) showing VINs, dealer locations, and claim timelines to pinpoint distribution patterns.
+
+
+terminal output:
+DEBUG:    < TEXT '{"user_id":1001,"user_message":"for south can y..."agent_type":"analyst"}' [117 bytes]
+DEBUG:    > TEXT '{"type":"thinking","step":"initialization","con...with ANALYST agent..."}' [99 bytes]
+2026-01-12 17:51:24,188 [INFO] app.models.azure_openai_handler: Initialized reasoning model: gpt-5 (reasoning_effort=minimal)
+2026-01-12 17:51:24,190 [INFO] app.agents.analyst_agent: ✅ Analyst agent initialized with PostgreSQL memory (thread_id: conv_73)
+2026-01-12 17:51:24,210 [INFO] app.agents.analyst_agent: ✅ TodoListMiddleware enabled for task planning
+2026-01-12 17:51:24,210 [INFO] app.agents.analyst_agent: 📋 write_todos tool will be available via TodoListMiddleware
+2026-01-12 17:51:24,360 [INFO] app.models.azure_openai_handler: Initialized chat model: gpt-4o-mini (temp=0.1, max_tokens=4096)
+2026-01-12 17:51:24,360 [INFO] app.agents.analyst_agent: 🔄 Summarization enabled: triggers at 100000 tokens, keeps 20 recent messages
+2026-01-12 17:51:24,428 [INFO] app.agents.analyst_agent: 📋 TodoListMiddleware should provide write_todos tool automatically during execution
+2026-01-12 17:51:24,440 [INFO] app.agents.analyst_agent: Analyst agent initialized successfully
+2026-01-12 17:51:24,440 [INFO] app.agents.agent_pool: 📝 Created ANALYST agent for conversation 73
+2026-01-12 17:51:24,440 [INFO] backend.services.conversations.conversation_service: Using analyst agent for conversation 73
+2026-01-12 17:51:24,440 [INFO] app.agents.analyst_agent: Streaming analysis for: for south can you give me deatiled for the head lamp failure...
+2026-01-12 17:51:26,615 [INFO] httpx: HTTP Request: POST https://manufacturing-acc.cognitiveservices.azure.com/openai/deployments/gpt-5/chat/completions?api-version=2025-01-01-preview "HTTP/1.1 200 OK"
+2026-01-12 17:51:28,498 [INFO] app.agents.analyst_agent: 🔧 Tool call detected: name='write_todos', args keys=['todos']
+2026-01-12 17:51:28,498 [INFO] app.agents.analyst_agent: 📋 Detected todo tool with name: 'write_todos'
+
+📋 Task Plan (7 items):
+- ⏳ Identify relevant data sources: Warranty (claims), Traceability (parts/batches/vendors), PPCM (Cp/Cpk), eSQA (incoming concerns) for South Zone head lamp failure
+- ⏳ Query Warranty claims filtered to South Zone and complaint contains 'head lamp' to get claims, zones, and link to parts
+- ⏳ Trace parts to batches (batch_code, batch_date, shift) and count distinct claims per batch to avoid double-counting
+- ⏳ Get vendor details for involved parts and join PPCM Cp/Cpk values
+- ⏳ Fetch eSQA concerns for those parts (counts and rejection qty)
+- ⏳ Correlate findings and compile an end-to-end summary with tables (parts, batch concentration, vendors with Cp/Cpk, ESQA)
+- ⏳ Provide recommendations and offer further drill-down (e.g., VIN linkage or time clustering)
+
+DEBUG:    > TEXT '{"type": "thinking", "step": "Planning", "conte...e or time clustering)"}' [881 bytes]
+2026-01-12 17:51:28,509 [INFO] app.agents.analyst_agent: 🔧 Tool result detected: name='analyst_agent', content type=str
+2026-01-12 17:51:28,513 [INFO] app.agents.analyst_agent: 🔧 Tool result detected: name='write_todos', content type=str
+2026-01-12 17:51:28,513 [INFO] app.agents.analyst_agent: 📋 Todo tool result with name: 'write_todos'
+2026-01-12 17:51:29,377 [INFO] httpx: HTTP Request: POST https://manufacturing-acc.cognitiveservices.azure.com/openai/deployments/gpt-5/chat/completions?api-version=2025-01-01-preview "HTTP/1.1 200 OK"
+2026-01-12 17:51:30,758 [INFO] app.agents.analyst_agent: 🔧 Tool call detected: name='think', args keys=['thought']
+
+🤔 Reasoning:
+We need to run end-to-end queries: start with warranty claims in South Zone with complaint_desc contains 'head lamp'. Then parts involved, batches with distinct claim counts per batch, vendor + Cp/Cpk, ESQA concerns. We'll craft a combined query per the pattern. We'll also possibly need separate aggregation tables: part-level counts, batch concentration counts, vendor Cp/Cpk summary, ESQA counts. Might do multiple queries or one complex query with aggregations. We'll run one for part-level counts; one for batch-wise counts using DISTINCT claim_no; one for vendor Cp/Cpk; one for ESQA summary. We'll mark todo tasks in progress and complete as we proceed.
+
+DEBUG:    > TEXT '{"type": "thinking", "step": "Reasoning", "cont...mplete as we proceed."}' [716 bytes]
+2026-01-12 17:51:30,758 [INFO] app.agents.analyst_agent: 🔧 Tool result detected: name='analyst_agent', content type=str
+2026-01-12 17:51:30,758 [INFO] app.tools.think_tool: 🤔 Agent thinking: We need to run end-to-end queries: start with warranty claims in South Zone with complaint_desc contains 'head lamp'. Then parts involved, batches with distinct claim counts per batch, vendor + Cp/Cpk, ESQA concerns. We'll craft a combined query per the pattern. We'll also possibly need separate aggregation tables: part-level counts, batch concentration counts, vendor Cp/Cpk summary, ESQA counts. Might do multiple queries or one complex query with aggregations. We'll run one for part-level counts; one for batch-wise counts using DISTINCT claim_no; one for vendor Cp/Cpk; one for ESQA summary. We'll mark todo tasks in progress and complete as we proceed.
+2026-01-12 17:51:30,758 [INFO] app.tools.think_tool: 🤔 Full thought (660 chars): We need to run end-to-end queries: start with warranty claims in South Zone with complaint_desc contains 'head lamp'. Then parts involved, batches with distinct claim counts per batch, vendor + Cp/Cpk, ESQA concerns. We'll craft a combined query per the pattern. We'll also possibly need separate aggregation tables: part-level counts, batch concentration counts, vendor Cp/Cpk summary, ESQA counts. Might do multiple queries or one complex query with aggregations. We'll run one for part-level counts; one for batch-wise counts using DISTINCT claim_no; one for vendor Cp/Cpk; one for ESQA summary. We'll mark todo tasks in progress and complete as we proceed.
+2026-01-12 17:51:30,758 [INFO] app.agents.analyst_agent: 🔧 Tool result detected: name='think', content type=str
+2026-01-12 17:51:34,648 [INFO] httpx: HTTP Request: POST https://manufacturing-acc.cognitiveservices.azure.com/openai/deployments/gpt-5/chat/completions?api-version=2025-01-01-preview "HTTP/1.1 200 OK"
+2026-01-12 17:51:34,830 [INFO] app.agents.analyst_agent: 🔧 Tool call detected: name='execute_cypher_query', args keys=['question']
+2026-01-12 17:51:34,830 [INFO] app.agents.analyst_agent: 🔧 Tool call detected: name='execute_cypher_query', args keys=['question']
+2026-01-12 17:51:34,830 [INFO] app.agents.analyst_agent: 🔧 Tool call detected: name='execute_cypher_query', args keys=['question']
+2026-01-12 17:51:34,830 [INFO] app.agents.analyst_agent: 🔧 Tool call detected: name='execute_cypher_query', args keys=['question']
+2026-01-12 17:51:34,830 [INFO] app.agents.analyst_agent: 🔧 Tool result detected: name='analyst_agent', content type=str
+2026-01-12 17:51:34,869 [INFO] app.models.azure_openai_handler: Initialized reasoning model: gpt-5 (reasoning_effort=minimal)
+2026-01-12 17:51:34,874 [INFO] app.models.azure_openai_handler: Initialized reasoning model: gpt-5 (reasoning_effort=minimal)
+2026-01-12 17:51:34,874 [INFO] app.models.azure_openai_handler: Initialized reasoning model: gpt-5 (reasoning_effort=minimal)
+2026-01-12 17:51:34,880 [INFO] app.models.azure_openai_handler: Initialized reasoning model: gpt-5 (reasoning_effort=minimal)
+2026-01-12 17:51:34,887 [INFO] app.agents.cypher_agent: Cypher agent initialized successfully
+2026-01-12 17:51:34,887 [INFO] app.agents.cypher_agent: Cypher agent initialized successfully
+2026-01-12 17:51:34,887 [INFO] app.agents.cypher_agent: 🔍 Cypher Agent generating query for: For South Zone head lamp failure: Get vendor capability summary. Match claims (zone='South Zone', co...
+2026-01-12 17:51:34,887 [INFO] app.agents.cypher_agent: Cypher agent initialized successfully
+2026-01-12 17:51:34,887 [INFO] app.agents.cypher_agent: 🔍 Cypher Agent generating query for: For South Zone head lamp failure: Get batch-wise failure concentration. Match WarrantyClaim (zone='S...
+2026-01-12 17:51:34,900 [INFO] app.agents.cypher_agent: 🔍 Cypher Agent generating query for: For South Zone head lamp failure: Get part-level summary. Match WarrantyClaim with zone='South Zone'...
+2026-01-12 17:51:34,900 [INFO] app.agents.cypher_agent: Cypher agent initialized successfully
+2026-01-12 17:51:34,900 [INFO] app.agents.cypher_agent: 🔍 Cypher Agent generating query for: For South Zone head lamp failure: Get ESQA incoming quality concerns for involved parts. Match claim...
+2026-01-12 17:51:36,066 [INFO] httpx: HTTP Request: POST https://manufacturing-acc.cognitiveservices.azure.com/openai/deployments/gpt-5/chat/completions?api-version=2025-01-01-preview "HTTP/1.1 200 OK"
+2026-01-12 17:51:36,101 [INFO] httpx: HTTP Request: POST https://manufacturing-acc.cognitiveservices.azure.com/openai/deployments/gpt-5/chat/completions?api-version=2025-01-01-preview "HTTP/1.1 200 OK"
+2026-01-12 17:51:36,142 [INFO] httpx: HTTP Request: POST https://manufacturing-acc.cognitiveservices.azure.com/openai/deployments/gpt-5/chat/completions?api-version=2025-01-01-preview "HTTP/1.1 200 OK"
+2026-01-12 17:51:36,231 [INFO] httpx: HTTP Request: POST https://manufacturing-acc.cognitiveservices.azure.com/openai/deployments/gpt-5/chat/completions?api-version=2025-01-01-preview "HTTP/1.1 200 OK"
+2026-01-12 17:51:37,306 [INFO] app.utils.query_executor: Executing Cypher query
+2026-01-12 17:51:37,319 [INFO] app.connectors.neo4j_connector: Executing Cypher query: MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)-[:FROM_BATCH]->(b:Batch)
+WHERE wc.zone = 'South Zone'
+  AND wc.complaint_desc <> 'unknown'
+  AND toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
+WITH b.batch_code AS batch_code, b.batch_date AS batch_date, b.shift AS shift,
+     COUNT(DISTINCT wc.claim_no) AS failures
+RETURN batch_code, batch_date, shift, failures
+ORDER BY failures DESC
+LIMIT 20...
+2026-01-12 17:51:37,329 [INFO] app.utils.query_executor: Executing Cypher query
+2026-01-12 17:51:37,329 [INFO] app.connectors.neo4j_connector: Executing Cypher query: MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
+WHERE wc.zone = 'South Zone'
+  AND toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
+WITH p.part_no AS part_no, COUNT(DISTINCT wc.claim_no) AS claim_count
+RETURN part_no, claim_count
+ORDER BY claim_count DESC
+LIMIT 20...
+2026-01-12 17:51:37,542 [INFO] app.connectors.neo4j_connector: Query returned 5 results
+2026-01-12 17:51:37,542 [INFO] app.utils.query_executor: Query executed successfully, returned 5 records
+2026-01-12 17:51:37,548 [INFO] app.agents.analyst_agent: 🔧 Tool result detected: name='execute_cypher_query', content type=str
+2026-01-12 17:51:37,735 [INFO] app.utils.query_executor: Executing Cypher query
+2026-01-12 17:51:37,737 [INFO] app.connectors.neo4j_connector: Executing Cypher query: MATCH (wc:WarrantyClaim)
+WHERE wc.zone = 'South Zone'
+  AND wc.complaint_desc <> 'unknown'
+  AND toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
+WITH wc LIMIT 200
+
+MATCH (wc)-[:INVOLVES_PART]->(p:Part)
+OPTIONAL MATCH (e:ESQAConcern)-[:RAISED_FOR]->(p)
+WITH p.part_no AS part_no,
+     COUNT(DISTINCT e) AS esqa_concerns,
+     SUM(e.rejection_qty) AS total_rejections
+RETURN part_no, esqa_concerns, total_rejections
+ORDER BY total_rejections DESC
+LIMIT 20...
+2026-01-12 17:51:37,936 [INFO] app.connectors.neo4j_connector: Query returned 5 results
+2026-01-12 17:51:37,936 [INFO] app.utils.query_executor: Query executed successfully, returned 5 records
+2026-01-12 17:51:37,938 [INFO] app.agents.analyst_agent: 🔧 Tool result detected: name='execute_cypher_query', content type=str
+2026-01-12 17:51:37,942 [INFO] app.utils.query_executor: Executing Cypher query
+2026-01-12 17:51:37,942 [INFO] app.connectors.neo4j_connector: Executing Cypher query: MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
+WHERE wc.zone = 'South Zone'
+  AND toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
+WITH wc, p
+MATCH (v:Vendor)-[:SUPPLIES]->(p)
+OPTIONAL MATCH (v)-[cpk:HAS_CPK]->(p)
+WITH v.name AS vendor, p.part_no AS part_no,
+     COUNT(DISTINCT wc.claim_no) AS claims,
+     MAX(cpk.cp) AS cp,
+     MAX(cpk.cpk) AS cpk
+RETURN vendor, part_no, claims, cp, cpk
+ORDER BY claims DESC
+LIMIT 20...
+2026-01-12 17:51:38,175 [INFO] app.connectors.neo4j_connector: Query returned 3 results
+2026-01-12 17:51:38,175 [INFO] app.utils.query_executor: Query executed successfully, returned 3 records
+2026-01-12 17:51:38,175 [INFO] app.agents.analyst_agent: 🔧 Tool result detected: name='execute_cypher_query', content type=str
+2026-01-12 17:51:41,441 [INFO] app.connectors.neo4j_connector: Query returned 20 results
+2026-01-12 17:51:41,441 [INFO] app.utils.query_executor: Query executed successfully, returned 20 records
+2026-01-12 17:51:41,441 [INFO] app.agents.analyst_agent: 🔧 Tool result detected: name='execute_cypher_query', content type=str
+2026-01-12 17:51:42,767 [INFO] httpx: HTTP Request: POST https://manufacturing-acc.cognitiveservices.azure.com/openai/deployments/gpt-5/chat/completions?api-version=2025-01-01-preview "HTTP/1.1 200 OK"
+2026-01-12 17:51:43,352 [INFO] app.agents.analyst_agent: 🔧 Tool call detected: name='write_todos', args keys=['todos']
+2026-01-12 17:51:43,352 [INFO] app.agents.analyst_agent: 📋 Detected todo tool with name: 'write_todos'
+
+📋 Task Plan (5 items):
+- ✅ Query Warranty claims filtered to South Zone and complaint contains 'head lamp' to get claims, zones, and link to parts
+- ✅ Trace parts to batches (batch_code, batch_date, shift) and count distinct claims per batch to avoid double-counting
+- ✅ Get vendor details for involved parts and join PPCM Cp/Cpk values
+- ✅ Fetch eSQA concerns for those parts (counts and rejection qty)
