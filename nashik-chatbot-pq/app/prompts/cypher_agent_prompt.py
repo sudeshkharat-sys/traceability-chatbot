@@ -472,29 +472,49 @@ RETURN
     - `:FITTED_ON` (Part → Vehicle) - 1.7M relationships, only use when absolutely necessary
     - Long paths through multiple relationships
 
-11. ✅ **CRITICAL: Avoid Cartesian Products in Batch Queries!**
-    - **PROBLEM**: Same claim can have MULTIPLE batch records → Creates wrong counts
-    - **WRONG**: `COUNT(wc)` or `COUNT(*)` when joining through batches
-    - **CORRECT**: `COUNT(DISTINCT wc.claim_no)` when counting failures per batch
+11. ✅ **CRITICAL: Count at PART+BATCH Level, NOT Claim Level!**
+    - **PROBLEM**: Same claim (VIN) can have MULTIPLE parts from DIFFERENT batches
+    - **Example**: VIN S2G18326 has head lamp failure
+      - Left lamp from Batch 436
+      - Right lamp from Batch 245
+      - Both batches would count this VIN → DOUBLE COUNTING!
 
-    **Example - WRONG (creates cartesian product):**
-    ```cypher
-    MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)-[:FROM_BATCH]->(b:Batch)
-    WHERE wc.complaint_desc CONTAINS 'HEAD LAMP'
-    RETURN b.batch_date, COUNT(wc) AS failures
-    // This counts each claim MULTIPLE times if it has multiple batches!
-    ```
+    - **WRONG #1**: `COUNT(wc)` - Counts relationships (very wrong)
+    - **WRONG #2**: `COUNT(DISTINCT wc.claim_no)` - Counts same claim across multiple batches!
+    - **CORRECT**: `COUNT(*)` at Part→Batch level - Counts distinct part instances from batch
 
-    **Example - CORRECT (uses DISTINCT):**
+    **Example - WRONG (counts claims, not parts):**
     ```cypher
     MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)-[:FROM_BATCH]->(b:Batch)
     WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
     WITH b.batch_date AS batch_date, b.shift AS shift,
          COUNT(DISTINCT wc.claim_no) AS failures
     RETURN batch_date, shift, failures
-    ORDER BY failures DESC
-    LIMIT 20
+    // This counts the SAME claim in MULTIPLE batches if it has multiple parts!
+    // Result: Batch 436 shows 62 claims, Batch 245 shows 62 claims
+    // But only 64 total claims exist! (Same claims counted twice)
     ```
+
+    **Example - CORRECT (counts part instances from batch):**
+    ```cypher
+    MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)-[:FROM_BATCH]->(b:Batch)
+    WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
+      AND p.part_no <> 'unknown'
+      AND b.batch_code IS NOT NULL
+    RETURN b.batch_code AS batch_code,
+           b.batch_date AS batch_date,
+           b.shift AS shift,
+           COUNT(*) AS part_failures_from_batch
+    ORDER BY part_failures_from_batch DESC
+    LIMIT 20
+    // This counts PART INSTANCES from each batch that failed
+    // Correct interpretation: "How many failed parts came from this batch?"
+    ```
+
+    **CRITICAL UNDERSTANDING:**
+    - **Batch-wise defect rate** = Count failed PART INSTANCES from that batch
+    - **NOT** = Count how many VINs were affected by that batch
+    - Same VIN can have multiple parts → Each part counted separately
 
 ---
 

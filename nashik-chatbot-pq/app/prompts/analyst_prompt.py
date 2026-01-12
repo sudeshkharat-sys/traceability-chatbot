@@ -195,16 +195,26 @@ RETURN b.batch_date, b.shift, COUNT(wc) AS failures
 // This will count each claim multiple times if it has multiple batches!
 ```
 
-**CORRECT - Use DISTINCT claim_no:**
+**CORRECT - Count at Part+Batch level (NOT just claim level):**
 ```cypher
-// DO THIS - Count distinct claims per batch
+// DO THIS - Count distinct PART INSTANCES from each batch that failed
+// NOT distinct claims (since same claim can have multiple parts from different batches!)
 MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)-[:FROM_BATCH]->(b:Batch)
 WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
-WITH b.batch_date AS batch_date, b.shift AS shift,
-     COUNT(DISTINCT wc.claim_no) AS failures
-RETURN batch_date, shift, failures
-ORDER BY failures DESC
+  AND p.part_no <> 'unknown'
+  AND b.batch_code IS NOT NULL
+// Count unique combinations of (claim, part, batch)
+// This prevents counting the same claim multiple times across batches
+RETURN b.batch_code AS batch_code,
+       b.batch_date AS batch_date,
+       b.shift AS shift,
+       COUNT(*) AS part_failures_from_batch
+ORDER BY part_failures_from_batch DESC
 LIMIT 20
+
+// Alternative: If you want to show how many DISTINCT claims affected per batch
+// But understand same claim may appear in multiple batches (different parts)
+// This is informational but not accurate for "batch defect rate"
 ```
 
 ### For End-to-End Traceability (Include ALL data sources):
