@@ -472,6 +472,30 @@ RETURN
     - `:FITTED_ON` (Part → Vehicle) - 1.7M relationships, only use when absolutely necessary
     - Long paths through multiple relationships
 
+11. ✅ **CRITICAL: Avoid Cartesian Products in Batch Queries!**
+    - **PROBLEM**: Same claim can have MULTIPLE batch records → Creates wrong counts
+    - **WRONG**: `COUNT(wc)` or `COUNT(*)` when joining through batches
+    - **CORRECT**: `COUNT(DISTINCT wc.claim_no)` when counting failures per batch
+
+    **Example - WRONG (creates cartesian product):**
+    ```cypher
+    MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)-[:FROM_BATCH]->(b:Batch)
+    WHERE wc.complaint_desc CONTAINS 'HEAD LAMP'
+    RETURN b.batch_date, COUNT(wc) AS failures
+    // This counts each claim MULTIPLE times if it has multiple batches!
+    ```
+
+    **Example - CORRECT (uses DISTINCT):**
+    ```cypher
+    MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)-[:FROM_BATCH]->(b:Batch)
+    WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
+    WITH b.batch_date AS batch_date, b.shift AS shift,
+         COUNT(DISTINCT wc.claim_no) AS failures
+    RETURN batch_date, shift, failures
+    ORDER BY failures DESC
+    LIMIT 20
+    ```
+
 ---
 
 ## Response Format
