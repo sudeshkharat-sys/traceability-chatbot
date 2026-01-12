@@ -74,11 +74,18 @@ def normalize_part_number(part_value):
     """
     Normalize part numbers to ensure consistency across datasets.
 
-    Valid format: ####AAA####A (13 characters)
-    Example: 2301AW503170N, 0107BW500561N
+    Valid formats:
+        - ####AA#####A  (12-13 chars: 4 digits + 2 letters + 5-6 digits + 1 letter)
+        - ####AAA####A  (13-14 chars: 4 digits + 3 letters + 5-6 digits + 1 letter)
+
+    Examples:
+        - 0107BW500561N (13 chars)
+        - 2303CW504481N (13 chars)
+        - 1101AAA03621N (13 chars)
 
     Returns:
         - Standard format part if valid (e.g., "0107BW500561N")
+        - J-format preserved (e.g., "J60-BOD-1920")
         - "unknown" if invalid or garbage text
     """
     import re
@@ -99,8 +106,9 @@ def normalize_part_number(part_value):
     part = part.upper()
 
     # Check if it matches valid part number pattern
-    # Pattern: 4 digits + 2-3 letters + 5 alphanumeric + 1 letter
-    pattern = r"^[0-9]{4}[A-Z]{2,3}[0-9]{5}[A-Z]$"
+    # Pattern: 4 digits + 2-3 letters + 5-6 digits + 1 letter (total 12-14 chars)
+    # Examples: 0114DW500591N, 1101AAA03621N, 2303CW504481N
+    pattern = r"^[0-9]{4}[A-Z]{2,3}[0-9]{5,6}[A-Z]$"
 
     if re.match(pattern, part):
         return part  # Valid standard format
