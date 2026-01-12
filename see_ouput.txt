@@ -1,10 +1,12 @@
-🔧 Normalizing part numbers...
-✅ Part number normalization complete:
-   Warranty - Valid: 1,218/1,434 (84.9%)
-   Warranty - Invalid/Unknown: 216 (15.1%)
-   Sample invalid entries (marked as 'unknown'):
-     - 0111AW50003KT
-     - S0117E000511N
-     - S0117E000521N
-     - S0111H000141N
-     - S0117E000541N
+can you give me zone wise top concerns?
+
+Bot
+Happy to help. Could you clarify a couple of points so I can pull the right data?
+
+Which dataset should I use for “concerns” (Warranty_Analysis, Warranty claims, eSQA incoming quality, or combine them)?
+What time window do you want (e.g., last3 months, YTD, last12 months)?
+How are “zones” defined in your context (geographical sales zones, service regions, or manufacturing plant zones)?
+Do you want “top concerns” by count, rate per1,000 units, or severity-weighted?
+
+
+
