@@ -1,0 +1,14 @@
+================================================================================
+PREPROCESSING DATA
+================================================================================
+
+🔧 Normalizing part numbers...
+✅ Part number normalization complete:
+   Warranty - Valid: 647/1,434 (45.1%)
+   Warranty - Invalid/Unknown: 787 (54.9%)
+   Sample invalid entries (marked as 'unknown'):
+     - 0111AW50003KT
+     - 2303CW504481N
+     - S0117E000511N
+     - 0111HW500041N
+     - 1803AW600131B
