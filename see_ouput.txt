@@ -1,205 +1,129 @@
-can you summarise the top concerns?
+can you summarise the top concerns zone wise?
 
 Bot
-Top warranty concerns by zone (all available data)
-Using field warranty claims, here are the most frequent complaint descriptions per zone. Metric is count of claims; top10 per zone.
+Zone-wise Top Warranty Concerns (All available data)
+Here are the top customer concerns by zone based on warranty claim counts. Counts represent distinct claims per concern. Items marked “-” indicate unspecified complaint descriptions captured in the data.
 
 Detailed Analysis
 East Zone
-Zone	Complaint	Count
-East Zone	NOISE WHILE TURNING THE STEERING	42
-East Zone	HEAD LAMP FAILURE	39
-East Zone	BRAKE SWITCH FAILURE	22
-East Zone	SUN ROOF MECHANISM FAILURE	21
-East Zone	SUNROOF ROLLOSHADE/ MOTOR FAILURE	18
-East Zone	SUN ROOF MOTOR FAILURE	18
-East Zone	ABNORMAL NOISE FROM ENGINE	15
-East Zone	-	13
-East Zone	A/C LOUVERS FAILURE - FRONT	13
-East Zone	PARKING BRAKE FAILURE	12
+Complaint	Claims
+NOISE WHILE TURNING THE STEERING	42
+HEAD LAMP FAILURE	39
+BRAKE SWITCH FAILURE	22
+SUN ROOF MECHANISM FAILURE	21
+SUNROOF ROLLOSHADE/ MOTOR FAILURE	18
+SUN ROOF MOTOR FAILURE	18
+ABNORMAL NOISE FROM ENGINE	15
+A/C LOUVERS FAILURE - FRONT	13
+-	13
+PARKING BRAKE FAILURE	12
 North Zone
-Zone	Complaint	Count
-North Zone	HEAD LAMP FAILURE	133
-North Zone	SUN ROOF MECHANISM FAILURE	102
-North Zone	INFOTAINMENT SYSTEM HANGS	94
-North Zone	RPAS SENSOR FAILURE	87
-North Zone	ABNORMAL NOISE FROM ENGINE	69
-North Zone	A/C LOUVERS FAILURE - FRONT	61
-North Zone	BRAKE SWITCH FAILURE	59
-North Zone	NOISE WHILE TURNING THE STEERING	59
-North Zone	SUN ROOF MOTOR FAILURE	58
-North Zone	-	49
+Complaint	Claims
+HEAD LAMP FAILURE	133
+SUN ROOF MECHANISM FAILURE	102
+INFOTAINMENT SYSTEM HANGS	94
+RPAS SENSOR FAILURE	87
+ABNORMAL NOISE FROM ENGINE	69
+A/C LOUVERS FAILURE - FRONT	61
+BRAKE SWITCH FAILURE	59
+NOISE WHILE TURNING THE STEERING	59
+SUN ROOF MOTOR FAILURE	58
+-	49
 South Zone
-Zone	Complaint	Count
-South Zone	RPAS SENSOR FAILURE	79
-South Zone	ABNORMAL NOISE FROM ENGINE	66
-South Zone	HEAD LAMP FAILURE	64
-South Zone	SUN ROOF MECHANISM FAILURE	59
-South Zone	A/C LOUVERS FAILURE - FRONT	54
-South Zone	NOISE WHILE TURNING THE STEERING	46
-South Zone	-	43
-South Zone	WIRING HARNESS FAIL- ENG/MTR COMPARTMENT	38
-South Zone	ANTENNA FAILURE	35
-South Zone	INFOTAINMENT SYSTEM HANGS	32
+Complaint	Claims
+RPAS SENSOR FAILURE	79
+ABNORMAL NOISE FROM ENGINE	66
+HEAD LAMP FAILURE	64
+SUN ROOF MECHANISM FAILURE	59
+A/C LOUVERS FAILURE - FRONT	54
+NOISE WHILE TURNING THE STEERING	46
+-	43
+WIRING HARNESS FAIL- ENG/MTR COMPARTMENT	38
+ANTENNA FAILURE	35
+INFOTAINMENT SYSTEM HANGS	32
 West Zone
-Zone	Complaint	Count
-West Zone	SUN ROOF MECHANISM FAILURE	119
-West Zone	HEAD LAMP FAILURE	88
-West Zone	INFOTAINMENT SYSTEM HANGS	53
-West Zone	-	39
-West Zone	RPAS SENSOR FAILURE	37
-West Zone	ABNORMAL NOISE FROM ENGINE	37
-West Zone	BRAKE SWITCH FAILURE	36
-West Zone	SUN ROOF MOTOR FAILURE	35
-West Zone	SUNROOF ROLLOSHADE/ MOTOR FAILURE	34
-West Zone	NOISE WHILE TURNING THE STEERING	33
+Complaint	Claims
+SUN ROOF MECHANISM FAILURE	119
+HEAD LAMP FAILURE	88
+INFOTAINMENT SYSTEM HANGS	53
+-	39
+ABNORMAL NOISE FROM ENGINE	37
+RPAS SENSOR FAILURE	37
+BRAKE SWITCH FAILURE	36
+SUN ROOF MOTOR FAILURE	35
+SUNROOF ROLLOSHADE/ MOTOR FAILURE	34
+NOISE WHILE TURNING THE STEERING	33
 Next Steps
-Would you like a consolidated “Top10 overall” across all zones?
-I can break these down by involved part or vendor to identify the main contributors.
-If needed, I can run traceability for specific complaints (e.g., sunroof mechanism failure) to see affected batches/VINs and check supplier capability (Cp/Cpk) and incoming rejection trends.
+Would you like a detailed end-to-end traceability for any specific concern (e.g., “Head Lamp Failure” or “Sun Roof Mechanism Failure”)? I can provide parts, batches, vendor Cp/Cpk, and ESQA incoming quality in one view.
+We can also compare trends across zones for a single concern to identify regional drivers and potential supplier/batch clustering.
 
 
-for the east zone can give me some detailed for the  noise while turning the steering
+for south can you give me deatiled for the head lamp failure
 
 Bot
-East Zone — “Noise while turning the steering” detailed viewFocused on warranty claims in East Zone with complaint “NOISE WHILE TURNING THE STEERING.” Below is a breakdown by parts, vendors, dealers, and failure km distribution, plus related commodity tagging.
+South Zone — Head Lamp Failure:
+End-to-End Traceability and AnalysisFocused analysis of “Head Lamp Failure” in South Zone across Warranty, Traceability, PPCM (Cp/Cpk), and eSQA incoming quality. Clear clustering seen at specific batches; supplier capability appears adequate, but incoming rejections are notable.
+
 Detailed Analysis
-Claim volume and failure kms snapshot
-Metric	Value
-Total claims analyzed	42
-Min failure kms	1,134
-Median failure kms	8,913
-Max failure kms	56,252
+Parts Involved (Claim counts)
+Part No	Distinct Claims
+1701AW500101N	33
+1701AW500091N	28
+1701CW500021N	1
+J61-RET-0005	1
+1803AW600131B	1
+Batch Concentration (Distinct claims per batch)
+Batch Code	Batch Date	Shift	Failures
+436	100925	01	62
+245	170525	01	62
+460	200525	01	61
+461	200525	01	61
+459	200525	01	61
+209	170525	01	61
+216	170525	01	61
+612	290525	01	61
+470	200525	01	61
+477	200525	01	61
+623	290525	01	61
+453	200525	01	61
+462	200525	01	61
+476	200525	01	61
+616	290525	01	61
+656	270525	01	61
+217	170525	01	61
+600	240525	01	61
+474	200525	01	61
+975	230525	01	61
+Note: Failures counted as distinct claim_no to avoid double-counting across multi-batch linkages. Multiple batches in late May (200525) and late May29 (290525) show clustering on Shift01.
+
+Vendor Capability (Supplier + Cp/Cpk)
+Vendor	Part No	Claims	Cp	Cpk
+LUMAX INDUSTRIES LIMITED	1701AW500101N	33	1.90	1.69
+LUMAX INDUSTRIES LIMITED	1701AW500091N	28	1.90	1.71
+LUMAX INDUSTRIES LIMITED	1701CW500021N	1	1.95	1.73
 Interpretation:
 
-Failures span early life to mid-life, with a median around ~9k kms, indicating most issues emerge relatively early but not necessarily at newborn mileage.
-Upper tail suggests some late detections or progressive wear/noise issues.
-Parts involved (top)
-Part No	Vehicle Model	Claims
-1104AAA07211N	THAR5DOOR (W502)	15
-1101AAA03621N	THAR5DOOR (W502)	11
-1104AAA07341N	-	10
-1102AAA0010KT	-	2
-J60-STG-0213	-	1
-J60-STG-0070	-	1
-SF0202378	-	1
-1104AAA07451N	THAR5DOOR (W502)	1
-Notes:
+Cp/Cpk values are above1.33, indicating statistically capable processes at supplier end.
+Field failures likely driven by specific batch/shift issues or downstream handling rather than chronic supplier process capability.
+ESQA Incoming Quality (Internal)
+Part No	ESQA Concerns	Total Rejections
+1701AW500091N	15	420
+1701AW500101N	13	396
+1701CW500021N	3	4
+J61-RET-0005	0	0
+1803AW600131B	0	0
+Interpretation:
 
-Concentration on THAR5DOOR (W502) steering components (likely column/intermediate shaft/rack-related part numbers).
-Three part numbers account for the bulk (15 +11 +10 =36 of42, ~86%), indicating a focused subset of steering components.
-Vendors attributed (top)
-Vendor	Claims
-DDH00079AB-HL Mando Anand India Private Limit	12
-DDR00083AC-RANE MADRAS LIMITED	9
-DDR00086AA-RIGHT TIGHT FASTNERS PVT LTD	1
-Notes:
+Significant incoming rejections for1701AW500091N and1701AW500101N align with the field claim concentration, suggesting specific problematic lots were detected internally.
+The combination of high ESQA rejections and batch clustering points to discrete batch quality escapes rather than a capability-wide issue.
+Key Insights
+Batch/Shift clustering:
+Heavy concentration on Shift01 across multiple dates (notably200525 and290525), indicating potential manufacturing window issues (e.g., process drift, fixture wear, lamp sealing/optics alignment, or material lot changes).
 
-Two primary steering system vendors dominate attribution: HL Mando Anand and Rane Madras.
-Fastener attribution is minimal but may point to torque/fastening or NVH-related joint integrity in isolated cases.
-Dealers filing (top)
-Dealer Code	Dealer	Claims
-SI010381	ICONIC AUTOMOBILES	25
-SA010941	APEX MOTOR ENTERPRISE	3
-SG011021	GARGYA MOTORS PVT LTD	2
-SA011651	ANANTCARS AUTO PVT LTD	2
-ST017511	TITANIA MOTOCORP PRIVATE	2
-SB011001	BALAJI AUTO WORKS PVT. LTD.	2
-SR010561	AUTO CARRIAGE PVT. LTD.	2
-SS013691	SHIVNATH MOTORS (I) PVT. LTD.	1
-SL010921	LEADER AUTO SALES PVT LTD	1
-SS012981	SALUJA AUTO RETAILS PVT LTD	1
-Notes:
-
-Heavy clustering at ICONIC AUTOMOBILES (25 claims, ~60% of East Zone volume), suggesting local conditions, diagnosis practices, or specific vehicle populations concentrated at this dealer.
-Related commodity/component
-Commodity	Claims
-DAC	7
-Notes:
-
-DAC tag presence suggests steering column/rack or associated driveline/axle component category linkage for a subset; worth checking precise commodity mappings for DAC in your taxonomy.
-Practical insights
-Part focus:
-Prioritize1104AAA07211N,1101AAA03621N,1104AAA07341N for teardown and NVH analysis. These three cover ~86% of the concern.
-
-Vendor engagement: HL Mando Anand and Rane Madras should be engaged for design review, assembly torque specs, and joint clearance checks. Consider joint audit for grease application, bearing preload, intermediate shaft spline backlash, and clamp bolt torques.
-Dealer clustering: ICONIC AUTOMOBILES shows a strong concentration. Review repair procedures, road test criteria, and local road/usage conditions. A joint field clinic there may rapidly surface root cause signals.
-Failure timing: Median ~9k kms suggests early wear-in issues—potential mis-torque, lubrication, or tolerance stack-up rather than end-of-life wear. Check noise signatures under specific steering angles and low-speed maneuvers.
+Supplier capability is statistically good (Cp/Cpk >1.33), which shifts focus to batch-specific controls, logistics, or assembly integration issues.
+ESQA detected and rejected significant quantities for the two dominant part numbers, but the presence of high field claims suggests some problematic batches bypassed detection or arrived after the ESQA detection window.
 Next Steps
-Would you like me to run traceability for the top part numbers (VINs, batches) to see if specific production lots or shifts are overrepresented?
-I can also correlate with eSQA incoming concerns and PPCM Cp/Cpk for the vendors above to assess capability risk and incoming rejection trends.
-If you want, I can generate a dealer-wise action sheet (diagnosis checklist, torque specs, test route recommendations) for ICONIC AUTOMOBILES to standardize field detection and repair.
-
-
-can you give mfg date and batch traceabilty for  head lamp failure in thar rox 
-
-Bot
-Thar Rox head lamp failure — manufacturing date and batch traceabilityI traced headlamp-related warranty claims for Thar Rox using the Thar5DOOR (W502) model proxy, and linked parts to batches and manufacturing dates. Below is a sample of VIN-wise batch details for the implicated headlamp part.
-Detailed Analysis
-VIN ↔ Part ↔ Batch details (sample)
-VIN	Claim No	Part No	Lot No (decoded)	Batch Date	Batch Shift	Vendor
-S2G18326	26464634	0315CBG00011N	480:0315CBG00011N:DM090K:230725:03:0200387	230725	03	-
-S2G18326	26464634	0315CBG00011N	480:0315CBG00011N:DM090K:280425:02:0201387	280425	02	-
-S2G18326	26464634	0315CBG00011N	480:0315CBG00011N:DM090K:280425:02:0201378	280425	02	-
-S2G18326	26464634	0315CBG00011N	480:0315CBG00011N:DM090K:280425:02:0201379	280425	02	-
-S2G18326	26464634	0315CBG00011N	480:0315CBG00011N:DM090K:280425:02:0201374	280425	02	-
-S2G18326	26464634	0315CBG00011N	480:0315CBG00011N:DM090K:280425:02:0201386	280425	02	-
-S2G18326	26464634	0315CBG00011N	480:0315CBG00011N:DM090K:280425:02:0201405	280425	02	-
-S2G18326	26464634	0315CBG00011N	480:0315CBG00011N:DM090K:280425:02:0201414	280425	02	-
-S2G18326	26464634	0315CBG00011N	480:0315CBG00011N:DM090K:280425:02:0201432	280425	02	-
-S2G18326	26464634	0315CBG00011N	480:0315CBG00011N:DM090K:280425:02:0201433	280425	02	-
-Notes:
-
-Part number0315CBG00011N is repeatedly tied to head lamp failures on Thar5DOOR (W502) used as proxy for Thar Rox.
-Lot No format decodes as: [Plant/Line Code]:[Part No]:[Supplier Code]:[YYMMDD]:[Shift]:[Batch/Serial].
-Observed batch dates include230725 (Shift03) and multiple entries on280425 (Shift02), indicating concentrated production lots.
-Vendor name is not linked in these specific batch records (dash shown). If needed, I can cross-verify vendor via supplied relationships or PPCM.
-Observations
-High clustering around280425 (Shift02) batches for the headlamp part0315CBG00011N suggests a potential lot-specific issue.
-The presence of multiple sequential batch serials (e.g.,0201374…0201435) indicates contiguous production runs—worth reviewing process logs and outgoing inspection records for that date/shift.
-The single older batch on230725 (Shift03) may indicate sporadic issues or different root causes compared to the280425 cluster.
-Next Steps
-Do you want me to:
-Expand the traceability to include all VINs with head lamp failure for Thar Rox and compute batch-wise failure rates?
-Link these batches to the supplier capability (PPCM Cp/Cpk) and any eSQA incoming rejections around230725 and280425 (Shift02)?
-Pull fitment scan values (if available) for additional trace links at the vehicle assembly stage?
-
-
-can you prepare the table for the batch date wise failure?
-
-Bot
-Head lamp failure — batch date-wise failure summary (Thar Rox via Thar5DOOR W502)
-Aggregated warranty claims involving headlamp parts, grouped by manufacturing batch date and shift.
-
-Detailed Analysis
-Batch date-wise failures (top entries)
-Batch Date (YYMMDD)	Shift	Failures
-300825	01	316
-180625	01	316
-170525	01	316
-150725	01	316
-130325	01	316
-100925	01	316
-080925	01	316
-050925	01	316
-310825	01	315
-300725	01	315
-300425	01	315
-290725	01	315
-290425	01	315
-280825	01	315
-280525	01	315
-280425	01	315
-280325	01	315
-280225	01	315
-270625	01	315
-270425	01	315
-Notes:
-
-Dates are in YYMMDD format. For example,280425 =2028-04-25.
-There is a clear clustering of failures tied to Shift01 across multiple batch dates, with peak counts at several dates. -280425 (Shift01) appears prominently; earlier trace samples also showed280425 (Shift02) presence for VIN S2G18326, indicating multiple shifts impacted around this date.
-Next Steps
-Do you want me to:
-Expand the table to include all batch dates (not just top entries) or convert to calendar format (YYYY-MM-DD)?
-Break down failures by vendor for each batch date to identify supplier-specific trends?
-Overlay eSQA incoming rejection data and PPCM Cp/Cpk for these dates to assess process capability and incoming quality risks?
+Trace VINs for the top batches (e.g.,200525 Shift01,290525 Shift01) to map vehicle build dates and plant assembly shifts—this can confirm downstream assembly contributions. I can pull VINs and link them to these batch codes.
+Perform lot-level containment and enhanced inspection for1701AW500091N and1701AW500101N in upcoming receipts; tighten incoming sampling for Shift01 output.
+Request supplier’s batch records for late May runs: sealant curing logs, photometric checks, lens-housing fit records, and any line changeover notes.
+If you want, I can provide a drill-down for one batch (e.g.,200525 Shift01) showing VINs, dealer locations, and claim timelines to pinpoint distribution patterns.
