@@ -1,0 +1,72 @@
+(training) PS D:\Training_Scripts\Traning_Scripts\auto_annotation> python .\auto_train_annotation.py
+🚀 Starting bootstrap automation...
+ 
+ 
+Step 2 Training bootstrap model (15-20 min)...
+Step 1 Preparing training dataset...
+✅ Training dataset prepared
+New https://pypi.org/project/ultralytics/8.3.252 available  Update with 'pip install -U ultralytics'
+Ultralytics 8.3.251  Python-3.11.14 torch-2.9.1+cu130 CUDA:0 (NVIDIA RTX 4000 Ada Generation, 20474MiB)
+engine\trainer: agnostic_nms=False, amp=True, augment=False, auto_augment=randaugment, batch=8, bgr=0.0, box=7.5, cache=False, cfg=None, classes=None, close_mosaic=10, cls=0.5, compile=False, conf=None, copy_paste=0.5, copy_paste_mode=flip, cos_lr=False, cutmix=0.0, data=dataset\data.yaml, degrees=15, deterministic=True, device=0, dfl=1.5, dnn=False, dropout=0.0, dynamic=False, embed=None, epochs=100, erasing=0.4, exist_ok=True, fliplr=0.5, flipud=0.0, format=torchscript, fraction=1.0, freeze=None, half=False, hsv_h=0.02, hsv_s=0.7, hsv_v=0.4, imgsz=640, int8=False, iou=0.7, keras=False, kobj=1.0, line_width=None, lr0=0.001, lrf=0.01, mask_ratio=4, max_det=300, mixup=0.3, mode=train, model=yolo11s.pt, momentum=0.937, mosaic=1.0, multi_scale=False, name=wheel_model, nbs=64, nms=False, opset=None, optimize=False, optimizer=AdamW, overlap_mask=True, patience=100, perspective=0.0, plots=True, pose=12.0, pretrained=True, profile=False, project=model_training, rect=False, resume=False, retina_masks=False, save=True, save_conf=False, save_crop=False, save_dir=D:\Training_Scripts\Traning_Scripts\auto_annotation\model_training\wheel_model, save_frames=False, save_json=False, save_period=-1, save_txt=False, scale=0.9, seed=0, shear=0.0, show=False, show_boxes=True, show_conf=True, show_labels=True, simplify=True, single_cls=False, source=None, split=val, stream_buffer=False, task=detect, time=None, tracker=botsort.yaml, translate=0.2, val=True, verbose=True, vid_stride=1, visualize=False, warmup_bias_lr=0.1, warmup_epochs=3.0, warmup_momentum=0.8, weight_decay=0.0005, workers=4, workspace=None
+Traceback (most recent call last):
+  File "C:\Users\50014665\AppData\Local\miniconda3\envs\training\Lib\site-packages\ultralytics\utils\__init__.py", line 604, in load
+    data = instance.yaml.load(s, Loader=instance.SafeLoader) or {}
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\50014665\AppData\Local\miniconda3\envs\training\Lib\site-packages\yaml\__init__.py", line 81, in load
+    return loader.get_single_data()
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\50014665\AppData\Local\miniconda3\envs\training\Lib\site-packages\yaml\constructor.py", line 49, in get_single_data
+    node = self.get_single_node()
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "yaml/_yaml.pyx", line 674, in yaml._yaml.CParser.get_single_node
+  File "yaml/_yaml.pyx", line 688, in yaml._yaml.CParser._compose_document
+  File "yaml/_yaml.pyx", line 732, in yaml._yaml.CParser._compose_node
+  File "yaml/_yaml.pyx", line 848, in yaml._yaml.CParser._compose_mapping_node
+  File "yaml/_yaml.pyx", line 861, in yaml._yaml.CParser._parse_next_event
+yaml.scanner.ScannerError: mapping values are not allowed in this context
+  in "<unicode string>", line 2, column 10
+ 
+During handling of the above exception, another exception occurred:
+ 
+Traceback (most recent call last):
+  File "C:\Users\50014665\AppData\Local\miniconda3\envs\training\Lib\site-packages\ultralytics\engine\trainer.py", line 652, in get_dataset
+    data = check_det_dataset(self.args.data)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\50014665\AppData\Local\miniconda3\envs\training\Lib\site-packages\ultralytics\data\utils.py", line 410, in check_det_dataset
+    data = YAML.load(file, append_filename=True)  # dictionary
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\50014665\AppData\Local\miniconda3\envs\training\Lib\site-packages\ultralytics\utils\__init__.py", line 608, in load
+    data = instance.yaml.load(s, Loader=instance.SafeLoader) or {}
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\50014665\AppData\Local\miniconda3\envs\training\Lib\site-packages\yaml\__init__.py", line 81, in load
+    return loader.get_single_data()
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\50014665\AppData\Local\miniconda3\envs\training\Lib\site-packages\yaml\constructor.py", line 49, in get_single_data
+    node = self.get_single_node()
+           ^^^^^^^^^^^^^^^^^^^^^^
+  File "yaml/_yaml.pyx", line 674, in yaml._yaml.CParser.get_single_node
+  File "yaml/_yaml.pyx", line 688, in yaml._yaml.CParser._compose_document
+  File "yaml/_yaml.pyx", line 732, in yaml._yaml.CParser._compose_node
+  File "yaml/_yaml.pyx", line 848, in yaml._yaml.CParser._compose_mapping_node
+  File "yaml/_yaml.pyx", line 861, in yaml._yaml.CParser._parse_next_event
+yaml.scanner.ScannerError: mapping values are not allowed in this context
+  in "<unicode string>", line 2, column 10
+ 
+The above exception was the direct cause of the following exception:
+ 
+Traceback (most recent call last):
+  File "D:\Training_Scripts\Traning_Scripts\auto_annotation\auto_train_annotation.py", line 57, in <module>
+    model.train(
+  File "C:\Users\50014665\AppData\Local\miniconda3\envs\training\Lib\site-packages\ultralytics\engine\model.py", line 769, in train
+    self.trainer = (trainer or self._smart_load("trainer"))(overrides=args, _callbacks=self.callbacks)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\50014665\AppData\Local\miniconda3\envs\training\Lib\site-packages\ultralytics\models\yolo\detect\train.py", line 63, in __init__
+    super().__init__(cfg, overrides, _callbacks)
+  File "C:\Users\50014665\AppData\Local\miniconda3\envs\training\Lib\site-packages\ultralytics\engine\trainer.py", line 184, in __init__
+    self.data = self.get_dataset()
+                ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\50014665\AppData\Local\miniconda3\envs\training\Lib\site-packages\ultralytics\engine\trainer.py", line 656, in get_dataset
+    raise RuntimeError(emojis(f"Dataset '{clean_url(self.args.data)}' error ❌ {e}")) from e
+RuntimeError: Dataset 'dataset/data.yaml' error  mapping values are not allowed in this context
+  in "<unicode string>", line 2, column 10
+(training) PS D:\Training_Scripts\Traning_Scripts\auto_annotation>
