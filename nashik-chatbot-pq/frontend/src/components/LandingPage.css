@@ -1,7 +1,10 @@
 .landing-page {
   width: 100%;
   min-height: 100vh;
-  background: linear-gradient(135deg, #FFFFFF 0%, #FFE8EA 50%, #FFD5D8 100%);
+  background-image: url('../assests/backround_landing.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -43,30 +46,13 @@
   max-width: 1400px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 2.5rem;
-}
-
-/* Image Section - Left Side */
-.image-section {
-  flex: 1;
-  display: flex;
-  align-items: center;
   justify-content: center;
-  padding: 1rem;
 }
 
-.landing-image {
-  width: 100%;
-  max-width: 550px;
-  height: auto;
-  object-fit: contain;
-  animation: fadeInLeft 0.8s ease;
-}
-
-/* Features Container - Right Side */
+/* Features Container - Centered */
 .features-container {
-  flex: 1;
+  width: 100%;
+  max-width: 700px;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -176,18 +162,8 @@
 
 /* Responsive Design */
 @media (max-width: 1024px) {
-  .landing-content {
-    flex-direction: column;
-    gap: 3rem;
-  }
-
-  .image-section {
-    width: 100%;
-    max-width: 500px;
-  }
-
   .features-container {
-    width: 100%;
+    max-width: 650px;
   }
 }
 
@@ -209,19 +185,8 @@
     right: 1rem;
   }
 
-  .landing-content {
-    gap: 2rem;
-  }
-
-  .image-section {
-    padding: 1rem;
-  }
-
-  .landing-image {
-    max-width: 400px;
-  }
-
   .features-container {
+    max-width: 600px;
     padding: 1rem;
     gap: 1rem;
   }
@@ -255,6 +220,10 @@
 
   .corner-logo-right {
     right: 0.75rem;
+  }
+
+  .features-container {
+    max-width: 100%;
   }
 
   .feature-card {

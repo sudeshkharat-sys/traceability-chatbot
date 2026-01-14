@@ -1,7 +1,6 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import "./LandingPage.css";
-import backgroundImage from "../assests/background.png";
 import traceabilityIcon from "../assests/traceability.png";
 import qualityIcon from "../assests/quality.png";
 import guidelineIcon from "../assests/guideline.png";
@@ -62,16 +61,7 @@ function LandingPage() {
       />
 
       <div className="landing-content">
-        {/* Image Section - Left Side */}
-        <div className="image-section">
-          <img
-            src={backgroundImage}
-            alt="Quality Management System"
-            className="landing-image"
-          />
-        </div>
-
-        {/* Features List - Right Side */}
+        {/* Features List - Centered */}
         <div className="features-container">
           {features.map((feature) => (
             <div
