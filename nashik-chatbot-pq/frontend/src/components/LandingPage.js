@@ -47,22 +47,40 @@ function LandingPage() {
   return (
     <div className="landing-page">
       <div className="landing-content">
+        {/* Image Section - Left Side */}
+        <div className="image-section">
+          <img
+            src={traceabilityIcon}
+            alt="Traceability System"
+            className="landing-image"
+          />
+        </div>
+
+        {/* Features List - Right Side */}
         <div className="features-container">
           {features.map((feature) => (
-            <div key={feature.id} className="feature-card">
-              <div
-                style={{ display: "flex", alignItems: "center", width: "100%" }}
-              >
+            <div
+              key={feature.id}
+              className="feature-card"
+              onClick={() => handleGetStarted(feature.route)}
+            >
+              <div className="feature-content">
                 <img
                   src={feature.icon}
                   alt={feature.title}
                   className="feature-icon"
                 />
-                <h3 className="feature-title">{feature.title}</h3>
+                <div className="feature-info">
+                  <h3 className="feature-title">{feature.title}</h3>
+                  <p className="feature-description">{feature.description}</p>
+                </div>
               </div>
               <button
                 className="get-started-btn"
-                onClick={() => handleGetStarted(feature.route)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleGetStarted(feature.route);
+                }}
               >
                 Get started
                 <span className="arrow-icon">→</span>
