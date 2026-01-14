@@ -269,7 +269,7 @@ const ThinkingStepsDisplay = React.memo(
         {validReasoningSteps.length > 0 && (
           <div className="thinking-section reasoning-section">
             <div className="section-header">
-              <span className="section-icon">✨</span>
+              <span className="section-icon" style={{ filter: 'hue-rotate(310deg) saturate(2)' }}>✨</span>
               <span className="section-title">Reasoning</span>
             </div>
             <div className="section-content reasoning-content-fixed">
