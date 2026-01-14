@@ -7,7 +7,7 @@ import guidelineIcon from "../assests/guideline.png";
 import supportIcon from "../assests/support.png";
 import utilityLogo from "../assests/Mahindra_Logo_utilty.png";
 import mahindraRiseLogo from "../assests/mahindra_rise_logo.png";
-import carImage from "../assests/car_image.jpg";
+import carImage from "../assests/new.jpg";
 
 function LandingPage() {
   const navigate = useNavigate();
@@ -63,13 +63,14 @@ function LandingPage() {
 
       <div className="landing-content">
         {/* Left Section - Car Image */}
-        <div className="left-section">
+        
+        {/*<div className="left-section">
           <img
             src={carImage}
             alt="Mahindra Vehicle"
             className="car-image"
           />
-        </div>
+        </div>*/}
 
         {/* Right Section - Features List */}
         <div className="features-container">
