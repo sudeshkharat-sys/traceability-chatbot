@@ -1,263 +1,107 @@
-can you summarise the top concerns zone wise?
+================================================================================
+LOADING TRACEABILITY DATA
+================================================================================
+✓ 6. Traceability Report - Dec24 to Feb25_Dec 2024.csv: 24,560 VINs
+✓ 6. Traceability Report - Dec24 to Feb25_Jan 2025.csv: 206,352 VINs
+✓ 6. Traceability Report - Dec24 to Feb25_Feb 2025.csv: 374,959 VINs
+✓ 6. Traceability Report - Mar25 to Apr25_Mar 2025.csv: 630,455 VINs
+✓ 6. Traceability Report - Mar25 to Apr25_Apr 2025.csv: 928,079 VINs
+✓ 6. Traceability Report - May25 to Jun25_May 2025.csv: 946,460 VINs
+✓ 6. Traceability Report - May25 to Jun25_june 2025.csv: 899,110 VINs
+✓ 6. Traceability Report - Jul25 to Aug25_July 2025.csv: 855,053 VINs
+✓ 6. Traceability Report - Jul25 to Aug25_Aug 2025.csv: 1,007,726 VINs
+✓ 6. Traceability Report - Sep25 to Oct25_Sept 2025.csv: 1,048,573 VINs
+✓ 6. Traceability Report - Sep25 to Oct25_Oct 2025.csv: 1,048,574 VINs
+✓ 7.Thar_Roxx_NOV_and_Desc_Nov_2025_page1.csv: 1,048,575 VINs
+✓ 7.Thar_Roxx_NOV_and_Desc_Nov_2025_page2.csv: 10,589 VINs
+✓ 7.Thar_Roxx_NOV_and_Desc_Dec_2025.csv: 758,488 VINs
 
-Bot
-Zone-wise Top Warranty Concerns (All available data)
-Here are the top customer concerns by zone based on warranty claim counts. Counts represent distinct claims per concern. Items marked “-” indicate unspecified complaint descriptions captured in the data.
+Total unique traceability VINs: 81,977
 
-Detailed Analysis
-East Zone
-Complaint	Claims
-NOISE WHILE TURNING THE STEERING	42
-HEAD LAMP FAILURE	39
-BRAKE SWITCH FAILURE	22
-SUN ROOF MECHANISM FAILURE	21
-SUNROOF ROLLOSHADE/ MOTOR FAILURE	18
-SUN ROOF MOTOR FAILURE	18
-ABNORMAL NOISE FROM ENGINE	15
-A/C LOUVERS FAILURE - FRONT	13
--	13
-PARKING BRAKE FAILURE	12
-North Zone
-Complaint	Claims
-HEAD LAMP FAILURE	133
-SUN ROOF MECHANISM FAILURE	102
-INFOTAINMENT SYSTEM HANGS	94
-RPAS SENSOR FAILURE	87
-ABNORMAL NOISE FROM ENGINE	69
-A/C LOUVERS FAILURE - FRONT	61
-BRAKE SWITCH FAILURE	59
-NOISE WHILE TURNING THE STEERING	59
-SUN ROOF MOTOR FAILURE	58
--	49
-South Zone
-Complaint	Claims
-RPAS SENSOR FAILURE	79
-ABNORMAL NOISE FROM ENGINE	66
-HEAD LAMP FAILURE	64
-SUN ROOF MECHANISM FAILURE	59
-A/C LOUVERS FAILURE - FRONT	54
-NOISE WHILE TURNING THE STEERING	46
--	43
-WIRING HARNESS FAIL- ENG/MTR COMPARTMENT	38
-ANTENNA FAILURE	35
-INFOTAINMENT SYSTEM HANGS	32
-West Zone
-Complaint	Claims
-SUN ROOF MECHANISM FAILURE	119
-HEAD LAMP FAILURE	88
-INFOTAINMENT SYSTEM HANGS	53
--	39
-ABNORMAL NOISE FROM ENGINE	37
-RPAS SENSOR FAILURE	37
-BRAKE SWITCH FAILURE	36
-SUN ROOF MOTOR FAILURE	35
-SUNROOF ROLLOSHADE/ MOTOR FAILURE	34
-NOISE WHILE TURNING THE STEERING	33
-Next Steps
-Would you like a detailed end-to-end traceability for any specific concern (e.g., “Head Lamp Failure” or “Sun Roof Mechanism Failure”)? I can provide parts, batches, vendor Cp/Cpk, and ESQA incoming quality in one view.
-We can also compare trends across zones for a single concern to identify regional drivers and potential supplier/batch clustering.
+================================================================================
+LOADING WARRANTY DATA
+================================================================================
+✓ Loaded 6,014 warranty records
 
+================================================================================
+ANALYZING WARRANTY DATA BY MANUFACTURING MONTH
+================================================================================
 
-for south can you give me deatiled for the head lamp failure
+================================================================================
+MONTH-BY-MONTH MATCHING ANALYSIS
+================================================================================
 
-Bot
-South Zone — Head Lamp Failure:
-End-to-End Traceability and AnalysisFocused analysis of “Head Lamp Failure” in South Zone across Warranty, Traceability, PPCM (Cp/Cpk), and eSQA incoming quality. Clear clustering seen at specific batches; supplier capability appears adequate, but incoming rejections are notable.
+Month           Records    Unique VINs  Matched    Unmatched    Match %    Status
+-----------------------------------------------------------------------------------------------
+Jun-2024        2          2            0          2                 0.0% ✗ INCOMPLETE
+Jul-2024        166        128          0          128               0.0% ✗ INCOMPLETE
+Aug-2024        407        326          0          326               0.0% ✗ INCOMPLETE
+Sep-2024        797        630          0          630               0.0% ✗ INCOMPLETE
+Oct-2024        988        805          0          805               0.0% ✗ INCOMPLETE
+Nov-2024        702        584          3          581               0.5% ✗ INCOMPLETE
+Dec-2024        695        572          572        0               100.0% ✓ COMPLETE
+Jan-2025        497        433          433        0               100.0% ✓ COMPLETE
+Feb-2025        407        354          354        0               100.0% ✓ COMPLETE
+Mar-2025        406        361          361        0               100.0% ✓ COMPLETE
+Apr-2025        400        344          344        0               100.0% ✓ COMPLETE
+May-2025        249        237          237        0               100.0% ✓ COMPLETE
+Jun-2025        198        179          179        0               100.0% ✓ COMPLETE
+Jul-2025        84         81           81         0               100.0% ✓ COMPLETE
+Aug-2025        16         16           16         0               100.0% ✓ COMPLETE
 
-Detailed Analysis
-Parts Involved (Claim counts)
-Part No	Distinct Claims
-1701AW500101N	33
-1701AW500091N	28
-1701CW500021N	1
-J61-RET-0005	1
-1803AW600131B	1
-Batch Concentration (Distinct claims per batch)
-Batch Code	Batch Date	Shift	Failures
-436	100925	01	62
-245	170525	01	62
-460	200525	01	61
-461	200525	01	61
-459	200525	01	61
-209	170525	01	61
-216	170525	01	61
-612	290525	01	61
-470	200525	01	61
-477	200525	01	61
-623	290525	01	61
-453	200525	01	61
-462	200525	01	61
-476	200525	01	61
-616	290525	01	61
-656	270525	01	61
-217	170525	01	61
-600	240525	01	61
-474	200525	01	61
-975	230525	01	61
-Note: Failures counted as distinct claim_no to avoid double-counting across multi-batch linkages. Multiple batches in late May (200525) and late May29 (290525) show clustering on Shift01.
+================================================================================
+SUMMARY
+================================================================================
 
-Vendor Capability (Supplier + Cp/Cpk)
-Vendor	Part No	Claims	Cp	Cpk
-LUMAX INDUSTRIES LIMITED	1701AW500101N	33	1.90	1.69
-LUMAX INDUSTRIES LIMITED	1701AW500091N	28	1.90	1.71
-LUMAX INDUSTRIES LIMITED	1701CW500021N	1	1.95	1.73
-Interpretation:
+ORIGINAL WARRANTY DATA:
+   Total records: 6,014
+   Total unique VINs: 5,052
+   Months covered: 15
 
-Cp/Cpk values are above1.33, indicating statistically capable processes at supplier end.
-Field failures likely driven by specific batch/shift issues or downstream handling rather than chronic supplier process capability.
-ESQA Incoming Quality (Internal)
-Part No	ESQA Concerns	Total Rejections
-1701AW500091N	15	420
-1701AW500101N	13	396
-1701CW500021N	3	4
-J61-RET-0005	0	0
-1803AW600131B	0	0
-Interpretation:
+✓ COMPLETE MONTHS (≥95% match): 9
+   Dec-2024          695 records,   572 VINs, 100.0% match
+   Jan-2025          497 records,   433 VINs, 100.0% match
+   Feb-2025          407 records,   354 VINs, 100.0% match
+   Mar-2025          406 records,   361 VINs, 100.0% match
+   Apr-2025          400 records,   344 VINs, 100.0% match
+   May-2025          249 records,   237 VINs, 100.0% match
+   Jun-2025          198 records,   179 VINs, 100.0% match
+   Jul-2025           84 records,    81 VINs, 100.0% match
+   Aug-2025           16 records,    16 VINs, 100.0% match
+   Subtotal: 2,952 records (49.1%)
 
-Significant incoming rejections for1701AW500091N and1701AW500101N align with the field claim concentration, suggesting specific problematic lots were detected internally.
-The combination of high ESQA rejections and batch clustering points to discrete batch quality escapes rather than a capability-wide issue.
-Key Insights
-Batch/Shift clustering:
-Heavy concentration on Shift01 across multiple dates (notably200525 and290525), indicating potential manufacturing window issues (e.g., process drift, fixture wear, lamp sealing/optics alignment, or material lot changes).
+✗ INCOMPLETE MONTHS (<95% match): 6
+   Jun-2024            2 records,     2 VINs,   0.0% match
+   Jul-2024          166 records,   128 VINs,   0.0% match
+   Aug-2024          407 records,   326 VINs,   0.0% match
+   Sep-2024          797 records,   630 VINs,   0.0% match
+   Oct-2024          988 records,   805 VINs,   0.0% match
+   Nov-2024          702 records,   584 VINs,   0.5% match
+   Subtotal: 3,062 records (50.9%)
 
-Supplier capability is statistically good (Cp/Cpk >1.33), which shifts focus to batch-specific controls, logistics, or assembly integration issues.
-ESQA detected and rejected significant quantities for the two dominant part numbers, but the presence of high field claims suggests some problematic batches bypassed detection or arrived after the ESQA detection window.
-Next Steps
-Trace VINs for the top batches (e.g.,200525 Shift01,290525 Shift01) to map vehicle build dates and plant assembly shifts—this can confirm downstream assembly contributions. I can pull VINs and link them to these batch codes.
-Perform lot-level containment and enhanced inspection for1701AW500091N and1701AW500101N in upcoming receipts; tighten incoming sampling for Shift01 output.
-Request supplier’s batch records for late May runs: sealant curing logs, photometric checks, lens-housing fit records, and any line changeover notes.
-If you want, I can provide a drill-down for one batch (e.g.,200525 Shift01) showing VINs, dealer locations, and claim timelines to pinpoint distribution patterns.
+================================================================================
+RECOMMENDATIONS
+================================================================================
 
+✓ GOOD NEWS: 9 out of 15 months have complete traceability
 
-terminal output:
-DEBUG:    < TEXT '{"user_id":1001,"user_message":"for south can y..."agent_type":"analyst"}' [117 bytes]
-DEBUG:    > TEXT '{"type":"thinking","step":"initialization","con...with ANALYST agent..."}' [99 bytes]
-2026-01-12 17:51:24,188 [INFO] app.models.azure_openai_handler: Initialized reasoning model: gpt-5 (reasoning_effort=minimal)
-2026-01-12 17:51:24,190 [INFO] app.agents.analyst_agent: ✅ Analyst agent initialized with PostgreSQL memory (thread_id: conv_73)
-2026-01-12 17:51:24,210 [INFO] app.agents.analyst_agent: ✅ TodoListMiddleware enabled for task planning
-2026-01-12 17:51:24,210 [INFO] app.agents.analyst_agent: 📋 write_todos tool will be available via TodoListMiddleware
-2026-01-12 17:51:24,360 [INFO] app.models.azure_openai_handler: Initialized chat model: gpt-4o-mini (temp=0.1, max_tokens=4096)
-2026-01-12 17:51:24,360 [INFO] app.agents.analyst_agent: 🔄 Summarization enabled: triggers at 100000 tokens, keeps 20 recent messages
-2026-01-12 17:51:24,428 [INFO] app.agents.analyst_agent: 📋 TodoListMiddleware should provide write_todos tool automatically during execution
-2026-01-12 17:51:24,440 [INFO] app.agents.analyst_agent: Analyst agent initialized successfully
-2026-01-12 17:51:24,440 [INFO] app.agents.agent_pool: 📝 Created ANALYST agent for conversation 73
-2026-01-12 17:51:24,440 [INFO] backend.services.conversations.conversation_service: Using analyst agent for conversation 73
-2026-01-12 17:51:24,440 [INFO] app.agents.analyst_agent: Streaming analysis for: for south can you give me deatiled for the head lamp failure...
-2026-01-12 17:51:26,615 [INFO] httpx: HTTP Request: POST https://manufacturing-acc.cognitiveservices.azure.com/openai/deployments/gpt-5/chat/completions?api-version=2025-01-01-preview "HTTP/1.1 200 OK"
-2026-01-12 17:51:28,498 [INFO] app.agents.analyst_agent: 🔧 Tool call detected: name='write_todos', args keys=['todos']
-2026-01-12 17:51:28,498 [INFO] app.agents.analyst_agent: 📋 Detected todo tool with name: 'write_todos'
+To achieve 100% matching, you can:
+   Option 1: Keep only complete months (2,952 records, 49.1%)
+   Option 2: Request missing traceability data for 6 months
 
-📋 Task Plan (7 items):
-- ⏳ Identify relevant data sources: Warranty (claims), Traceability (parts/batches/vendors), PPCM (Cp/Cpk), eSQA (incoming concerns) for South Zone head lamp failure
-- ⏳ Query Warranty claims filtered to South Zone and complaint contains 'head lamp' to get claims, zones, and link to parts
-- ⏳ Trace parts to batches (batch_code, batch_date, shift) and count distinct claims per batch to avoid double-counting
-- ⏳ Get vendor details for involved parts and join PPCM Cp/Cpk values
-- ⏳ Fetch eSQA concerns for those parts (counts and rejection qty)
-- ⏳ Correlate findings and compile an end-to-end summary with tables (parts, batch concentration, vendors with Cp/Cpk, ESQA)
-- ⏳ Provide recommendations and offer further drill-down (e.g., VIN linkage or time clustering)
+================================================================================
+SAVING RECOMMENDATIONS
+================================================================================
+✓ Results saved to: C:\Users\50014665\GraphRag\Traceability\nashik-chatbot-pq\scripts\monthly_analysis_results.txt
 
-DEBUG:    > TEXT '{"type": "thinking", "step": "Planning", "conte...e or time clustering)"}' [881 bytes]
-2026-01-12 17:51:28,509 [INFO] app.agents.analyst_agent: 🔧 Tool result detected: name='analyst_agent', content type=str
-2026-01-12 17:51:28,513 [INFO] app.agents.analyst_agent: 🔧 Tool result detected: name='write_todos', content type=str
-2026-01-12 17:51:28,513 [INFO] app.agents.analyst_agent: 📋 Todo tool result with name: 'write_todos'
-2026-01-12 17:51:29,377 [INFO] httpx: HTTP Request: POST https://manufacturing-acc.cognitiveservices.azure.com/openai/deployments/gpt-5/chat/completions?api-version=2025-01-01-preview "HTTP/1.1 200 OK"
-2026-01-12 17:51:30,758 [INFO] app.agents.analyst_agent: 🔧 Tool call detected: name='think', args keys=['thought']
+================================================================================
+ANALYSIS COMPLETE!
+================================================================================
 
-🤔 Reasoning:
-We need to run end-to-end queries: start with warranty claims in South Zone with complaint_desc contains 'head lamp'. Then parts involved, batches with distinct claim counts per batch, vendor + Cp/Cpk, ESQA concerns. We'll craft a combined query per the pattern. We'll also possibly need separate aggregation tables: part-level counts, batch concentration counts, vendor Cp/Cpk summary, ESQA counts. Might do multiple queries or one complex query with aggregations. We'll run one for part-level counts; one for batch-wise counts using DISTINCT claim_no; one for vendor Cp/Cpk; one for ESQA summary. We'll mark todo tasks in progress and complete as we proceed.
+Next Steps:
+   1. Review the analysis above
+   2. Decide which months to keep/remove
+   3. Run 'filter_warranty_data.py' to filter the data
+================================================================================
 
-DEBUG:    > TEXT '{"type": "thinking", "step": "Reasoning", "cont...mplete as we proceed."}' [716 bytes]
-2026-01-12 17:51:30,758 [INFO] app.agents.analyst_agent: 🔧 Tool result detected: name='analyst_agent', content type=str
-2026-01-12 17:51:30,758 [INFO] app.tools.think_tool: 🤔 Agent thinking: We need to run end-to-end queries: start with warranty claims in South Zone with complaint_desc contains 'head lamp'. Then parts involved, batches with distinct claim counts per batch, vendor + Cp/Cpk, ESQA concerns. We'll craft a combined query per the pattern. We'll also possibly need separate aggregation tables: part-level counts, batch concentration counts, vendor Cp/Cpk summary, ESQA counts. Might do multiple queries or one complex query with aggregations. We'll run one for part-level counts; one for batch-wise counts using DISTINCT claim_no; one for vendor Cp/Cpk; one for ESQA summary. We'll mark todo tasks in progress and complete as we proceed.
-2026-01-12 17:51:30,758 [INFO] app.tools.think_tool: 🤔 Full thought (660 chars): We need to run end-to-end queries: start with warranty claims in South Zone with complaint_desc contains 'head lamp'. Then parts involved, batches with distinct claim counts per batch, vendor + Cp/Cpk, ESQA concerns. We'll craft a combined query per the pattern. We'll also possibly need separate aggregation tables: part-level counts, batch concentration counts, vendor Cp/Cpk summary, ESQA counts. Might do multiple queries or one complex query with aggregations. We'll run one for part-level counts; one for batch-wise counts using DISTINCT claim_no; one for vendor Cp/Cpk; one for ESQA summary. We'll mark todo tasks in progress and complete as we proceed.
-2026-01-12 17:51:30,758 [INFO] app.agents.analyst_agent: 🔧 Tool result detected: name='think', content type=str
-2026-01-12 17:51:34,648 [INFO] httpx: HTTP Request: POST https://manufacturing-acc.cognitiveservices.azure.com/openai/deployments/gpt-5/chat/completions?api-version=2025-01-01-preview "HTTP/1.1 200 OK"
-2026-01-12 17:51:34,830 [INFO] app.agents.analyst_agent: 🔧 Tool call detected: name='execute_cypher_query', args keys=['question']
-2026-01-12 17:51:34,830 [INFO] app.agents.analyst_agent: 🔧 Tool call detected: name='execute_cypher_query', args keys=['question']
-2026-01-12 17:51:34,830 [INFO] app.agents.analyst_agent: 🔧 Tool call detected: name='execute_cypher_query', args keys=['question']
-2026-01-12 17:51:34,830 [INFO] app.agents.analyst_agent: 🔧 Tool call detected: name='execute_cypher_query', args keys=['question']
-2026-01-12 17:51:34,830 [INFO] app.agents.analyst_agent: 🔧 Tool result detected: name='analyst_agent', content type=str
-2026-01-12 17:51:34,869 [INFO] app.models.azure_openai_handler: Initialized reasoning model: gpt-5 (reasoning_effort=minimal)
-2026-01-12 17:51:34,874 [INFO] app.models.azure_openai_handler: Initialized reasoning model: gpt-5 (reasoning_effort=minimal)
-2026-01-12 17:51:34,874 [INFO] app.models.azure_openai_handler: Initialized reasoning model: gpt-5 (reasoning_effort=minimal)
-2026-01-12 17:51:34,880 [INFO] app.models.azure_openai_handler: Initialized reasoning model: gpt-5 (reasoning_effort=minimal)
-2026-01-12 17:51:34,887 [INFO] app.agents.cypher_agent: Cypher agent initialized successfully
-2026-01-12 17:51:34,887 [INFO] app.agents.cypher_agent: Cypher agent initialized successfully
-2026-01-12 17:51:34,887 [INFO] app.agents.cypher_agent: 🔍 Cypher Agent generating query for: For South Zone head lamp failure: Get vendor capability summary. Match claims (zone='South Zone', co...
-2026-01-12 17:51:34,887 [INFO] app.agents.cypher_agent: Cypher agent initialized successfully
-2026-01-12 17:51:34,887 [INFO] app.agents.cypher_agent: 🔍 Cypher Agent generating query for: For South Zone head lamp failure: Get batch-wise failure concentration. Match WarrantyClaim (zone='S...
-2026-01-12 17:51:34,900 [INFO] app.agents.cypher_agent: 🔍 Cypher Agent generating query for: For South Zone head lamp failure: Get part-level summary. Match WarrantyClaim with zone='South Zone'...
-2026-01-12 17:51:34,900 [INFO] app.agents.cypher_agent: Cypher agent initialized successfully
-2026-01-12 17:51:34,900 [INFO] app.agents.cypher_agent: 🔍 Cypher Agent generating query for: For South Zone head lamp failure: Get ESQA incoming quality concerns for involved parts. Match claim...
-2026-01-12 17:51:36,066 [INFO] httpx: HTTP Request: POST https://manufacturing-acc.cognitiveservices.azure.com/openai/deployments/gpt-5/chat/completions?api-version=2025-01-01-preview "HTTP/1.1 200 OK"
-2026-01-12 17:51:36,101 [INFO] httpx: HTTP Request: POST https://manufacturing-acc.cognitiveservices.azure.com/openai/deployments/gpt-5/chat/completions?api-version=2025-01-01-preview "HTTP/1.1 200 OK"
-2026-01-12 17:51:36,142 [INFO] httpx: HTTP Request: POST https://manufacturing-acc.cognitiveservices.azure.com/openai/deployments/gpt-5/chat/completions?api-version=2025-01-01-preview "HTTP/1.1 200 OK"
-2026-01-12 17:51:36,231 [INFO] httpx: HTTP Request: POST https://manufacturing-acc.cognitiveservices.azure.com/openai/deployments/gpt-5/chat/completions?api-version=2025-01-01-preview "HTTP/1.1 200 OK"
-2026-01-12 17:51:37,306 [INFO] app.utils.query_executor: Executing Cypher query
-2026-01-12 17:51:37,319 [INFO] app.connectors.neo4j_connector: Executing Cypher query: MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)-[:FROM_BATCH]->(b:Batch)
-WHERE wc.zone = 'South Zone'
-  AND wc.complaint_desc <> 'unknown'
-  AND toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
-WITH b.batch_code AS batch_code, b.batch_date AS batch_date, b.shift AS shift,
-     COUNT(DISTINCT wc.claim_no) AS failures
-RETURN batch_code, batch_date, shift, failures
-ORDER BY failures DESC
-LIMIT 20...
-2026-01-12 17:51:37,329 [INFO] app.utils.query_executor: Executing Cypher query
-2026-01-12 17:51:37,329 [INFO] app.connectors.neo4j_connector: Executing Cypher query: MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
-WHERE wc.zone = 'South Zone'
-  AND toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
-WITH p.part_no AS part_no, COUNT(DISTINCT wc.claim_no) AS claim_count
-RETURN part_no, claim_count
-ORDER BY claim_count DESC
-LIMIT 20...
-2026-01-12 17:51:37,542 [INFO] app.connectors.neo4j_connector: Query returned 5 results
-2026-01-12 17:51:37,542 [INFO] app.utils.query_executor: Query executed successfully, returned 5 records
-2026-01-12 17:51:37,548 [INFO] app.agents.analyst_agent: 🔧 Tool result detected: name='execute_cypher_query', content type=str
-2026-01-12 17:51:37,735 [INFO] app.utils.query_executor: Executing Cypher query
-2026-01-12 17:51:37,737 [INFO] app.connectors.neo4j_connector: Executing Cypher query: MATCH (wc:WarrantyClaim)
-WHERE wc.zone = 'South Zone'
-  AND wc.complaint_desc <> 'unknown'
-  AND toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
-WITH wc LIMIT 200
-
-MATCH (wc)-[:INVOLVES_PART]->(p:Part)
-OPTIONAL MATCH (e:ESQAConcern)-[:RAISED_FOR]->(p)
-WITH p.part_no AS part_no,
-     COUNT(DISTINCT e) AS esqa_concerns,
-     SUM(e.rejection_qty) AS total_rejections
-RETURN part_no, esqa_concerns, total_rejections
-ORDER BY total_rejections DESC
-LIMIT 20...
-2026-01-12 17:51:37,936 [INFO] app.connectors.neo4j_connector: Query returned 5 results
-2026-01-12 17:51:37,936 [INFO] app.utils.query_executor: Query executed successfully, returned 5 records
-2026-01-12 17:51:37,938 [INFO] app.agents.analyst_agent: 🔧 Tool result detected: name='execute_cypher_query', content type=str
-2026-01-12 17:51:37,942 [INFO] app.utils.query_executor: Executing Cypher query
-2026-01-12 17:51:37,942 [INFO] app.connectors.neo4j_connector: Executing Cypher query: MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
-WHERE wc.zone = 'South Zone'
-  AND toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
-WITH wc, p
-MATCH (v:Vendor)-[:SUPPLIES]->(p)
-OPTIONAL MATCH (v)-[cpk:HAS_CPK]->(p)
-WITH v.name AS vendor, p.part_no AS part_no,
-     COUNT(DISTINCT wc.claim_no) AS claims,
-     MAX(cpk.cp) AS cp,
-     MAX(cpk.cpk) AS cpk
-RETURN vendor, part_no, claims, cp, cpk
-ORDER BY claims DESC
-LIMIT 20...
-2026-01-12 17:51:38,175 [INFO] app.connectors.neo4j_connector: Query returned 3 results
-2026-01-12 17:51:38,175 [INFO] app.utils.query_executor: Query executed successfully, returned 3 records
-2026-01-12 17:51:38,175 [INFO] app.agents.analyst_agent: 🔧 Tool result detected: name='execute_cypher_query', content type=str
-2026-01-12 17:51:41,441 [INFO] app.connectors.neo4j_connector: Query returned 20 results
-2026-01-12 17:51:41,441 [INFO] app.utils.query_executor: Query executed successfully, returned 20 records
-2026-01-12 17:51:41,441 [INFO] app.agents.analyst_agent: 🔧 Tool result detected: name='execute_cypher_query', content type=str
-2026-01-12 17:51:42,767 [INFO] httpx: HTTP Request: POST https://manufacturing-acc.cognitiveservices.azure.com/openai/deployments/gpt-5/chat/completions?api-version=2025-01-01-preview "HTTP/1.1 200 OK"
-2026-01-12 17:51:43,352 [INFO] app.agents.analyst_agent: 🔧 Tool call detected: name='write_todos', args keys=['todos']
-2026-01-12 17:51:43,352 [INFO] app.agents.analyst_agent: 📋 Detected todo tool with name: 'write_todos'
-
-📋 Task Plan (5 items):
-- ✅ Query Warranty claims filtered to South Zone and complaint contains 'head lamp' to get claims, zones, and link to parts
-- ✅ Trace parts to batches (batch_code, batch_date, shift) and count distinct claims per batch to avoid double-counting
-- ✅ Get vendor details for involved parts and join PPCM Cp/Cpk values
-- ✅ Fetch eSQA concerns for those parts (counts and rejection qty)
+(ai) PS C:\Users\50014665\GraphRag\Traceability\nashik-chatbot-pq\scripts>
