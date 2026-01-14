@@ -62,15 +62,24 @@ function LandingPage() {
       />
 
       <div className="landing-content">
-        {/* Left Section - Car Image */}
-        
-        {/*<div className="left-section">
+        {/* Left Section - Car Image with Text */}
+        <div className="left-section">
+          <div className="ai-solution-text">
+            <h1 className="main-heading">
+              <span className="word word-1">AI-Powered</span>
+              <span className="word word-2">Quality</span>
+              <span className="word word-3">Management</span>
+            </h1>
+            <p className="sub-heading">
+              Intelligent solutions for traceability, quality assurance, and diagnostic support
+            </p>
+          </div>
           <img
             src={carImage}
             alt="Mahindra Vehicle"
             className="car-image"
           />
-        </div>*/}
+        </div>
 
         {/* Right Section - Features List */}
         <div className="features-container">
