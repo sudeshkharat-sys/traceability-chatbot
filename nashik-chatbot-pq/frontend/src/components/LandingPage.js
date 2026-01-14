@@ -6,6 +6,8 @@ import traceabilityIcon from "../assests/traceability.png";
 import qualityIcon from "../assests/quality.png";
 import guidelineIcon from "../assests/guideline.png";
 import supportIcon from "../assests/support.png";
+import utilityLogo from "../assests/Mahindra_Logo_utilty.jpg";
+import mahindraRiseLogo from "../assests/mahindra_rise_logo.png";
 
 function LandingPage() {
   const navigate = useNavigate();
@@ -47,6 +49,18 @@ function LandingPage() {
 
   return (
     <div className="landing-page">
+      {/* Top Corner Logos */}
+      <img
+        src={utilityLogo}
+        alt="Mahindra Utility Logo"
+        className="corner-logo corner-logo-left"
+      />
+      <img
+        src={mahindraRiseLogo}
+        alt="Mahindra Rise Logo"
+        className="corner-logo corner-logo-right"
+      />
+
       <div className="landing-content">
         {/* Image Section - Left Side */}
         <div className="image-section">
