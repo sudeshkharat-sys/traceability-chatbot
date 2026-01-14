@@ -50,28 +50,27 @@
   gap: 2.5rem;
 }
 
-/* Left Section - Car Image */
+/* Left Section - AI Text */
 .left-section {
   flex: 1;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 1rem;
-  gap: 2rem;
+  padding: 2rem;
 }
 
 /* AI Solution Text Section */
 .ai-solution-text {
   text-align: center;
-  padding: 2rem;
-  background: rgba(255, 255, 255, 0.95);
-  border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(220, 20, 60, 0.15);
-  backdrop-filter: blur(10px);
-  border: 2px solid rgba(220, 20, 60, 0.2);
+  padding: 2.5rem 3rem;
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 20px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(15px);
+  border: 1px solid rgba(220, 20, 60, 0.15);
   animation: slideDown 1s ease-out;
-  max-width: 600px;
+  max-width: 500px;
 }
 
 .main-heading {
@@ -121,16 +120,6 @@
   animation-fill-mode: forwards;
   opacity: 0;
   font-weight: 500;
-}
-
-.car-image {
-  width: 100%;
-  max-width: 550px;
-  height: auto;
-  object-fit: contain;
-  animation: fadeInLeft 0.8s ease 1s;
-  animation-fill-mode: forwards;
-  opacity: 0;
 }
 
 /* Right Section - Features Container */
@@ -314,10 +303,6 @@
     font-size: 1.1rem;
   }
 
-  .car-image {
-    max-width: 450px;
-  }
-
   .features-container {
     width: 100%;
     max-width: 650px;
@@ -343,13 +328,12 @@
   }
 
   .left-section {
-    padding: 1rem;
-    gap: 1.5rem;
+    padding: 1.5rem;
   }
 
   .ai-solution-text {
     max-width: 100%;
-    padding: 1.25rem;
+    padding: 1.5rem;
   }
 
   .main-heading {
@@ -358,10 +342,6 @@
 
   .sub-heading {
     font-size: 1rem;
-  }
-
-  .car-image {
-    max-width: 400px;
   }
 
   .features-container {
@@ -403,11 +383,11 @@
 
   .left-section {
     max-width: 100%;
-    gap: 1rem;
+    padding: 1rem;
   }
 
   .ai-solution-text {
-    padding: 1rem;
+    padding: 1.25rem 1.5rem;
   }
 
   .main-heading {
@@ -417,10 +397,6 @@
 
   .sub-heading {
     font-size: 0.9rem;
-  }
-
-  .car-image {
-    max-width: 300px;
   }
 
   .features-container {

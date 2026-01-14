@@ -7,7 +7,6 @@ import guidelineIcon from "../assests/guideline.png";
 import supportIcon from "../assests/support.png";
 import utilityLogo from "../assests/Mahindra_Logo_utilty.png";
 import mahindraRiseLogo from "../assests/mahindra_rise_logo.png";
-import carImage from "../assests/new.jpg";
 
 function LandingPage() {
   const navigate = useNavigate();
@@ -62,7 +61,7 @@ function LandingPage() {
       />
 
       <div className="landing-content">
-        {/* Left Section - Car Image with Text */}
+        {/* Left Section - AI Solution Text */}
         <div className="left-section">
           <div className="ai-solution-text">
             <h1 className="main-heading">
@@ -74,11 +73,6 @@ function LandingPage() {
               Intelligent solutions for traceability, quality assurance, and diagnostic support
             </p>
           </div>
-          <img
-            src={carImage}
-            alt="Mahindra Vehicle"
-            className="car-image"
-          />
         </div>
 
         {/* Right Section - Features List */}
