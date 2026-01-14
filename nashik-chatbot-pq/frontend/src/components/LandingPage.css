@@ -272,32 +272,7 @@
   }
 }
 
-@keyframes textGlow {
-  0%, 100% {
-    text-shadow:
-      0 0 10px rgba(220, 20, 60, 0.3),
-      0 0 20px rgba(220, 20, 60, 0.2),
-      0 0 30px rgba(220, 20, 60, 0.1);
-  }
-  50% {
-    text-shadow:
-      0 0 20px rgba(220, 20, 60, 0.6),
-      0 0 30px rgba(220, 20, 60, 0.4),
-      0 0 40px rgba(220, 20, 60, 0.2);
-  }
-}
 
-@keyframes dropShadowGlow {
-  0%, 100% {
-    filter: drop-shadow(0 0 8px rgba(220, 20, 60, 0.4))
-            drop-shadow(0 0 16px rgba(220, 20, 60, 0.2));
-  }
-  50% {
-    filter: drop-shadow(0 0 16px rgba(220, 20, 60, 0.8))
-            drop-shadow(0 0 24px rgba(220, 20, 60, 0.4))
-            drop-shadow(0 0 32px rgba(220, 20, 60, 0.2));
-  }
-}
 
 @keyframes fadeInScale {
   from {

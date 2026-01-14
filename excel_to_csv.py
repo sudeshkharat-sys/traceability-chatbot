@@ -20,8 +20,8 @@ from pathlib import Path
 import re
 
 # 🔹 CHANGE THIS to your Excel folder path
-INPUT_DIR = Path(r"C:\Users\50014665\GraphRag\thar_remain")   # Windows path (raw string)
-OUTPUT_DIR = Path(r"C:\Users\50014665\GraphRag\thar_csv_new")
+INPUT_DIR = Path(r"C:\Users\50014665\GraphRag\Traceability\excel")   # Windows path (raw string)
+OUTPUT_DIR = Path(r"C:\Users\50014665\GraphRag\Traceability\excel\csv_output")  # Windows path (raw string)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 EXCEL_EXTS = {".xls", ".xlsx", ".xlsm"}

@@ -29,7 +29,7 @@ from datetime import datetime
 # ═══════════════════════════════════════════════════════════════
 
 # CSV file paths
-CSV_DIR = Path(__file__).parent.parent.parent / "thar_csv"
+CSV_DIR = Path(__file__).parent.parent.parent / "csv_output"
 
 WARRANTY_FILE = CSV_DIR / "2. THAR ROXX Warranty_Sheet1.csv"
 WARRANTY_ANALYSIS_FILE = CSV_DIR / "3. THAR ROXX Warranty Analysis_Sheet1.csv"

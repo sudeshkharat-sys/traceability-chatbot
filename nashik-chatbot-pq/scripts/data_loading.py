@@ -23,23 +23,23 @@ print("=" * 80)
 print("LOADING CSV FILES")
 print("=" * 80)
 
-ppcm = pd.read_csv("../../thar_csv/1. THAR ROXX PPCM_Sheet1.csv")
-warranty = pd.read_csv("../../thar_csv/2. THAR ROXX Warranty_Sheet1.csv")
+ppcm = pd.read_csv("../../csv_output/1. THAR ROXX PPCM_Sheet1.csv")
+warranty = pd.read_csv("../../csv_output/2. THAR ROXX Warranty_Sheet1_FILTERED.csv")
 warranty_analysis = pd.read_csv(
-    "../../thar_csv/3. THAR ROXX Warranty Analysis_Sheet1.csv"
+    "../../csv_output/3. THAR ROXX Warranty Analysis_Sheet1_FILTERED.csv"
 )
-esqa = pd.read_csv("../../thar_csv/4. THAR ROXX e-SQA_Sheet1.csv")
+esqa = pd.read_csv("../../csv_output/4. THAR ROXX e-SQA_Sheet1.csv")
 
 # Load ALL traceability files
 import os
 
-folder = "../../thar_csv"
+folder = "../../csv_output"
 trace_files = [
     f for f in os.listdir(folder) if "traceability" in f.lower() and f.endswith(".csv")
 ]
 print(f"Found {len(trace_files)} traceability files")
 trace = pd.concat(
-    [pd.read_csv(os.path.join(folder, f)) for f in trace_files], ignore_index=True
+    [pd.read_csv(os.path.join(folder, f),low_memory=False) for f in trace_files], ignore_index=True
 )
 
 print(
@@ -60,12 +60,15 @@ warranty_analysis = warranty_analysis.fillna("unknown")
 esqa = esqa.fillna("unknown")
 trace = trace.fillna("unknown")
 
+print("✅ Filled missing values with 'unknown'")
+
 # Clean vendor names
 warranty["vender"] = warranty["vender"].replace(["-", "", "N/A", " "], "unknown")
 
 # CRITICAL: Extract VIN suffix (last 8 chars) from traceability
 trace["VIN_SHORT"] = trace["VINNumber"].str[-8:]
 
+print("✅ Extracted short VIN (last 8 chars) from traceability")
 
 # ═══════════════════════════════════════════════════════════
 # PART NUMBER NORMALIZATION (FIX ISSUE #1 & #5: Part mismatch & Duplicate nodes)
@@ -88,6 +91,7 @@ def normalize_part_number(part_value):
         - J-format preserved (e.g., "J60-BOD-1920")
         - "unknown" if invalid or garbage text
     """
+    print("Starting part number normalization...")
     import re
 
     # Handle NaN, None, empty
@@ -145,6 +149,7 @@ trace["BOMPARTNO"] = trace["BOMPARTNO"].apply(normalize_part_number)
 # Report normalization results
 warranty_valid = (warranty["part"] != "unknown").sum()
 warranty_total = len(warranty)
+
 warranty_invalid = warranty_total - warranty_valid
 
 print(f"✅ Part number normalization complete:")

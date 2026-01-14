@@ -27,8 +27,8 @@ from collections import defaultdict
 # CSV file paths (relative to script location)
 CSV_DIR = Path(__file__).parent.parent.parent / "csv_output"
 
-WARRANTY_FILE = CSV_DIR / "2. THAR ROXX Warranty_Sheet1_backup_20260112_140107.csv"
-WARRANTY_ANALYSIS_FILE = CSV_DIR / "3. THAR ROXX Warranty Analysis_Sheet1_backup_20260112_140107.csv"
+WARRANTY_FILE = CSV_DIR / "2. THAR ROXX Warranty_Sheet1.csv"
+WARRANTY_ANALYSIS_FILE = CSV_DIR / "3. THAR ROXX Warranty Analysis_Sheet1.csv"
 PPCM_FILE = CSV_DIR / "1. THAR ROXX PPCM_Sheet1.csv"
 ESQA_FILE = CSV_DIR / "4. THAR ROXX e-SQA_Sheet1.csv"
 
