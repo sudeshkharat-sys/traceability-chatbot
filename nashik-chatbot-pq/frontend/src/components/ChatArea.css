@@ -3,7 +3,7 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: linear-gradient(135deg, #FFFFFF 0%, #FFF5F5 50%, #FFE4E8 100%);
+  background: #FFFFFF;
   position: relative;
 }
 
@@ -57,8 +57,8 @@
   right: -60px;
   height: 60px;
   background: linear-gradient(to bottom,
-    rgba(255, 245, 245, 0.9) 0%,
-    rgba(255, 245, 245, 0.6) 50%,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.7) 50%,
     transparent 100%);
   z-index: 10;
   pointer-events: none;
@@ -142,13 +142,13 @@
 
 /* Welcome Message Box */
 .welcome-message-wrapper {
-  background-color: rgba(255, 255, 255, 0.95);
-  border: 1px solid rgba(220, 20, 60, 0.1);
+  background-color: #FFFFFF;
+  border: 1px solid #E5E5E5;
   border-radius: 18px;
   padding: 10px 15px;
   max-width: 580px;
   width: 100%;
-  box-shadow: 0 6px 24px rgba(220, 20, 60, 0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(10px);
   animation: slideUp 0.5s ease;
 }
@@ -298,9 +298,9 @@
   z-index: 11;
   padding: 15px 60px 20px;
   background: linear-gradient(to top,
-    rgba(255, 245, 245, 0.95) 0%,
-    rgba(255, 245, 245, 0.85) 50%,
-    rgba(255, 245, 245, 0.6) 85%,
+    rgba(255, 255, 255, 0.98) 0%,
+    rgba(255, 255, 255, 0.9) 50%,
+    rgba(255, 255, 255, 0.7) 85%,
     transparent 100%);
   animation: fadeInSmooth 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   backdrop-filter: blur(10px);
@@ -331,15 +331,15 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  background-color: rgba(255, 255, 255, 0.98);
+  background-color: #FFFFFF;
   border-radius: 28px;
   padding: 12px 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(10px);
   max-width: 900px;
   margin: 0 auto;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid #E5E5E5;
   animation: fadeInInput 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -355,9 +355,9 @@
 }
 
 .chat-input-wrapper:focus-within {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2), 0 2px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
   transform: translateY(-2px);
-  border-color: rgba(220, 20, 60, 0.3);
+  border-color: #DC143C;
 }
 
 .chat-input {

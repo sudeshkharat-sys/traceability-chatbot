@@ -1,12 +1,13 @@
 .thinking-steps-container {
-  background: linear-gradient(135deg, rgba(220, 20, 60, 0.08) 0%, rgba(255, 245, 245, 0.5) 100%);
+  background: #FFFFFF;
   border-left: 3px solid #DC143C;
   padding: 16px 18px;
   margin: 12px 0 12px 44px;
   border-radius: 8px;
   animation: slideIn 0.5s ease;
   backdrop-filter: blur(10px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #E5E5E5;
 }
 
 /* Section Styles */
@@ -49,10 +50,10 @@
 
 /* Reasoning Section - Fixed size container */
 .reasoning-section {
-  background: rgba(255, 255, 255, 0.02);
+  background: #FAFAFA;
   padding: 10px 12px;
   border-radius: 6px;
-  border: 1px solid rgba(220, 20, 60, 0.1);
+  border: 1px solid #E5E5E5;
   margin-bottom: 8px;
 }
 
@@ -80,7 +81,7 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  color: rgba(255, 255, 255, 0.85);
+  color: #2c2c2c;
   font-size: 12px;
   line-height: 1.5;
   animation: fadeIn 0.4s ease;
@@ -92,7 +93,7 @@
 }
 
 .reasoning-item.current {
-  color: rgba(255, 255, 255, 0.95);
+  color: #1a1a1a;
 }
 
 .reasoning-text {

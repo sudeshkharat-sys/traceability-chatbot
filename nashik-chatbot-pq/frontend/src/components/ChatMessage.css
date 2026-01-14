@@ -140,13 +140,14 @@
 }
 
 .bot-message .message-bubble {
-  background-color: rgba(255, 255, 255, 0.92);
+  background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
   color: #1f1f1f;
   border-bottom-left-radius: 4px;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   contain: layout style;
   overflow-anchor: auto;
+  border: 1px solid #E5E5E5;
   /* Prevent flickering during streaming */
   transform: translateZ(0);
   -webkit-transform: translateZ(0);

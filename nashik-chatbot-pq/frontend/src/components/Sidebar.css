@@ -1,14 +1,14 @@
 .sidebar {
   width: 215px;
   height: 100vh;
-  background: linear-gradient(180deg, #FFFFFF 0%, #FFF5F5 50%, #FFE4E8 100%);
+  background: #FFFFFF;
   color: #1a1a1a;
   display: flex;
   flex-direction: column;
   position: relative;
   transition: width 0.3s ease;
-  border-right: 1px solid rgba(220, 20, 60, 0.15);
-  box-shadow: 2px 0 10px rgba(220, 20, 60, 0.08);
+  border-right: 1px solid #E5E5E5;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.05);
 }
 
 .sidebar.collapsed {
@@ -18,13 +18,13 @@
 
 .sidebar-header {
   padding: 10px;
-  border-bottom: 1px solid rgba(220, 20, 60, 0.15);
+  border-bottom: 1px solid #E5E5E5;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   min-height: 56px;
-  background: rgba(255, 255, 255, 0.5);
+  background: #FFFFFF;
 }
 
 .chatbot-title {
@@ -42,8 +42,8 @@
   width: 36px;
   height: 36px;
   background-color: transparent;
-  border: 1px solid rgba(220, 20, 60, 0.2);
-  color: #DC143C;
+  border: 1px solid #E5E5E5;
+  color: #666666;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -54,7 +54,7 @@
 }
 
 .home-btn:hover {
-  background-color: rgba(220, 20, 60, 0.1);
+  background-color: #F5F5F5;
   border-color: #DC143C;
   color: #DC143C;
 }
@@ -71,8 +71,8 @@
   width: calc(100% - 40px);
   margin: 10px;
   padding: 12px 16px;
-  background-color: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(220, 20, 60, 0.2);
+  background-color: #FFFFFF;
+  border: 1px solid #E5E5E5;
   border-radius: 8px;
   color: #1a1a1a;
   font-size: 14px;
@@ -81,7 +81,7 @@
 }
 
 .new-chat-btn:hover {
-  background-color: rgba(220, 20, 60, 0.1);
+  background-color: #F5F5F5;
   border-color: #DC143C;
 }
 
@@ -111,7 +111,7 @@
 
 .recent-title {
   font-size: 10px;
-  color: rgba(220, 20, 60, 0.6);
+  color: #999999;
   text-transform: uppercase;
   margin: 0 0 6px 0;
   font-weight: 500;
@@ -133,11 +133,11 @@
 }
 
 .chat-item:hover {
-  background-color: rgba(220, 20, 60, 0.08);
+  background-color: #F5F5F5;
 }
 
 .chat-item.active {
-  background-color: rgba(220, 20, 60, 0.12);
+  background-color: #FFF0F2;
   border-left: 3px solid #DC143C;
 }
 
@@ -163,7 +163,7 @@
   right: 12px;
   background: transparent;
   border: none;
-  color: rgba(220, 20, 60, 0.6);
+  color: #999999;
   font-size: 18px;
   cursor: pointer;
   padding: 0;
@@ -179,7 +179,7 @@
 
 .chat-time {
   font-size: 9px;
-  color: rgba(220, 20, 60, 0.5);
+  color: #999999;
 }
 
 .sidebar-footer {
@@ -187,8 +187,8 @@
   align-items: center;
   justify-content: space-between;
   padding: 10px 5px;
-  border-top: 1px solid rgba(220, 20, 60, 0.15);
-  background: rgba(255, 255, 255, 0.5);
+  border-top: 1px solid #E5E5E5;
+  background: #FFFFFF;
 }
 
 .user-profile {
@@ -226,7 +226,7 @@
   height: 32px;
   background-color: transparent;
   border: none;
-  color: rgba(220, 20, 60, 0.6);
+  color: #666666;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -236,7 +236,7 @@
 }
 
 .settings-btn:hover {
-  background-color: rgba(220, 20, 60, 0.1);
+  background-color: #F5F5F5;
   color: #DC143C;
 }
 
@@ -298,7 +298,7 @@
 .no-chats {
   padding: 20px;
   text-align: center;
-  color: rgba(220, 20, 60, 0.5);
+  color: #999999;
   font-size: 14px;
 }
 
