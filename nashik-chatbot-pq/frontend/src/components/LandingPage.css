@@ -63,14 +63,9 @@
 
 /* AI Solution Text Section */
 .ai-solution-text {
-    text-align: center;
+    text-align: left;
     padding: 0.5rem 1rem;
-    /* background: transparent; */
-    /* border-radius: 20px; */
-    /* box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1); */
-    /* backdrop-filter: blur(15px); */
-    /* border: 1px solid rgba(220, 20, 60, 0.15); */
-    animation: slideDown 1s ease-out;
+    animation: fadeInScale 1.2s ease-out;
     max-width: 600px;
     margin-right: auto;
     margin-bottom: 150px;
@@ -98,8 +93,9 @@
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  animation: slideInRight 0.8s ease-out, gradientShift 3s ease infinite;
-  animation-fill-mode: forwards, none;
+  animation: slideInRight 0.8s ease-out, gradientShift 3s ease infinite, textGlow 2.5s ease-in-out infinite;
+  animation-fill-mode: forwards, none, none;
+  filter: drop-shadow(0 0 8px rgba(220, 20, 60, 0.3));
 }
 
 .main-heading .word-1 {
@@ -114,17 +110,13 @@
   animation-delay: 0.6s;
 }
 
-sub-heading {
+.sub-heading {
     text-align: left;
     font-size: 17px;
     color: #666666;
-    /* margin: 0; */
-    /* line-height: 1.6; */
-    animation: fadeInUp 1s ease-out 0.8s;
-    animation-fill-mode: forwards;
+    animation: fadeInUp 1s ease-out 0.8s, textGlow 3s ease-in-out infinite;
+    animation-fill-mode: forwards, none;
     opacity: 0;
-    /* font-weight: 500; */
-    /* padding: 0; */
 }
 
 /* Right Section - Features Container */
@@ -280,6 +272,32 @@ sub-heading {
   }
   100% {
     background-position: 0% 50%;
+  }
+}
+
+@keyframes textGlow {
+  0%, 100% {
+    text-shadow:
+      0 0 10px rgba(220, 20, 60, 0.3),
+      0 0 20px rgba(220, 20, 60, 0.2),
+      0 0 30px rgba(220, 20, 60, 0.1);
+  }
+  50% {
+    text-shadow:
+      0 0 20px rgba(220, 20, 60, 0.6),
+      0 0 30px rgba(220, 20, 60, 0.4),
+      0 0 40px rgba(220, 20, 60, 0.2);
+  }
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
