@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import "./LandingPage.css";
+import backgroundImage from "../assests/background.png";
 import traceabilityIcon from "../assests/traceability.png";
 import qualityIcon from "../assests/quality.png";
 import guidelineIcon from "../assests/guideline.png";
@@ -50,8 +51,8 @@ function LandingPage() {
         {/* Image Section - Left Side */}
         <div className="image-section">
           <img
-            src={traceabilityIcon}
-            alt="Traceability System"
+            src={backgroundImage}
+            alt="Quality Management System"
             className="landing-image"
           />
         </div>
