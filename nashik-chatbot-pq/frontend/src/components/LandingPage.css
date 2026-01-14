@@ -46,12 +46,30 @@
   max-width: 1400px;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
+  gap: 2.5rem;
 }
 
-/* Features Container - Centered */
-.features-container {
+/* Left Section - Car Image */
+.left-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.car-image {
   width: 100%;
+  max-width: 550px;
+  height: auto;
+  object-fit: contain;
+  animation: fadeInLeft 0.8s ease;
+}
+
+/* Right Section - Features Container */
+.features-container {
+  flex: 1;
   max-width: 600px;
   display: flex;
   flex-direction: column;
@@ -162,7 +180,22 @@
 
 /* Responsive Design */
 @media (max-width: 1024px) {
+  .landing-content {
+    flex-direction: column;
+    gap: 2rem;
+  }
+
+  .left-section {
+    width: 100%;
+    max-width: 500px;
+  }
+
+  .car-image {
+    max-width: 450px;
+  }
+
   .features-container {
+    width: 100%;
     max-width: 650px;
   }
 }
@@ -183,6 +216,14 @@
 
   .corner-logo-right {
     right: 1rem;
+  }
+
+  .left-section {
+    padding: 1rem;
+  }
+
+  .car-image {
+    max-width: 400px;
   }
 
   .features-container {
@@ -220,6 +261,14 @@
 
   .corner-logo-right {
     right: 0.75rem;
+  }
+
+  .left-section {
+    max-width: 100%;
+  }
+
+  .car-image {
+    max-width: 300px;
   }
 
   .features-container {
