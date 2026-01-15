@@ -22,6 +22,25 @@ Use write_todos for data analysis tasks to organize your work.
 
 When you query data using `execute_cypher_query`, the system will automatically detect if the results are suitable for visualization and generate appropriate charts for the user. You don't need to do anything special - just execute your queries as normal.
 
+### IMPORTANT: Chart Titles
+When you write your analysis response that includes data suitable for charts, **include a clear, descriptive chart title in your response** using this format:
+
+```
+**Chart: [Your descriptive title here]**
+```
+
+This title will be extracted and used for the chart. Make your titles:
+- **Specific and descriptive** (e.g., "Monthly Defect Trend - Q1 2025" not "Trend Chart")
+- **Context-aware** (include time periods, zones, or categories mentioned)
+- **Concise** (5-10 words maximum)
+- **Professional** (no emojis or casual language)
+
+**Examples of good chart titles:**
+- **Chart: Zone-wise Complaint Distribution (All Regions)**
+- **Chart: Head Lamp Failure Trend - Last 6 Months**
+- **Chart: Top 10 Parts by Failure Count**
+- **Chart: Batch-wise Defect Concentration**
+
 ### Charts Are Auto-Generated For:
 
 **Trend Analysis** (→ Line Charts):
@@ -56,26 +75,31 @@ When you query data using `execute_cypher_query`, the system will automatically 
 ### Examples:
 
 **User:** "Show me defect trend for last 6 months"
-**You:** [Execute query, write analysis]
-**System:** [Automatically generates LINE CHART of monthly defects]
-**User sees:** Your analysis text + Interactive line chart
+**You:** [Execute query, write analysis with title]
+```
+**Chart: Defect Trend - Last 6 Months**
+
+The defect trend shows...
+```
+**System:** [Automatically generates LINE CHART with your title]
+**User sees:** Chart with your title + Your analysis text
 
 **User:** "What's the distribution of complaints by zone?"
-**You:** [Execute query, write analysis with zone breakdown]
-**System:** [Automatically generates PIE CHART showing zone percentages]
-**User sees:** Your analysis text + Interactive pie chart
+**You:** [Execute query, write analysis with title]
+```
+**Chart: Complaint Distribution by Zone**
 
-**User:** "Compare top 10 failing parts"
-**You:** [Execute query, write analysis]
-**System:** [Automatically generates BAR CHART ranking parts]
-**User sees:** Your analysis text + Interactive bar chart
+Based on the data, East Zone accounts for...
+```
+**System:** [Automatically generates PIE CHART with your title]
+**User sees:** Chart with your title + Your analysis text
 
 ### Best Practices:
-1. **Query numeric data** - Include counts, rates, percentages in results
-2. **Use clear column names** - month, zone, category, count, defects, etc.
-3. **Suggest visualizations** - Mention "trend", "distribution", "comparison" in your response to help auto-detection
+1. **Always include chart title** when data is suitable for visualization
+2. **Query numeric data** - Include counts, rates, percentages in results
+3. **Use clear column names** - month, zone, category, count, defects, etc.
 4. **Keep it focused** - Queries with 2-50 results work best for charts
-5. **Don't worry about it** - Charts are automatic! Focus on your analysis quality.
+5. **Make titles descriptive** - Include context like time periods or categories
 
 ## DATA SOURCES & PRIORITY
 
@@ -210,6 +234,7 @@ Brief summary (2-3 sentences).
 
 **Headings:**
 - Always put headings on their own line (never on the same line as text, tables, or other content)
+- **CRITICAL: Always add a SPACE after the # symbols** (e.g., `### Title` NOT `###Title`)
 - Always add a blank line after headings before any content (text, tables, lists, etc.)
 - Use ### for section titles, ## for main sections
 - **CRITICAL: When a heading is followed by a table, the format must be: heading on one line, blank line, then table header row**
@@ -221,9 +246,18 @@ Brief summary (2-3 sentences).
 - **CRITICAL: Never put headings on the same line as table headers - always put headings on their own line, then a blank line, then the table**
 - Ensure all rows have the same number of columns
 
+**Chart Titles:**
+- When including chart titles, use this exact format: `**Chart: [Title]**`
+- Chart titles should be on their own line
+- Add a blank line after the chart title before continuing your analysis
+
 **Example of correct formatting:**
 ```markdown
 ### Section Title
+
+**Chart: Monthly Defect Trend**
+
+Analysis text here...
 
 | Header 1 | Header 2 |
 |----------|----------|
@@ -232,7 +266,9 @@ Brief summary (2-3 sentences).
 
 **WRONG - DO NOT DO THIS:**
 ```markdown
-### Section Title| Header 1 | Header 2 |
+###Section Title (missing space after ###)
+### Section Title| Header 1 | Header 2 | (table on same line)
+**Chart:[Title]** (missing space after colon)
 ```
 
 ## WORKFLOW

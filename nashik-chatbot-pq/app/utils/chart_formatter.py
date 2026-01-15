@@ -320,9 +320,34 @@ class ChartFormatter:
         return False
 
 
+def _extract_chart_title_from_response(user_question: str) -> Optional[str]:
+    """
+    Extract chart title from agent's response if it follows the pattern:
+    **Chart: [Title]**
+
+    Args:
+        user_question: The user's question or agent's response text
+
+    Returns:
+        Extracted title or None if not found
+    """
+    import re
+
+    # Look for pattern: **Chart: [Title]** or **Chart:[Title]**
+    pattern = r'\*\*Chart:\s*([^\*]+?)\*\*'
+    match = re.search(pattern, user_question, re.IGNORECASE)
+
+    if match:
+        title = match.group(1).strip()
+        return title
+
+    return None
+
+
 def _generate_chart_title(chart_type: str, x_key: str, y_keys: List[str], data: List[Dict]) -> str:
     """
     Generate a descriptive chart title based on data structure.
+    This is a fallback when agent doesn't provide a title.
 
     Args:
         chart_type: Type of chart ('line', 'bar', 'pie')
@@ -444,8 +469,16 @@ def format_neo4j_results_for_chart(
         x_key = keys[0]
         name_key = keys[0]
 
-    # Generate descriptive title based on data structure
-    title = _generate_chart_title(chart_type, x_key, y_keys, results)
+    # Try to extract title from user's question/response first
+    # The user_question might contain agent's response with chart title
+    extracted_title = _extract_chart_title_from_response(user_question)
+
+    # Use extracted title if available, otherwise generate one
+    if extracted_title:
+        title = extracted_title
+    else:
+        # Fallback: Generate descriptive title based on data structure
+        title = _generate_chart_title(chart_type, x_key, y_keys, results)
 
     # Generate axis labels
     x_label, y_label = _generate_axis_labels(x_key, y_keys)

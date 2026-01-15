@@ -298,6 +298,11 @@ const ChartComponent = ({ chartData }) => {
 
   return (
     <div className="chart-container my-3 p-3 bg-gray-800 rounded-lg border border-gray-700">
+      {title && (
+        <h3 className="text-sm font-semibold text-gray-100 mb-3 pb-2 border-b border-gray-700">
+          {title}
+        </h3>
+      )}
       <div className="chart-wrapper">
         {renderChart()}
       </div>

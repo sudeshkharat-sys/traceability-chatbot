@@ -261,6 +261,9 @@ class AnalystAgent:
             self.current_user_question = user_question
             self.current_chart_data = None
 
+            # Track the full response for chart title extraction
+            full_response_text = []
+
             # Create input messages
             inputs = {"messages": [{"role": "user", "content": user_question}]}
 
@@ -530,6 +533,9 @@ class AnalystAgent:
 
                                 response_started = True
 
+                                # Collect response text for chart title extraction
+                                full_response_text.append(token_content)
+
                                 yield {
                                     "type": "token",
                                     "content": token_content,
@@ -550,6 +556,19 @@ class AnalystAgent:
 
             # After streaming completes, emit chart data if available
             if self.current_chart_data:
+                # Try to extract chart title from agent's response
+                full_response = "".join(full_response_text)
+                from app.utils.chart_formatter import _extract_chart_title_from_response
+
+                extracted_title = _extract_chart_title_from_response(full_response)
+
+                # Update chart title if extracted from response
+                if extracted_title:
+                    self.current_chart_data["title"] = extracted_title
+                    logger.info(f"Using agent-provided chart title: {extracted_title}")
+                else:
+                    logger.info(f"Using auto-generated chart title: {self.current_chart_data.get('title')}")
+
                 logger.info(f"Emitting chart data: {self.current_chart_data.get('type')}")
                 yield {
                     "type": "chart",
