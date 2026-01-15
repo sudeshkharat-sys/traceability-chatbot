@@ -11,7 +11,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from 'recharts';
 
@@ -45,6 +44,40 @@ const ChartComponent = ({ chartData }) => {
 
   const colors = config.colors || DEFAULT_COLORS;
 
+  // Format month numbers to short month names
+  const formatMonth = (value) => {
+    const monthMap = {
+      '1': 'Jan', '2': 'Feb', '3': 'Mar', '4': 'Apr',
+      '5': 'May', '6': 'Jun', '7': 'Jul', '8': 'Aug',
+      '9': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec'
+    };
+    return monthMap[value] || value;
+  };
+
+  // Custom tooltip formatter for better readability
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (!active || !payload) return null;
+
+    return (
+      <div style={{
+        backgroundColor: '#1f2937',
+        border: '1px solid #374151',
+        borderRadius: '6px',
+        padding: '10px',
+        color: '#ffffff'
+      }}>
+        <p style={{ marginBottom: '5px', fontWeight: 'bold', color: '#ffffff' }}>
+          {formatMonth(label)}
+        </p>
+        {payload.map((entry, index) => (
+          <p key={index} style={{ margin: '3px 0', color: '#ffffff' }}>
+            <span style={{ color: entry.color }}>●</span> {entry.name}: {entry.value}
+          </p>
+        ))}
+      </div>
+    );
+  };
+
   // Render Bar Chart
   const renderBarChart = () => {
     const xAxis = config.xAxis || 'name';
@@ -54,7 +87,11 @@ const ChartComponent = ({ chartData }) => {
 
     return (
       <ResponsiveContainer width="100%" height={450}>
-        <BarChart data={data} margin={{ top: 20, right: 30, left: 60, bottom: 60 }}>
+        <BarChart
+          data={data}
+          margin={{ top: 20, right: 30, left: 60, bottom: 60 }}
+          onClick={null}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
           <XAxis
             dataKey={xAxis}
@@ -77,23 +114,14 @@ const ChartComponent = ({ chartData }) => {
               style: { fill: '#9ca3af', fontSize: '14px', fontWeight: 'bold', textAnchor: 'middle' }
             }}
           />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: '#1f2937',
-              border: '1px solid #374151',
-              borderRadius: '6px',
-              color: '#f3f4f6'
-            }}
-          />
-          <Legend
-            wrapperStyle={{ color: '#9ca3af', paddingTop: '20px' }}
-          />
+          <Tooltip content={<CustomTooltip />} />
           {yAxes.map((key, index) => (
             <Bar
               key={key}
               dataKey={key}
               fill={colors[index % colors.length]}
               radius={[4, 4, 0, 0]}
+              onClick={null}
             />
           ))}
         </BarChart>
@@ -110,12 +138,17 @@ const ChartComponent = ({ chartData }) => {
 
     return (
       <ResponsiveContainer width="100%" height={450}>
-        <LineChart data={data} margin={{ top: 20, right: 30, left: 60, bottom: 60 }}>
+        <LineChart
+          data={data}
+          margin={{ top: 20, right: 30, left: 60, bottom: 60 }}
+          onClick={null}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
           <XAxis
             dataKey={xAxis}
             stroke="#9ca3af"
             style={{ fontSize: '12px' }}
+            tickFormatter={formatMonth}
             label={{
               value: xAxisLabel,
               position: 'insideBottom',
@@ -133,17 +166,7 @@ const ChartComponent = ({ chartData }) => {
               style: { fill: '#9ca3af', fontSize: '14px', fontWeight: 'bold', textAnchor: 'middle' }
             }}
           />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: '#1f2937',
-              border: '1px solid #374151',
-              borderRadius: '6px',
-              color: '#f3f4f6'
-            }}
-          />
-          <Legend
-            wrapperStyle={{ color: '#9ca3af', paddingTop: '20px' }}
-          />
+          <Tooltip content={<CustomTooltip />} />
           {yAxes.map((key, index) => (
             <Line
               key={key}
@@ -153,6 +176,7 @@ const ChartComponent = ({ chartData }) => {
               strokeWidth={2}
               dot={{ fill: colors[index % colors.length], r: 4 }}
               activeDot={{ r: 6 }}
+              onClick={null}
             />
           ))}
         </LineChart>
@@ -195,9 +219,35 @@ const ChartComponent = ({ chartData }) => {
       );
     };
 
+    // Custom pie tooltip with white text
+    const PieTooltip = ({ active, payload }) => {
+      if (!active || !payload || !payload[0]) return null;
+
+      const data = payload[0];
+      const total = pieData.reduce((sum, d) => sum + d.value, 0);
+      const percent = ((data.value / total) * 100).toFixed(1);
+
+      return (
+        <div style={{
+          backgroundColor: '#1f2937',
+          border: '1px solid #374151',
+          borderRadius: '6px',
+          padding: '10px',
+          color: '#ffffff'
+        }}>
+          <p style={{ margin: '0', fontWeight: 'bold', color: '#ffffff' }}>
+            {data.name}
+          </p>
+          <p style={{ margin: '3px 0 0 0', color: '#ffffff' }}>
+            {data.value} ({percent}%)
+          </p>
+        </div>
+      );
+    };
+
     return (
       <ResponsiveContainer width="100%" height={500}>
-        <PieChart>
+        <PieChart onClick={null}>
           <Pie
             data={pieData}
             cx="50%"
@@ -210,26 +260,13 @@ const ChartComponent = ({ chartData }) => {
             outerRadius={130}
             fill="#8884d8"
             dataKey="value"
+            onClick={null}
           >
             {pieData.map((entry, index) => (
               <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
             ))}
           </Pie>
-          <Tooltip
-            contentStyle={{
-              backgroundColor: '#1f2937',
-              border: '1px solid #374151',
-              borderRadius: '6px',
-              color: '#f3f4f6'
-            }}
-            formatter={(value, name) => [`${value} (${((value / pieData.reduce((sum, d) => sum + d.value, 0)) * 100).toFixed(1)}%)`, name]}
-          />
-          <Legend
-            wrapperStyle={{ color: '#9ca3af', paddingTop: '20px' }}
-            layout="horizontal"
-            align="center"
-            verticalAlign="bottom"
-          />
+          <Tooltip content={<PieTooltip />} />
         </PieChart>
       </ResponsiveContainer>
     );
@@ -251,11 +288,6 @@ const ChartComponent = ({ chartData }) => {
 
   return (
     <div className="chart-container my-4 p-4 bg-gray-800 rounded-lg border border-gray-700">
-      {title && (
-        <h3 className="text-base font-semibold text-gray-100 mb-4 pb-2 border-b border-gray-700">
-          📊 {title}
-        </h3>
-      )}
       <div className="chart-wrapper">
         {renderChart()}
       </div>
