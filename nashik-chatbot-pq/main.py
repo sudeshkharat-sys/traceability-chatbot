@@ -7,11 +7,10 @@ import logging
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.api.endpoints import router as api_router
 from app.config.config import get_settings
-from fastapi.templating import Jinja2Templates
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
@@ -89,18 +88,18 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    app.mount("/", StaticFiles(directory="./frontend", html=True), name="static")
+
+    # Include API routes first
     app.include_router(api_router, prefix="/api")
+
+    # Mount static files (React build) - this catches all remaining routes
+    # html=True enables SPA routing (serves index.html for all non-file paths)
+    app.mount("/", StaticFiles(directory="./frontend/build", html=True), name="static")
+
     return app
 
 
 app = create_app()
-
-templates = Jinja2Templates(directory="templates")
-
-@app.get("/")
-async def serve_spa(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
 
 if __name__ == "__main__":
     settings = get_settings()
