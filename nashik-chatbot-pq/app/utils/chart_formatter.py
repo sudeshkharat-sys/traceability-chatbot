@@ -1,0 +1,401 @@
+"""
+Chart Data Formatter Utility
+
+This module provides utilities to format Neo4j query results and other data
+into chart-ready formats for the frontend ChartComponent.
+"""
+
+from typing import List, Dict, Any, Optional, Literal
+from datetime import datetime
+
+
+ChartType = Literal["bar", "line", "pie"]
+
+
+class ChartFormatter:
+    """Formats data into chart-compatible structures"""
+
+    @staticmethod
+    def format_chart_data(
+        chart_type: ChartType,
+        data: List[Dict[str, Any]],
+        title: str,
+        x_axis: Optional[str] = None,
+        y_axis: Optional[List[str]] = None,
+        name_key: Optional[str] = None,
+        value_key: Optional[str] = None,
+        colors: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Format data into chart configuration structure.
+
+        Args:
+            chart_type: Type of chart ('bar', 'line', or 'pie')
+            data: List of data points/records
+            title: Chart title
+            x_axis: Key for x-axis (for bar/line charts)
+            y_axis: List of keys for y-axis values (for bar/line charts)
+            name_key: Key for category names (for pie charts)
+            value_key: Key for values (for pie charts)
+            colors: Optional list of color hex codes
+
+        Returns:
+            Dictionary with chart configuration
+        """
+        chart_config = {
+            "type": chart_type,
+            "title": title,
+            "data": data,
+            "config": {},
+        }
+
+        if chart_type in ["bar", "line"]:
+            if x_axis:
+                chart_config["config"]["xAxis"] = x_axis
+            if y_axis:
+                chart_config["config"]["yAxis"] = y_axis
+        elif chart_type == "pie":
+            if name_key:
+                chart_config["config"]["nameKey"] = name_key
+            if value_key:
+                chart_config["config"]["valueKey"] = value_key
+
+        if colors:
+            chart_config["config"]["colors"] = colors
+
+        return chart_config
+
+    @staticmethod
+    def format_time_series(
+        records: List[Dict[str, Any]],
+        time_key: str,
+        value_keys: List[str],
+        title: str,
+        chart_type: ChartType = "line",
+    ) -> Dict[str, Any]:
+        """
+        Format time series data for line or bar charts.
+
+        Args:
+            records: List of records with time and value data
+            time_key: Key containing time/date information
+            value_keys: Keys for values to plot
+            title: Chart title
+            chart_type: 'line' or 'bar'
+
+        Returns:
+            Chart configuration dictionary
+        """
+        # Sort by time if possible
+        try:
+            sorted_records = sorted(records, key=lambda x: x.get(time_key, ""))
+        except:
+            sorted_records = records
+
+        return ChartFormatter.format_chart_data(
+            chart_type=chart_type,
+            data=sorted_records,
+            title=title,
+            x_axis=time_key,
+            y_axis=value_keys,
+        )
+
+    @staticmethod
+    def format_distribution(
+        records: List[Dict[str, Any]],
+        name_key: str,
+        value_key: str,
+        title: str,
+        chart_type: ChartType = "pie",
+    ) -> Dict[str, Any]:
+        """
+        Format distribution data for pie or bar charts.
+
+        Args:
+            records: List of records with categories and values
+            name_key: Key for category names
+            value_key: Key for values
+            title: Chart title
+            chart_type: 'pie' or 'bar'
+
+        Returns:
+            Chart configuration dictionary
+        """
+        if chart_type == "pie":
+            return ChartFormatter.format_chart_data(
+                chart_type="pie",
+                data=records,
+                title=title,
+                name_key=name_key,
+                value_key=value_key,
+            )
+        else:  # bar chart
+            return ChartFormatter.format_chart_data(
+                chart_type="bar",
+                data=records,
+                title=title,
+                x_axis=name_key,
+                y_axis=[value_key],
+            )
+
+    @staticmethod
+    def format_comparison(
+        records: List[Dict[str, Any]],
+        category_key: str,
+        compare_keys: List[str],
+        title: str,
+        chart_type: ChartType = "bar",
+    ) -> Dict[str, Any]:
+        """
+        Format comparison data for bar or line charts.
+
+        Args:
+            records: List of records with categories and comparison values
+            category_key: Key for category names
+            compare_keys: Keys for values to compare
+            title: Chart title
+            chart_type: 'bar' or 'line'
+
+        Returns:
+            Chart configuration dictionary
+        """
+        return ChartFormatter.format_chart_data(
+            chart_type=chart_type,
+            data=records,
+            title=title,
+            x_axis=category_key,
+            y_axis=compare_keys,
+        )
+
+    @staticmethod
+    def detect_chart_type_from_data(
+        data: List[Dict[str, Any]], user_question: str = ""
+    ) -> Optional[ChartType]:
+        """
+        Intelligently detect the best chart type based on data structure and user question.
+
+        Args:
+            data: Data records
+            user_question: User's question (for context)
+
+        Returns:
+            Suggested chart type or None
+        """
+        if not data or len(data) == 0:
+            return None
+
+        question_lower = user_question.lower()
+
+        # Keywords suggesting specific chart types
+        if any(
+            keyword in question_lower
+            for keyword in ["trend", "over time", "timeline", "progression"]
+        ):
+            return "line"
+
+        if any(
+            keyword in question_lower
+            for keyword in [
+                "distribution",
+                "breakdown",
+                "percentage",
+                "proportion",
+                "share",
+            ]
+        ):
+            return "pie"
+
+        if any(
+            keyword in question_lower
+            for keyword in ["compare", "comparison", "vs", "versus", "difference"]
+        ):
+            return "bar"
+
+        # Analyze data structure
+        first_record = data[0]
+        keys = list(first_record.keys())
+
+        # Check for time-related keys
+        time_keys = ["date", "time", "month", "year", "quarter", "week", "day"]
+        has_time_key = any(
+            any(tk in key.lower() for tk in time_keys) for key in keys
+        )
+
+        if has_time_key:
+            return "line"
+
+        # If only 2 keys (name + value), likely a distribution
+        if len(keys) == 2:
+            return "pie"
+
+        # Default to bar chart for multi-value comparisons
+        return "bar"
+
+    @staticmethod
+    def should_generate_chart(user_question: str, query_results: List[Dict]) -> bool:
+        """
+        Determine if a chart should be generated based on the question and results.
+
+        Args:
+            user_question: User's question
+            query_results: Query results from Neo4j
+
+        Returns:
+            True if chart should be generated
+        """
+        if not query_results or len(query_results) == 0:
+            return False
+
+        # Too much data might not be suitable for charts
+        if len(query_results) > 50:
+            return False
+
+        question_lower = user_question.lower()
+
+        # Chart-related keywords
+        chart_keywords = [
+            "chart",
+            "graph",
+            "plot",
+            "visualize",
+            "show",
+            "display",
+            "trend",
+            "distribution",
+            "comparison",
+            "compare",
+            "over time",
+            "breakdown",
+            "percentage",
+            "rate",
+            "count",
+            "number of",
+            "how many",
+            "statistics",
+            "metrics",
+        ]
+
+        # Questions that don't need charts
+        non_chart_keywords = [
+            "what is",
+            "who is",
+            "when was",
+            "where is",
+            "list all",
+            "show me all",
+            "explain",
+            "describe",
+            "tell me about",
+        ]
+
+        # Check if question suggests a chart
+        has_chart_keyword = any(keyword in question_lower for keyword in chart_keywords)
+        has_non_chart = any(keyword in question_lower for keyword in non_chart_keywords)
+
+        if has_chart_keyword and not has_non_chart:
+            return True
+
+        # Check if data is numeric (good for charts)
+        first_record = query_results[0]
+        numeric_fields = sum(
+            1
+            for value in first_record.values()
+            if isinstance(value, (int, float)) and not isinstance(value, bool)
+        )
+
+        # If multiple numeric fields, likely good for charting
+        if numeric_fields >= 1 and len(query_results) >= 2:
+            return True
+
+        return False
+
+
+def format_neo4j_results_for_chart(
+    results: List[Dict[str, Any]], user_question: str
+) -> Optional[Dict[str, Any]]:
+    """
+    High-level function to automatically format Neo4j results into chart data.
+
+    Args:
+        results: Query results from Neo4j
+        user_question: User's original question
+
+    Returns:
+        Chart configuration dict or None if no chart should be generated
+    """
+    if not ChartFormatter.should_generate_chart(user_question, results):
+        return None
+
+    # Detect chart type
+    chart_type = ChartFormatter.detect_chart_type_from_data(results, user_question)
+    if not chart_type:
+        return None
+
+    # Extract keys from first record
+    if not results:
+        return None
+
+    first_record = results[0]
+    keys = list(first_record.keys())
+
+    # Find likely keys for axes
+    time_keys = ["date", "time", "month", "year", "quarter", "week", "day"]
+    category_keys = ["category", "type", "name", "status", "label"]
+
+    x_key = None
+    y_keys = []
+    name_key = None
+    value_key = None
+
+    for key in keys:
+        key_lower = key.lower()
+
+        # Check for time keys
+        if any(tk in key_lower for tk in time_keys):
+            x_key = key
+        # Check for category keys
+        elif any(ck in key_lower for ck in category_keys):
+            if not x_key:
+                x_key = key
+            name_key = key
+        # Numeric keys become y-axis values
+        elif isinstance(first_record[key], (int, float)) and not isinstance(
+            first_record[key], bool
+        ):
+            y_keys.append(key)
+            if not value_key:
+                value_key = key
+
+    # Default to first key if no x_key found
+    if not x_key and keys:
+        x_key = keys[0]
+        name_key = keys[0]
+
+    # Generate title from question
+    title = user_question[:60] + "..." if len(user_question) > 60 else user_question
+
+    # Format based on chart type
+    if chart_type == "pie":
+        return ChartFormatter.format_distribution(
+            records=results,
+            name_key=name_key or x_key,
+            value_key=value_key or (y_keys[0] if y_keys else keys[1]),
+            title=title,
+            chart_type="pie",
+        )
+    elif chart_type == "line":
+        return ChartFormatter.format_time_series(
+            records=results,
+            time_key=x_key,
+            value_keys=y_keys if y_keys else [keys[1]],
+            title=title,
+            chart_type="line",
+        )
+    else:  # bar
+        return ChartFormatter.format_comparison(
+            records=results,
+            category_key=x_key,
+            compare_keys=y_keys if y_keys else [keys[1]],
+            title=title,
+            chart_type="bar",
+        )

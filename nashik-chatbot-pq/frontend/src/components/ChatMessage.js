@@ -6,6 +6,7 @@ import "./ChatMessage.css";
 import mahindraLogo from "../assests/logo.png";
 import { conversationService } from "../services/api";
 import FeedbackModal from "./FeedbackModal";
+import ChartComponent from "./ChartComponent";
 import { fixMarkdownTables } from "../utils/markdownUtils";
 
 const ChatMessage = ({ message, conversationId, thinkingSteps }) => {
@@ -95,11 +96,17 @@ const ChatMessage = ({ message, conversationId, thinkingSteps }) => {
           {!isUser ? (
             <>
               {message.text ? (
-                <div className="bot-message-markdown">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {fixedMarkdown}
-                  </ReactMarkdown>
-                </div>
+                <>
+                  <div className="bot-message-markdown">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {fixedMarkdown}
+                    </ReactMarkdown>
+                  </div>
+                  {/* Render chart if chart_data is present */}
+                  {message.chart_data && (
+                    <ChartComponent chartData={message.chart_data} />
+                  )}
+                </>
               ) : (
                 <div className="typing-indicator">
                   <span className="typing-dot"></span>

@@ -76,6 +76,7 @@ class ConversationService:
                 return
 
             full_response = []
+            chart_data = None
             response_saved = False
 
             # Get agent from pool
@@ -91,13 +92,25 @@ class ConversationService:
 
                     # Collect response tokens
                     if event.get("type") == "token":
-                        full_response.append(
-                            event["content"]
-                        )  # Save response to database after streaming completes
+                        full_response.append(event["content"])
+
+                    # Collect chart data if present
+                    elif event.get("type") == "chart":
+                        chart_data = event.get("chart_data")
+                        logger.info(f"Captured chart data: {chart_data.get('type') if chart_data else None}")
+
+                # Save response to database after streaming completes
                 if full_response:
                     complete_response = "".join(full_response)
                     print(complete_response)
-                    response_data = {"response": complete_response, "similar_docs": []}
+                    response_data = {
+                        "response": complete_response,
+                        "similar_docs": [],
+                    }
+
+                    # Include chart data if available
+                    if chart_data:
+                        response_data["chart_data"] = chart_data
 
                     message_id = self.chat_manager.save_message(
                         conversation_id=conversation_id,
@@ -116,13 +129,18 @@ class ConversationService:
                         )
                         self.chat_manager.update_chat_title(conversation_id, title)
 
-                    # Send final response with message ID
+                    # Send final response with message ID and chart data
                     final_data = {
                         "type": "final",
                         "content": complete_response,
                         "messageId": message_id,
                         "response": complete_response,
                     }
+
+                    # Include chart data in final response
+                    if chart_data:
+                        final_data["chart_data"] = chart_data
+
                     yield f"data: {json.dumps(final_data)}\n\n"
 
                     logger.info(

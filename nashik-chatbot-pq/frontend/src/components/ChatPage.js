@@ -237,6 +237,8 @@ function ChatPage() {
             }),
             cypher_query: response?.cypher_query,
             similar_docs: response?.similar_docs,
+            // Include chart_data if present in historical message
+            ...(response?.chart_data && { chart_data: response.chart_data }),
           });
         });
       } else {
@@ -461,6 +463,26 @@ function ChatPage() {
         messagesRef.current = out;
         return out;
       });
+    } else if (data.type === "chart") {
+      // Handle chart data event
+      console.log("Chart data received:", data.chart_data);
+
+      // Store chart data in the last bot message
+      setMessages((prev) => {
+        if (!prev.length) return prev;
+        const out = [...prev];
+        const idx = out.length - 1;
+
+        if (out[idx].sender === "bot" && !out[idx].messageId) {
+          out[idx] = {
+            ...out[idx],
+            chart_data: data.chart_data,
+          };
+        }
+
+        messagesRef.current = out;
+        return out;
+      });
     } else if (data.type === "complete" || data.type === "final") {
       setIsLoading(false);
       setThinkingSteps([]);
@@ -477,6 +499,8 @@ function ChatPage() {
             ...out[idx],
             messageId: data.messageId || data.message_id,
             text: data.content || data.response || out[idx].text,
+            // Include chart_data if present in final event
+            ...(data.chart_data && { chart_data: data.chart_data }),
           };
         } else {
           // Fallback: create new message
@@ -489,6 +513,8 @@ function ChatPage() {
               hour: "2-digit",
               minute: "2-digit",
             }),
+            // Include chart_data if present
+            ...(data.chart_data && { chart_data: data.chart_data }),
           });
         }
 

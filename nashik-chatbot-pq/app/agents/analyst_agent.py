@@ -16,6 +16,7 @@ from app.services.prompt_manager import (
 )
 from app.models.model_factory import ModelFactory
 from app.utils.query_executor import QueryExecutor
+from app.utils.chart_formatter import format_neo4j_results_for_chart
 from app.connectors.neo4j_connector import Neo4jConnector
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,9 @@ class AnalystAgent:
         self.summarization_trigger_tokens = summarization_trigger_tokens
         self.keep_recent_messages = keep_recent_messages
         self.agent = None
+        # Store chart data for the current query
+        self.current_chart_data = None
+        self.current_user_question = None
         self._initialize_agent()
 
     def _initialize_agent(self):
@@ -85,6 +89,26 @@ class AnalystAgent:
                 # Execute the generated query
                 query = cypher_result["cypher_query"]
                 result = self.query_executor.execute_cypher(query)
+
+                # Check if we should generate a chart for these results
+                if result.get("success") and result.get("records"):
+                    try:
+                        # Use the current user question for context
+                        user_question = (
+                            self.current_user_question
+                            if hasattr(self, "current_user_question")
+                            and self.current_user_question
+                            else question
+                        )
+                        chart_data = format_neo4j_results_for_chart(
+                            result["records"], user_question
+                        )
+                        if chart_data:
+                            # Store chart data for later emission
+                            self.current_chart_data = chart_data
+                            logger.info(f"Generated chart data: {chart_data.get('type')} chart")
+                    except Exception as e:
+                        logger.warning(f"Could not generate chart data: {e}")
 
                 return result
 
@@ -232,6 +256,10 @@ class AnalystAgent:
         """
         try:
             logger.info(f"Streaming analysis for: {user_question[:100]}...")
+
+            # Store the user question for chart generation context
+            self.current_user_question = user_question
+            self.current_chart_data = None
 
             # Create input messages
             inputs = {"messages": [{"role": "user", "content": user_question}]}
@@ -519,6 +547,16 @@ class AnalystAgent:
                                 just_finished_thinking = True
                                 # Skip - we already capture thinking from tool calls above
                                 continue
+
+            # After streaming completes, emit chart data if available
+            if self.current_chart_data:
+                logger.info(f"Emitting chart data: {self.current_chart_data.get('type')}")
+                yield {
+                    "type": "chart",
+                    "chart_data": self.current_chart_data,
+                }
+                # Clear chart data after emitting
+                self.current_chart_data = None
 
         except Exception as e:
             logger.error(f"Error in streaming: {e}", exc_info=True)
