@@ -46,12 +46,22 @@ const ChartComponent = ({ chartData }) => {
 
   // Format month numbers to short month names
   const formatMonth = (value) => {
+    // Handle both "1" and "01" formats
     const monthMap = {
-      '1': 'Jan', '2': 'Feb', '3': 'Mar', '4': 'Apr',
-      '5': 'May', '6': 'Jun', '7': 'Jul', '8': 'Aug',
-      '9': 'Sep', '10': 'Oct', '11': 'Nov', '12': 'Dec'
+      '1': 'Jan', '01': 'Jan',
+      '2': 'Feb', '02': 'Feb',
+      '3': 'Mar', '03': 'Mar',
+      '4': 'Apr', '04': 'Apr',
+      '5': 'May', '05': 'May',
+      '6': 'Jun', '06': 'Jun',
+      '7': 'Jul', '07': 'Jul',
+      '8': 'Aug', '08': 'Aug',
+      '9': 'Sep', '09': 'Sep',
+      '10': 'Oct', '11': 'Nov', '12': 'Dec'
     };
-    return monthMap[value] || value;
+    // Also handle numeric values
+    const strValue = String(value);
+    return monthMap[strValue] || value;
   };
 
   // Custom tooltip formatter for better readability
@@ -86,10 +96,10 @@ const ChartComponent = ({ chartData }) => {
     const yAxisLabel = config.yAxisLabel || (yAxes.length === 1 ? yAxes[0] : 'Value');
 
     return (
-      <ResponsiveContainer width="100%" height={450}>
+      <ResponsiveContainer width="100%" height={320}>
         <BarChart
           data={data}
-          margin={{ top: 20, right: 30, left: 60, bottom: 60 }}
+          margin={{ top: 15, right: 20, left: 50, bottom: 50 }}
           onClick={null}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -137,10 +147,10 @@ const ChartComponent = ({ chartData }) => {
     const yAxisLabel = config.yAxisLabel || (yAxes.length === 1 ? yAxes[0] : 'Value');
 
     return (
-      <ResponsiveContainer width="100%" height={450}>
+      <ResponsiveContainer width="100%" height={320}>
         <LineChart
           data={data}
-          margin={{ top: 20, right: 30, left: 60, bottom: 60 }}
+          margin={{ top: 15, right: 20, left: 50, bottom: 50 }}
           onClick={null}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -198,12 +208,12 @@ const ChartComponent = ({ chartData }) => {
     // Custom label that stays visible (not just on hover)
     const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
       const RADIAN = Math.PI / 180;
-      const radius = outerRadius + 25;
+      const radius = outerRadius + 20;
       const x = cx + radius * Math.cos(-midAngle * RADIAN);
       const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
-      // Only show label if percentage is > 3% (to avoid cluttering small slices)
-      if (percent < 0.03) return null;
+      // Only show label if percentage is > 5% (to avoid cluttering small slices)
+      if (percent < 0.05) return null;
 
       return (
         <text
@@ -212,7 +222,7 @@ const ChartComponent = ({ chartData }) => {
           fill="#9ca3af"
           textAnchor={x > cx ? 'start' : 'end'}
           dominantBaseline="central"
-          style={{ fontSize: '12px', fontWeight: '500' }}
+          style={{ fontSize: '11px', fontWeight: '500' }}
         >
           {`${name}: ${(percent * 100).toFixed(1)}%`}
         </text>
@@ -246,7 +256,7 @@ const ChartComponent = ({ chartData }) => {
     };
 
     return (
-      <ResponsiveContainer width="100%" height={500}>
+      <ResponsiveContainer width="100%" height={350}>
         <PieChart onClick={null}>
           <Pie
             data={pieData}
@@ -257,7 +267,7 @@ const ChartComponent = ({ chartData }) => {
               strokeWidth: 1
             }}
             label={renderCustomLabel}
-            outerRadius={130}
+            outerRadius={100}
             fill="#8884d8"
             dataKey="value"
             onClick={null}
@@ -287,7 +297,7 @@ const ChartComponent = ({ chartData }) => {
   };
 
   return (
-    <div className="chart-container my-4 p-4 bg-gray-800 rounded-lg border border-gray-700">
+    <div className="chart-container my-3 p-3 bg-gray-800 rounded-lg border border-gray-700">
       <div className="chart-wrapper">
         {renderChart()}
       </div>
