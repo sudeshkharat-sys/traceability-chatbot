@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     SERVER_LOG_LEVEL: str = "debug"
 
     # CORS Configuration
-    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5000,http://127.0.0.1:5000"
 
     # Session Configuration
     SESSION_SECRET: str = "change-me-in-production"
