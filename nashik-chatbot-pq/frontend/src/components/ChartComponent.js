@@ -76,11 +76,11 @@ const ChartComponent = ({ chartData }) => {
         padding: '10px',
         color: '#ffffff'
       }}>
-        <p style={{ marginBottom: '5px', fontWeight: 'bold', color: '#ffffff' }}>
+        <p style={{fontWeight: 'bold', color: '#ffffff' }}>
           {formatMonth(label)}
         </p>
         {payload.map((entry, index) => (
-          <p key={index} style={{ margin: '3px 0', color: '#ffffff' }}>
+          <p key={index} style={{ color: '#ffffff' }}>
             <span style={{ color: entry.color }}>●</span> {entry.name}: {entry.value}
           </p>
         ))}
@@ -99,7 +99,6 @@ const ChartComponent = ({ chartData }) => {
       <ResponsiveContainer width="100%" height={320}>
         <BarChart
           data={data}
-          margin={{ top: 15, right: 20, left: 50, bottom: 50 }}
           onClick={null}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -150,7 +149,6 @@ const ChartComponent = ({ chartData }) => {
       <ResponsiveContainer width="100%" height={320}>
         <LineChart
           data={data}
-          margin={{ top: 15, right: 20, left: 50, bottom: 50 }}
           onClick={null}
         >
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
