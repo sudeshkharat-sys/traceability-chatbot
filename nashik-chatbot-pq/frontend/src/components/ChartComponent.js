@@ -49,19 +49,33 @@ const ChartComponent = ({ chartData }) => {
   const renderBarChart = () => {
     const xAxis = config.xAxis || 'name';
     const yAxes = config.yAxis || Object.keys(data[0]).filter(key => key !== xAxis);
+    const xAxisLabel = config.xAxisLabel || xAxis;
+    const yAxisLabel = config.yAxisLabel || (yAxes.length === 1 ? yAxes[0] : 'Value');
 
     return (
-      <ResponsiveContainer width="100%" height={400}>
-        <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+      <ResponsiveContainer width="100%" height={450}>
+        <BarChart data={data} margin={{ top: 20, right: 30, left: 60, bottom: 60 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
           <XAxis
             dataKey={xAxis}
             stroke="#9ca3af"
             style={{ fontSize: '12px' }}
+            label={{
+              value: xAxisLabel,
+              position: 'insideBottom',
+              offset: -10,
+              style: { fill: '#9ca3af', fontSize: '14px', fontWeight: 'bold' }
+            }}
           />
           <YAxis
             stroke="#9ca3af"
             style={{ fontSize: '12px' }}
+            label={{
+              value: yAxisLabel,
+              angle: -90,
+              position: 'insideLeft',
+              style: { fill: '#9ca3af', fontSize: '14px', fontWeight: 'bold', textAnchor: 'middle' }
+            }}
           />
           <Tooltip
             contentStyle={{
@@ -72,7 +86,7 @@ const ChartComponent = ({ chartData }) => {
             }}
           />
           <Legend
-            wrapperStyle={{ color: '#9ca3af' }}
+            wrapperStyle={{ color: '#9ca3af', paddingTop: '20px' }}
           />
           {yAxes.map((key, index) => (
             <Bar
@@ -91,19 +105,33 @@ const ChartComponent = ({ chartData }) => {
   const renderLineChart = () => {
     const xAxis = config.xAxis || 'name';
     const yAxes = config.yAxis || Object.keys(data[0]).filter(key => key !== xAxis);
+    const xAxisLabel = config.xAxisLabel || xAxis;
+    const yAxisLabel = config.yAxisLabel || (yAxes.length === 1 ? yAxes[0] : 'Value');
 
     return (
-      <ResponsiveContainer width="100%" height={400}>
-        <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+      <ResponsiveContainer width="100%" height={450}>
+        <LineChart data={data} margin={{ top: 20, right: 30, left: 60, bottom: 60 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
           <XAxis
             dataKey={xAxis}
             stroke="#9ca3af"
             style={{ fontSize: '12px' }}
+            label={{
+              value: xAxisLabel,
+              position: 'insideBottom',
+              offset: -10,
+              style: { fill: '#9ca3af', fontSize: '14px', fontWeight: 'bold' }
+            }}
           />
           <YAxis
             stroke="#9ca3af"
             style={{ fontSize: '12px' }}
+            label={{
+              value: yAxisLabel,
+              angle: -90,
+              position: 'insideLeft',
+              style: { fill: '#9ca3af', fontSize: '14px', fontWeight: 'bold', textAnchor: 'middle' }
+            }}
           />
           <Tooltip
             contentStyle={{
@@ -114,7 +142,7 @@ const ChartComponent = ({ chartData }) => {
             }}
           />
           <Legend
-            wrapperStyle={{ color: '#9ca3af' }}
+            wrapperStyle={{ color: '#9ca3af', paddingTop: '20px' }}
           />
           {yAxes.map((key, index) => (
             <Line
@@ -143,16 +171,43 @@ const ChartComponent = ({ chartData }) => {
       value: parseFloat(item[valueKey]) || 0
     }));
 
+    // Custom label that stays visible (not just on hover)
+    const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
+      const RADIAN = Math.PI / 180;
+      const radius = outerRadius + 25;
+      const x = cx + radius * Math.cos(-midAngle * RADIAN);
+      const y = cy + radius * Math.sin(-midAngle * RADIAN);
+
+      // Only show label if percentage is > 3% (to avoid cluttering small slices)
+      if (percent < 0.03) return null;
+
+      return (
+        <text
+          x={x}
+          y={y}
+          fill="#9ca3af"
+          textAnchor={x > cx ? 'start' : 'end'}
+          dominantBaseline="central"
+          style={{ fontSize: '12px', fontWeight: '500' }}
+        >
+          {`${name}: ${(percent * 100).toFixed(1)}%`}
+        </text>
+      );
+    };
+
     return (
-      <ResponsiveContainer width="100%" height={400}>
+      <ResponsiveContainer width="100%" height={500}>
         <PieChart>
           <Pie
             data={pieData}
             cx="50%"
             cy="50%"
-            labelLine={true}
-            label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(1)}%`}
-            outerRadius={120}
+            labelLine={{
+              stroke: '#9ca3af',
+              strokeWidth: 1
+            }}
+            label={renderCustomLabel}
+            outerRadius={130}
             fill="#8884d8"
             dataKey="value"
           >
@@ -167,9 +222,13 @@ const ChartComponent = ({ chartData }) => {
               borderRadius: '6px',
               color: '#f3f4f6'
             }}
+            formatter={(value, name) => [`${value} (${((value / pieData.reduce((sum, d) => sum + d.value, 0)) * 100).toFixed(1)}%)`, name]}
           />
           <Legend
-            wrapperStyle={{ color: '#9ca3af' }}
+            wrapperStyle={{ color: '#9ca3af', paddingTop: '20px' }}
+            layout="horizontal"
+            align="center"
+            verticalAlign="bottom"
           />
         </PieChart>
       </ResponsiveContainer>
@@ -193,8 +252,8 @@ const ChartComponent = ({ chartData }) => {
   return (
     <div className="chart-container my-4 p-4 bg-gray-800 rounded-lg border border-gray-700">
       {title && (
-        <h3 className="text-lg font-semibold text-gray-100 mb-4 text-center">
-          {title}
+        <h3 className="text-base font-semibold text-gray-100 mb-4 pb-2 border-b border-gray-700">
+          📊 {title}
         </h3>
       )}
       <div className="chart-wrapper">

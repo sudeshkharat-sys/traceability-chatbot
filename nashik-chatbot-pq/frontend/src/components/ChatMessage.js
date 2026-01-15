@@ -97,15 +97,15 @@ const ChatMessage = ({ message, conversationId, thinkingSteps }) => {
             <>
               {message.text ? (
                 <>
+                  {/* Render chart ABOVE text if chart_data is present */}
+                  {message.chart_data && (
+                    <ChartComponent chartData={message.chart_data} />
+                  )}
                   <div className="bot-message-markdown">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
                       {fixedMarkdown}
                     </ReactMarkdown>
                   </div>
-                  {/* Render chart if chart_data is present */}
-                  {message.chart_data && (
-                    <ChartComponent chartData={message.chart_data} />
-                  )}
                 </>
               ) : (
                 <div className="typing-indicator">

@@ -252,12 +252,17 @@ class ChartFormatter:
 
         question_lower = user_question.lower()
 
-        # Chart-related keywords
-        chart_keywords = [
+        # Chart-related keywords (high priority - explicit chart requests)
+        explicit_chart_keywords = [
             "chart",
             "graph",
             "plot",
             "visualize",
+            "visualization",
+        ]
+
+        # Chart-related keywords (medium priority)
+        chart_keywords = [
             "show",
             "display",
             "trend",
@@ -288,6 +293,11 @@ class ChartFormatter:
             "tell me about",
         ]
 
+        # If user explicitly asks for chart/plot/graph - ALWAYS generate
+        has_explicit_chart = any(keyword in question_lower for keyword in explicit_chart_keywords)
+        if has_explicit_chart:
+            return True
+
         # Check if question suggests a chart
         has_chart_keyword = any(keyword in question_lower for keyword in chart_keywords)
         has_non_chart = any(keyword in question_lower for keyword in non_chart_keywords)
@@ -308,6 +318,69 @@ class ChartFormatter:
             return True
 
         return False
+
+
+def _generate_chart_title(chart_type: str, x_key: str, y_keys: List[str], data: List[Dict]) -> str:
+    """
+    Generate a descriptive chart title based on data structure.
+
+    Args:
+        chart_type: Type of chart ('line', 'bar', 'pie')
+        x_key: Key for x-axis or category
+        y_keys: Keys for y-axis values
+        data: The data being charted
+
+    Returns:
+        Descriptive title string
+    """
+    # Format key names nicely (remove underscores, capitalize)
+    def format_key(key):
+        return key.replace('_', ' ').replace('-', ' ').title()
+
+    if chart_type == "line":
+        if len(y_keys) == 1:
+            return f"{format_key(y_keys[0])} Over {format_key(x_key)}"
+        else:
+            return f"{', '.join([format_key(k) for k in y_keys[:2]])} Trend"
+    elif chart_type == "bar":
+        if len(y_keys) == 1:
+            return f"{format_key(y_keys[0])} by {format_key(x_key)}"
+        else:
+            return f"Comparison: {', '.join([format_key(k) for k in y_keys[:2]])}"
+    elif chart_type == "pie":
+        if len(y_keys) >= 1:
+            return f"{format_key(y_keys[0])} Distribution"
+        else:
+            return f"{format_key(x_key)} Distribution"
+
+    return "Data Visualization"
+
+
+def _generate_axis_labels(x_key: str, y_keys: List[str]) -> tuple:
+    """
+    Generate descriptive axis labels.
+
+    Args:
+        x_key: Key for x-axis
+        y_keys: Keys for y-axis values
+
+    Returns:
+        Tuple of (x_label, y_label)
+    """
+    def format_key(key):
+        return key.replace('_', ' ').replace('-', ' ').title()
+
+    x_label = format_key(x_key)
+
+    if len(y_keys) == 1:
+        y_label = format_key(y_keys[0])
+    elif len(y_keys) > 1:
+        # If multiple y-axes, use generic label or first key
+        y_label = format_key(y_keys[0])
+    else:
+        y_label = "Value"
+
+    return x_label, y_label
 
 
 def format_neo4j_results_for_chart(
@@ -340,7 +413,7 @@ def format_neo4j_results_for_chart(
 
     # Find likely keys for axes
     time_keys = ["date", "time", "month", "year", "quarter", "week", "day"]
-    category_keys = ["category", "type", "name", "status", "label"]
+    category_keys = ["category", "type", "name", "status", "label", "zone", "part"]
 
     x_key = None
     y_keys = []
@@ -371,12 +444,15 @@ def format_neo4j_results_for_chart(
         x_key = keys[0]
         name_key = keys[0]
 
-    # Generate title from question
-    title = user_question[:60] + "..." if len(user_question) > 60 else user_question
+    # Generate descriptive title based on data structure
+    title = _generate_chart_title(chart_type, x_key, y_keys, results)
+
+    # Generate axis labels
+    x_label, y_label = _generate_axis_labels(x_key, y_keys)
 
     # Format based on chart type
     if chart_type == "pie":
-        return ChartFormatter.format_distribution(
+        chart_config = ChartFormatter.format_distribution(
             records=results,
             name_key=name_key or x_key,
             value_key=value_key or (y_keys[0] if y_keys else keys[1]),
@@ -384,18 +460,28 @@ def format_neo4j_results_for_chart(
             chart_type="pie",
         )
     elif chart_type == "line":
-        return ChartFormatter.format_time_series(
+        chart_config = ChartFormatter.format_time_series(
             records=results,
             time_key=x_key,
             value_keys=y_keys if y_keys else [keys[1]],
             title=title,
             chart_type="line",
         )
+        # Add axis labels
+        chart_config["config"]["xAxisLabel"] = x_label
+        chart_config["config"]["yAxisLabel"] = y_label
+        return chart_config
     else:  # bar
-        return ChartFormatter.format_comparison(
+        chart_config = ChartFormatter.format_comparison(
             records=results,
             category_key=x_key,
             compare_keys=y_keys if y_keys else [keys[1]],
             title=title,
             chart_type="bar",
         )
+        # Add axis labels
+        chart_config["config"]["xAxisLabel"] = x_label
+        chart_config["config"]["yAxisLabel"] = y_label
+        return chart_config
+
+    return chart_config
