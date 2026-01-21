@@ -1,7 +1,8 @@
 # Multi-stage Dockerfile for Thar Roxx Quality Intelligence API
 
 # Stage 1: Build React Frontend
-FROM node:24.13-alpine AS frontend-builder
+# Using Node 20 LTS for better stability and compatibility
+FROM node:20-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 
