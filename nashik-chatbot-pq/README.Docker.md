@@ -18,6 +18,8 @@ The Docker setup includes the following services:
 - At least 4GB of available RAM
 - Azure OpenAI API credentials
 
+> **Don't have Docker installed?** See [DOCKER_INSTALLATION.md](DOCKER_INSTALLATION.md) for complete installation instructions for Ubuntu.
+
 ## Data Persistence & Auto-Start
 
 ✅ **Your data is safe!** This setup uses Docker volumes for persistent storage.
