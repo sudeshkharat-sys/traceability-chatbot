@@ -8,9 +8,28 @@ from functools import lru_cache
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# .env file in the same folder as this config file
-CONFIG_DIR = Path(__file__).parent
-ENV_FILE = CONFIG_DIR / ".env"
+# .env file configuration
+# Prioritize .env in the current working directory (useful for production/exe)
+# Fallback to the one in this config folder (useful for dev)
+import sys
+
+def get_env_path():
+    # Check for .env in current working directory
+    cwd_env = Path.cwd() / ".env"
+    if cwd_env.exists():
+        return cwd_env
+    
+    # If frozen (PyInstaller), check executable directory
+    if getattr(sys, 'frozen', False):
+        exe_dir = Path(sys.executable).parent
+        exe_env = exe_dir / ".env"
+        if exe_env.exists():
+            return exe_env
+            
+    # Default to local config dir
+    return Path(__file__).parent / ".env"
+
+ENV_FILE = get_env_path()
 
 
 class Settings(BaseSettings):

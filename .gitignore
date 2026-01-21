@@ -55,4 +55,9 @@ Thumbs.db
 *.wmv
 *.csv
 *.xlsx
+*.toc
+*.pkg
+*.pyz
+*.zip
+*.spec
 

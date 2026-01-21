@@ -92,9 +92,53 @@ def create_app() -> FastAPI:
     # Include API routes first
     app.include_router(api_router, prefix="/api")
 
-    # Mount static files (React build) - this catches all remaining routes
-    # html=True enables SPA routing (serves index.html for all non-file paths)
-    app.mount("/", StaticFiles(directory="./frontend/build", html=True), name="static")
+    # Determine frontend build directory
+    import sys
+    from pathlib import Path
+    from fastapi.responses import FileResponse
+    
+    def get_frontend_path():
+        # 1. Check current working directory (e.g., ./frontend/build)
+        cwd_path = Path.cwd() / "frontend" / "build"
+        if cwd_path.exists():
+            return cwd_path
+            
+        # 2. If frozen, check next to executable
+        if getattr(sys, 'frozen', False):
+            exe_path = Path(sys.executable).parent / "frontend" / "build"
+            if exe_path.exists():
+                return exe_path
+                
+            # 3. If frozen (onefile), check temp dir (sys._MEIPASS)
+            if hasattr(sys, '_MEIPASS'):
+                 meipass_path = Path(sys._MEIPASS) / "frontend" / "build"
+                 if meipass_path.exists():
+                     return meipass_path
+
+        # 4. Fallback to default dev path
+        return Path("./frontend/build")
+
+    frontend_path = get_frontend_path()
+    
+    if frontend_path.exists():
+        # 1. Mount /static explicitly (CSS/JS chunks)
+        static_dir = frontend_path / "static"
+        if static_dir.exists():
+            app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+        
+        # 2. Catch-all route for SPA
+        # This serves files if they exist (favicon.ico, etc.), otherwise index.html
+        @app.get("/{full_path:path}")
+        async def serve_spa(full_path: str):
+            # Check if actual file exists in build dir
+            file_path = frontend_path / full_path
+            if file_path.is_file():
+                return FileResponse(file_path)
+            
+            # Otherwise serve index.html (client-side routing)
+            return FileResponse(frontend_path / "index.html")
+    else:
+        logger.warning(f"⚠️ Frontend build not found at {frontend_path}. UI will not be available.")
 
     return app
 
@@ -102,25 +146,37 @@ def create_app() -> FastAPI:
 app = create_app()
 
 if __name__ == "__main__":
+    import sys
     settings = get_settings()
 
     # Configure uvicorn with optimized settings for Windows
-    config = {
-        "app": "main:app",
+    # Check if frozen to determine how to pass the app
+    is_frozen = getattr(sys, 'frozen', False)
+    
+    run_config = {
         "host": settings.SERVER_HOST,
         "port": settings.SERVER_PORT,
-        "reload": settings.SERVER_RELOAD,
         "log_level": settings.SERVER_LOG_LEVEL.lower(),
-        "workers": 1,  # Single worker to avoid multiprocessing issues on Windows
+        "workers": 1,
     }
 
-    # When reload is enabled, add reload-specific settings
-    if settings.SERVER_RELOAD:
-        config.update(
+    if is_frozen:
+        # Frozen: Pass app object, disable reload
+        run_config["app"] = app
+        run_config["reload"] = False
+        logger.info("❄️ Running in frozen mode")
+    else:
+        # Dev: Pass import string, enable reload from settings
+        run_config["app"] = "main:app"
+        run_config["reload"] = settings.SERVER_RELOAD
+    
+    # When reload is enabled (and not frozen), add reload-specific settings
+    if run_config.get("reload"):
+        run_config.update(
             {
-                "reload_dirs": ["app", "backend"],  # Only watch relevant directories
-                "reload_delay": 0.5,  # Add small delay to batch changes
+                "reload_dirs": ["app", "backend"],
+                "reload_delay": 0.5,
             }
         )
 
-    uvicorn.run(**config)
+    uvicorn.run(**run_config)
