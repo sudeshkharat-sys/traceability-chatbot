@@ -18,6 +18,23 @@ The Docker setup includes the following services:
 - At least 4GB of available RAM
 - Azure OpenAI API credentials
 
+> **Don't have Docker installed?** See [DOCKER_INSTALLATION.md](DOCKER_INSTALLATION.md) for complete installation instructions for Ubuntu.
+
+## Data Persistence & Auto-Start
+
+✅ **Your data is safe!** This setup uses Docker volumes for persistent storage.
+✅ **Auto-starts on VM reboot!** All containers configured with `restart: unless-stopped`.
+
+Perfect for VMs that shutdown daily:
+- **8 PM VM shutdown** → Data persists on disk
+- **Morning VM startup** → Containers auto-start with all data intact
+
+**See [VM_RESTART_GUIDE.md](VM_RESTART_GUIDE.md) for complete details on:**
+- How data persistence works
+- Auto-start configuration
+- Testing VM restart scenarios
+- One-time VM setup (enable Docker on boot)
+
 ## Quick Start
 
 ### 1. Clone the Repository
