@@ -17,6 +17,9 @@ RUN npm install --legacy-peer-deps --production=false
 # Copy frontend source code
 COPY frontend/ ./
 
+# Debug: List files to verify structure
+RUN ls -la && ls -la src/ && ls -la src/assests/ && ls -la src/components/
+
 # Build React application
 RUN npm run build
 
