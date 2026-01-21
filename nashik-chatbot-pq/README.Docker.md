@@ -100,6 +100,43 @@ All services should show "healthy" status after a minute.
 - **Neo4j Browser**: http://localhost:7474 (Username: `neo4j`, Password: `password`)
 - **Direct App Access**: http://localhost:5000 (bypasses Nginx)
 
+## SSL/HTTPS Setup
+
+🔒 **Want to enable HTTPS?** The setup is already configured for SSL with separate server blocks for HTTP (port 80) and HTTPS (port 443).
+
+### Quick SSL Setup
+
+```bash
+# Run the automated setup script
+sudo ./setup-ssl.sh /path/to/your/certificates
+
+# Restart Docker
+sudo docker compose down && sudo docker compose up -d
+```
+
+### SSL Documentation
+
+- **[QUICK_SSL_SETUP.md](QUICK_SSL_SETUP.md)** - ⚡ Fast reference guide with one-command setup
+- **[CERTIFICATE_SETUP_GUIDE.md](CERTIFICATE_SETUP_GUIDE.md)** - 📚 Comprehensive guide with detailed instructions
+- **[SSL_SETUP.md](SSL_SETUP.md)** - 🔧 Complete SSL/HTTPS configuration reference
+
+### What's Already Configured
+
+✅ **nginx.conf** - HTTP (port 80) and HTTPS (port 443) server blocks
+✅ **docker-compose.yml** - Exposes ports 80 and 443
+✅ **docker-compose.yml** - Mounts ./ssl directory to container
+✅ **.gitignore** - SSL files won't be committed to git
+
+**You only need to provide the certificate files!**
+
+### SSL Certificate Options
+
+1. **Let's Encrypt** (Free, recommended for production)
+2. **Existing SSL Certificate** (Commercial or organizational)
+3. **Self-Signed** (Testing only)
+
+See the SSL documentation above for detailed setup instructions for each option.
+
 ## Service Configuration
 
 ### PostgreSQL
@@ -358,7 +395,7 @@ For production deployment:
 
 1. **Change Default Passwords**: Update all passwords in `docker-compose.yml` and `.env`
 2. **Use Secrets**: Consider using Docker secrets for sensitive data
-3. **Enable HTTPS**: Configure SSL/TLS in Nginx
+3. **Enable HTTPS**: See [SSL/HTTPS Setup](#sslhttps-setup) section above and [QUICK_SSL_SETUP.md](QUICK_SSL_SETUP.md)
 4. **Resource Limits**: Add resource constraints in `docker-compose.yml`
 5. **Monitoring**: Add health monitoring and alerting
 6. **Backups**: Set up automated backup schedules
@@ -381,7 +418,7 @@ app:
 ## Network Architecture
 
 ```
-Internet (Port 80)
+Internet (Port 80 HTTP / Port 443 HTTPS)
         ↓
     [Nginx Container]
         ↓ (forwards to)
@@ -389,6 +426,8 @@ Internet (Port 80)
         ↓               ↓
 [PostgreSQL:5432]  [Neo4j:7687]
 ```
+
+**Note**: HTTPS (port 443) requires SSL certificates - see [SSL/HTTPS Setup](#sslhttps-setup) section above.
 
 ## Environment Variables Reference
 
