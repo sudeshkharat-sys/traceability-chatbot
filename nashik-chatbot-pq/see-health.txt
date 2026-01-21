@@ -1,0 +1,68 @@
+(base) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ ./docker-health.sh 
+=== Docker Compose Services Status ===
+WARN[0000] /home/maiuser/nashik-chatbot-pq/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove i
+t to avoid potential confusion 
+NAME                    IMAGE                   COMMAND                  SERVICE    CREATED         STATUS                     PORTS
+traceability-app        nashik-chatbot-pq-app   "python main.py"         app        8 minutes ago   Up 8 minutes (healthy)     0.0.0.0:
+5000->5000/tcp, [::]:5000->5000/tcp
+traceability-neo4j      neo4j:2025.12.1         "tini -g -- /startup…"   neo4j      8 minutes ago   Up 8 minutes (healthy)     0.0.0.0:
+7474->7474/tcp, [::]:7474->7474/tcp, 7473/tcp, 0.0.0.0:7687->7687/tcp, [::]:7687->7687/tcp
+traceability-nginx      nginx:alpine            "/docker-entrypoint.…"   nginx      8 minutes ago   Up 8 minutes (unhealthy)   0.0.0.0:
+80->80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp
+traceability-postgres   postgres:17-alpine      "docker-entrypoint.s…"   postgres   8 minutes ago   Up 8 minutes (healthy)     0.0.0.0:
+5432->5432/tcp, [::]:5432->5432/tcp
+
+=== Container Health ===
+NAMES                   STATUS
+traceability-nginx      Up 8 minutes (unhealthy)
+traceability-app        Up 8 minutes (healthy)
+traceability-postgres   Up 8 minutes (healthy)
+traceability-neo4j      Up 8 minutes (healthy)
+
+=== Port Listening ===
+tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN      104059/docker-proxy 
+tcp        0      0 0.0.0.0:443             0.0.0.0:*               LISTEN      104074/docker-proxy 
+tcp        0      0 0.0.0.0:5432            0.0.0.0:*               LISTEN      103401/docker-proxy 
+tcp        0      0 0.0.0.0:7687            0.0.0.0:*               LISTEN      103372/docker-proxy 
+tcp        0      0 0.0.0.0:7474            0.0.0.0:*               LISTEN      103358/docker-proxy 
+tcp6        0      0 :::80                   :::*                    LISTEN      104066/docker-proxy 
+tcp6       0      0 :::443                  :::*                    LISTEN      104083/docker-proxy 
+tcp6       0      0 :::5432                 :::*                    LISTEN      103408/docker-proxy 
+tcp6       0      0 :::7687                 :::*                    LISTEN      103380/docker-proxy 
+tcp6       0      0 :::7474                 :::*                    LISTEN      103365/docker-proxy 
+
+=== Test HTTP Connection ===
+HTTP Status: 200
+
+=== PostgreSQL Connection ===
+WARN[0000] /home/maiuser/nashik-chatbot-pq/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove i
+t to avoid potential confusion 
+/var/run/postgresql:5432 - accepting connections
+
+=== Recent App Logs ===
+WARN[0000] /home/maiuser/nashik-chatbot-pq/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove i
+t to avoid potential confusion 
+traceability-app  | INFO:     127.0.0.1:45680 - "GET /health HTTP/1.1" 200 OK
+traceability-app  | INFO:     172.18.0.5:44758 - "GET / HTTP/1.1" 200 OK
+traceabillity-app  | INFO:     127.0.0.1:49762 - "GET /health HTTP/1.1" 200 OK
+traceability-app  | INFO:     127.0.0.1:35638 - "GET /health HTTP/1.1" 200 OK
+traceability-app  | INFO:     127.0.0.1:43602 - "GET /health HTTP/1.1" 200 OK
+traceability-app  | INFO:     127.0.0.1:51862 - "GET /health HTTP/1.1" 200 OK
+traceability-app  | INFO:     127.0.0.1:51668 - "GET /health HTTP/1.1" 200 OK
+traceability-app  | INFO:     127.0.0.1:46282 - "GET /health HTTP/1.1" 200 OK
+traceability-app  | INFO:     127.0.0.1:36452 - "GET /health HTTP/1.1" 200 OK
+traceability-app  | INFO:     172.18.0.5:52938 - "GET / HTTP/1.1" 200 OK
+
+=== Recent Nginx Logs ===
+WARN[0000] /home/maiuser/nashik-chatbot-pq/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove i
+t to avoid potential confusion 
+traceability-nginx  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
+traceability-nginx  | 10-listen-on-ipv6-by-default.sh: info: Getting the checksum of /etc/nginx/conf.d/default.conf
+traceability-nginx  | 10-listen-on-ipv6-by-default.sh: info: Enabled listen on IPv6 in /etc/nginx/conf.d/default.conf
+traceability-nginx  | /docker-entrypoint.sh: Sourcing /docker-entrypoint.d/15-local-resolvers.envsh
+traceability-nginx  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/20-envsubst-on-templates.sh
+traceability-nginx  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/30-tune-worker-processes.sh
+traceability-nginx  | /docker-entrypoint.sh: Configuration complete; ready for start up
+traceability-nginx  | 172.18.0.1 - - [21/Jan/2026:11:57:41 +0000] "q" 400 157 "-" "-"
+traceability-nginx  | 172.18.0.1 - - [21/Jan/2026:12:00:30 +0000] "GET / HTTP/1.1" 200 644 "-" "curl/8.5.0"
+traceability-nginx  | 172.18.0.1 - - [21/Jan/2026:12:04:06 +0000] "GET / HTTP/1.1" 200 644 "-" "curl/8.5.0"
