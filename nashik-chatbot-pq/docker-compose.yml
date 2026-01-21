@@ -24,15 +24,19 @@ services:
       - traceability-network
     restart: unless-stopped
 
-  # Neo4j Graph Database
+  # Neo4j Graph Database (2025.12.1 optimized for 32GB RAM Ubuntu VM)
   neo4j:
-    image: neo4j:5.15-community
+    image: neo4j:2025.12.1
     container_name: traceability-neo4j
     environment:
       NEO4J_AUTH: neo4j/password
-      NEO4J_dbms_memory_pagecache_size: 1G
-      NEO4J_dbms_memory_heap_initial__size: 1G
-      NEO4J_dbms_memory_heap_max__size: 2G
+      # Memory configuration optimized for 32GB RAM system
+      # Page cache: 18GB - for caching graph data and indexes
+      NEO4J_server_memory_pagecache_size: 18G
+      # Heap: 10-12GB - for transaction processing and query execution
+      NEO4J_server_memory_heap_initial__size: 10G
+      NEO4J_server_memory_heap_max__size: 12G
+      # APOC Plugin configuration
       NEO4J_PLUGINS: '["apoc"]'
       NEO4J_dbms_security_procedures_unrestricted: apoc.*
       NEO4J_dbms_security_procedures_allowlist: apoc.*

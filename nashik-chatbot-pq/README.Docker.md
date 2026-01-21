@@ -92,12 +92,37 @@ All services should show "healthy" status after a minute.
 
 ### Neo4j
 
-- **Image**: neo4j:5.15-community
+- **Image**: neo4j:2025.12.1
 - **HTTP Port**: 7474
 - **Bolt Port**: 7687
 - **Username**: neo4j
 - **Password**: password
 - **Data Volumes**: neo4j_data, neo4j_logs, neo4j_import, neo4j_plugins
+
+#### Memory Configuration (Optimized for 32GB RAM Ubuntu VM)
+
+The Neo4j configuration is optimized for a dedicated Ubuntu VM with 32GB RAM:
+
+- **Page Cache**: 18GB - Used for caching graph data and indexes from disk into memory for optimal read performance
+- **Heap Initial Size**: 10GB - Initial JVM heap allocation for transaction processing
+- **Heap Max Size**: 12GB - Maximum JVM heap for query execution and intermediate results
+- **OS Reserve**: ~2GB - Reserved for operating system and other processes
+
+This configuration follows Neo4j's best practices, allocating approximately:
+- **56% to Page Cache** (18GB) - Primary performance driver for graph traversals
+- **31-38% to Heap** (10-12GB) - Handles transaction states and query processing
+- **6% to OS** (2GB) - System overhead and process management
+
+**Note**: For different RAM sizes, you can adjust these values proportionally or use Neo4j's memory recommendation tool:
+```bash
+docker-compose exec neo4j neo4j-admin server memory-recommendation --memory=32g
+```
+
+**For detailed memory configuration guidance**, see [NEO4J_MEMORY_GUIDE.md](NEO4J_MEMORY_GUIDE.md) which includes:
+- Memory component explanations
+- Recommendations for different RAM sizes (8GB, 16GB, 32GB, 64GB)
+- Performance tuning tips
+- Troubleshooting common memory issues
 
 ### Application
 
