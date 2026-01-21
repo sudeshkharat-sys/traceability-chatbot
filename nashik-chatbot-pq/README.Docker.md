@@ -9,7 +9,7 @@ The Docker setup includes the following services:
 1. **PostgreSQL** (Alpine 17) - Relational database for chat history and checkpoints
 2. **Neo4j** (Community Edition) - Graph database for knowledge graphs
 3. **Application** - FastAPI backend with React frontend
-4. **Nginx** - Reverse proxy forwarding traffic from port 7434 to the application
+4. **Nginx** - Reverse proxy forwarding traffic from port 80 to the application
 
 ## Prerequisites
 
@@ -96,9 +96,9 @@ All services should show "healthy" status after a minute.
 
 ### 5. Access the Application
 
-- **Main Application**: http://localhost:7434
+- **Main Application**: http://localhost (port 80)
 - **Neo4j Browser**: http://localhost:7474 (Username: `neo4j`, Password: `password`)
-- **Direct App Access**: http://localhost:5000
+- **Direct App Access**: http://localhost:5000 (bypasses Nginx)
 
 ## Service Configuration
 
@@ -153,7 +153,7 @@ docker-compose exec neo4j neo4j-admin server memory-recommendation --memory=32g
 
 ### Nginx
 
-- **External Port**: 7434
+- **External Port**: 80
 - **Internal Port**: 80
 - **Purpose**: Reverse proxy to application on port 5000
 
@@ -284,7 +284,7 @@ If ports are already in use, modify them in `docker-compose.yml`:
 
 ```yaml
 ports:
-  - "17434:80"  # Change 7434 to another port
+  - "8080:80"  # Change 80 to another port (e.g., 8080)
 ```
 
 ### Database Connection Issues
@@ -381,10 +381,10 @@ app:
 ## Network Architecture
 
 ```
-Internet (Port 7434)
+Internet (Port 80)
         ↓
     [Nginx Container]
-        ↓ (Port 80)
+        ↓ (forwards to)
     [App Container] (Port 5000)
         ↓               ↓
 [PostgreSQL:5432]  [Neo4j:7687]
