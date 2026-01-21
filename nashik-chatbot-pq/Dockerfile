@@ -9,7 +9,9 @@ WORKDIR /app/frontend
 COPY frontend/package*.json ./
 
 # Install frontend dependencies
-RUN npm ci --production=false
+# Using npm install instead of npm ci for better compatibility with different Node versions
+# The lock file may be generated with different Node versions locally
+RUN npm install --legacy-peer-deps --production=false
 
 # Copy frontend source code
 COPY frontend/ ./
