@@ -29,25 +29,29 @@ cd nashik-chatbot-pq
 
 ### 2. Configure Environment Variables
 
-Copy the example environment file and configure your Azure OpenAI credentials:
+Copy the example environment file and configure your credentials:
 
 ```bash
 cp .env.docker.example .env
 ```
 
-Edit the `.env` file and add your Azure OpenAI credentials:
+Edit the `.env` file and update the following:
 
+**Required - Azure OpenAI credentials:**
 ```env
 AZURE_API_KEY=your_actual_azure_api_key
 AZURE_CHAT_ENDPOINT=https://your-resource.openai.azure.com/...
 AZURE_EMBEDDING_ENDPOINT=https://your-resource.openai.azure.com/...
 ```
 
-Also copy the environment file to the app config directory:
-
-```bash
-cp .env app/config/.env
+**IMPORTANT - Change default passwords:**
+```env
+POSTGRES_PASSWORD=your_secure_postgres_password
+NEO4J_PASSWORD=your_secure_neo4j_password
+SESSION_SECRET=your_random_session_secret
 ```
+
+> **Note:** The `.env` file is automatically loaded by Docker Compose and mounted into containers. No need to create separate config files. See [ENVIRONMENT_SETUP.md](ENVIRONMENT_SETUP.md) for detailed configuration guide.
 
 ### 3. Start All Services
 
@@ -371,19 +375,31 @@ Internet (Port 7434)
 
 ## Environment Variables Reference
 
-| Variable | Description | Default |
+**Required Variables (Must be set in .env):**
+
+| Variable | Description | Example |
 |----------|-------------|---------|
-| AZURE_API_KEY | Azure OpenAI API Key | Required |
-| AZURE_CHAT_ENDPOINT | Azure Chat Model Endpoint | Required |
-| AZURE_EMBEDDING_ENDPOINT | Azure Embedding Endpoint | Required |
-| NEO4J_URI | Neo4j Connection URI | neo4j://neo4j:7687 |
-| NEO4J_USERNAME | Neo4j Username | neo4j |
-| NEO4J_PASSWORD | Neo4j Password | password |
-| POSTGRES_HOST | PostgreSQL Host | postgres |
-| POSTGRES_PORT | PostgreSQL Port | 5432 |
-| POSTGRES_USER | PostgreSQL User | postgres |
-| POSTGRES_PASSWORD | PostgreSQL Password | password |
-| POSTGRES_DB | PostgreSQL Database | chatbot |
+| AZURE_API_KEY | Azure OpenAI API Key | `abc123...` |
+| AZURE_CHAT_ENDPOINT | Azure Chat Model Endpoint | `https://your-resource.openai.azure.com/...` |
+| AZURE_EMBEDDING_ENDPOINT | Azure Embedding Endpoint | `https://your-resource.openai.azure.com/...` |
+| POSTGRES_PASSWORD | PostgreSQL Password | **Change from default!** |
+| NEO4J_PASSWORD | Neo4j Password | **Change from default!** |
+
+**Optional Variables (with defaults):**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| NEO4J_URL | `neo4j://neo4j:7687` | Neo4j Connection URI |
+| NEO4J_USERNAME | `neo4j` | Neo4j Username |
+| POSTGRES_HOST | `postgres` | PostgreSQL Host |
+| POSTGRES_PORT | `5432` | PostgreSQL Port |
+| POSTGRES_USER | `postgres` | PostgreSQL User |
+| POSTGRES_DB | `chatbot` | PostgreSQL Database |
+| SERVER_HOST | `0.0.0.0` | Application Host |
+| SERVER_PORT | `5000` | Application Port |
+| SESSION_SECRET | `change-me-in-production` | **Change for security!** |
+
+> **For complete environment configuration documentation**, see [ENVIRONMENT_SETUP.md](ENVIRONMENT_SETUP.md)
 
 ## Support
 
