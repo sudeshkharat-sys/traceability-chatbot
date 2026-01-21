@@ -118,7 +118,7 @@ services:
     image: nginx:alpine
     container_name: traceability-nginx
     ports:
-      - "8080:80"  # Using port 8080 externally (port 80 is occupied)
+      - "80:80"  # Port 80 for load balancer traffic
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
