@@ -4,22 +4,22 @@ This guide explains how environment variables and configuration files work in th
 
 ## Overview
 
-The project uses environment variables for configuration with two different setups:
+The project uses a single `.env` file for configuration that works for both Docker and local development.
 
-1. **Docker Deployment** - Uses root `.env` file
-2. **Local Development** - Uses `app/config/.env` file
+**Simple Setup:**
+1. Copy `.env.example` to `.env`
+2. Fill in your credentials
+3. For local dev, change `POSTGRES_HOST` and `NEO4J_URL` to localhost values
 
 ## File Structure
 
 ```
 /
-├── .env.docker.example          # Template for Docker deployment
-├── .env                         # Your actual config (Docker) - DO NOT COMMIT
-├── docker-compose.yml           # Reads from .env
+├── .env.example                # Template (commit to git)
+├── .env                        # Your config (DO NOT COMMIT - gitignored)
+├── docker-compose.yml          # Reads from .env
 └── app/config/
-    ├── .env.example            # Template for local development
-    ├── .env                    # Your actual config (Local) - DO NOT COMMIT
-    └── config.py               # Reads environment variables
+    └── config.py              # Reads environment variables
 ```
 
 ## Docker Deployment Setup
@@ -28,7 +28,7 @@ The project uses environment variables for configuration with two different setu
 
 ```bash
 # Copy the example file
-cp .env.docker.example .env
+cp .env.example .env
 
 # Edit with your credentials
 nano .env  # or use your preferred editor
@@ -87,22 +87,24 @@ docker-compose up -d
 
 ## Local Development Setup
 
-### Step 1: Create Local .env File
+### Step 1: Create .env File
 
 ```bash
-# Copy the example file
-cp app/config/.env.example app/config/.env
+# Copy the same example file
+cp .env.example .env
 
 # Edit with your credentials
-nano app/config/.env
+nano .env
 ```
 
-### Step 2: Configure for Local Services
+### Step 2: Update for Local Services
+
+Change these values in your `.env` file:
 
 ```env
-# Point to local database instances
-NEO4J_URL=neo4j://127.0.0.1:7687
-POSTGRES_HOST=localhost
+# Change from Docker service names to localhost
+POSTGRES_HOST=localhost           # Instead of 'postgres'
+NEO4J_URL=neo4j://127.0.0.1:7687  # Instead of 'neo4j://neo4j:7687'
 ```
 
 ### Step 3: Run Application
@@ -114,6 +116,8 @@ pip install -r requirements.txt
 # Run the app
 python main.py
 ```
+
+> **Note:** The same `.env` file works for both Docker and local development. Just change the host values for local dev.
 
 ## Environment Variables Reference
 
@@ -144,7 +148,7 @@ python main.py
 
 ### ✅ DO
 
-- ✅ Copy `.env.docker.example` to `.env` and fill in actual values
+- ✅ Copy `.env.example` to `.env` and fill in actual values
 - ✅ Change ALL default passwords before production deployment
 - ✅ Keep `.env` files in `.gitignore` (already configured)
 - ✅ Use strong, unique passwords for each service
@@ -242,7 +246,7 @@ If you have existing configuration:
 
 ```bash
 # 1. Create .env file
-cp .env.docker.example .env
+cp .env.example .env
 
 # 2. Move hardcoded passwords to .env
 # OLD (docker-compose.yml):
@@ -258,13 +262,15 @@ docker-compose down
 docker-compose up -d
 ```
 
-### From Separate .env Files
+### Upgrading from Previous Setup
+
+If you previously had separate `.env` files:
 
 ```bash
-# If you had separate .env for app/config/.env:
-# 1. Copy relevant values to root .env
-# 2. Remove app/config/.env (will be replaced by mount)
-# 3. Restart Docker: docker-compose down && docker-compose up -d
+# The project now uses a single .env file
+# 1. All configuration is in root .env
+# 2. No separate app/config/.env needed
+# 3. Simply restart: docker-compose down && docker-compose up -d
 ```
 
 ## Summary
@@ -273,7 +279,7 @@ docker-compose up -d
 
 ```bash
 # One-time setup
-cp .env.docker.example .env
+cp .env.example .env
 nano .env  # Fill in credentials
 
 # Start services
@@ -283,9 +289,9 @@ docker-compose up -d
 ### For Local Development
 
 ```bash
-# One-time setup
-cp app/config/.env.example app/config/.env
-nano app/config/.env  # Fill in credentials
+# One-time setup (same file as Docker!)
+cp .env.example .env
+nano .env  # Fill in credentials and change hosts to localhost
 
 # Run app
 python main.py
@@ -295,10 +301,10 @@ python main.py
 
 ```bash
 # Docker Deployment
-.env.docker.example → .env → docker-compose.yml → containers
+.env.example → .env → docker-compose.yml → containers
 
 # Local Development
-app/config/.env.example → app/config/.env → config.py → app
+.env.example → .env → config.py → app
 
 # Check current config
 docker-compose config

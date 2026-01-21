@@ -32,7 +32,7 @@ cd nashik-chatbot-pq
 Copy the example environment file and configure your credentials:
 
 ```bash
-cp .env.docker.example .env
+cp .env.example .env
 ```
 
 Edit the `.env` file and update the following:
