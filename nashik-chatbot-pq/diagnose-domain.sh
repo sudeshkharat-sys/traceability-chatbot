@@ -3,8 +3,8 @@
 echo "=== Domain & HTTPS Configuration Diagnostic ==="
 echo ""
 
-# Get the domain from nginx.conf
-DOMAIN=$(grep -m 1 "server_name" /home/user/Traceability/nashik-chatbot-pq/nginx.conf | grep -v "_" | awk '{print $2}' | tr -d ';')
+# Get the domain from nginx.conf (skip comments and wildcard domains)
+DOMAIN=$(grep "server_name" /home/user/Traceability/nashik-chatbot-pq/nginx.conf | grep -v "^[[:space:]]*#" | grep -v "server_name[[:space:]]*_" | head -1 | awk '{print $2}' | tr -d ';')
 echo "Domain configured in nginx: $DOMAIN"
 echo ""
 
