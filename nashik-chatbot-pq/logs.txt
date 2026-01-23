@@ -1,28 +1,17 @@
-WARN[0000] /home/maiuser/nashik-chatbot-pq/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove i
-t to avoid potential confusion 
-NAME                 IMAGE                   COMMAND                  SERVICE   CREATED        STATUS                   PORTS
-traceability-app     nashik-chatbot-pq-app   "python main.py"         app       40 hours ago   Up 3 minutes (healthy)   0.0.0.0:5000->5
-000/tcp, [::]:5000->5000/tcp
-traceability-neo4j   neo4j:2025.12.1         "tini -g -- /startup…"   neo4j     40 hours ago   Up 3 minutes (healthy)   0.0.0.0:7474->7
-474/tcp, [::]:7474->7474/tcp, 7473/tcp, 0.0.0.0:7687->7687/tcp, [::]:7687->7687/tcp
+(base) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ sudo docker images | grep postgres
+postgres                17-alpine     aa3668fcbcb5   5 weeks ago    279MB
+postgres                17.7-alpine   aa3668fcbcb5   5 weeks ago    279MB
+(base) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ sudo systemctl status postgres
+Unit postgres.service could not be found.
 (base) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ sudo docker compose up -d
 WARN[0000] /home/maiuser/nashik-chatbot-pq/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove i
 t to avoid potential confusion 
 [+] Running 3/4
- ⠧ Container traceability-postgres  Starting                                                                                      0.6s 
- ✔ Container traceability-neo4j     Running                                                                                       0.0s 
+ ✔ Container traceability-neo4j     Healthy                                                                                       0.8s 
+ ✔ Container traceability-postgres  Healthy                                                                                      10.8s 
  ✔ Container traceability-app       Running                                                                                       0.0s 
- ✔ Container traceability-nginx     Created                                                                                       0.0s 
+ ⠇ Container traceability-nginx     Starting                                                                                     11.4s 
 Error response from daemon: failed to set up container networking: driver failed programming external connectivity on endpoint traceabi
-lity-postgres (868623fe8c3d206f799b4961e57911ed749ef1014f1de144ff8f01059e88b69d): Bind for 0.0.0.0:5432 failed: port is already allocat
-ed
-(base) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ sudo docker ps
-CONTAINER ID   IMAGE                   COMMAND                  CREATED        STATUS                   PORTS                          
-                                                                      NAMES
-0e05eaa8c0e5   nashik-chatbot-pq-app   "python main.py"         40 hours ago   Up 7 minutes (healthy)   0.0.0.0:5000->5000/tcp, [::]:50
-00->5000/tcp                                                          traceability-app
-150f7fc69985   neo4j:2025.12.1         "tini -g -- /startup…"   41 hours ago   Up 7 minutes (healthy)   0.0.0.0:7474->7474/tcp, [::]:74
-74->7474/tcp, 7473/tcp, 0.0.0.0:7687->7687/tcp, [::]:7687->7687/tcp   traceability-neo4j
-292c02582cd8   postgres:18             "docker-entrypoint.s…"   2 days ago     Up 7 minutes             0.0.0.0:5432->5432/tcp, [::]:54
-32->5432/tcp                                                          postgres
+lity-nginx (a6630047e8ca411b42ef636a49340e97a2166b3ab94e571d243ae344962bc19d): failed to bind host port for 0.0.0.0:80:172.18.0.3:80/tc
+p: address already in use
 (base) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ 
