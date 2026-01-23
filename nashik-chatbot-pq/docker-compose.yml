@@ -98,6 +98,7 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./.env:/app/app/config/.env:ro
+      - frontend-build:/app/frontend/build  # Shared frontend build with nginx
     depends_on:
       postgres:
         condition: service_healthy
@@ -122,7 +123,8 @@ services:
       - "443:443"  # HTTPS
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./ssl:/etc/nginx/ssl:ro  # Mount SSL certificates (create ./ssl directory with cert.pem and key.pem)
+      - ./ssl:/etc/nginx/ssl:ro  # Mount SSL certificates
+      - frontend-build:/usr/share/nginx/html:ro  # Mount frontend build for static file serving
     depends_on:
       - app
     healthcheck:
@@ -148,4 +150,6 @@ volumes:
   neo4j_import:
     driver: local
   neo4j_plugins:
+    driver: local
+  frontend-build:
     driver: local
