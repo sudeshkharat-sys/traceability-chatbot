@@ -9,12 +9,12 @@ frontend/.env
 app/config/.env
 
 # SSL Certificates (sensitive!)
-ssl/
-*.pem
-*.crt
-*.key
-*.p12
-*.pfx
+# ssl/
+# *.pem
+# *.crt
+# *.key
+# *.p12
+# *.pfx
 
 # Node artifact files
 node_modules/
