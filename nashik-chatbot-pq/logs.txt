@@ -1,23 +1,15 @@
-(base) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ ./diagnose-domain.sh 
 === Domain & HTTPS Configuration Diagnostic ===
 
-Domain configured in nginx: 
+Domain configured in nginx: mai-quality-bot.m-devsecops.com
 
 Step 1: Checking DNS Resolution...
 ---
-m.root-servers.net.
-d.root-servers.net.
-b.root-servers.net.
-h.root-servers.net.
-j.root-servers.net.
-l.root-servers.net.
-k.root-servers.net.
-i.root-servers.net.
-a.root-servers.net.
-e.root-servers.net.
-f.root-servers.net.
-c.root-servers.net.
-g.root-servers.net.
+Server:127.0.0.53
+Address:127.0.0.53#53
+
+Non-authoritative answer:
+*** Can't find mai-quality-bot.m-devsecops.com: No answer
+
 
 Step 2: Checking Server IP...
 ---
@@ -25,8 +17,9 @@ Server IP addresses: 10.226.0.19 172.17.0.1 172.18.0.1
 
 Step 3: Checking if nginx container is running...
 ---
-5192c4f58b18   nginx:alpine            "/docker-entrypoint.…"   37 minutes ago   Up 36 minutes (unhealthy)   0.0.0.0:80->80/tcp, [::]:8
+5192c4f58b18   nginx:alpine            "/docker-entrypoint.…"   54 minutes ago   Up 54 minutes (unhealthy)   0.0.0.0:80->80/tcp, [::]:8
 0->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp                         traceability-nginx
+
 Step 4: Checking SSL certificates...
 ---
 Certificate found. Details:
@@ -35,7 +28,7 @@ issuer=C = US, O = DigiCert Inc, OU = www.digicert.com, CN = RapidSSL TLS RSA CA
 notBefore=Oct  7 00:00:00 2025 GMT
 notAfter=Nov  7 23:59:59 2026 GMT
 X509v3 Subject Alternative Name: 
-    DNS:*.m-devsecops.com, DNS:m-devsecops.com
+    DNS:*.m-devsecops.ccom, DNS:m-devsecops.com
 
 Step 5: Testing connectivity...
 ---
@@ -57,18 +50,19 @@ Step 6: Checking nginx configuration...
 ---
 nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
 nginx: configuration file /etc/nginx/nginx.conf test is successful
+
 === DIAGNOSIS SUMMARY ===
 
 ✓ Nginx is serving the application correctly
 ✓ Application loads when accessed via IP: https://10.226.0.19
 
 Issues to fix:
-1. DNS:  must resolve to your server IP (10.226.0.19)
-2. SSL: Install SSL certificate for  to remove 'not secure' warning
+1. DNS: mai-quality-bot.m-devsecops.com must resolve to your server IP (10.226.0.19)
+2. SSL: Install SSL certificate for mai-quality-bot.m-devsecops.com to remove 'not secure' warning
 
 How to fix DNS:
   - Contact your DNS administrator
-  - Add A record:  -> 10.226.0.19
+  - Add A record: mai-quality-bot.m-devsecops.com -> 10.226.0.19
   - Wait for DNS propagation (can take up to 24 hours)
 
 How to fix SSL:
@@ -80,7 +74,3 @@ How to fix SSL:
 
 After both are fixed, restart docker:
   docker compose down && docker compose up -d
-
-(base) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ ^C
-(base) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ ^C
-(base) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ 
