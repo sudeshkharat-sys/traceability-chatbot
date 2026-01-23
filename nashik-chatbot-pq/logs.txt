@@ -1,76 +1,30 @@
-=== Domain & HTTPS Configuration Diagnostic ===
-
-Domain configured in nginx: mai-quality-bot.m-devsecops.com
-
-Step 1: Checking DNS Resolution...
----
-Server:127.0.0.53
-Address:127.0.0.53#53
-
-Non-authoritative answer:
-*** Can't find mai-quality-bot.m-devsecops.com: No answer
-
-
-Step 2: Checking Server IP...
----
-Server IP addresses: 10.226.0.19 172.17.0.1 172.18.0.1 
-
-Step 3: Checking if nginx container is running...
----
-5192c4f58b18   nginx:alpine            "/docker-entrypoint.…"   54 minutes ago   Up 54 minutes (unhealthy)   0.0.0.0:80->80/tcp, [::]:8
-0->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp                         traceability-nginx
-
-Step 4: Checking SSL certificates...
----
-Certificate found. Details:
-subject=CN = *.m-devsecops.com
-issuer=C = US, O = DigiCert Inc, OU = www.digicert.com, CN = RapidSSL TLS RSA CA G1
-notBefore=Oct  7 00:00:00 2025 GMT
-notAfter=Nov  7 23:59:59 2026 GMT
-X509v3 Subject Alternative Name: 
-    DNS:*.m-devsecops.ccom, DNS:m-devsecops.com
-
-Step 5: Testing connectivity...
----
-Testing HTTP (port 80):
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-  0    31    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
-HTTP/1.1 405 Method Not Allowed
-Server: nginx/1.29.4
-
-Testing HTTPS (port 443):
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-  0    31    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
-HTTP/1.1 405 Method Not Allowed
-Server: nginx/1.29.4
-
-Step 6: Checking nginx configuration...
----
-nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
-nginx: configuration file /etc/nginx/nginx.conf test is successful
-
-=== DIAGNOSIS SUMMARY ===
-
-✓ Nginx is serving the application correctly
-✓ Application loads when accessed via IP: https://10.226.0.19
-
-Issues to fix:
-1. DNS: mai-quality-bot.m-devsecops.com must resolve to your server IP (10.226.0.19)
-2. SSL: Install SSL certificate for mai-quality-bot.m-devsecops.com to remove 'not secure' warning
-
-How to fix DNS:
-  - Contact your DNS administrator
-  - Add A record: mai-quality-bot.m-devsecops.com -> 10.226.0.19
-  - Wait for DNS propagation (can take up to 24 hours)
-
-How to fix SSL:
-  Option 1: Use existing certificates
-    ./setup-ssl.sh /path/to/certificates
-
-  Option 2: Use Let's Encrypt (free)
-    See documentation for Let's Encrypt setup
-
-After both are fixed, restart docker:
-  docker compose down && docker compose up -d
+/docker-entrypoint.sh: Configuration complete; ready for start up
+2026/01/23 09:00:44 [warn] 1#1: the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/nginx.c
+onf:51
+nginx: [warn] the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/nginx.conf:51
+2026/01/23 09:00:44 [warn] 1#1: the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/nginx.c
+onf:52
+nginx: [warn] the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/nginx.conf:52
+2026/01/23 09:00:44 [emerg] 1#1: cannot load certificate "/etc/nginx/ssl/fullchain.pem": PEM_read_bio_X509() failed (SSL: error:0480006
+6:PEM routines::bad end line)
+nginx: [emerg] cannot load certificate "/etc/nginx/ssl/fullchain.pem": PEM_read_bio_X509() failed (SSL: error:04800066:PEM routines::ba
+d end line)
+/docker-entrypoint.sh: /docker-entrypoint.d/ is not empty, will attempt to perform configuration
+/docker-entrypoint.sh: Looking for shell scripts in /docker-entrypoint.d/
+/docker-entrypoint.sh: Launching /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
+10-listen-on-ipv6-by-default.sh: info: IPv6 listen already enabled
+/docker-entrypoint.sh: Sourcing /docker-entrypoint.d/15-local-resolvers.envsh
+/docker-entrypoint.sh: Launching /docker-entrypoint.d/20-envsubst-on-templates.sh
+/docker-entrypoint.sh: Launching /docker-entrypoint.d/30-tune-worker-processes.sh
+/docker-entrypoint.sh: Configuration complete; ready for start up
+2026/01/23 09:00:57 [warn] 1#1: the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/nginx.c
+onf:51
+nginx: [warn] the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/nginx.conf:51
+2026/01/23 09:00:57 [warn] 1#1: the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/nginx.c
+onf:52
+nginx: [warn] the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/nginx.conf:52
+2026/01/23 09:00:57 [emerg] 1#1: cannot load certificate "/etc/nginx/ssl/fullchain.pem": PEM_read_bio_X509() failed (SSL: error:0480006
+6:PEM routines::bad end line)
+nginx: [emerg] cannot load certificate "/etc/nginx/ssl/fullchain.pem": PEM_read_bio_X509() failed (SSL: error:04800066:PEM routines::ba
+d end line)
+(base) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$
