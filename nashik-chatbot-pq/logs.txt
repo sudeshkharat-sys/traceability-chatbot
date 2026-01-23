@@ -1,30 +1,31 @@
-/docker-entrypoint.sh: Configuration complete; ready for start up
-2026/01/23 09:00:44 [warn] 1#1: the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/nginx.c
-onf:51
-nginx: [warn] the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/nginx.conf:51
-2026/01/23 09:00:44 [warn] 1#1: the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/nginx.c
-onf:52
-nginx: [warn] the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/nginx.conf:52
-2026/01/23 09:00:44 [emerg] 1#1: cannot load certificate "/etc/nginx/ssl/fullchain.pem": PEM_read_bio_X509() failed (SSL: error:0480006
-6:PEM routines::bad end line)
-nginx: [emerg] cannot load certificate "/etc/nginx/ssl/fullchain.pem": PEM_read_bio_X509() failed (SSL: error:04800066:PEM routines::ba
-d end line)
-/docker-entrypoint.sh: /docker-entrypoint.d/ is not empty, will attempt to perform configuration
-/docker-entrypoint.sh: Looking for shell scripts in /docker-entrypoint.d/
-/docker-entrypoint.sh: Launching /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
-10-listen-on-ipv6-by-default.sh: info: IPv6 listen already enabled
-/docker-entrypoint.sh: Sourcing /docker-entrypoint.d/15-local-resolvers.envsh
-/docker-entrypoint.sh: Launching /docker-entrypoint.d/20-envsubst-on-templates.sh
-/docker-entrypoint.sh: Launching /docker-entrypoint.d/30-tune-worker-processes.sh
-/docker-entrypoint.sh: Configuration complete; ready for start up
-2026/01/23 09:00:57 [warn] 1#1: the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/nginx.c
-onf:51
-nginx: [warn] the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/nginx.conf:51
-2026/01/23 09:00:57 [warn] 1#1: the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/nginx.c
-onf:52
-nginx: [warn] the "listen ... http2" directive is deprecated, use the "http2" directive instead in /etc/nginx/nginx.conf:52
-2026/01/23 09:00:57 [emerg] 1#1: cannot load certificate "/etc/nginx/ssl/fullchain.pem": PEM_read_bio_X509() failed (SSL: error:0480006
-6:PEM routines::bad end line)
-nginx: [emerg] cannot load certificate "/etc/nginx/ssl/fullchain.pem": PEM_read_bio_X509() failed (SSL: error:04800066:PEM routines::ba
-d end line)
-(base) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$
+traceability-nginx  | /docker-entrypoint.sh: Configuration complete; ready for start up
+traceability-nginx  | 2026/01/23 09:13:03 [emerg] 1#1: cannot load certificate "/etc/nginx/ssl/fullchain.pem": PEM_read_bio_X509() fail
+ed (SSL: error:04800066:PEM routines::bad end line)
+traceability-nginx  | nginx: [emerg] cannot load certificate "/etc/nginx/ssl/fullchain.pem": PEM_read_bio_X509() failed (SSL: error:048
+00066:PEM routines::bad end line)
+traceability-nginx  | /docker-entrypoint.sh: /docker-entrypoint.d/ is not empty, will attempt to perform configuration
+traceability-nginx  | /docker-entrypoint.sh: Looking for shell scripts in /docker-entrypoint.d/
+traceability-nginx  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
+traceability-nginx  | 10-listen-on-ipv6-by-default.sh: info: IPv6 listen already enabled
+traceability-nginx  | /docker-entrypoint.sh: Sourcing /docker-entrypoint.d/15-local-resolvers.envsh
+traceability-nginx  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/20-envsubst-on-templates.sh
+traceability-nginx  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/30-tune-worker-processes.sh
+traceability-nginx  | /docker-entrypoint.sh: Configuration complete; ready for start up
+traceability-nginx  | 2026/01/23 09:13:05 [emerg] 1#1: cannot load certificate "/etc/nginx/ssl/fullchain.pem": PEM_read_bio_X509() fail
+ed (SSL: error:04800066:PEM routines::bad end line)
+traceability-nginx  | nginx: [emerg] cannot load certificate "/etc/nginx/ssl/fullchain.pem": PEM_read_bio_X509() failed (SSL: error:048
+00066:PEM routines::bad end line)
+traceability-nginx  | /docker-entrypoint.sh: /docker-entrypoint.d/ is not empty, will attempt to perform configuration
+traceability-nginx  | /docker-entrypoint.sh: Looking for shell scripts in /docker-entrypoint.d/
+traceability-nginx  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/10-listen-on-ipv6-by-default.sh
+traceability-nginx  | 10-listen-on-ipv6-by-default.sh: info: IPv6 listen already enabled
+traceability-nginx  | /docker-entrypoint.sh: Sourcing /docker-entrypoint.d/15-local-resolvers.envsh
+traceability-nginx  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/20-envsubst-on-templates.sh
+traceability-nginx  | /docker-entrypoint.sh: Launching /docker-entrypoint.d/30-tune-worker-processes.sh
+traceability-nginx  | /docker-entrypoint.sh: Configuration complete; ready for start up
+traceability-nginx  | 2026/01/23 09:13:09 [emerg] 1#1: cannot load certificate "/etc/nginx/ssl/fullchain.pem": PEM_read_bio_X509() fail
+ed (SSL: error:04800066:PEM routines::bad end line)
+traceability-nginx  | nginx: [emerg] cannot load certificate "/etc/nginx/ssl/fullchain.pem": PEM_read_bio_X509() failed (SSL: error:048
+00066:PEM routines::bad end line)
+(base) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ 
+nx.conf:52
