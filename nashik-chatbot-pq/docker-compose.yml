@@ -23,20 +23,26 @@ services:
     networks:
       - traceability-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
 
   # Neo4j Graph Database (2025.12.1 optimized for 32GB RAM Ubuntu VM)
-  # MEMORY ALLOCATION: Neo4j 20GB + App 8GB + OS 4GB = 32GB
+  # MEMORY ALLOCATION: App 16GB (priority) + Neo4j 12GB + Postgres 2GB + OS 2GB = 32GB
   neo4j:
     image: neo4j:2025.12.1
     container_name: traceability-neo4j
     environment:
       NEO4J_AUTH: ${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD}
-      # Memory configuration - REDUCED to leave room for data loading
-      # Page cache: 12GB - for caching graph data and indexes
-      NEO4J_server_memory_pagecache_size: 12G
-      # Heap: 6-8GB - for transaction processing and query execution
-      NEO4J_server_memory_heap_initial__size: 6G
-      NEO4J_server_memory_heap_max__size: 8G
+      # Memory configuration - REDUCED to prioritize app for data loading
+      # Page cache: 6GB - for caching graph data and indexes
+      NEO4J_server_memory_pagecache_size: 6G
+      # Heap: 4-5GB - for transaction processing and query execution
+      NEO4J_server_memory_heap_initial__size: 4G
+      NEO4J_server_memory_heap_max__size: 5G
       # APOC Plugin configuration
       NEO4J_PLUGINS: '["apoc"]'
       NEO4J_dbms_security_procedures_unrestricted: apoc.*
@@ -61,12 +67,13 @@ services:
     deploy:
       resources:
         limits:
-          memory: 22G
+          memory: 12G
         reservations:
-          memory: 16G
+          memory: 8G
 
   # Application (FastAPI + React)
-  # Memory limit: 8GB for data loading with large CSV files (500k+ rows)
+  # Memory limit: 16GB for data loading with large CSV files (500k+ rows)
+  # App gets priority memory allocation since data loading is the main task
   app:
     build:
       context: .
@@ -75,9 +82,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 8G
+          memory: 16G
         reservations:
-          memory: 4G
+          memory: 8G
     environment:
       # Azure OpenAI (Set these in .env file)
       AZURE_API_KEY: ${AZURE_API_KEY}
