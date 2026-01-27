@@ -25,17 +25,18 @@ services:
     restart: unless-stopped
 
   # Neo4j Graph Database (2025.12.1 optimized for 32GB RAM Ubuntu VM)
+  # MEMORY ALLOCATION: Neo4j 20GB + App 8GB + OS 4GB = 32GB
   neo4j:
     image: neo4j:2025.12.1
     container_name: traceability-neo4j
     environment:
       NEO4J_AUTH: ${NEO4J_USERNAME:-neo4j}/${NEO4J_PASSWORD}
-      # Memory configuration optimized for 32GB RAM system
-      # Page cache: 18GB - for caching graph data and indexes
-      NEO4J_server_memory_pagecache_size: 18G
-      # Heap: 10-12GB - for transaction processing and query execution
-      NEO4J_server_memory_heap_initial__size: 10G
-      NEO4J_server_memory_heap_max__size: 12G
+      # Memory configuration - REDUCED to leave room for data loading
+      # Page cache: 12GB - for caching graph data and indexes
+      NEO4J_server_memory_pagecache_size: 12G
+      # Heap: 6-8GB - for transaction processing and query execution
+      NEO4J_server_memory_heap_initial__size: 6G
+      NEO4J_server_memory_heap_max__size: 8G
       # APOC Plugin configuration
       NEO4J_PLUGINS: '["apoc"]'
       NEO4J_dbms_security_procedures_unrestricted: apoc.*
@@ -57,13 +58,26 @@ services:
     networks:
       - traceability-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 22G
+        reservations:
+          memory: 16G
 
   # Application (FastAPI + React)
+  # Memory limit: 8GB for data loading with large CSV files (500k+ rows)
   app:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: traceability-app
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
     environment:
       # Azure OpenAI (Set these in .env file)
       AZURE_API_KEY: ${AZURE_API_KEY}
