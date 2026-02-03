@@ -82,6 +82,14 @@ class Settings(BaseSettings):
     OPENSEARCH_USE_SSL: bool = False
     OPENSEARCH_INDEX_NAME: str = "documents"
 
+    # Document Processing Configuration (Dataloader)
+    DOCLING_BASE_DIR: str = "/data/documents"
+    DOCLING_ARTIFACTS_PATH: str = "/data/docling_models/docling_all_models"
+    DOCLING_INPUT_ROOT: str = "/data/documents/input"
+    DOCLING_OUTPUT_ROOT: str = "/data/documents/output"
+    DOCLING_VLM_MODEL: str = "SmolDocling-256M-preview"
+    DOCLING_LAYOUT_MODEL: str = "docling-layout-heron"
+
     # Agent Configuration
     MAX_CHAT_HISTORY: int = 10
     QUERY_TIMEOUT_SECONDS: int = 30
@@ -105,6 +113,12 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list:
         """Get CORS origins as a list"""
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
+
+    @property
+    def opensearch_url(self) -> str:
+        """Get OpenSearch connection URL"""
+        protocol = "https" if self.OPENSEARCH_USE_SSL else "http"
+        return f"{protocol}://{self.OPENSEARCH_HOST}:{self.OPENSEARCH_PORT}"
 
 
 @lru_cache()

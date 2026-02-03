@@ -120,12 +120,15 @@ OPENSEARCH_USE_SSL=false
 OPENSEARCH_INDEX_NAME=documents
 ```
 
-3. Configure paths in `config.yaml`:
-```yaml
-base_dir: /path/to/your/documents
-input_root: /path/to/your/documents/input
-output_root: /path/to/your/documents/output
-artifacts_path: /path/to/docling_models
+3. Configure document processing paths in `.env`:
+```bash
+# Document Processing Paths
+DOCLING_BASE_DIR=/data/documents
+DOCLING_ARTIFACTS_PATH=/data/docling_models/docling_all_models
+DOCLING_INPUT_ROOT=/data/documents/input
+DOCLING_OUTPUT_ROOT=/data/documents/output
+DOCLING_VLM_MODEL=SmolDocling-256M-preview
+DOCLING_LAYOUT_MODEL=docling-layout-heron
 ```
 
 ## Usage
@@ -205,8 +208,8 @@ This runs:
 cp .env.example .env
 vim .env  # Add your credentials
 
-# 2. Edit config.yaml with your paths
-vim config.yaml
+# 2. Configure document paths in .env
+# (See DOCLING_* variables in .env.example)
 
 # 3. Initialize database (creates tables)
 cd /path/to/nashik-chatbot-pq
@@ -356,57 +359,41 @@ psql -h localhost -U postgres -d chatbot
 
 ### Custom File Extensions
 
-Edit `config.yaml`:
-```yaml
-files:
-  extensions:
-    - .pdf
-    - .docx
-    - .txt
-    - .md
+When running scrape, specify extensions:
+```bash
+python main.py scrape -d /path -i index --extensions .pdf .docx .txt
 ```
 
 ### Custom Chunking
 
-Edit `config.yaml`:
-```yaml
-chunking:
-  max_tokens: 4096  # Smaller chunks
-  overlap_tokens: 100  # Add overlap
-```
-
-### Custom OpenSearch Mapping
-
-Edit `config.yaml` to change vector dimensions or index settings:
-```yaml
-opensearch:
-  index_mapping:
-    properties:
-      embedding:
-        dimension: 3072  # For different embedding model
-```
+Edit `pipeline_factory.py` to adjust chunking parameters:
+```python
+chunker = HybridChunker(
+    tokenizer=Tokenizer(encoding=tiktoken.get_encoding("cl100k_base")),
+    max_tokens=4096,  # Smaller chunks
+    # Add overlap if needed
+)
 
 ## File Structure
 
 ```
 dataloader/
-├── main.py                      # Main entry point
+├── main.py                      # Main entry point with CLI
 ├── scrape_process.py            # File scanning & registration
-├── create_embedding_process.py  # Document processing & embedding
-├── document_processor.py        # Original Docling conversion (legacy)
+├── create_embedding_process.py  # Document processing & embedding (LangChain)
+├── document_processor.py        # Original Docling conversion (standalone legacy)
 ├── pipeline_factory.py          # Document converter & chunker factory
 ├── serializers.py              # Custom chunk serializers
-├── config.py                   # Path configuration (legacy)
-├── config.yaml                 # New YAML configuration
+├── config.py                   # Loads paths from app/config/config.py
 └── README.md                   # This file
 
 app/
 ├── connectors/
-│   ├── opensearch_connector.py  # OpenSearch client
+│   ├── opensearch_connector.py  # OpenSearch client with LangChain integration
 │   ├── state_db_connector.py    # PostgreSQL client
-│   └── table_creation.py        # Database schema
+│   └── table_creation.py        # Database schema (includes scraped_docs & chunks)
 └── config/
-    └── config.py               # Environment configuration
+    └── config.py               # Centralized environment configuration
 ```
 
 ## Migration from Old System

@@ -1,6 +1,7 @@
 """
 Create Embedding Process - Processes incomplete documents and creates embeddings
 Takes documents from scraped_docs, processes through pipeline, and upserts to OpenSearch
+Uses LangChain's OpenSearchVectorSearch for vector operations
 """
 
 import os
@@ -15,7 +16,7 @@ from datetime import datetime
 import sys
 sys.path.append(str(Path(__file__).parent.parent))
 
-from openai import AzureOpenAI
+from langchain_openai import AzureOpenAIEmbeddings
 
 from app.connectors.state_db_connector import StateDBConnector
 from app.connectors.opensearch_connector import get_opensearch_connector
@@ -27,28 +28,22 @@ logger = logging.getLogger(__name__)
 
 
 class EmbeddingProcessor:
-    """Processes documents and creates embeddings"""
+    """Processes documents and creates embeddings using LangChain"""
 
     def __init__(
         self,
         db_connector: StateDBConnector,
         opensearch_connector,
-        embedding_client: AzureOpenAI,
-        embedding_deployment: str,
     ):
         """
         Initialize embedding processor
 
         Args:
             db_connector: Database connector instance
-            opensearch_connector: OpenSearch connector instance
-            embedding_client: Azure OpenAI client for embeddings
-            embedding_deployment: Name of the embedding deployment
+            opensearch_connector: OpenSearch connector with LangChain integration
         """
         self.db = db_connector
         self.opensearch = opensearch_connector
-        self.embedding_client = embedding_client
-        self.embedding_deployment = embedding_deployment
 
         # Initialize document processing pipeline
         self.doc_converter = pipeline_factory.get_converter()
@@ -172,24 +167,6 @@ class EmbeddingProcessor:
             result = self.db.execute_insert_update(query, params)
             return result[0]["chunk_id"] if result else chunk_id
 
-    def create_embeddings(self, texts: List[str]) -> List[List[float]]:
-        """
-        Create embeddings for texts using Azure OpenAI
-
-        Args:
-            texts: List of texts to embed
-
-        Returns:
-            list: List of embedding vectors
-        """
-        try:
-            response = self.embedding_client.embeddings.create(
-                input=texts, model=self.embedding_deployment
-            )
-            return [item.embedding for item in response.data]
-        except Exception as e:
-            logger.error(f"Error creating embeddings: {e}")
-            raise
 
     def process_document(self, doc: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -233,6 +210,9 @@ class EmbeddingProcessor:
 
             # Process each chunk
             chunk_texts = []
+            chunk_metadatas = []
+            chunk_ids = []
+            chunk_hashes = []
             chunk_data = []
 
             for i, chunk in enumerate(chunks):
@@ -242,13 +222,15 @@ class EmbeddingProcessor:
                 # Calculate chunk hash
                 chunk_hash = self.calculate_chunk_hash(chunk_text, chunk_metadata)
 
-                # Check if chunk exists in DB and OpenSearch
+                # Check if chunk exists in DB
                 exists_db, db_chunk_id, existing_hash = self.chunk_exists_in_db(chunk_hash)
 
-                # Check if exists in OpenSearch
-                opensearch_id = f"{doc['doc_name']}_{i}"
-                exists_os, hash_matches_os, _ = self.opensearch.check_document_exists(
-                    doc["index_name"], opensearch_id, chunk_hash
+                # Generate OpenSearch ID
+                opensearch_id = f"{doc['id']}_{i}"
+
+                # Check if exists in OpenSearch with same hash
+                exists_os, hash_matches_os, existing_os_hash = self.opensearch.check_document_exists(
+                    opensearch_id, chunk_hash
                 )
 
                 # If chunk exists in both DB and OpenSearch with same hash, skip
@@ -259,68 +241,68 @@ class EmbeddingProcessor:
                     stats["chunks_skipped"] += 1
                     continue
 
-                # Need to process this chunk
+                # Add to batch for processing
                 chunk_texts.append(chunk_text)
-                chunk_data.append(
-                    {
-                        "index": i,
-                        "text": chunk_text,
-                        "metadata": chunk_metadata,
-                        "hash": chunk_hash,
-                        "opensearch_id": opensearch_id,
-                        "exists_db": exists_db,
-                        "exists_os": exists_os,
-                    }
-                )
 
-            # Create embeddings in batch
+                # Enrich metadata with document info and hash
+                enriched_metadata = {
+                    **chunk_metadata,
+                    "doc_name": doc["doc_name"],
+                    "doc_id": doc["id"],
+                    "chunk_hash": chunk_hash,
+                }
+                chunk_metadatas.append(enriched_metadata)
+                chunk_ids.append(opensearch_id)
+                chunk_hashes.append(chunk_hash)
+
+                chunk_data.append({
+                    "index": i,
+                    "text": chunk_text,
+                    "metadata": chunk_metadata,
+                    "hash": chunk_hash,
+                    "opensearch_id": opensearch_id,
+                })
+
+            # Use LangChain to add texts (handles embedding generation and indexing)
             if chunk_texts:
-                logger.info(f"Creating embeddings for {len(chunk_texts)} chunks")
-                embeddings = self.create_embeddings(chunk_texts)
+                logger.info(f"Processing {len(chunk_texts)} chunks using LangChain")
 
-                # Upsert to OpenSearch and DB
-                for chunk_info, embedding in zip(chunk_data, embeddings):
-                    try:
-                        # Prepare document for OpenSearch
-                        os_document = {
-                            "text": chunk_info["text"],
-                            "embedding": embedding,
-                            "metadata": chunk_info["metadata"],
-                            "doc_name": doc["doc_name"],
-                            "doc_id": doc["id"],
-                        }
+                try:
+                    # LangChain handles embedding creation and upsert in one call
+                    added_ids, os_stats = self.opensearch.add_texts_with_hash(
+                        texts=chunk_texts,
+                        metadatas=chunk_metadatas,
+                        ids=chunk_ids,
+                        chunk_hashes=chunk_hashes,
+                    )
 
-                        # Upsert to OpenSearch
-                        result = self.opensearch.upsert_document(
-                            doc["index_name"],
-                            chunk_info["opensearch_id"],
-                            os_document,
-                            chunk_info["hash"],
-                        )
+                    # Update state database for each chunk
+                    for chunk_info in chunk_data:
+                        try:
+                            # Upsert to database
+                            self.upsert_chunk_to_db(
+                                doc["id"],
+                                doc["index_name"],
+                                chunk_info["hash"],
+                                chunk_info["text"],
+                                chunk_info["metadata"],
+                                chunk_info["opensearch_id"],
+                            )
 
-                        # Upsert to database
-                        self.upsert_chunk_to_db(
-                            doc["id"],
-                            doc["index_name"],
-                            chunk_info["hash"],
-                            chunk_info["text"],
-                            chunk_info["metadata"],
-                            chunk_info["opensearch_id"],
-                        )
+                        except Exception as e:
+                            logger.error(f"Error updating DB for chunk {chunk_info['index']}: {e}")
+                            stats["errors"] += 1
 
-                        stats["chunks_processed"] += 1
-                        if result == "created":
-                            stats["chunks_created"] += 1
-                            logger.debug(f"Created chunk {chunk_info['index']}")
-                        elif result == "updated":
-                            stats["chunks_updated"] += 1
-                            logger.debug(f"Updated chunk {chunk_info['index']}")
-                        else:
-                            stats["chunks_skipped"] += 1
+                    # Update stats from OpenSearch operation
+                    stats["chunks_processed"] += len(chunk_texts)
+                    stats["chunks_created"] += os_stats["created"]
+                    stats["chunks_updated"] += os_stats["updated"]
+                    stats["chunks_skipped"] += os_stats["skipped"]
+                    stats["errors"] += os_stats["errors"]
 
-                    except Exception as e:
-                        logger.error(f"Error processing chunk {chunk_info['index']}: {e}")
-                        stats["errors"] += 1
+                except Exception as e:
+                    logger.error(f"Error during LangChain processing: {e}")
+                    stats["errors"] += len(chunk_texts)
 
             # Mark as successful if no errors or only skipped chunks
             stats["success"] = stats["errors"] == 0
@@ -423,18 +405,25 @@ class EmbeddingProcessor:
         return overall_stats
 
 
-def create_embeddings():
+def create_embeddings(index_name: Optional[str] = None):
     """
     Main function to process incomplete documents and create embeddings
+
+    Args:
+        index_name: Optional index name to override settings default
     """
     settings = get_settings()
 
-    # Initialize Azure OpenAI client
-    embedding_client = AzureOpenAI(
+    # Initialize LangChain Azure OpenAI embeddings
+    embeddings = AzureOpenAIEmbeddings(
         api_key=settings.AZURE_API_KEY,
         api_version=settings.AZURE_API_VERSION_EMBED,
         azure_endpoint=settings.AZURE_EMBEDDING_ENDPOINT,
+        azure_deployment=settings.AZURE_EMBEDDING_DEPLOYMENT,
     )
+
+    # Use provided index name or default from settings
+    target_index = index_name or settings.OPENSEARCH_INDEX_NAME
 
     # Initialize connectors
     with StateDBConnector(
@@ -444,22 +433,24 @@ def create_embeddings():
         user=settings.POSTGRES_USER,
         password=settings.POSTGRES_PASSWORD,
     ) as db:
-        # Get OpenSearch config from settings
+        # Initialize OpenSearch with LangChain integration
         opensearch_connector = get_opensearch_connector(
-            host=settings.OPENSEARCH_HOST,
-            port=settings.OPENSEARCH_PORT,
-            username=settings.OPENSEARCH_USERNAME if hasattr(settings, 'OPENSEARCH_USERNAME') else None,
-            password=settings.OPENSEARCH_PASSWORD if hasattr(settings, 'OPENSEARCH_PASSWORD') else None,
-            use_ssl=settings.OPENSEARCH_USE_SSL if hasattr(settings, 'OPENSEARCH_USE_SSL') else False,
+            opensearch_url=settings.opensearch_url,
+            index_name=target_index,
+            embeddings=embeddings,
+            username=settings.OPENSEARCH_USERNAME,
+            password=settings.OPENSEARCH_PASSWORD,
+            use_ssl=settings.OPENSEARCH_USE_SSL,
         )
 
         try:
+            # Ensure index exists with k-NN configuration
+            opensearch_connector.ensure_index_exists(vector_dimension=1536)
+
             # Initialize processor
             processor = EmbeddingProcessor(
                 db_connector=db,
                 opensearch_connector=opensearch_connector,
-                embedding_client=embedding_client,
-                embedding_deployment=settings.AZURE_EMBEDDING_DEPLOYMENT,
             )
 
             # Process incomplete documents

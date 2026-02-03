@@ -1,6 +1,7 @@
 """
 OpenSearch Connector for Document Vector Storage
-Handles connection, indexing, and upsert operations for document embeddings
+Uses LangChain's OpenSearchVectorSearch for vector operations
+Combined with native OpenSearch client for advanced operations
 """
 
 import logging
@@ -8,99 +9,129 @@ from typing import List, Dict, Any, Optional
 from opensearchpy import OpenSearch, helpers
 from opensearchpy.exceptions import OpenSearchException
 
+from langchain_community.vectorstores import OpenSearchVectorSearch
+from langchain_core.embeddings import Embeddings
+
 logger = logging.getLogger(__name__)
 
 
 class OpenSearchConnector:
-    """Manages OpenSearch connections and operations"""
+    """
+    Manages OpenSearch connections and operations
+    Combines LangChain's OpenSearchVectorSearch with native OpenSearch client
+    """
 
     def __init__(
         self,
-        host: str = "localhost",
-        port: int = 9200,
-        auth: Optional[tuple] = None,
+        opensearch_url: str,
+        index_name: str,
+        embeddings: Embeddings,
+        username: Optional[str] = None,
+        password: Optional[str] = None,
         use_ssl: bool = False,
         verify_certs: bool = False,
         ssl_show_warn: bool = False,
     ):
         """
-        Initialize OpenSearch connection
+        Initialize OpenSearch connection with LangChain integration
 
         Args:
-            host: OpenSearch host
-            port: OpenSearch port
-            auth: Tuple of (username, password) for authentication
+            opensearch_url: OpenSearch URL (e.g., http://localhost:9200)
+            index_name: Name of the index to use
+            embeddings: LangChain embeddings instance
+            username: Optional username for authentication
+            password: Optional password for authentication
             use_ssl: Whether to use SSL
             verify_certs: Whether to verify SSL certificates
             ssl_show_warn: Whether to show SSL warnings
         """
-        self.config = {
-            "hosts": [{"host": host, "port": port}],
-            "http_auth": auth,
-            "use_ssl": use_ssl,
-            "verify_certs": verify_certs,
-            "ssl_show_warn": ssl_show_warn,
-        }
-        self.client = None
-        self._connect()
+        self.opensearch_url = opensearch_url
+        self.index_name = index_name
+        self.embeddings = embeddings
 
-    def _connect(self):
-        """Establish connection to OpenSearch"""
-        try:
-            self.client = OpenSearch(**self.config)
-            # Test connection
-            info = self.client.info()
-            logger.info(f"Connected to OpenSearch cluster: {info['cluster_name']}")
-        except Exception as e:
-            logger.error(f"Failed to connect to OpenSearch: {e}")
-            raise
+        # Initialize LangChain vector store
+        http_auth = (username, password) if username and password else None
 
-    def create_index(self, index_name: str, mappings: Dict[str, Any]) -> bool:
+        self.vector_store = OpenSearchVectorSearch(
+            opensearch_url=opensearch_url,
+            index_name=index_name,
+            embedding_function=embeddings,
+            http_auth=http_auth,
+            use_ssl=use_ssl,
+            verify_certs=verify_certs,
+            ssl_show_warn=ssl_show_warn,
+        )
+
+        # Also keep native client for advanced operations
+        self.client = self.vector_store.client
+        logger.info(f"Connected to OpenSearch at {opensearch_url}, index: {index_name}")
+
+    def ensure_index_exists(self, vector_dimension: int = 1536) -> bool:
         """
-        Create an index with specified mappings
+        Ensure index exists with proper k-NN configuration
 
         Args:
-            index_name: Name of the index to create
-            mappings: Index mapping configuration
+            vector_dimension: Dimension of embedding vectors (default: 1536 for text-embedding-ada-002)
 
         Returns:
-            bool: True if successful, False otherwise
+            bool: True if index exists or was created successfully
         """
         try:
-            if not self.client.indices.exists(index=index_name):
-                response = self.client.indices.create(
-                    index=index_name, body={"mappings": mappings}
-                )
-                logger.info(f"Index '{index_name}' created: {response}")
+            if not self.client.indices.exists(index=self.index_name):
+                # Create index with k-NN settings
+                index_body = {
+                    "settings": {
+                        "index.knn": True,  # Enable k-NN
+                        "number_of_shards": 1,
+                        "number_of_replicas": 0,
+                    },
+                    "mappings": {
+                        "properties": {
+                            "text": {"type": "text"},
+                            "vector_field": {
+                                "type": "knn_vector",
+                                "dimension": vector_dimension,
+                                "method": {
+                                    "name": "hnsw",
+                                    "space_type": "cosinesimilarity",
+                                    "engine": "nmslib",
+                                },
+                            },
+                            "metadata": {"type": "object", "enabled": True},
+                            "doc_name": {"type": "keyword"},
+                            "doc_id": {"type": "long"},
+                            "chunk_hash": {"type": "keyword"},
+                        }
+                    },
+                }
+
+                self.client.indices.create(index=self.index_name, body=index_body)
+                logger.info(f"Created k-NN index '{self.index_name}' with dimension {vector_dimension}")
                 return True
             else:
-                logger.info(f"Index '{index_name}' already exists")
+                logger.info(f"Index '{self.index_name}' already exists")
                 return True
         except OpenSearchException as e:
-            logger.error(f"Failed to create index '{index_name}': {e}")
+            logger.error(f"Failed to ensure index exists: {e}")
             return False
 
     def check_document_exists(
-        self, index_name: str, doc_id: str, doc_hash: str
+        self, doc_id: str, chunk_hash: str
     ) -> tuple[bool, bool, Optional[str]]:
         """
         Check if document exists and compare hash
 
         Args:
-            index_name: Name of the index
             doc_id: Document ID to check
-            doc_hash: Hash of the current document
+            chunk_hash: Hash of the current chunk
 
         Returns:
             tuple: (exists, hash_matches, existing_hash)
-                - exists: True if document with this ID exists
-                - hash_matches: True if hash matches (only valid if exists=True)
-                - existing_hash: The hash value from existing doc (if exists)
         """
         try:
-            response = self.client.get(index=index_name, id=doc_id, _source=["doc_hash"])
-            existing_hash = response["_source"].get("doc_hash")
-            hash_matches = existing_hash == doc_hash
+            response = self.client.get(index=self.index_name, id=doc_id, _source=["chunk_hash"])
+            existing_hash = response["_source"].get("chunk_hash")
+            hash_matches = existing_hash == chunk_hash
             return True, hash_matches, existing_hash
         except OpenSearchException as e:
             if e.status_code == 404:
@@ -108,146 +139,194 @@ class OpenSearchConnector:
             logger.error(f"Error checking document existence: {e}")
             return False, False, None
 
-    def upsert_document(
+    def add_texts_with_hash(
         self,
-        index_name: str,
-        doc_id: str,
-        document: Dict[str, Any],
-        doc_hash: str,
-    ) -> str:
+        texts: List[str],
+        metadatas: Optional[List[Dict[str, Any]]] = None,
+        ids: Optional[List[str]] = None,
+        chunk_hashes: Optional[List[str]] = None,
+    ) -> tuple[List[str], Dict[str, int]]:
         """
-        Upsert a document (insert if not exists, update if exists with different hash)
+        Add texts to vector store with hash-based duplicate detection
+        Uses LangChain's add_texts for embedding generation
 
         Args:
-            index_name: Name of the index
-            doc_id: Document ID
-            document: Document data to index
-            doc_hash: Hash of the document for duplicate detection
+            texts: List of text chunks to add
+            metadatas: Optional list of metadata dicts for each text
+            ids: Optional list of IDs for each text
+            chunk_hashes: Optional list of hashes for duplicate detection
 
         Returns:
-            str: "created", "updated", or "skipped"
-        """
-        try:
-            # Check if document exists and compare hash
-            exists, hash_matches, existing_hash = self.check_document_exists(
-                index_name, doc_id, doc_hash
-            )
-
-            # Add hash to document
-            document["doc_hash"] = doc_hash
-
-            if not exists:
-                # Create new document
-                self.client.index(index=index_name, id=doc_id, body=document)
-                logger.info(f"Created document {doc_id} in index {index_name}")
-                return "created"
-            elif not hash_matches:
-                # Update existing document (hash changed)
-                self.client.index(index=index_name, id=doc_id, body=document)
-                logger.info(
-                    f"Updated document {doc_id} in index {index_name} (hash changed: {existing_hash} -> {doc_hash})"
-                )
-                return "updated"
-            else:
-                # Skip - document exists with same hash
-                logger.debug(
-                    f"Skipped document {doc_id} in index {index_name} (hash unchanged)"
-                )
-                return "skipped"
-
-        except OpenSearchException as e:
-            logger.error(f"Failed to upsert document {doc_id}: {e}")
-            raise
-
-    def bulk_upsert(
-        self,
-        index_name: str,
-        documents: List[Dict[str, Any]],
-        id_field: str = "id",
-        hash_field: str = "doc_hash",
-    ) -> Dict[str, int]:
-        """
-        Bulk upsert documents with duplicate detection
-
-        Args:
-            index_name: Name of the index
-            documents: List of documents to upsert
-            id_field: Field name containing document ID
-            hash_field: Field name containing document hash
-
-        Returns:
-            dict: Statistics of the operation (created, updated, skipped, errors)
+            tuple: (list of IDs added, stats dict)
         """
         stats = {"created": 0, "updated": 0, "skipped": 0, "errors": 0}
 
-        for doc in documents:
+        if not ids:
+            ids = [f"chunk_{i}" for i in range(len(texts))]
+
+        if not chunk_hashes:
+            chunk_hashes = [None] * len(texts)
+
+        # Prepare data
+        texts_to_add = []
+        metadatas_to_add = []
+        ids_to_add = []
+
+        for i, (text, chunk_hash, doc_id) in enumerate(zip(texts, chunk_hashes, ids)):
             try:
-                doc_id = doc.get(id_field)
-                doc_hash = doc.get(hash_field)
+                # Check if document exists
+                if chunk_hash:
+                    exists, hash_matches, existing_hash = self.check_document_exists(
+                        doc_id, chunk_hash
+                    )
 
-                if not doc_id or not doc_hash:
-                    logger.warning(f"Document missing {id_field} or {hash_field}, skipping")
-                    stats["errors"] += 1
-                    continue
+                    if exists and hash_matches:
+                        logger.debug(f"Skipped chunk {doc_id} (hash unchanged)")
+                        stats["skipped"] += 1
+                        continue
+                    elif exists:
+                        logger.debug(
+                            f"Will update chunk {doc_id} (hash changed: {existing_hash[:8]}... -> {chunk_hash[:8]}...)"
+                        )
+                        stats["updated"] += 1
+                    else:
+                        stats["created"] += 1
+                else:
+                    stats["created"] += 1
 
-                result = self.upsert_document(index_name, doc_id, doc, doc_hash)
-                stats[result] += 1
+                # Add to batch
+                texts_to_add.append(text)
+                ids_to_add.append(doc_id)
+
+                # Add hash to metadata
+                metadata = metadatas[i] if metadatas and i < len(metadatas) else {}
+                metadata["chunk_hash"] = chunk_hash
+                metadatas_to_add.append(metadata)
 
             except Exception as e:
-                logger.error(f"Error processing document: {e}")
+                logger.error(f"Error processing chunk {i}: {e}")
                 stats["errors"] += 1
 
-        logger.info(
-            f"Bulk upsert completed: {stats['created']} created, {stats['updated']} updated, "
-            f"{stats['skipped']} skipped, {stats['errors']} errors"
-        )
-        return stats
+        # Use LangChain to add texts (generates embeddings and indexes)
+        if texts_to_add:
+            try:
+                added_ids = self.vector_store.add_texts(
+                    texts=texts_to_add,
+                    metadatas=metadatas_to_add,
+                    ids=ids_to_add,
+                    bulk_size=500,
+                )
+                logger.info(
+                    f"Batch complete: {stats['created']} created, {stats['updated']} updated, "
+                    f"{stats['skipped']} skipped, {stats['errors']} errors"
+                )
+                return added_ids, stats
+            except Exception as e:
+                logger.error(f"Failed to add texts to OpenSearch: {e}")
+                raise
+        else:
+            logger.info("No new texts to add (all skipped)")
+            return [], stats
 
-    def delete_document(self, index_name: str, doc_id: str) -> bool:
+    def similarity_search(
+        self,
+        query: str,
+        k: int = 4,
+        filter: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Perform similarity search using LangChain
+
+        Args:
+            query: Query text
+            k: Number of results to return
+            filter: Optional metadata filter
+
+        Returns:
+            list: List of matching documents with metadata
+        """
+        try:
+            # Use LangChain's similarity search
+            docs = self.vector_store.similarity_search(
+                query=query,
+                k=k,
+                filter=filter,
+            )
+            return [{"text": doc.page_content, "metadata": doc.metadata} for doc in docs]
+        except Exception as e:
+            logger.error(f"Similarity search failed: {e}")
+            return []
+
+    def similarity_search_with_score(
+        self,
+        query: str,
+        k: int = 4,
+        filter: Optional[Dict[str, Any]] = None,
+    ) -> List[tuple[Dict[str, Any], float]]:
+        """
+        Perform similarity search with relevance scores
+
+        Args:
+            query: Query text
+            k: Number of results to return
+            filter: Optional metadata filter
+
+        Returns:
+            list: List of (document, score) tuples
+        """
+        try:
+            docs_and_scores = self.vector_store.similarity_search_with_score(
+                query=query,
+                k=k,
+                filter=filter,
+            )
+            return [
+                ({"text": doc.page_content, "metadata": doc.metadata}, score)
+                for doc, score in docs_and_scores
+            ]
+        except Exception as e:
+            logger.error(f"Similarity search with score failed: {e}")
+            return []
+
+    def delete_document(self, doc_id: str) -> bool:
         """
         Delete a document from index
 
         Args:
-            index_name: Name of the index
             doc_id: Document ID to delete
 
         Returns:
             bool: True if successful, False otherwise
         """
         try:
-            self.client.delete(index=index_name, id=doc_id)
-            logger.info(f"Deleted document {doc_id} from index {index_name}")
+            self.client.delete(index=self.index_name, id=doc_id)
+            logger.info(f"Deleted document {doc_id} from index {self.index_name}")
             return True
         except OpenSearchException as e:
             if e.status_code == 404:
-                logger.warning(f"Document {doc_id} not found in index {index_name}")
+                logger.warning(f"Document {doc_id} not found in index {self.index_name}")
             else:
                 logger.error(f"Failed to delete document {doc_id}: {e}")
             return False
 
-    def search(
-        self,
-        index_name: str,
-        query: Dict[str, Any],
-        size: int = 10,
-    ) -> List[Dict[str, Any]]:
+    def get_stats(self) -> Dict[str, Any]:
         """
-        Search documents in index
-
-        Args:
-            index_name: Name of the index
-            query: OpenSearch query DSL
-            size: Number of results to return
+        Get index statistics
 
         Returns:
-            list: List of matching documents
+            dict: Index statistics including document count
         """
         try:
-            response = self.client.search(index=index_name, body=query, size=size)
-            return [hit["_source"] for hit in response["hits"]["hits"]]
-        except OpenSearchException as e:
-            logger.error(f"Search failed: {e}")
-            return []
+            stats = self.client.indices.stats(index=self.index_name)
+            doc_count = stats["indices"][self.index_name]["primaries"]["docs"]["count"]
+            return {
+                "index_name": self.index_name,
+                "document_count": doc_count,
+                "size_in_bytes": stats["indices"][self.index_name]["primaries"]["store"]["size_in_bytes"],
+            }
+        except Exception as e:
+            logger.error(f"Failed to get stats: {e}")
+            return {"error": str(e)}
 
     def close(self):
         """Close the OpenSearch connection"""
@@ -257,18 +336,20 @@ class OpenSearchConnector:
 
 
 def get_opensearch_connector(
-    host: str,
-    port: int,
+    opensearch_url: str,
+    index_name: str,
+    embeddings: Embeddings,
     username: Optional[str] = None,
     password: Optional[str] = None,
     use_ssl: bool = False,
 ) -> OpenSearchConnector:
     """
-    Factory function to create OpenSearch connector from configuration
+    Factory function to create OpenSearch connector with LangChain integration
 
     Args:
-        host: OpenSearch host
-        port: OpenSearch port
+        opensearch_url: OpenSearch URL (e.g., http://localhost:9200)
+        index_name: Name of the index
+        embeddings: LangChain embeddings instance (e.g., AzureOpenAIEmbeddings)
         username: Optional username for authentication
         password: Optional password for authentication
         use_ssl: Whether to use SSL
@@ -276,10 +357,11 @@ def get_opensearch_connector(
     Returns:
         OpenSearchConnector instance
     """
-    auth = (username, password) if username and password else None
     return OpenSearchConnector(
-        host=host,
-        port=port,
-        auth=auth,
+        opensearch_url=opensearch_url,
+        index_name=index_name,
+        embeddings=embeddings,
+        username=username,
+        password=password,
         use_ssl=use_ssl,
     )

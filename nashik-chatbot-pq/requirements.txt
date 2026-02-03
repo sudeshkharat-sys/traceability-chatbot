@@ -9,6 +9,7 @@ pandas
 langchain
 langchain-openai
 langchain-neo4j
+langchain-community
 langgraph
 langgraph-checkpoint-postgres
 openai
