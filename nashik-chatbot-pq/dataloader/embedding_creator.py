@@ -19,9 +19,9 @@ sys.path.append(str(Path(__file__).parent.parent))
 from langchain_openai import AzureOpenAIEmbeddings
 
 from app.connectors.state_db_connector import StateDBConnector
-from app.connectors.opensearch_connector import get_opensearch_connector
+from app.connectors.opensearch_connector import OpenSearchConnector
 from app.config.config import get_settings
-
+from app.models.model_factory import ModelFactory
 import pipeline_factory
 
 logger = logging.getLogger(__name__)
@@ -405,7 +405,7 @@ class EmbeddingProcessor:
         return overall_stats
 
 
-def create_embeddings(index_name: Optional[str] = None):
+def create_embeddings(self):
     """
     Main function to process incomplete documents and create embeddings
 
@@ -413,72 +413,27 @@ def create_embeddings(index_name: Optional[str] = None):
         index_name: Optional index name to override settings default
     """
     settings = get_settings()
-
-    # Initialize LangChain Azure OpenAI embeddings
-    embeddings = AzureOpenAIEmbeddings(
-        api_key=settings.AZURE_API_KEY,
-        api_version=settings.AZURE_API_VERSION_EMBED,
-        azure_endpoint=settings.AZURE_EMBEDDING_ENDPOINT,
-        azure_deployment=settings.AZURE_EMBEDDING_DEPLOYMENT,
-    )
-
-    # Use provided index name or default from settings
-    target_index = index_name or settings.OPENSEARCH_INDEX_NAME
-
-    # Initialize connectors
-    with StateDBConnector(
+    embedding_model = ModelFactory.get_embedding_model()
+    db  = StateDBConnector(
         host=settings.POSTGRES_HOST,
         port=settings.POSTGRES_PORT,
         database=settings.POSTGRES_DB,
         user=settings.POSTGRES_USER,
         password=settings.POSTGRES_PASSWORD,
-    ) as db:
-        # Initialize OpenSearch with LangChain integration
-        opensearch_connector = get_opensearch_connector(
-            opensearch_url=settings.opensearch_url,
-            index_name=target_index,
-            embeddings=embeddings,
+    )
+    opensearch_connector = OpenSearchConnector(
+            opensearch_url=settings.OPENSEARCH_URL,
+            embeddings=embedding_model,
             username=settings.OPENSEARCH_USERNAME,
             password=settings.OPENSEARCH_PASSWORD,
             use_ssl=settings.OPENSEARCH_USE_SSL,
+            verify_certs=settings.OPENSEARCH_VERIFY_CERTS,
         )
-
-        try:
-            # Ensure index exists with k-NN configuration
-            opensearch_connector.ensure_index_exists(vector_dimension=1536)
-
-            # Initialize processor
-            processor = EmbeddingProcessor(
-                db_connector=db,
-                opensearch_connector=opensearch_connector,
-            )
-
-            # Process incomplete documents
-            stats = processor.process_incomplete_documents()
-
-            return stats
-
-        finally:
-            # Close OpenSearch connection
-            opensearch_connector.close()
-
-
-if __name__ == "__main__":
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    # Intialize processor
+    processor = EmbeddingProcessor(
+        db_connector=db,
+        opensearch_connector=opensearch_connector,
     )
-
-    # Run embedding creation
-    stats = create_embeddings()
-
-    print(f"\n{'='*60}")
-    print("Processing Complete!")
-    print(f"{'='*60}")
-    print(f"Documents completed: {stats['documents_completed']}")
-    print(f"Documents failed: {stats['documents_failed']}")
-    print(f"Total chunks created: {stats['total_chunks_created']}")
-    print(f"Total chunks updated: {stats['total_chunks_updated']}")
-    print(f"Total chunks skipped: {stats['total_chunks_skipped']}")
-    print(f"Total errors: {stats['total_errors']}")
+    # Process incomplete documents
+    stats = processor.process_incomplete_documents()
+    return stats

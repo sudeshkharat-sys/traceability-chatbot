@@ -61,51 +61,6 @@ def create_tables(ctx):
         logger.error(f"❌ Error creating tables: {e}")
         raise
 
-
-@task
-def list_tables(ctx):
-    """
-    List all tables in the database
-
-    Usage: invoke list-tables
-    """
-    logger.info("=" * 80)
-    logger.info("📑 Listing Database Tables...")
-    logger.info("=" * 80)
-    try:
-        manager = StateDBManager()
-        tables = manager.list_tables()
-        logger.info(f"Found {len(tables)} tables")
-    except Exception as e:
-        logger.error(f"❌ Error listing tables: {e}")
-        raise
-
-
-@task
-def drop_all_tables(ctx):
-    """
-    Drop all tables in the database (USE WITH CAUTION!)
-
-    Usage: invoke drop-all-tables
-    """
-    logger.warning("=" * 80)
-    logger.warning("⚠️  WARNING: This will DROP ALL TABLES!")
-    logger.warning("=" * 80)
-
-    confirm = input("Are you sure? Type 'YES' to confirm: ")
-
-    if confirm == "YES":
-        try:
-            manager = StateDBManager()
-            manager.drop_all_tables()
-            logger.warning("✅ All tables dropped")
-        except Exception as e:
-            logger.error(f"❌ Error dropping tables: {e}")
-            raise
-    else:
-        logger.info("❌ Operation cancelled")
-
-
 @task
 def setup_database(ctx):
     """
@@ -282,20 +237,15 @@ def validate_connections(ctx):
 # ============================================================================
 
 @task
-def scrape_documents(ctx, directory, index_name, extensions=None, no_recursive=False):
+def scrape_documents(ctx, directory):
     """
     Scrape documents from filesystem and register in scraped_docs table
 
     Usage:
         invoke scrape-documents --directory=/path/to/docs --index-name=my_index
-        invoke scrape-documents --directory=/path/to/docs --index-name=my_index --extensions=".pdf,.docx"
-        invoke scrape-documents --directory=/path/to/docs --index-name=my_index --no-recursive
-
     Args:
         directory: Directory path to scan for documents
         index_name: OpenSearch index name for these documents
-        extensions: Comma-separated file extensions (default: .pdf)
-        no_recursive: Don't scan subdirectories recursively
     """
     logger.info("=" * 80)
     logger.info("📁 Scraping Documents from Filesystem...")
@@ -303,29 +253,10 @@ def scrape_documents(ctx, directory, index_name, extensions=None, no_recursive=F
 
     try:
         from dataloader.scrape_process import scrape_files
-
-        # Parse extensions
-        if extensions:
-            ext_list = [ext.strip() for ext in extensions.split(',')]
-        else:
-            ext_list = ['.pdf']
-
-        recursive = not no_recursive
-
         logger.info(f"Directory: {directory}")
-        logger.info(f"Index Name: {index_name}")
-        logger.info(f"Extensions: {ext_list}")
-        logger.info(f"Recursive: {recursive}")
         logger.info("")
-
         # Run scrape process
-        stats = scrape_files(
-            directory=directory,
-            index_name=index_name,
-            file_extensions=ext_list,
-            recursive=recursive,
-        )
-
+        stats = scrape_files(directory=directory,)
         logger.info("=" * 80)
         logger.info("📊 Scraping Results:")
         logger.info(f"  Files scanned: {stats['scanned']}")
@@ -341,13 +272,11 @@ def scrape_documents(ctx, directory, index_name, extensions=None, no_recursive=F
 
     except Exception as e:
         logger.error(f"❌ Error during document scraping: {e}")
-        import traceback
-        traceback.print_exc()
-        raise
+        raise e
 
 
 @task
-def create_embeddings(ctx, index_name=None):
+def create_embeddings(ctx):
     """
     Process incomplete documents and create embeddings in OpenSearch
     Processes all documents in scraped_docs table with status='incomplete'
@@ -366,14 +295,8 @@ def create_embeddings(ctx, index_name=None):
     try:
         from dataloader.create_embedding_process import create_embeddings as run_embedding_process
 
-        if index_name:
-            logger.info(f"Target Index: {index_name}")
-        else:
-            logger.info("Using default index from settings")
-        logger.info("")
-
         # Run embedding creation process
-        stats = run_embedding_process(index_name=index_name)
+        stats = run_embedding_process()
 
         logger.info("=" * 80)
         logger.info("📊 Embedding Creation Results:")

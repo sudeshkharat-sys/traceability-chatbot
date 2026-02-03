@@ -116,8 +116,6 @@ class FileScraper:
     def scrape_directory(
         self,
         directory: Path,
-        file_extensions: List[str] = None,
-        recursive: bool = True,
     ) -> dict:
         """
         Scrape a directory for files and register them in database
@@ -140,30 +138,13 @@ class FileScraper:
 
         if not directory.exists():
             logger.error(f"Directory does not exist: {directory}")
-            return stats
-
-        # Default to PDF files if not specified
-        if file_extensions is None:
-            file_extensions = [".pdf"]
-
-        # Normalize extensions to lowercase with dot
-        file_extensions = [
-            ext.lower() if ext.startswith(".") else f".{ext.lower()}"
-            for ext in file_extensions
-        ]
-
-        # Get files to process
-        if recursive:
-            files = []
-            for ext in file_extensions:
-                files.extend(directory.rglob(f"*{ext}"))
-        else:
-            files = []
-            for ext in file_extensions:
-                files.extend(directory.glob(f"*{ext}"))
+            return 
+        
+        files = []
+        files.extend(directory.glob(f"*.Pdf"))
 
         logger.info(
-            f"Found {len(files)} files with extensions {file_extensions} in {directory}"
+            f"Found {len(files)} files in {directory}"
         )
 
         # Process each file
@@ -195,26 +176,17 @@ class FileScraper:
         return stats
 
 
-def scrape_files(
-    directory: str,
-    index_name: str,
-    file_extensions: List[str] = None,
-    recursive: bool = True,
-) -> dict:
+def scrape_files(directory: str,) -> dict:
     """
     Main function to scrape files from directory
 
     Args:
         directory: Directory path to scrape
-        index_name: Name of the index for these documents
-        file_extensions: List of file extensions to include
-        recursive: Whether to recursively scan subdirectories
 
     Returns:
         dict: Statistics of the scraping operation
     """
     settings = get_settings()
-
     with StateDBConnector(
         host=settings.POSTGRES_HOST,
         port=settings.POSTGRES_PORT,
@@ -222,62 +194,5 @@ def scrape_files(
         user=settings.POSTGRES_USER,
         password=settings.POSTGRES_PASSWORD,
     ) as db:
-        scraper = FileScraper(db, index_name)
-        return scraper.scrape_directory(
-            Path(directory), file_extensions, recursive
-        )
-
-
-if __name__ == "__main__":
-    import argparse
-
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
-
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(
-        description="Scrape files from directory and register for processing"
-    )
-    parser.add_argument(
-        "--directory",
-        "-d",
-        required=True,
-        help="Directory to scrape for files",
-    )
-    parser.add_argument(
-        "--index-name",
-        "-i",
-        required=True,
-        help="Name of the OpenSearch index for these documents",
-    )
-    parser.add_argument(
-        "--extensions",
-        "-e",
-        nargs="+",
-        default=[".pdf"],
-        help="File extensions to include (e.g., .pdf .docx)",
-    )
-    parser.add_argument(
-        "--no-recursive",
-        action="store_true",
-        help="Don't scan subdirectories recursively",
-    )
-
-    args = parser.parse_args()
-
-    # Run scraping
-    stats = scrape_files(
-        directory=args.directory,
-        index_name=args.index_name,
-        file_extensions=args.extensions,
-        recursive=not args.no_recursive,
-    )
-
-    print(f"\n=== Scraping Results ===")
-    print(f"Files scanned: {stats['scanned']}")
-    print(f"New documents: {stats['new']}")
-    print(f"Existing documents: {stats['existing']}")
-    print(f"Errors: {stats['errors']}")
+        scraper = FileScraper(db, settings.OPENSEARCH_INDEX_NAME)
+        return scraper.scrape_directory(Path(directory))

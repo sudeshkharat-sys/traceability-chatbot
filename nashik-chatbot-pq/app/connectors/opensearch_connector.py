@@ -24,7 +24,6 @@ class OpenSearchConnector:
     def __init__(
         self,
         opensearch_url: str,
-        index_name: str,
         embeddings: Embeddings,
         username: Optional[str] = None,
         password: Optional[str] = None,
@@ -37,7 +36,6 @@ class OpenSearchConnector:
 
         Args:
             opensearch_url: OpenSearch URL (e.g., http://localhost:9200)
-            index_name: Name of the index to use
             embeddings: LangChain embeddings instance
             username: Optional username for authentication
             password: Optional password for authentication
@@ -46,74 +44,16 @@ class OpenSearchConnector:
             ssl_show_warn: Whether to show SSL warnings
         """
         self.opensearch_url = opensearch_url
-        self.index_name = index_name
         self.embeddings = embeddings
-
-        # Initialize LangChain vector store
         http_auth = (username, password) if username and password else None
-
-        self.vector_store = OpenSearchVectorSearch(
-            opensearch_url=opensearch_url,
-            index_name=index_name,
-            embedding_function=embeddings,
+        self.client = OpenSearch(
+            hosts=opensearch_url,
             http_auth=http_auth,
             use_ssl=use_ssl,
             verify_certs=verify_certs,
             ssl_show_warn=ssl_show_warn,
+            timeout=30,
         )
-
-        # Also keep native client for advanced operations
-        self.client = self.vector_store.client
-        logger.info(f"Connected to OpenSearch at {opensearch_url}, index: {index_name}")
-
-    def ensure_index_exists(self, vector_dimension: int = 1536) -> bool:
-        """
-        Ensure index exists with proper k-NN configuration
-
-        Args:
-            vector_dimension: Dimension of embedding vectors (default: 1536 for text-embedding-ada-002)
-
-        Returns:
-            bool: True if index exists or was created successfully
-        """
-        try:
-            if not self.client.indices.exists(index=self.index_name):
-                # Create index with k-NN settings
-                index_body = {
-                    "settings": {
-                        "index.knn": True,  # Enable k-NN
-                        "number_of_shards": 1,
-                        "number_of_replicas": 0,
-                    },
-                    "mappings": {
-                        "properties": {
-                            "text": {"type": "text"},
-                            "vector_field": {
-                                "type": "knn_vector",
-                                "dimension": vector_dimension,
-                                "method": {
-                                    "name": "hnsw",
-                                    "space_type": "cosinesimilarity",
-                                    "engine": "nmslib",
-                                },
-                            },
-                            "metadata": {"type": "object", "enabled": True},
-                            "doc_name": {"type": "keyword"},
-                            "doc_id": {"type": "long"},
-                            "chunk_hash": {"type": "keyword"},
-                        }
-                    },
-                }
-
-                self.client.indices.create(index=self.index_name, body=index_body)
-                logger.info(f"Created k-NN index '{self.index_name}' with dimension {vector_dimension}")
-                return True
-            else:
-                logger.info(f"Index '{self.index_name}' already exists")
-                return True
-        except OpenSearchException as e:
-            logger.error(f"Failed to ensure index exists: {e}")
-            return False
 
     def check_document_exists(
         self, doc_id: str, chunk_hash: str
@@ -134,10 +74,8 @@ class OpenSearchConnector:
             hash_matches = existing_hash == chunk_hash
             return True, hash_matches, existing_hash
         except OpenSearchException as e:
-            if e.status_code == 404:
-                return False, False, None
             logger.error(f"Error checking document existence: {e}")
-            return False, False, None
+            raise e
 
     def add_texts_with_hash(
         self,
@@ -214,7 +152,7 @@ class OpenSearchConnector:
                     texts=texts_to_add,
                     metadatas=metadatas_to_add,
                     ids=ids_to_add,
-                    bulk_size=500,
+                    bulk_size=10000,
                 )
                 logger.info(
                     f"Batch complete: {stats['created']} created, {stats['updated']} updated, "
@@ -303,30 +241,7 @@ class OpenSearchConnector:
             logger.info(f"Deleted document {doc_id} from index {self.index_name}")
             return True
         except OpenSearchException as e:
-            if e.status_code == 404:
-                logger.warning(f"Document {doc_id} not found in index {self.index_name}")
-            else:
-                logger.error(f"Failed to delete document {doc_id}: {e}")
-            return False
-
-    def get_stats(self) -> Dict[str, Any]:
-        """
-        Get index statistics
-
-        Returns:
-            dict: Index statistics including document count
-        """
-        try:
-            stats = self.client.indices.stats(index=self.index_name)
-            doc_count = stats["indices"][self.index_name]["primaries"]["docs"]["count"]
-            return {
-                "index_name": self.index_name,
-                "document_count": doc_count,
-                "size_in_bytes": stats["indices"][self.index_name]["primaries"]["store"]["size_in_bytes"],
-            }
-        except Exception as e:
-            logger.error(f"Failed to get stats: {e}")
-            return {"error": str(e)}
+            raise e
 
     def close(self):
         """Close the OpenSearch connection"""
@@ -334,34 +249,3 @@ class OpenSearchConnector:
             self.client.close()
             logger.info("OpenSearch connection closed")
 
-
-def get_opensearch_connector(
-    opensearch_url: str,
-    index_name: str,
-    embeddings: Embeddings,
-    username: Optional[str] = None,
-    password: Optional[str] = None,
-    use_ssl: bool = False,
-) -> OpenSearchConnector:
-    """
-    Factory function to create OpenSearch connector with LangChain integration
-
-    Args:
-        opensearch_url: OpenSearch URL (e.g., http://localhost:9200)
-        index_name: Name of the index
-        embeddings: LangChain embeddings instance (e.g., AzureOpenAIEmbeddings)
-        username: Optional username for authentication
-        password: Optional password for authentication
-        use_ssl: Whether to use SSL
-
-    Returns:
-        OpenSearchConnector instance
-    """
-    return OpenSearchConnector(
-        opensearch_url=opensearch_url,
-        index_name=index_name,
-        embeddings=embeddings,
-        username=username,
-        password=password,
-        use_ssl=use_ssl,
-    )
