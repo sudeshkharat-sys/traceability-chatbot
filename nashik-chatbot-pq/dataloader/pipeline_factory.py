@@ -1,3 +1,6 @@
+import os
+import sys
+from pathlib import Path
 import tiktoken
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import (
@@ -10,23 +13,36 @@ from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
 from docling_core.transforms.chunker.tokenizer.openai import OpenAITokenizer
 
-import config
+# Add parent directory to path to import app config
+sys.path.append(str(Path(__file__).parent.parent))
+
+from app.config.config import get_settings
 from serializers import CustomSerializerProvider
 
+# Get settings once at module level
+settings = get_settings()
+
+# Set up paths
+ARTIFACTS_PATH = Path(settings.DOCLING_ARTIFACTS_PATH)
+VLM_MODEL_FOLDER = ARTIFACTS_PATH / f"ds4sd--{settings.DOCLING_VLM_MODEL}"
+
+# Set environment variable for Docling
+os.environ["DOCLING_ARTIFACTS_PATH"] = str(ARTIFACTS_PATH)
+
 def get_pipeline_options():
-    pipeline_options = PdfPipelineOptions(artifacts_path=config.ARTIFACTS_PATH)
-    
+    pipeline_options = PdfPipelineOptions(artifacts_path=ARTIFACTS_PATH)
+
     # 1. Table Settings
     pipeline_options.do_table_structure = True
     pipeline_options.table_structure_options = TableStructureOptions(
         mode=TableFormerMode.ACCURATE,
         do_cell_matching=False
     )
-    
+
     # 2. VLM / Picture Description Settings
     pipeline_options.do_picture_description = True
     pipeline_options.picture_description_options = PictureDescriptionVlmOptions(
-        repo_id=str(config.VLM_MODEL_FOLDER)
+        repo_id=str(VLM_MODEL_FOLDER)
     )
     
     # 3. Image Generation Settings

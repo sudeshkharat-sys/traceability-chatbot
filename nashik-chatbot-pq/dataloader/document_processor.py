@@ -1,27 +1,42 @@
+import sys
 import time
 import json
 import logging
+from pathlib import Path
 from docling_core.types.doc import ImageRefMode, PictureItem, TableItem
 
-import config
+# Add parent directory to path to import app config
+sys.path.append(str(Path(__file__).parent.parent))
+
+from app.config.config import get_settings
 import pipeline_factory
 
 logger = logging.getLogger(__name__)
 
+# Get settings
+settings = get_settings()
+
+# Set up paths
+ARTIFACTS_PATH = Path(settings.DOCLING_ARTIFACTS_PATH)
+INPUT_ROOT = Path(settings.DOCLING_INPUT_ROOT)
+OUTPUT_ROOT = Path(settings.DOCLING_OUTPUT_ROOT)
+VLM_MODEL_FOLDER = ARTIFACTS_PATH / f"ds4sd--{settings.DOCLING_VLM_MODEL}"
+LAYOUT_MODEL_FOLDER = ARTIFACTS_PATH / f"docling-project--{settings.DOCLING_LAYOUT_MODEL}"
+
 def process_files():
     # Verify paths
-    if not config.VLM_MODEL_FOLDER.exists():
-        logger.error(f"VLM Model folder not found at: {config.VLM_MODEL_FOLDER}")
+    if not VLM_MODEL_FOLDER.exists():
+        logger.error(f"VLM Model folder not found at: {VLM_MODEL_FOLDER}")
     else:
-        logger.info(f"Confirmed local VLM model at: {config.VLM_MODEL_FOLDER}")
+        logger.info(f"Confirmed local VLM model at: {VLM_MODEL_FOLDER}")
 
-    if not config.LAYOUT_MODEL_FOLDER.exists():
-        logger.warning(f"Layout Model folder not found at: {config.LAYOUT_MODEL_FOLDER}")
+    if not LAYOUT_MODEL_FOLDER.exists():
+        logger.warning(f"Layout Model folder not found at: {LAYOUT_MODEL_FOLDER}")
 
-    pdf_files = list(config.INPUT_ROOT.rglob("*.pdf"))
+    pdf_files = list(INPUT_ROOT.rglob("*.pdf"))
 
     if not pdf_files:
-        print(f"No PDF files found in {config.INPUT_ROOT}")
+        print(f"No PDF files found in {INPUT_ROOT}")
         return
 
     # Initialize components
@@ -39,8 +54,8 @@ def process_files():
             conv_res = doc_converter.convert(pdf_file)
             
             # Output Directory
-            relative_path = pdf_file.relative_to(config.INPUT_ROOT)
-            doc_output_dir = config.OUTPUT_ROOT / relative_path.parent / pdf_file.stem
+            relative_path = pdf_file.relative_to(INPUT_ROOT)
+            doc_output_dir = OUTPUT_ROOT / relative_path.parent / pdf_file.stem
             doc_output_dir.mkdir(parents=True, exist_ok=True)
             
             # Subdirectories
