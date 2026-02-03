@@ -1,0 +1,55 @@
+import tiktoken
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import (
+    PdfPipelineOptions,
+    TableFormerMode,
+    PictureDescriptionVlmOptions,
+    TableStructureOptions
+)
+from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
+from docling_core.transforms.chunker.tokenizer.openai import OpenAITokenizer
+
+import config
+from serializers import CustomSerializerProvider
+
+def get_pipeline_options():
+    pipeline_options = PdfPipelineOptions(artifacts_path=config.ARTIFACTS_PATH)
+    
+    # 1. Table Settings
+    pipeline_options.do_table_structure = True
+    pipeline_options.table_structure_options = TableStructureOptions(
+        mode=TableFormerMode.ACCURATE,
+        do_cell_matching=False
+    )
+    
+    # 2. VLM / Picture Description Settings
+    pipeline_options.do_picture_description = True
+    pipeline_options.picture_description_options = PictureDescriptionVlmOptions(
+        repo_id=str(config.VLM_MODEL_FOLDER)
+    )
+    
+    # 3. Image Generation Settings
+    pipeline_options.images_scale = 2.0
+    pipeline_options.generate_page_images = True
+    pipeline_options.generate_picture_images = True
+    pipeline_options.generate_table_images = True
+    
+    return pipeline_options
+
+def get_converter():
+    return DocumentConverter(
+        format_options={
+            InputFormat.PDF: PdfFormatOption(pipeline_options=get_pipeline_options())
+        }
+    )
+
+def get_chunker():
+    tokenizer = OpenAITokenizer(
+        tokenizer=tiktoken.get_encoding("cl100k_base"),
+        max_tokens=8191,
+    )
+    return HybridChunker(
+        tokenizer=tokenizer,
+        serializer_provider=CustomSerializerProvider(),
+    )
