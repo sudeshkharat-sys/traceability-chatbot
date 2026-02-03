@@ -1,0 +1,126 @@
+# =====================================================
+# Generic Data Loader Configuration
+# =====================================================
+# This configuration file defines paths and settings for
+# the document processing pipeline
+
+# =====================================================
+# DOCUMENT PROCESSING PATHS
+# =====================================================
+# Base directory for all document processing operations
+# Adjust these paths based on your environment
+base_dir: /data/documents
+
+# Path to Docling model artifacts
+# Download models from: https://huggingface.co/docling
+artifacts_path: /data/docling_models/docling_all_models
+
+# Input directory where source documents are located
+# The scrape process will scan this directory for files
+input_root: /data/documents/input
+
+# Output directory for processed documents
+# Document conversion results and intermediate files will be saved here
+output_root: /data/documents/output
+
+# =====================================================
+# MODEL CONFIGURATION
+# =====================================================
+# Visual Language Model (VLM) for picture descriptions
+# Model: SmolDocling-256M-preview
+vlm_model_folder: SmolDocling-256M-preview
+
+# Layout detection model
+# Model: docling-layout-heron
+layout_model_folder: docling-layout-heron
+
+# =====================================================
+# PROCESSING OPTIONS
+# =====================================================
+processing:
+  # Enable table structure extraction
+  do_table_structure: true
+
+  # Enable picture descriptions using VLM
+  do_picture_description: true
+
+  # Generate page images (scale factor)
+  images_scale: 2.0
+
+  # Generate various image types
+  generate_page_images: true
+  generate_picture_images: true
+  generate_table_images: true
+
+# =====================================================
+# CHUNKING CONFIGURATION
+# =====================================================
+chunking:
+  # Tokenizer to use (OpenAI compatible)
+  tokenizer: cl100k_base
+
+  # Maximum tokens per chunk
+  max_tokens: 8191
+
+  # Chunk overlap (optional)
+  # overlap_tokens: 100
+
+# =====================================================
+# FILE PROCESSING SETTINGS
+# =====================================================
+files:
+  # File extensions to process
+  # Add more extensions as needed
+  extensions:
+    - .pdf
+    - .docx
+    - .doc
+    - .txt
+
+  # Recursive directory scanning
+  recursive: true
+
+  # Skip files matching these patterns
+  exclude_patterns:
+    - ".*"  # Hidden files
+    - "_*"  # Files starting with underscore
+
+# =====================================================
+# OPENSEARCH INDEX SETTINGS
+# =====================================================
+opensearch:
+  # Default index name
+  default_index: documents
+
+  # Index mapping for embeddings
+  # Dimension should match your embedding model (Azure text-embedding-ada-002 = 1536)
+  index_mapping:
+    properties:
+      text:
+        type: text
+      embedding:
+        type: knn_vector
+        dimension: 1536
+        method:
+          name: hnsw
+          space_type: cosinesimilarity
+          engine: nmslib
+      metadata:
+        type: object
+        enabled: true
+      doc_name:
+        type: keyword
+      doc_id:
+        type: long
+      doc_hash:
+        type: keyword
+
+# =====================================================
+# LOGGING CONFIGURATION
+# =====================================================
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+  # Log file (optional)
+  # file: /data/logs/dataloader.log

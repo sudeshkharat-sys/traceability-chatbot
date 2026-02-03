@@ -74,6 +74,14 @@ class Settings(BaseSettings):
     # Session Configuration
     SESSION_SECRET: str = "change-me-in-production"
 
+    # OpenSearch Configuration (for document embeddings)
+    OPENSEARCH_HOST: str = "localhost"
+    OPENSEARCH_PORT: int = 9200
+    OPENSEARCH_USERNAME: Optional[str] = None
+    OPENSEARCH_PASSWORD: Optional[str] = None
+    OPENSEARCH_USE_SSL: bool = False
+    OPENSEARCH_INDEX_NAME: str = "documents"
+
     # Agent Configuration
     MAX_CHAT_HISTORY: int = 10
     QUERY_TIMEOUT_SECONDS: int = 30

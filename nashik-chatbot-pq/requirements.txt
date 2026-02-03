@@ -17,11 +17,13 @@ openai
 neo4j
 psycopg2-binary
 sqlalchemy
+opensearch-py
 
 # Configuration & Environment
 pydantic
 pydantic-settings
 python-dotenv
+pyyaml
 
 # Task Management
 invoke

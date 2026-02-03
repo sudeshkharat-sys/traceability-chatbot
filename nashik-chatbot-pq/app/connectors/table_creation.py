@@ -60,6 +60,8 @@ def create_dynamic_table(name, columns, constraints=None, indexes=None):
 conversation_id_seq = Sequence("conversation_id_seq")
 message_id_seq = Sequence("message_id_seq")
 feedback_id_seq = Sequence("feedback_id_seq")
+scraped_doc_id_seq = Sequence("scraped_doc_id_seq")
+chunk_id_seq = Sequence("chunk_id_seq")
 
 
 # =====================================================
@@ -202,6 +204,87 @@ create_dynamic_table(
     ],
     indexes=[
         Index("idx_system_prompts_key", "prompt_key"),
+    ],
+)
+
+
+# =====================================================
+# SCRAPED_DOCS TABLE (tracks documents to be processed)
+# =====================================================
+create_dynamic_table(
+    "scraped_docs",
+    [
+        Column(
+            "id",
+            BigInteger,
+            scraped_doc_id_seq,
+            primary_key=True,
+            server_default=scraped_doc_id_seq.next_value(),
+        ),
+        Column("index_name", String(255), nullable=False),
+        Column("doc_name", Text, nullable=False),
+        Column("doc_path", Text, nullable=False),
+        Column("doc_hash", String(64), nullable=False),
+        Column("status", String(20), nullable=False, default="incomplete"),
+        Column(
+            "created_at", DateTime, default=datetime.datetime.utcnow, nullable=False
+        ),
+        Column(
+            "updated_at",
+            DateTime,
+            default=datetime.datetime.utcnow,
+            onupdate=datetime.datetime.utcnow,
+            nullable=False,
+        ),
+    ],
+    indexes=[
+        Index("idx_scraped_docs_status", "status"),
+        Index("idx_scraped_docs_index_name", "index_name"),
+        Index("idx_scraped_docs_hash", "doc_hash"),
+    ],
+)
+
+
+# =====================================================
+# CHUNKS TABLE (stores processed document chunks)
+# =====================================================
+create_dynamic_table(
+    "chunks",
+    [
+        Column(
+            "chunk_id",
+            BigInteger,
+            chunk_id_seq,
+            primary_key=True,
+            server_default=chunk_id_seq.next_value(),
+        ),
+        Column(
+            "doc_id",
+            BigInteger,
+            ForeignKey("scraped_docs.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        Column("index_name", String(255), nullable=False),
+        Column("chunk_hash", String(64), nullable=False),
+        Column("chunk_text", Text, nullable=False),
+        Column("chunk_metadata", JSONB, nullable=True),
+        Column("opensearch_id", String(255), nullable=True),
+        Column(
+            "created_at", DateTime, default=datetime.datetime.utcnow, nullable=False
+        ),
+        Column(
+            "updated_at",
+            DateTime,
+            default=datetime.datetime.utcnow,
+            onupdate=datetime.datetime.utcnow,
+            nullable=False,
+        ),
+    ],
+    indexes=[
+        Index("idx_chunks_doc_id", "doc_id"),
+        Index("idx_chunks_index_name", "index_name"),
+        Index("idx_chunks_hash", "chunk_hash"),
+        Index("idx_chunks_opensearch_id", "opensearch_id"),
     ],
 )
 
