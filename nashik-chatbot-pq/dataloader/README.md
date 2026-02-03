@@ -131,41 +131,42 @@ DOCLING_VLM_MODEL=SmolDocling-256M-preview
 DOCLING_LAYOUT_MODEL=docling-layout-heron
 ```
 
-## Usage
+## 🚀 Usage
 
-The data loader has three main commands:
+The data loader is integrated into the project's task system using **Invoke**. All commands are run from the **project root** directory.
 
-### 1. Scrape Process Only
+### 1. Scrape Documents
 
 Scan filesystem and register documents for processing:
 
 ```bash
-cd dataloader
-python main.py scrape --directory /path/to/docs --index-name my_index
-```
+# Basic usage
+invoke scrape-documents --directory=/path/to/docs --index-name=my_index
 
-**Options:**
-- `--directory`, `-d`: Directory to scrape (required)
-- `--index-name`, `-i`: OpenSearch index name (required)
-- `--extensions`, `-e`: File extensions (default: `.pdf`)
-- `--no-recursive`: Don't scan subdirectories
-
-**Example:**
-```bash
-python main.py scrape \
-  --directory /data/documents/pdfs \
-  --index-name technical_docs \
-  --extensions .pdf .docx \
+# With options
+invoke scrape-documents \
+  --directory=/data/documents/pdfs \
+  --index-name=technical_docs \
+  --extensions=".pdf,.docx" \
   --no-recursive
 ```
 
-### 2. Create Embedding Process Only
+**Arguments:**
+- `--directory`: Directory to scrape (required)
+- `--index-name`: OpenSearch index name (required)
+- `--extensions`: Comma-separated file extensions (default: `.pdf`)
+- `--no-recursive`: Don't scan subdirectories
+
+### 2. Create Embeddings
 
 Process all incomplete documents and create embeddings:
 
 ```bash
-cd dataloader
-python main.py create-embedding
+# Use default index from settings
+invoke create-embeddings
+
+# Specify custom index
+invoke create-embeddings --index-name=my_index
 ```
 
 This will:
@@ -173,7 +174,7 @@ This will:
 2. For each document:
    - Convert using Docling
    - Chunk the content
-   - Generate embeddings using Azure OpenAI
+   - Generate embeddings using Azure OpenAI (via LangChain)
    - Check if chunks exist (by hash)
    - Upsert to OpenSearch (skip if unchanged)
    - Upsert to PostgreSQL chunks table
@@ -189,17 +190,43 @@ This will:
 Run both processes sequentially:
 
 ```bash
-cd dataloader
-python main.py full \
-  --directory /path/to/docs \
-  --index-name my_index
+invoke process-documents \
+  --directory=/path/to/docs \
+  --index-name=my_index
 ```
 
 This runs:
 1. Scrape process → registers documents
 2. Create embedding process → processes all incomplete documents
 
-## Workflow Examples
+### 4. List Documents
+
+View documents in the scraped_docs table:
+
+```bash
+# List all documents
+invoke list-documents
+
+# Filter by status
+invoke list-documents --status=incomplete
+
+# Filter by index with limit
+invoke list-documents --index-name=my_index --limit=20
+```
+
+### 5. Reset Document Status
+
+Reprocess documents by resetting their status to incomplete:
+
+```bash
+# Reset specific document by ID
+invoke reset-document-status --doc-id=5
+
+# Reset all documents in an index
+invoke reset-document-status --index-name=my_index
+```
+
+## 📋 Workflow Examples
 
 ### First-Time Setup
 
@@ -213,11 +240,10 @@ vim .env  # Add your credentials
 
 # 3. Initialize database (creates tables)
 cd /path/to/nashik-chatbot-pq
-python -c "from app.connectors.state_db_manager import StateDBManager; from app.config.config import get_settings; settings = get_settings(); StateDBManager.create_database_if_not_exists(settings.POSTGRES_HOST, settings.POSTGRES_PORT, settings.POSTGRES_USER, settings.POSTGRES_PASSWORD, settings.POSTGRES_DB); StateDBManager.initialize_database(settings.postgres_url)"
+invoke setup-database
 
 # 4. Run full pipeline
-cd dataloader
-python main.py full --directory /data/documents --index-name docs
+invoke process-documents --directory=/data/documents --index-name=docs
 ```
 
 ### Incremental Updates
@@ -226,24 +252,42 @@ When you add new documents to your directory:
 
 ```bash
 # Scrape new files
-python main.py scrape --directory /data/documents --index-name docs
+invoke scrape-documents --directory=/data/documents --index-name=docs
 
 # Process only new documents
-python main.py create-embedding
+invoke create-embeddings
 ```
 
 ### Reprocessing Documents
 
 If you need to reprocess specific documents:
 
-```sql
--- Reset document status in PostgreSQL
-UPDATE scraped_docs SET status = 'incomplete' WHERE id = 123;
+```bash
+# Reset specific document
+invoke reset-document-status --doc-id=123
+
+# Or reset entire index
+invoke reset-document-status --index-name=docs
 ```
 
 Then run:
 ```bash
-python main.py create-embedding
+invoke create-embeddings
+```
+
+### Monitoring Progress
+
+Check document processing status:
+
+```bash
+# View incomplete documents
+invoke list-documents --status=incomplete
+
+# View completed documents
+invoke list-documents --status=complete
+
+# View all documents in an index
+invoke list-documents --index-name=docs --limit=50
 ```
 
 ## Document Processing Pipeline
@@ -355,13 +399,16 @@ psql -h localhost -U postgres -d chatbot
 # Check .env settings
 ```
 
-## Advanced Configuration
+## ⚙️ Advanced Configuration
 
 ### Custom File Extensions
 
 When running scrape, specify extensions:
 ```bash
-python main.py scrape -d /path -i index --extensions .pdf .docx .txt
+invoke scrape-documents \
+  --directory=/path \
+  --index-name=index \
+  --extensions=".pdf,.docx,.txt"
 ```
 
 ### Custom Chunking
@@ -369,56 +416,64 @@ python main.py scrape -d /path -i index --extensions .pdf .docx .txt
 Edit `pipeline_factory.py` to adjust chunking parameters:
 ```python
 chunker = HybridChunker(
-    tokenizer=Tokenizer(encoding=tiktoken.get_encoding("cl100k_base")),
-    max_tokens=4096,  # Smaller chunks
+    tokenizer=OpenAITokenizer(
+        tokenizer=tiktoken.get_encoding("cl100k_base"),
+        max_tokens=4096,  # Smaller chunks
+    ),
     # Add overlap if needed
 )
 
-## File Structure
+## 📁 File Structure
 
 ```
 dataloader/
-├── main.py                      # Main entry point with CLI
 ├── scrape_process.py            # File scanning & registration
 ├── create_embedding_process.py  # Document processing & embedding (LangChain)
 ├── document_processor.py        # Original Docling conversion (standalone legacy)
 ├── pipeline_factory.py          # Document converter & chunker factory
 ├── serializers.py              # Custom chunk serializers
-├── config.py                   # Loads paths from app/config/config.py
 └── README.md                   # This file
 
 app/
 ├── connectors/
 │   ├── opensearch_connector.py  # OpenSearch client with LangChain integration
 │   ├── state_db_connector.py    # PostgreSQL client
+│   ├── state_db_manager.py      # Database initialization & management
 │   └── table_creation.py        # Database schema (includes scraped_docs & chunks)
 └── config/
     └── config.py               # Centralized environment configuration
+
+tasks.py                         # Invoke tasks for all operations
+.env                            # Environment configuration (create from .env.example)
 ```
 
-## Migration from Old System
+## 🔄 Migration from Old System
 
-If you're migrating from the old `main.py`:
+If you're migrating from the old document processor:
 
 **Old way:**
 ```bash
-python main.py  # Processes all PDFs, no state tracking
+cd dataloader
+python document_processor.py  # Processes all PDFs, no state tracking
 ```
 
-**New way:**
+**New way (task-based):**
 ```bash
-# Step 1: Register files
-python main.py scrape --directory /input --index-name docs
+# From project root
+# Step 1: Register files in database
+invoke scrape-documents --directory=/input --index-name=docs
 
 # Step 2: Process with state tracking
-python main.py create-embedding
+invoke create-embeddings
 ```
 
 **Benefits:**
-- State persistence (resume after failures)
-- Duplicate detection (no reprocessing)
-- Incremental updates (only new documents)
-- Database storage (queryable chunks)
+- ✅ State persistence (resume after failures)
+- ✅ Duplicate detection (no reprocessing)
+- ✅ Incremental updates (only new documents)
+- ✅ Database storage (queryable chunks)
+- ✅ LangChain integration (automatic embeddings)
+- ✅ Task-based management (centralized commands)
 
 ## Contributing
 

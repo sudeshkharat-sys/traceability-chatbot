@@ -275,3 +275,317 @@ def validate_connections(ctx):
     except Exception as e:
         logger.error(f"❌ Error validating connections: {e}")
         raise
+
+
+# ============================================================================
+# DOCUMENT PROCESSING TASKS (Generic Dataloader)
+# ============================================================================
+
+@task
+def scrape_documents(ctx, directory, index_name, extensions=None, no_recursive=False):
+    """
+    Scrape documents from filesystem and register in scraped_docs table
+
+    Usage:
+        invoke scrape-documents --directory=/path/to/docs --index-name=my_index
+        invoke scrape-documents --directory=/path/to/docs --index-name=my_index --extensions=".pdf,.docx"
+        invoke scrape-documents --directory=/path/to/docs --index-name=my_index --no-recursive
+
+    Args:
+        directory: Directory path to scan for documents
+        index_name: OpenSearch index name for these documents
+        extensions: Comma-separated file extensions (default: .pdf)
+        no_recursive: Don't scan subdirectories recursively
+    """
+    logger.info("=" * 80)
+    logger.info("📁 Scraping Documents from Filesystem...")
+    logger.info("=" * 80)
+
+    try:
+        from dataloader.scrape_process import scrape_files
+
+        # Parse extensions
+        if extensions:
+            ext_list = [ext.strip() for ext in extensions.split(',')]
+        else:
+            ext_list = ['.pdf']
+
+        recursive = not no_recursive
+
+        logger.info(f"Directory: {directory}")
+        logger.info(f"Index Name: {index_name}")
+        logger.info(f"Extensions: {ext_list}")
+        logger.info(f"Recursive: {recursive}")
+        logger.info("")
+
+        # Run scrape process
+        stats = scrape_files(
+            directory=directory,
+            index_name=index_name,
+            file_extensions=ext_list,
+            recursive=recursive,
+        )
+
+        logger.info("=" * 80)
+        logger.info("📊 Scraping Results:")
+        logger.info(f"  Files scanned: {stats['scanned']}")
+        logger.info(f"  ✅ New documents: {stats['new']}")
+        logger.info(f"  ⏭️  Existing documents: {stats['existing']}")
+        logger.info(f"  ❌ Errors: {stats['errors']}")
+        logger.info("=" * 80)
+
+        if stats['errors'] > 0:
+            logger.warning("⚠️  Some documents had errors during scraping")
+        else:
+            logger.info("✅ Scraping completed successfully!")
+
+    except Exception as e:
+        logger.error(f"❌ Error during document scraping: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+@task
+def create_embeddings(ctx, index_name=None):
+    """
+    Process incomplete documents and create embeddings in OpenSearch
+    Processes all documents in scraped_docs table with status='incomplete'
+
+    Usage:
+        invoke create-embeddings
+        invoke create-embeddings --index-name=my_index
+
+    Args:
+        index_name: Optional index name to override settings default
+    """
+    logger.info("=" * 80)
+    logger.info("🧠 Creating Document Embeddings...")
+    logger.info("=" * 80)
+
+    try:
+        from dataloader.create_embedding_process import create_embeddings as run_embedding_process
+
+        if index_name:
+            logger.info(f"Target Index: {index_name}")
+        else:
+            logger.info("Using default index from settings")
+        logger.info("")
+
+        # Run embedding creation process
+        stats = run_embedding_process(index_name=index_name)
+
+        logger.info("=" * 80)
+        logger.info("📊 Embedding Creation Results:")
+        logger.info(f"  Documents processed: {stats['documents_processed']}")
+        logger.info(f"  ✅ Documents completed: {stats['documents_completed']}")
+        logger.info(f"  ❌ Documents failed: {stats['documents_failed']}")
+        logger.info("")
+        logger.info(f"  Chunks processed: {stats['total_chunks_processed']}")
+        logger.info(f"  ✅ Chunks created: {stats['total_chunks_created']}")
+        logger.info(f"  🔄 Chunks updated: {stats['total_chunks_updated']}")
+        logger.info(f"  ⏭️  Chunks skipped: {stats['total_chunks_skipped']}")
+        logger.info(f"  ❌ Errors: {stats['total_errors']}")
+        logger.info("=" * 80)
+
+        if stats['documents_failed'] > 0 or stats['total_errors'] > 0:
+            logger.warning("⚠️  Some documents or chunks had errors")
+        else:
+            logger.info("✅ Embedding creation completed successfully!")
+
+    except Exception as e:
+        logger.error(f"❌ Error during embedding creation: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+
+
+@task
+def process_documents(ctx, directory, index_name, extensions=None, no_recursive=False):
+    """
+    Full document processing pipeline: scrape + create embeddings
+    This runs both steps sequentially for complete end-to-end processing
+
+    Usage:
+        invoke process-documents --directory=/path/to/docs --index-name=my_index
+        invoke process-documents --directory=/path/to/docs --index-name=my_index --extensions=".pdf,.docx"
+
+    Args:
+        directory: Directory path to scan for documents
+        index_name: OpenSearch index name for these documents
+        extensions: Comma-separated file extensions (default: .pdf)
+        no_recursive: Don't scan subdirectories recursively
+    """
+    logger.info("=" * 80)
+    logger.info("🚀 Running Full Document Processing Pipeline...")
+    logger.info("=" * 80)
+
+    try:
+        # Step 1: Scrape documents
+        logger.info("\n" + "=" * 80)
+        logger.info("📁 STEP 1: Scraping Documents...")
+        logger.info("=" * 80)
+
+        scrape_documents(ctx, directory, index_name, extensions, no_recursive)
+
+        # Step 2: Create embeddings
+        logger.info("\n" + "=" * 80)
+        logger.info("🧠 STEP 2: Creating Embeddings...")
+        logger.info("=" * 80)
+
+        create_embeddings(ctx, index_name)
+
+        logger.info("\n" + "=" * 80)
+        logger.info("✅ Full document processing pipeline completed!")
+        logger.info("=" * 80)
+
+    except Exception as e:
+        logger.error(f"❌ Error during document processing: {e}")
+        raise
+
+
+@task
+def list_documents(ctx, status=None, index_name=None, limit=10):
+    """
+    List documents in the scraped_docs table
+
+    Usage:
+        invoke list-documents
+        invoke list-documents --status=incomplete
+        invoke list-documents --index-name=my_index --limit=20
+
+    Args:
+        status: Filter by status (incomplete/complete)
+        index_name: Filter by index name
+        limit: Maximum number of documents to show (default: 10)
+    """
+    logger.info("=" * 80)
+    logger.info("📄 Listing Scraped Documents...")
+    logger.info("=" * 80)
+
+    try:
+        from app.connectors.state_db_connector import StateDBConnector
+        from app.config.config import get_settings
+
+        settings = get_settings()
+
+        with StateDBConnector(
+            host=settings.POSTGRES_HOST,
+            port=settings.POSTGRES_PORT,
+            database=settings.POSTGRES_DB,
+            user=settings.POSTGRES_USER,
+            password=settings.POSTGRES_PASSWORD,
+        ) as db:
+            # Build query
+            conditions = []
+            params = []
+
+            if status:
+                conditions.append("status = %s")
+                params.append(status)
+
+            if index_name:
+                conditions.append("index_name = %s")
+                params.append(index_name)
+
+            where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+            query = f"""
+            SELECT id, index_name, doc_name, status, created_at, updated_at
+            FROM scraped_docs
+            {where_clause}
+            ORDER BY created_at DESC
+            LIMIT %s
+            """
+            params.append(limit)
+
+            docs = db.execute_query(query, tuple(params) if params else None)
+
+            if not docs:
+                logger.info("No documents found")
+            else:
+                logger.info(f"\nFound {len(docs)} documents:\n")
+                for doc in docs:
+                    logger.info(f"  📄 ID: {doc['id']} | Index: {doc['index_name']}")
+                    logger.info(f"     Name: {doc['doc_name']}")
+                    logger.info(f"     Status: {doc['status']}")
+                    logger.info(f"     Created: {doc['created_at']}")
+                    logger.info("")
+
+            # Get status counts
+            count_query = """
+            SELECT status, COUNT(*) as count
+            FROM scraped_docs
+            GROUP BY status
+            """
+            counts = db.execute_query(count_query)
+
+            logger.info("=" * 80)
+            logger.info("📊 Status Summary:")
+            for row in counts:
+                logger.info(f"  {row['status']}: {row['count']}")
+            logger.info("=" * 80)
+
+    except Exception as e:
+        logger.error(f"❌ Error listing documents: {e}")
+        raise
+
+
+@task
+def reset_document_status(ctx, doc_id=None, index_name=None):
+    """
+    Reset document status to 'incomplete' to reprocess them
+
+    Usage:
+        invoke reset-document-status --doc-id=5
+        invoke reset-document-status --index-name=my_index
+
+    Args:
+        doc_id: Reset specific document by ID
+        index_name: Reset all documents in an index
+    """
+    logger.info("=" * 80)
+    logger.info("🔄 Resetting Document Status...")
+    logger.info("=" * 80)
+
+    if not doc_id and not index_name:
+        logger.error("❌ Please specify either --doc-id or --index-name")
+        return
+
+    try:
+        from app.connectors.state_db_connector import StateDBConnector
+        from app.config.config import get_settings
+        from datetime import datetime
+
+        settings = get_settings()
+
+        with StateDBConnector(
+            host=settings.POSTGRES_HOST,
+            port=settings.POSTGRES_PORT,
+            database=settings.POSTGRES_DB,
+            user=settings.POSTGRES_USER,
+            password=settings.POSTGRES_PASSWORD,
+        ) as db:
+            if doc_id:
+                query = """
+                UPDATE scraped_docs
+                SET status = 'incomplete', updated_at = %s
+                WHERE id = %s
+                """
+                db.execute_insert_update(query, (datetime.utcnow(), doc_id))
+                logger.info(f"✅ Reset document ID {doc_id} to 'incomplete'")
+
+            elif index_name:
+                query = """
+                UPDATE scraped_docs
+                SET status = 'incomplete', updated_at = %s
+                WHERE index_name = %s
+                """
+                db.execute_insert_update(query, (datetime.utcnow(), index_name))
+                logger.info(f"✅ Reset all documents in index '{index_name}' to 'incomplete'")
+
+            logger.info("=" * 80)
+
+    except Exception as e:
+        logger.error(f"❌ Error resetting document status: {e}")
+        raise
