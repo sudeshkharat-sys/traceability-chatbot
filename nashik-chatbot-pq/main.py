@@ -30,14 +30,11 @@ async def lifespan(app: FastAPI):
 
     try:
         # Run all initialization: database, tables, prompts, connections
-        from app.services.startup_initializer import run_startup_initialization
-
-        results = run_startup_initialization(skip_on_error=True)
-
-        # Store results in app state for health checks
+        from app.services.startup_initializer import StartupInitializer
+        startup_initializer = StartupInitializer()
+        results = startup_initializer.initialize_all(skip_on_error=True)
         app.state.initialization_results = results
         app.state.is_initialized = all(r["success"] for r in results.values())
-
         if app.state.is_initialized:
             logger.info("✅ Application initialized successfully")
         else:
@@ -56,15 +53,12 @@ async def lifespan(app: FastAPI):
     # Cleanup connections
     try:
         from app.connectors.neo4j_connector import Neo4jConnector
-
         neo4j = Neo4jConnector()
         neo4j.close()
         logger.info("✅ Neo4j connection closed")
     except Exception as e:
         logger.warning(f"⚠️  Error closing Neo4j connection: {e}")
-
     logger.info("👋 Application shutdown complete")
-
 
 def create_app() -> FastAPI:
     """

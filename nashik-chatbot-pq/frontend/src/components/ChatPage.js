@@ -494,6 +494,26 @@ function ChatPage() {
         messagesRef.current = out;
         return out;
       });
+    } else if (data.type === "citations") {
+      // Handle citations data event
+      console.log("Citations received:", data.citations);
+
+      // Store citations in the last bot message
+      setMessages((prev) => {
+        if (!prev.length) return prev;
+        const out = [...prev];
+        const idx = out.length - 1;
+
+        if (out[idx].sender === "bot" && !out[idx].messageId) {
+          out[idx] = {
+            ...out[idx],
+            citations: data.citations,
+          };
+        }
+
+        messagesRef.current = out;
+        return out;
+      });
     } else if (data.type === "complete" || data.type === "final") {
       setIsLoading(false);
       setThinkingSteps([]);
@@ -512,6 +532,8 @@ function ChatPage() {
             text: data.content || data.response || out[idx].text,
             // Include chart_data if present in final event
             ...(data.chart_data && { chart_data: data.chart_data }),
+            // Include citations if present
+            ...(data.citations && { citations: data.citations }),
           };
         } else {
           // Fallback: create new message
@@ -526,6 +548,8 @@ function ChatPage() {
             }),
             // Include chart_data if present
             ...(data.chart_data && { chart_data: data.chart_data }),
+            // Include citations if present
+            ...(data.citations && { citations: data.citations }),
           });
         }
 

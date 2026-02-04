@@ -7,6 +7,7 @@ import mahindraLogo from "../assests/logo.png";
 import { conversationService } from "../services/api";
 import FeedbackModal from "./FeedbackModal";
 import ChartComponent from "./ChartComponent";
+import CitationsTable from "./CitationsTable";
 import { fixMarkdownTables } from "../utils/markdownUtils";
 
 const ChatMessage = ({ message, conversationId, thinkingSteps }) => {
@@ -106,6 +107,11 @@ const ChatMessage = ({ message, conversationId, thinkingSteps }) => {
                       {fixedMarkdown}
                     </ReactMarkdown>
                   </div>
+
+                  {/* Render citations table if available */}
+                  <CitationsTable 
+                    citations={message.citations || message.similar_docs} 
+                  />
                 </>
               ) : (
                 <div className="typing-indicator">

@@ -149,6 +149,9 @@ class StandardsGuidelinesAgent:
 
             just_finished_thinking = False
             response_started = False
+            
+            citations = []
+            seen_citations = set()
 
             for stream_mode, chunk in self.agent.stream(
                 inputs, config, stream_mode=["custom", "messages", "updates"]
@@ -239,6 +242,25 @@ class StandardsGuidelinesAgent:
                                     f"🔧 Tool result: name='{tool_name}', "
                                     f"content type={type(tool_content).__name__}"
                                 )
+                                
+                                # Capture citations from search_standards
+                                if tool_name == "search_standards":
+                                    import json
+                                    try:
+                                        data = json.loads(tool_content) if isinstance(tool_content, str) else tool_content
+                                        if isinstance(data, dict) and data.get("found"):
+                                            results = data.get("results", [])
+                                            for res in results:
+                                                meta = res.get("metadata", {})
+                                                doc_name = meta.get("doc_name")
+                                                # Use page_label if available, else page_number, else "N/A"
+                                                page_num = meta.get("page_label") or meta.get("page_number")
+                                                
+                                                if doc_name:
+                                                    # Removed deduplication to show all chunks
+                                                    citations.append(res)
+                                    except Exception as e:
+                                        logger.warning(f"Error parsing search_standards output for citations: {e}")
 
                                 # Emit todo updates from tool results
                                 if tool_name in ("write_todos", "todo_write", "write_todo_list", "todo_list") and tool_content:
@@ -306,6 +328,14 @@ class StandardsGuidelinesAgent:
                         just_finished_thinking = True
                         continue
 
+            # Yield citations at the end of the stream
+            if citations:
+                logger.info(f"Yielding {len(citations)} citations")
+                yield {
+                    "type": "citations",
+                    "citations": citations
+                }
+                
         except Exception as e:
             logger.error(f"Error in Standards & Guidelines streaming: {e}", exc_info=True)
             yield {"type": "error", "content": str(e)}

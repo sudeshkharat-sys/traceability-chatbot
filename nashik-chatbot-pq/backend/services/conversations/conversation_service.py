@@ -81,6 +81,7 @@ class ConversationService:
 
             full_response = []
             chart_data = None
+            citations_data = []
             response_saved = False
 
             # Get agent from pool
@@ -102,6 +103,11 @@ class ConversationService:
                     elif event.get("type") == "chart":
                         chart_data = event.get("chart_data")
                         logger.info(f"Captured chart data: {chart_data.get('type') if chart_data else None}")
+                        
+                    # Collect citations if present
+                    elif event.get("type") == "citations":
+                        citations_data = event.get("citations", [])
+                        logger.info(f"Captured {len(citations_data)} citations")
 
                 # Save response to database after streaming completes
                 if full_response:
@@ -109,7 +115,7 @@ class ConversationService:
                     print(complete_response)
                     response_data = {
                         "response": complete_response,
-                        "similar_docs": [],
+                        "similar_docs": citations_data if citations_data else [],
                     }
 
                     # Include chart data if available
@@ -139,6 +145,7 @@ class ConversationService:
                         "content": complete_response,
                         "messageId": message_id,
                         "response": complete_response,
+                        "citations": citations_data if citations_data else []
                     }
 
                     # Include chart data in final response
