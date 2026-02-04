@@ -10,6 +10,13 @@ Handles all application initialization on startup
 import logging
 from typing import Dict, Any
 from app.queries import CommonQueries
+from app.config.config import get_settings
+from sqlalchemy import create_engine, text
+from app.connectors.state_db_manager import StateDBManager
+from app.services.prompt_manager import get_prompt_manager
+from app.connectors.neo4j_connector import Neo4jConnector
+from app.connectors.opensearch_connector import OpenSearchConnector
+
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +34,10 @@ class StartupInitializer:
 
     def __init__(self):
         """Initialize the startup manager"""
-        self._initialization_complete = False
-        self._initialization_results = {}
+        self.db_manager = StateDBManager()
+        self.prompt_manager = get_prompt_manager()
+        self.settings = get_settings()
+        self.neo4j_connector = Neo4jConnector()
 
     def initialize_all(self, skip_on_error: bool = True) -> Dict[str, Any]:
         """
@@ -43,7 +52,6 @@ class StartupInitializer:
         logger.info("=" * 80)
         logger.info("🚀 Starting Application Initialization...")
         logger.info("=" * 80)
-
         results = {
             "database": {"success": False, "message": ""},
             "tables": {"success": False, "message": ""},
@@ -53,146 +61,84 @@ class StartupInitializer:
 
         # Step 1: Initialize Database
         logger.info("\n📊 Step 1/4: Initializing Database...")
-        try:
-            results["database"] = self._initialize_database()
-        except Exception as e:
-            results["database"] = {"success": False, "message": str(e)}
-            logger.error(f"❌ Database initialization failed: {e}")
-            if not skip_on_error:
-                raise
+        results["database"] = self._initialize_database()
 
         # Step 2: Create Tables
         logger.info("\n📋 Step 2/4: Creating Tables...")
-        try:
-            results["tables"] = self._create_tables()
-        except Exception as e:
-            results["tables"] = {"success": False, "message": str(e)}
-            logger.error(f"❌ Table creation failed: {e}")
-            if not skip_on_error:
-                raise
+        results["tables"] = self._create_tables()
 
         # Step 3: Seed Prompts
         logger.info("\n📝 Step 3/4: Seeding Default Prompts...")
-        try:
-            results["prompts"] = self._seed_prompts()
-        except Exception as e:
-            results["prompts"] = {"success": False, "message": str(e)}
-            logger.error(f"❌ Prompt seeding failed: {e}")
-            if not skip_on_error:
-                raise
+        results["prompts"] = self._seed_prompts()
+
 
         # Step 4: Validate Connections
         logger.info("\n🔌 Step 4/4: Validating Connections...")
-        try:
-            results["connections"] = self._validate_connections()
-        except Exception as e:
-            results["connections"] = {"success": False, "message": str(e)}
-            logger.error(f"❌ Connection validation failed: {e}")
-            if not skip_on_error:
-                raise
-
-        # Summary
-        self._print_summary(results)
-
-        self._initialization_complete = all(r["success"] for r in results.values())
-        self._initialization_results = results
+        results["connections"] = self._validate_connections()
 
         return results
 
-    def _initialize_database(self) -> Dict[str, Any]:
+    def _initialize_database(self):
         """Initialize PostgreSQL database"""
-        try:
-            from app.connectors.state_db_manager import StateDBManager
-
-            manager = StateDBManager()
-            manager.initialize_database()
-
-            logger.info("✅ Database initialized successfully")
-            return {"success": True, "message": "Database ready"}
-
-        except Exception as e:
-            logger.error(f"Error initializing database: {e}")
-            return {"success": False, "message": str(e)}
+        
+        self.db_manager.initialize_database()
+        logger.info("✅ Database initialized successfully")
+        return {"success": True, "message": "Database ready"}
 
     def _create_tables(self) -> Dict[str, Any]:
         """Create all required tables"""
-        try:
-            from app.connectors.state_db_manager import StateDBManager
-
-            manager = StateDBManager()
-            manager.create_tables_if_not_exists()
-            tables = manager.list_tables()
-
-            logger.info(f"✅ Tables created successfully ({len(tables)} tables)")
-            return {
-                "success": True,
-                "message": f"{len(tables)} tables ready",
-                "tables": tables,
-            }
-
-        except Exception as e:
-            logger.error(f"Error creating tables: {e}")
-            return {"success": False, "message": str(e)}
+        self.db_manager.create_tables_if_not_exists()
+        tables = self.db_manager.list_tables()
+        logger.info(f"✅ Tables created successfully ({len(tables)} tables)")
+        return {
+            "success": True,
+            "message": f"{len(tables)} tables ready",
+            "tables": tables,
+        }
 
     def _seed_prompts(self) -> Dict[str, Any]:
         """Seed default prompts to database"""
-        try:
-            from app.services.prompt_manager import get_prompt_manager
 
-            manager = get_prompt_manager()
-            results = manager.seed_default_prompts(force_update=True)
+        results = self.prompt_manager.seed_default_prompts(force_update=True)
+        seeded_count = sum(1 for v in results.values() if v)
+        total_count = len(results)
 
-            seeded_count = sum(1 for v in results.values() if v)
-            total_count = len(results)
-
-            logger.info(
-                f"✅ Prompts seeded successfully ({seeded_count}/{total_count})"
-            )
-            return {
-                "success": True,
-                "message": f"{seeded_count}/{total_count} prompts ready",
-                "details": results,
-            }
-
-        except Exception as e:
-            logger.error(f"Error seeding prompts: {e}")
-            return {"success": False, "message": str(e)}
+        logger.info(
+            f"✅ Prompts seeded successfully ({seeded_count}/{total_count})"
+        )
+        return {
+            "success": True,
+            "message": f"{seeded_count}/{total_count} prompts ready",
+            "details": results,
+        }
 
     def _validate_connections(self) -> Dict[str, Any]:
         """Validate all required connections"""
         connection_results = {
             "postgres": False,
             "neo4j": False,
+            "opensearch": False,
         }
 
-        # Validate PostgreSQL
-        try:
-            from app.config.config import get_settings
-            from sqlalchemy import create_engine, text
+        engine = create_engine(self.settings.postgres_url)
+        with engine.connect() as conn:
+            conn.execute(text(CommonQueries.TEST_CONNECTION))
+        engine.dispose()
+        connection_results["postgres"] = True
+        logger.info("  ✅ PostgreSQL connection validated")
 
-            settings = get_settings()
-            # Use postgres_url from settings which includes UTF-8 encoding
-            engine = create_engine(settings.postgres_url)
-            with engine.connect() as conn:
-                conn.execute(text(CommonQueries.TEST_CONNECTION))
-            engine.dispose()
-            connection_results["postgres"] = True
-            logger.info("  ✅ PostgreSQL connection validated")
-        except Exception as e:
-            logger.warning(f"  ⚠️  PostgreSQL connection failed: {e}")
+        opensearch_connector = OpenSearchConnector()
+        if opensearch_connector.test_connection():
+            connection_results["opensearch"] = True
+            logger.info("  ✅ OpenSearch connection validated")
+        opensearch_connector.close()
 
-        # Validate Neo4j
-        try:
-            from app.connectors.neo4j_connector import Neo4jConnector
 
-            neo4j = Neo4jConnector()
-            # Quick connectivity test using the connector's test method
-            if neo4j.test_connection():
-                connection_results["neo4j"] = True
-                logger.info("  ✅ Neo4j connection validated")
-            neo4j.close()
-        except Exception as e:
-            logger.warning(f"  ⚠️  Neo4j connection failed: {e}")
+        if self.neo4j_connector.test_connection():
+            connection_results["neo4j"] = True
+            logger.info("  ✅ Neo4j connection validated")
+        self.neo4j_connector.close()
+
 
         all_valid = all(connection_results.values())
 
@@ -208,58 +154,6 @@ class StartupInitializer:
             "details": connection_results,
         }
 
-    def _print_summary(self, results: Dict[str, Any]):
-        """Print initialization summary"""
-        logger.info("\n" + "=" * 80)
-        logger.info("📊 Initialization Summary")
-        logger.info("=" * 80)
-
-        for step, result in results.items():
-            status = "✅" if result["success"] else "❌"
-            logger.info(f"  {status} {step.capitalize()}: {result['message']}")
-
-        all_success = all(r["success"] for r in results.values())
-
-        if all_success:
-            logger.info("\n🎉 All initialization steps completed successfully!")
-        else:
-            failed_steps = [k for k, v in results.items() if not v["success"]]
-            logger.warning(f"\n⚠️  Some steps failed: {failed_steps}")
-
-        logger.info("=" * 80 + "\n")
-
-    @property
-    def is_initialized(self) -> bool:
-        """Check if initialization is complete"""
-        return self._initialization_complete
-
-    @property
-    def results(self) -> Dict[str, Any]:
-        """Get initialization results"""
-        return self._initialization_results
 
 
-# Singleton instance
-_initializer: StartupInitializer = None
 
-
-def get_startup_initializer() -> StartupInitializer:
-    """Get the singleton StartupInitializer instance"""
-    global _initializer
-    if _initializer is None:
-        _initializer = StartupInitializer()
-    return _initializer
-
-
-def run_startup_initialization(skip_on_error: bool = True) -> Dict[str, Any]:
-    """
-    Convenience function to run all startup initialization
-
-    Args:
-        skip_on_error: If True, continue with other steps even if one fails
-
-    Returns:
-        Dictionary with initialization results
-    """
-    initializer = get_startup_initializer()
-    return initializer.initialize_all(skip_on_error=skip_on_error)

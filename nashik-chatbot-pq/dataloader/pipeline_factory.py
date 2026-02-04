@@ -17,7 +17,7 @@ from docling_core.transforms.chunker.tokenizer.openai import OpenAITokenizer
 sys.path.append(str(Path(__file__).parent.parent))
 
 from app.config.config import get_settings
-from dataloader.serializer import CustomSerializerProvider
+from dataloader.serializer.serializers import CustomSerializerProvider
 
 # Get settings once at module level
 settings = get_settings()

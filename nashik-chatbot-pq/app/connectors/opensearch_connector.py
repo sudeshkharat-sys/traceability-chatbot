@@ -42,14 +42,10 @@ class OpenSearchConnector:
             use_ssl=self.settings.OPENSEARCH_USE_SSL,
             verify_certs=self.settings.OPENSEARCH_VERIFY_CERTS,
             ssl_show_warn=False,
+            engine="faiss",
         )
 
-        # Expose the native client for low-level operations (existence checks, etc.)
         self.client = self.vector_store.client
-
-    # ------------------------------------------------------------------
-    # Index management
-    # ------------------------------------------------------------------
 
     def index_exists(self) -> bool:
         """Check whether the configured index exists."""
@@ -58,10 +54,6 @@ class OpenSearchConnector:
     def delete_index(self) -> bool:
         """Delete the configured index."""
         return self.vector_store.delete_index()
-
-    # ------------------------------------------------------------------
-    # Document existence / hash check (native client)
-    # ------------------------------------------------------------------
 
     def check_document_exists(
         self, doc_id: str, chunk_hash: str
@@ -80,10 +72,6 @@ class OpenSearchConnector:
             return True, existing_hash == chunk_hash, existing_hash
         except NotFoundError:
             return False, False, None
-
-    # ------------------------------------------------------------------
-    # Write operations – delegate to LangChain
-    # ------------------------------------------------------------------
 
     def add_texts(
         self,
@@ -111,10 +99,6 @@ class OpenSearchConnector:
             ids=ids,
         )
 
-    # ------------------------------------------------------------------
-    # Search operations – delegate to LangChain
-    # ------------------------------------------------------------------
-
     def similarity_search(
         self,
         query: str,
@@ -136,20 +120,22 @@ class OpenSearchConnector:
             for doc, score in results
         ]
 
-    # ------------------------------------------------------------------
-    # Delete operations
-    # ------------------------------------------------------------------
-
     def delete_documents(self, ids: List[str]) -> bool:
         """Delete specific documents by ID from the index."""
         return self.vector_store.delete(ids=ids)
-
-    # ------------------------------------------------------------------
-    # Cleanup
-    # ------------------------------------------------------------------
-
+    
     def close(self):
         """Close the underlying OpenSearch client."""
         if self.client:
             self.client.close()
             logger.info("OpenSearch connection closed")
+            
+    def test_connection(self) -> bool:
+        """Test OpenSearch connection by checking if we can retrieve cluster info."""
+        try:
+            info = self.client.info()
+            logger.debug(f"OpenSearch cluster info: {info}")
+            return True
+        except Exception as e:
+            logger.error(f"OpenSearch connection test failed: {e}")
+            return False

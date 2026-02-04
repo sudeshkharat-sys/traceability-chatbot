@@ -70,9 +70,10 @@ class EmbeddingProcessor:
         Returns:
             tuple: (exists, chunk_id, existing_hash)
         """
-        result = self.db.execute_query(DataloaderQueries.GET_CHUNK_BY_HASH, (chunk_hash,))
+        params = {"chunk_hash": chunk_hash}
+        result = self.db.execute_query(DataloaderQueries.GET_CHUNK_BY_HASH, params)
         if result:
-            return True, result[0]["chunk_id"], result[0]["chunk_hash"]
+            return True, result[0][0], result[0][1]
         return False, None, None
 
     def upsert_chunk_to_db(
@@ -104,19 +105,34 @@ class EmbeddingProcessor:
         now = datetime.utcnow()
 
         if not exists:
-            params = (
-                doc_id, index_name, chunk_hash, chunk_text,
-                json.dumps(chunk_metadata), opensearch_id, now, now,
-            )
-            result = self.db.execute_insert_update(DataloaderQueries.INSERT_CHUNK, params)
-            return result[0]["chunk_id"] if result else None
+            params = {
+                "doc_id": doc_id,
+                "index_name": index_name,
+                "chunk_hash": chunk_hash,
+                "chunk_text": chunk_text,
+                "chunk_metadata": json.dumps(chunk_metadata),
+                "opensearch_id": opensearch_id,
+                "created_at": now,
+                "updated_at": now,
+            }
+            # execute_insert returns the inserted ID (chunk_id) directly
+            chunk_id = self.db.execute_insert(DataloaderQueries.INSERT_CHUNK, params)
+            return chunk_id
         else:
-            params = (
-                doc_id, index_name, chunk_text,
-                json.dumps(chunk_metadata), opensearch_id, now, chunk_hash,
-            )
-            result = self.db.execute_insert_update(DataloaderQueries.UPDATE_CHUNK, params)
-            return result[0]["chunk_id"] if result else chunk_id
+            params = {
+                "doc_id": doc_id,
+                "index_name": index_name,
+                "chunk_text": chunk_text,
+                "chunk_metadata": json.dumps(chunk_metadata),
+                "opensearch_id": opensearch_id,
+                "updated_at": now,
+                "chunk_hash": chunk_hash,
+            }
+            # execute_insert can also be used for UPDATE ... RETURNING chunk_id
+            # or use execute_update if we don't need the ID returned (but here we might)
+            # The query UPDATE_CHUNK ends with RETURNING chunk_id, so we use execute_insert
+            updated_id = self.db.execute_insert(DataloaderQueries.UPDATE_CHUNK, params)
+            return updated_id if updated_id else chunk_id
 
 
     def process_document(self, doc: Dict[str, Any]) -> Dict[str, Any]:
@@ -263,7 +279,10 @@ class EmbeddingProcessor:
             doc_id: ID of the document
             status: New status (incomplete/complete)
         """
-        self.db.execute_insert_update(
-            DataloaderQueries.UPDATE_DOCUMENT_STATUS, (status, datetime.utcnow(), doc_id)
-        )
+        params = {
+            "status": status,
+            "updated_at": datetime.utcnow(),
+            "id": doc_id,
+        }
+        self.db.execute_update(DataloaderQueries.UPDATE_DOCUMENT_STATUS, params)
         logger.info(f"Updated document {doc_id} status to '{status}'")

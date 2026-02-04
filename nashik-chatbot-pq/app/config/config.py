@@ -77,19 +77,19 @@ class Settings(BaseSettings):
     # OpenSearch Configuration (for document embeddings)
     OPENSEARCH_HOST: str = "localhost"
     OPENSEARCH_PORT: int = 9200
-    OPENSEARCH_USERNAME: Optional[str] = None
-    OPENSEARCH_PASSWORD: Optional[str] = None
+    OPENSEARCH_USERNAME: str
+    OPENSEARCH_PASSWORD: str
     OPENSEARCH_USE_SSL: bool = False
     OPENSEARCH_VERIFY_CERTS: bool = False
-    OPENSEARCH_INDEX_NAME: str = "documents"
+    OPENSEARCH_INDEX_NAME: str = "standard_guidelines_index"
 
     # Document Processing Configuration (Dataloader)
-    DOCLING_BASE_DIR: str = "/data/documents"
-    DOCLING_ARTIFACTS_PATH: str = "/data/docling_models/docling_all_models"
-    DOCLING_INPUT_ROOT: str = "/data/documents/input"
-    DOCLING_OUTPUT_ROOT: str = "/data/documents/output"
+    DOCLING_ARTIFACTS_PATH: str = "C:\\Users\\50014665\\Doc_processing\\docling_models\\docling_all_models"
     DOCLING_VLM_MODEL: str = "SmolDocling-256M-preview"
     DOCLING_LAYOUT_MODEL: str = "docling-layout-heron"
+    
+    # Directory to scrape documents from
+    DOCUMENT_INPUT_DIRECTORY: str = "C:\\Users\\50014665\\Doc_processing\\test"
 
     # Agent Configuration
     MAX_CHAT_HISTORY: int = 10

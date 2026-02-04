@@ -10,19 +10,13 @@ from app.services.prompt_manager import (
     get_cypher_prompt,
 )
 from app.services.startup_initializer import (
-    StartupInitializer,
-    get_startup_initializer,
-    run_startup_initialization,
+    StartupInitializer
 )
 
 __all__ = [
-    # Prompt Manager
     "PromptManager",
     "get_prompt_manager",
     "get_analyst_prompt",
     "get_cypher_prompt",
-    # Startup Initializer
     "StartupInitializer",
-    "get_startup_initializer",
-    "run_startup_initialization",
 ]

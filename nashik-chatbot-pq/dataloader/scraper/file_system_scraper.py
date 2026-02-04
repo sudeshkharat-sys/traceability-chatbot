@@ -63,8 +63,9 @@ class FileScraper:
         Returns:
             bool: True if file already exists with same hash
         """
-        result = self.db.execute_query(DataloaderQueries.CHECK_DOCUMENT_SCRAPED, (doc_path, doc_hash))
-        return result[0]["count"] > 0 if result else False
+        params = {"doc_path": doc_path, "doc_hash": doc_hash}
+        result = self.db.execute_query(DataloaderQueries.CHECK_DOCUMENT_SCRAPED, params)
+        return result[0][0] > 0 if result else False
 
     def insert_scraped_doc(
         self, doc_name: str, doc_path: str, doc_hash: str
@@ -86,13 +87,20 @@ class FileScraper:
             return None
 
         now = datetime.utcnow()
-        params = (
-            self.index_name, doc_name, doc_path,
-            doc_hash, "incomplete", now, now,
-        )
-        result = self.db.execute_insert_update(DataloaderQueries.INSERT_SCRAPED_DOC, params)
+        params = {
+            "index_name": self.index_name,
+            "doc_name": doc_name,
+            "doc_path": doc_path,
+            "doc_hash": doc_hash,
+            "status": "incomplete",
+            "created_at": now,
+            "updated_at": now,
+        }
+        result = self.db.execute_insert(DataloaderQueries.INSERT_SCRAPED_DOC, params)
         if result:
-            doc_id = result[0]["id"]
+            # Result could be an integer ID or a row depending on implementation
+            # execute_insert returns lastrowid or row[0]
+            doc_id = result
             logger.info(
                 f"Inserted document: {doc_name} (ID: {doc_id}, hash: {doc_hash[:8]}...)"
             )

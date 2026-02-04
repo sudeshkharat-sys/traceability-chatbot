@@ -52,7 +52,20 @@ class DocumentEmbeddingProcessor:
         """
         rows = self.db.execute_query(DataloaderQueries.GET_INCOMPLETE_DOCUMENTS)
         logger.info(f"Fetched {len(rows)} incomplete document(s) from scraped_docs")
-        return rows
+        
+        # Convert tuples to dictionaries
+        docs = []
+        for row in rows:
+            # Row order: id, index_name, doc_name, doc_path, doc_hash
+            docs.append({
+                "id": row[0],
+                "index_name": row[1],
+                "doc_name": row[2],
+                "doc_path": row[3],
+                "doc_hash": row[4]
+            })
+            
+        return docs
 
     # ------------------------------------------------------------------
     # Orchestration
