@@ -7,9 +7,7 @@ import logging
 import json
 from typing import Dict, Any, Generator
 from datetime import datetime
-from app.agents.agent_pool import AgentPool
 from app.chat_history.chat_manager import ChatManager
-from app.connectors.neo4j_connector import Neo4jConnector
 from app.connectors.state_db_connector import StateDBConnector
 
 logger = logging.getLogger(__name__)
@@ -17,11 +15,17 @@ logger = logging.getLogger(__name__)
 
 class ConversationService:
     """
-    Service class for handling conversation flow and agent orchestration
+    Service class for handling conversation flow and agent orchestration.
+
+    Neo4jConnector and AgentPool are imported lazily in __init__ so that
+    langchain_neo4j / langgraph are not pulled in at module load time.
     """
 
     def __init__(self):
         """Initialize the ConversationService"""
+        from app.connectors.neo4j_connector import Neo4jConnector
+        from app.agents.agent_pool import AgentPool
+
         self.neo4j = Neo4jConnector()
         self.state_db = StateDBConnector()
         self.chat_manager = ChatManager(self.state_db)

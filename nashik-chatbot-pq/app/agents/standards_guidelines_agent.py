@@ -7,12 +7,6 @@ import logging
 import sys
 from typing import Dict, Any, Generator
 
-from app.services.prompt_manager import (
-    get_standards_guidelines_prompt,
-    get_todo_list_middleware_prompt,
-)
-from app.models.model_factory import ModelFactory
-
 logger = logging.getLogger(__name__)
 
 
@@ -43,6 +37,8 @@ class StandardsGuidelinesAgent:
             summarization_trigger_tokens: Token count to trigger summarization (default: 100K)
             keep_recent_messages: Number of recent messages to keep after summarization (default: 20)
         """
+        from app.models.model_factory import ModelFactory
+
         self.llm = ModelFactory.get_analyst_model()
         self.thread_id = thread_id
         self.checkpointer = checkpointer
@@ -57,15 +53,16 @@ class StandardsGuidelinesAgent:
         try:
             from app.tools.vector_db_tool import search_standards
             from app.tools.think_tool import think
-
-            # Lazy import heavy deps
+            from app.services.prompt_manager import (
+                get_standards_guidelines_prompt,
+                get_todo_list_middleware_prompt,
+            )
             from langchain.agents import create_agent
             from langchain.agents.middleware import (
                 SummarizationMiddleware,
                 TodoListMiddleware,
             )
 
-            # Load prompt from DB (with fallback to default)
             prompt = get_standards_guidelines_prompt()
 
             agent_kwargs = {
@@ -96,6 +93,8 @@ class StandardsGuidelinesAgent:
             logger.info("✅ TodoListMiddleware enabled for task planning")
 
             if self.enable_summarization:
+                from app.models.model_factory import ModelFactory
+
                 summarization_model = ModelFactory.get_default_chat_model()
                 middleware.append(
                     SummarizationMiddleware(
@@ -292,11 +291,7 @@ class StandardsGuidelinesAgent:
                         continue
 
                     if current_node in RESPONSE_NODES:
-                        if not response_started and just_finished_thinking:
-                            import time
-                            time.sleep(0.3)
-                            just_finished_thinking = False
-
+                        just_finished_thinking = False
                         response_started = True
                         yield {
                             "type": "token",
