@@ -11,10 +11,8 @@ from typing import List, Dict, Any
 
 sys.path.append(str(Path(__file__).parent.parent))
 
-from app.config.config import get_settings
 from app.connectors.state_db_connector import StateDBConnector
 from app.connectors.opensearch_connector import OpenSearchConnector
-from app.models.model_factory import ModelFactory
 
 from embedding_creator import EmbeddingProcessor
 
@@ -28,25 +26,13 @@ class DocumentEmbeddingProcessor:
     """
 
     def __init__(self):
-        self.settings = get_settings()
-
-        # 1. State DB  (reads postgres_url from settings internally)
+        # State DB  (reads postgres_url from settings internally)
         self.db = StateDBConnector()
 
-        # 2. Embedding model via ModelFactory  (uses AzureOpenAIHandler internally)
-        self.embedding_model = ModelFactory.get_embedding_model()
+        # OpenSearch connector (reads settings + embedding model internally)
+        self.opensearch = OpenSearchConnector()
 
-        # 3. OpenSearch connector with the embedding model
-        self.opensearch = OpenSearchConnector(
-            opensearch_url=self.settings.opensearch_url,
-            embeddings=self.embedding_model,
-            username=self.settings.OPENSEARCH_USERNAME,
-            password=self.settings.OPENSEARCH_PASSWORD,
-            use_ssl=self.settings.OPENSEARCH_USE_SSL,
-            verify_certs=self.settings.OPENSEARCH_VERIFY_CERTS,
-        )
-
-        # 4. The processor that owns the Docling pipeline + chunk/upsert logic
+        # The processor that owns the Docling pipeline + chunk/upsert logic
         self.processor = EmbeddingProcessor(
             db_connector=self.db,
             opensearch_connector=self.opensearch,

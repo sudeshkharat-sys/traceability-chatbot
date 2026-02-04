@@ -1,251 +1,155 @@
 """
-OpenSearch Connector for Document Vector Storage
-Uses LangChain's OpenSearchVectorSearch for vector operations
-Combined with native OpenSearch client for advanced operations
+OpenSearch Connector – thin wrapper around LangChain's OpenSearchVectorSearch.
+All configuration is read from centralised settings; no constructor arguments needed.
+Embedding model is obtained from ModelFactory internally.
 """
 
 import logging
 from typing import List, Dict, Any, Optional
-from opensearchpy import OpenSearch, helpers
-from opensearchpy.exceptions import OpenSearchException
 
+from opensearchpy.exceptions import NotFoundError
 from langchain_community.vectorstores import OpenSearchVectorSearch
-from langchain_core.embeddings import Embeddings
+
+from app.config.config import get_settings
+from app.models.model_factory import ModelFactory
 
 logger = logging.getLogger(__name__)
 
 
 class OpenSearchConnector:
     """
-    Manages OpenSearch connections and operations
-    Combines LangChain's OpenSearchVectorSearch with native OpenSearch client
+    Zero-argument wrapper around LangChain OpenSearchVectorSearch.
+    Reads index_name, connection details, and the embedding model from
+    centralised settings / ModelFactory – nothing needs to be passed in.
     """
 
-    def __init__(
-        self,
-        opensearch_url: str,
-        embeddings: Embeddings,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        use_ssl: bool = False,
-        verify_certs: bool = False,
-        ssl_show_warn: bool = False,
-    ):
-        """
-        Initialize OpenSearch connection with LangChain integration
+    def __init__(self):
+        self.settings = get_settings()
+        self.index_name = self.settings.OPENSEARCH_INDEX_NAME
+        self.embeddings = ModelFactory.get_embedding_model()
 
-        Args:
-            opensearch_url: OpenSearch URL (e.g., http://localhost:9200)
-            embeddings: LangChain embeddings instance
-            username: Optional username for authentication
-            password: Optional password for authentication
-            use_ssl: Whether to use SSL
-            verify_certs: Whether to verify SSL certificates
-            ssl_show_warn: Whether to show SSL warnings
-        """
-        self.opensearch_url = opensearch_url
-        self.embeddings = embeddings
-        http_auth = (username, password) if username and password else None
-        self.client = OpenSearch(
-            hosts=opensearch_url,
-            http_auth=http_auth,
-            use_ssl=use_ssl,
-            verify_certs=verify_certs,
-            ssl_show_warn=ssl_show_warn,
-            timeout=30,
+        http_auth = (
+            (self.settings.OPENSEARCH_USERNAME, self.settings.OPENSEARCH_PASSWORD)
+            if self.settings.OPENSEARCH_USERNAME
+            else None
         )
+
+        self.vector_store = OpenSearchVectorSearch(
+            opensearch_url=self.settings.opensearch_url,
+            index_name=self.index_name,
+            embedding_function=self.embeddings,
+            http_auth=http_auth,
+            use_ssl=self.settings.OPENSEARCH_USE_SSL,
+            verify_certs=self.settings.OPENSEARCH_VERIFY_CERTS,
+            ssl_show_warn=False,
+        )
+
+        # Expose the native client for low-level operations (existence checks, etc.)
+        self.client = self.vector_store.client
+
+    # ------------------------------------------------------------------
+    # Index management
+    # ------------------------------------------------------------------
+
+    def index_exists(self) -> bool:
+        """Check whether the configured index exists."""
+        return self.vector_store.index_exists()
+
+    def delete_index(self) -> bool:
+        """Delete the configured index."""
+        return self.vector_store.delete_index()
+
+    # ------------------------------------------------------------------
+    # Document existence / hash check (native client)
+    # ------------------------------------------------------------------
 
     def check_document_exists(
         self, doc_id: str, chunk_hash: str
     ) -> tuple[bool, bool, Optional[str]]:
         """
-        Check if document exists and compare hash
-
-        Args:
-            doc_id: Document ID to check
-            chunk_hash: Hash of the current chunk
+        Check if a document exists in the index and compare its stored hash.
 
         Returns:
             tuple: (exists, hash_matches, existing_hash)
         """
         try:
-            response = self.client.get(index=self.index_name, id=doc_id, _source=["chunk_hash"])
+            response = self.client.get(
+                index=self.index_name, id=doc_id, _source=["chunk_hash"]
+            )
             existing_hash = response["_source"].get("chunk_hash")
-            hash_matches = existing_hash == chunk_hash
-            return True, hash_matches, existing_hash
-        except OpenSearchException as e:
-            logger.error(f"Error checking document existence: {e}")
-            raise e
+            return True, existing_hash == chunk_hash, existing_hash
+        except NotFoundError:
+            return False, False, None
 
-    def add_texts_with_hash(
+    # ------------------------------------------------------------------
+    # Write operations – delegate to LangChain
+    # ------------------------------------------------------------------
+
+    def add_texts(
         self,
         texts: List[str],
         metadatas: Optional[List[Dict[str, Any]]] = None,
         ids: Optional[List[str]] = None,
-        chunk_hashes: Optional[List[str]] = None,
-    ) -> tuple[List[str], Dict[str, int]]:
-        """
-        Add texts to vector store with hash-based duplicate detection
-        Uses LangChain's add_texts for embedding generation
+    ) -> List[str]:
+        """Embed texts and index them.  Embedding is handled internally."""
+        return self.vector_store.add_texts(
+            texts=texts,
+            metadatas=metadatas,
+            ids=ids,
+        )
 
-        Args:
-            texts: List of text chunks to add
-            metadatas: Optional list of metadata dicts for each text
-            ids: Optional list of IDs for each text
-            chunk_hashes: Optional list of hashes for duplicate detection
+    def add_embeddings(
+        self,
+        text_embeddings: List[tuple[str, List[float]]],
+        metadatas: Optional[List[Dict[str, Any]]] = None,
+        ids: Optional[List[str]] = None,
+    ) -> List[str]:
+        """Index pre-computed (text, embedding) pairs – skips the embedding call."""
+        return self.vector_store.add_embeddings(
+            text_embeddings=text_embeddings,
+            metadatas=metadatas,
+            ids=ids,
+        )
 
-        Returns:
-            tuple: (list of IDs added, stats dict)
-        """
-        stats = {"created": 0, "updated": 0, "skipped": 0, "errors": 0}
-
-        if not ids:
-            ids = [f"chunk_{i}" for i in range(len(texts))]
-
-        if not chunk_hashes:
-            chunk_hashes = [None] * len(texts)
-
-        # Prepare data
-        texts_to_add = []
-        metadatas_to_add = []
-        ids_to_add = []
-
-        for i, (text, chunk_hash, doc_id) in enumerate(zip(texts, chunk_hashes, ids)):
-            try:
-                # Check if document exists
-                if chunk_hash:
-                    exists, hash_matches, existing_hash = self.check_document_exists(
-                        doc_id, chunk_hash
-                    )
-
-                    if exists and hash_matches:
-                        logger.debug(f"Skipped chunk {doc_id} (hash unchanged)")
-                        stats["skipped"] += 1
-                        continue
-                    elif exists:
-                        logger.debug(
-                            f"Will update chunk {doc_id} (hash changed: {existing_hash[:8]}... -> {chunk_hash[:8]}...)"
-                        )
-                        stats["updated"] += 1
-                    else:
-                        stats["created"] += 1
-                else:
-                    stats["created"] += 1
-
-                # Add to batch
-                texts_to_add.append(text)
-                ids_to_add.append(doc_id)
-
-                # Add hash to metadata
-                metadata = metadatas[i] if metadatas and i < len(metadatas) else {}
-                metadata["chunk_hash"] = chunk_hash
-                metadatas_to_add.append(metadata)
-
-            except Exception as e:
-                logger.error(f"Error processing chunk {i}: {e}")
-                stats["errors"] += 1
-
-        # Use LangChain to add texts (generates embeddings and indexes)
-        if texts_to_add:
-            try:
-                added_ids = self.vector_store.add_texts(
-                    texts=texts_to_add,
-                    metadatas=metadatas_to_add,
-                    ids=ids_to_add,
-                    bulk_size=10000,
-                )
-                logger.info(
-                    f"Batch complete: {stats['created']} created, {stats['updated']} updated, "
-                    f"{stats['skipped']} skipped, {stats['errors']} errors"
-                )
-                return added_ids, stats
-            except Exception as e:
-                logger.error(f"Failed to add texts to OpenSearch: {e}")
-                raise
-        else:
-            logger.info("No new texts to add (all skipped)")
-            return [], stats
+    # ------------------------------------------------------------------
+    # Search operations – delegate to LangChain
+    # ------------------------------------------------------------------
 
     def similarity_search(
         self,
         query: str,
         k: int = 4,
-        filter: Optional[Dict[str, Any]] = None,
     ) -> List[Dict[str, Any]]:
-        """
-        Perform similarity search using LangChain
-
-        Args:
-            query: Query text
-            k: Number of results to return
-            filter: Optional metadata filter
-
-        Returns:
-            list: List of matching documents with metadata
-        """
-        try:
-            # Use LangChain's similarity search
-            docs = self.vector_store.similarity_search(
-                query=query,
-                k=k,
-                filter=filter,
-            )
-            return [{"text": doc.page_content, "metadata": doc.metadata} for doc in docs]
-        except Exception as e:
-            logger.error(f"Similarity search failed: {e}")
-            return []
+        """Similarity search – returns list of {text, metadata} dicts."""
+        docs = self.vector_store.similarity_search(query=query, k=k)
+        return [{"text": doc.page_content, "metadata": doc.metadata} for doc in docs]
 
     def similarity_search_with_score(
         self,
         query: str,
         k: int = 4,
-        filter: Optional[Dict[str, Any]] = None,
     ) -> List[tuple[Dict[str, Any], float]]:
-        """
-        Perform similarity search with relevance scores
+        """Similarity search with relevance scores."""
+        results = self.vector_store.similarity_search_with_score(query=query, k=k)
+        return [
+            ({"text": doc.page_content, "metadata": doc.metadata}, score)
+            for doc, score in results
+        ]
 
-        Args:
-            query: Query text
-            k: Number of results to return
-            filter: Optional metadata filter
+    # ------------------------------------------------------------------
+    # Delete operations
+    # ------------------------------------------------------------------
 
-        Returns:
-            list: List of (document, score) tuples
-        """
-        try:
-            docs_and_scores = self.vector_store.similarity_search_with_score(
-                query=query,
-                k=k,
-                filter=filter,
-            )
-            return [
-                ({"text": doc.page_content, "metadata": doc.metadata}, score)
-                for doc, score in docs_and_scores
-            ]
-        except Exception as e:
-            logger.error(f"Similarity search with score failed: {e}")
-            return []
+    def delete_documents(self, ids: List[str]) -> bool:
+        """Delete specific documents by ID from the index."""
+        return self.vector_store.delete(ids=ids)
 
-    def delete_document(self, doc_id: str) -> bool:
-        """
-        Delete a document from index
-
-        Args:
-            doc_id: Document ID to delete
-
-        Returns:
-            bool: True if successful, False otherwise
-        """
-        try:
-            self.client.delete(index=self.index_name, id=doc_id)
-            logger.info(f"Deleted document {doc_id} from index {self.index_name}")
-            return True
-        except OpenSearchException as e:
-            raise e
+    # ------------------------------------------------------------------
+    # Cleanup
+    # ------------------------------------------------------------------
 
     def close(self):
-        """Close the OpenSearch connection"""
+        """Close the underlying OpenSearch client."""
         if self.client:
             self.client.close()
             logger.info("OpenSearch connection closed")
-

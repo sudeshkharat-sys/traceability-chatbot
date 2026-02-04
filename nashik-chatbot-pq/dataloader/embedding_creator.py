@@ -191,49 +191,41 @@ class EmbeddingProcessor:
             chunk_texts = []
             chunk_metadatas = []
             chunk_ids = []
-            chunk_hashes = []
             chunk_data = []
 
             for i, chunk in enumerate(chunks):
                 chunk_text = self.chunker.contextualize(chunk=chunk)
                 chunk_metadata = chunk.meta.export_json_dict()
 
-                # Calculate chunk hash
                 chunk_hash = self.calculate_chunk_hash(chunk_text, chunk_metadata)
-
-                # Check if chunk exists in DB
-                exists_db, db_chunk_id, existing_hash = self.chunk_exists_in_db(chunk_hash)
-
-                # Generate OpenSearch ID
                 opensearch_id = f"{doc['id']}_{i}"
 
-                # Check if exists in OpenSearch with same hash
-                exists_os, hash_matches_os, existing_os_hash = self.opensearch.check_document_exists(
+                exists_db, _, _ = self.chunk_exists_in_db(chunk_hash)
+                exists_os, hash_matches_os, _ = self.opensearch.check_document_exists(
                     opensearch_id, chunk_hash
                 )
 
-                # If chunk exists in both DB and OpenSearch with same hash, skip
-                if exists_db and exists_os and hash_matches_os and existing_hash == chunk_hash:
-                    logger.debug(
-                        f"Chunk {i} already exists in DB and OpenSearch with same hash, skipping"
-                    )
+                # Both DB and OpenSearch already have this exact hash – nothing to do
+                if exists_db and exists_os and hash_matches_os:
+                    logger.debug(f"Chunk {i} unchanged in DB and OpenSearch, skipping")
                     stats["chunks_skipped"] += 1
                     continue
 
-                # Add to batch for processing
-                chunk_texts.append(chunk_text)
+                # Track whether this will be a create or update in OpenSearch
+                if exists_os:
+                    stats["chunks_updated"] += 1
+                else:
+                    stats["chunks_created"] += 1
 
-                # Enrich metadata with document info and hash
                 enriched_metadata = {
                     **chunk_metadata,
                     "doc_name": doc["doc_name"],
                     "doc_id": doc["id"],
                     "chunk_hash": chunk_hash,
                 }
+                chunk_texts.append(chunk_text)
                 chunk_metadatas.append(enriched_metadata)
                 chunk_ids.append(opensearch_id)
-                chunk_hashes.append(chunk_hash)
-
                 chunk_data.append({
                     "index": i,
                     "text": chunk_text,
@@ -242,23 +234,21 @@ class EmbeddingProcessor:
                     "opensearch_id": opensearch_id,
                 })
 
-            # Use LangChain to add texts (handles embedding generation and indexing)
+            # LangChain handles embedding generation and bulk indexing
             if chunk_texts:
                 logger.info(f"Processing {len(chunk_texts)} chunks using LangChain")
 
                 try:
-                    # LangChain handles embedding creation and upsert in one call
-                    added_ids, os_stats = self.opensearch.add_texts_with_hash(
+                    self.opensearch.add_texts(
                         texts=chunk_texts,
                         metadatas=chunk_metadatas,
                         ids=chunk_ids,
-                        chunk_hashes=chunk_hashes,
                     )
+                    stats["chunks_processed"] += len(chunk_texts)
 
-                    # Update state database for each chunk
+                    # Upsert each chunk to the state database
                     for chunk_info in chunk_data:
                         try:
-                            # Upsert to database
                             self.upsert_chunk_to_db(
                                 doc["id"],
                                 doc["index_name"],
@@ -267,17 +257,9 @@ class EmbeddingProcessor:
                                 chunk_info["metadata"],
                                 chunk_info["opensearch_id"],
                             )
-
                         except Exception as e:
                             logger.error(f"Error updating DB for chunk {chunk_info['index']}: {e}")
                             stats["errors"] += 1
-
-                    # Update stats from OpenSearch operation
-                    stats["chunks_processed"] += len(chunk_texts)
-                    stats["chunks_created"] += os_stats["created"]
-                    stats["chunks_updated"] += os_stats["updated"]
-                    stats["chunks_skipped"] += os_stats["skipped"]
-                    stats["errors"] += os_stats["errors"]
 
                 except Exception as e:
                     logger.error(f"Error during LangChain processing: {e}")
