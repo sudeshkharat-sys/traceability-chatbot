@@ -9,12 +9,18 @@ function ChatPage() {
   const [searchParams] = useSearchParams();
   const feature = searchParams.get("feature");
 
+  // Map landing-page feature key → backend agent_type
+  const getAgentType = (feat) => {
+    if (feat === "guideline") return "standards_guidelines";
+    return "analyst";
+  };
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [messages, setMessages] = useState([]);
   const [recentChats, setRecentChats] = useState([]);
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [agentType, setAgentType] = useState("analyst");
+  const [agentType, setAgentType] = useState(() => getAgentType(feature));
   const [thinkingSteps, setThinkingSteps] = useState([]);
   const [currentThinkingStep, setCurrentThinkingStep] = useState("");
   const websocketRef = useRef(null);
@@ -40,7 +46,12 @@ function ChatPage() {
     return featureNames[feature] || "Quality Assistant Bot";
   };
 
-  // Load conversation history on mount
+  // Sync agentType when the URL feature param changes
+  useEffect(() => {
+    setAgentType(getAgentType(feature));
+  }, [feature]);
+
+  // Load conversation history on mount / when agentType changes
   useEffect(() => {
     loadConversationHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
