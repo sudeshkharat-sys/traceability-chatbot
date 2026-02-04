@@ -293,10 +293,13 @@ def create_embeddings(ctx):
     logger.info("=" * 80)
 
     try:
-        from dataloader.create_embedding_process import create_embeddings as run_embedding_process
+        from dataloader.document_embedding_processor import DocumentEmbeddingProcessor
 
-        # Run embedding creation process
-        stats = run_embedding_process()
+        dep = DocumentEmbeddingProcessor()
+        try:
+            stats = dep.run()
+        finally:
+            dep.close()
 
         logger.info("=" * 80)
         logger.info("📊 Embedding Creation Results:")

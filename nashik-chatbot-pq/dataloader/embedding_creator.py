@@ -4,7 +4,6 @@ Takes documents from scraped_docs, processes through pipeline, and upserts to Op
 Uses LangChain's OpenSearchVectorSearch for vector operations
 """
 
-import os
 import time
 import json
 import hashlib
@@ -16,12 +15,7 @@ from datetime import datetime
 import sys
 sys.path.append(str(Path(__file__).parent.parent))
 
-from langchain_openai import AzureOpenAIEmbeddings
-
 from app.connectors.state_db_connector import StateDBConnector
-from app.connectors.opensearch_connector import OpenSearchConnector
-from app.config.config import get_settings
-from app.models.model_factory import ModelFactory
 import pipeline_factory
 
 logger = logging.getLogger(__name__)
@@ -405,35 +399,3 @@ class EmbeddingProcessor:
         return overall_stats
 
 
-def create_embeddings(self):
-    """
-    Main function to process incomplete documents and create embeddings
-
-    Args:
-        index_name: Optional index name to override settings default
-    """
-    settings = get_settings()
-    embedding_model = ModelFactory.get_embedding_model()
-    db  = StateDBConnector(
-        host=settings.POSTGRES_HOST,
-        port=settings.POSTGRES_PORT,
-        database=settings.POSTGRES_DB,
-        user=settings.POSTGRES_USER,
-        password=settings.POSTGRES_PASSWORD,
-    )
-    opensearch_connector = OpenSearchConnector(
-            opensearch_url=settings.OPENSEARCH_URL,
-            embeddings=embedding_model,
-            username=settings.OPENSEARCH_USERNAME,
-            password=settings.OPENSEARCH_PASSWORD,
-            use_ssl=settings.OPENSEARCH_USE_SSL,
-            verify_certs=settings.OPENSEARCH_VERIFY_CERTS,
-        )
-    # Intialize processor
-    processor = EmbeddingProcessor(
-        db_connector=db,
-        opensearch_connector=opensearch_connector,
-    )
-    # Process incomplete documents
-    stats = processor.process_incomplete_documents()
-    return stats
