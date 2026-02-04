@@ -22,7 +22,6 @@ sys.path.insert(0, str(project_root / "thar-quality-system"))
 # ---------------------------------------------------------------------------
 # App imports  (all at top – nothing imported inside task bodies)
 # ---------------------------------------------------------------------------
-from app.connectors.state_db_manager import StateDBManager
 from app.connectors.state_db_connector import StateDBConnector
 from app.queries import DataloaderQueries
 
@@ -38,45 +37,6 @@ logging.basicConfig(
 # ============================================================================
 # DATABASE SETUP
 # ============================================================================
-
-
-@task
-def setup_database(ctx):
-    """
-    Complete database setup: create database, tables, and seed prompts
-
-    Usage: invoke setup-database
-    """
-    logger.info("=" * 80)
-    logger.info("Setting up Database...")
-    logger.info("=" * 80)
-
-    try:
-        manager = StateDBManager()
-
-        logger.info("\nStep 1: Creating database...")
-        manager.initialize_database()
-
-        logger.info("\nStep 2: Creating tables...")
-        manager.create_tables_if_not_exists()
-
-        logger.info("\nStep 3: Verifying tables...")
-        tables = manager.list_tables()
-
-        logger.info("\nStep 4: Seeding default prompts...")
-        from app.services.prompt_manager import get_prompt_manager
-
-        prompt_manager = get_prompt_manager()
-        prompt_results = prompt_manager.seed_default_prompts(force_update=False)
-
-        logger.info("=" * 80)
-        logger.info(f"Database setup complete – {len(tables)} tables, "
-                    f"{sum(1 for v in prompt_results.values() if v)} prompts seeded")
-        logger.info("=" * 80)
-
-    except Exception as e:
-        logger.error(f"Error setting up database: {e}")
-        raise
 
 
 @task
