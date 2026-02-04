@@ -80,6 +80,7 @@ class Settings(BaseSettings):
     OPENSEARCH_USERNAME: Optional[str] = None
     OPENSEARCH_PASSWORD: Optional[str] = None
     OPENSEARCH_USE_SSL: bool = False
+    OPENSEARCH_VERIFY_CERTS: bool = False
     OPENSEARCH_INDEX_NAME: str = "documents"
 
     # Document Processing Configuration (Dataloader)
