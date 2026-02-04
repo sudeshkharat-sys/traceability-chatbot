@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from typing import Optional
 from app.agents.cypher_agent import CypherAgent
 from app.agents.analyst_agent import AnalystAgent
+from app.agents.standards_guidelines_agent import StandardsGuidelinesAgent
 from app.agents.checkpointer_manager import get_checkpointer_manager
 from app.connectors.neo4j_connector import Neo4jConnector
 
@@ -69,6 +70,12 @@ class AgentPool:
                     thread_id=thread_id,
                     checkpointer=self.checkpointer,  # Enable conversation memory
                 )
+            elif agent_type == "standards_guidelines":
+                thread_id = f"conv_{conversation_id}"
+                agent = StandardsGuidelinesAgent(
+                    thread_id=thread_id,
+                    checkpointer=self.checkpointer,
+                )
             else:
                 raise ValueError(f"Unknown agent type: {agent_type}")
 
@@ -111,6 +118,21 @@ class AgentPool:
             neo4j_connector=self.neo4j,
             thread_id=thread_id,
             checkpointer=self.checkpointer,  # Enable conversation memory
+        )
+
+    def get_standards_guidelines_agent(self, thread_id: str = "default") -> StandardsGuidelinesAgent:
+        """
+        Get a standalone Standards & Guidelines agent instance
+
+        Args:
+            thread_id: Thread ID for conversation tracking
+
+        Returns:
+            StandardsGuidelinesAgent instance
+        """
+        return StandardsGuidelinesAgent(
+            thread_id=thread_id,
+            checkpointer=self.checkpointer,
         )
 
     def get_active_agent_count(self) -> int:

@@ -30,6 +30,10 @@ DEFAULT_PROMPTS = {
         "name": "TodoListMiddleware System Prompt",
         "content": None,  # Will be loaded from file
     },
+    "standards_guidelines_prompt": {
+        "name": "Standards & Guidelines Agent Prompt",
+        "content": None,  # Will be loaded from file
+    },
 }
 
 
@@ -39,10 +43,12 @@ def _load_default_prompts_from_files():
         from app.prompts.analyst_prompt import ANALYST_PROMPT
         from app.prompts.cypher_agent_prompt import CYPHER_AGENT_PROMPT
         from app.prompts.todo_list_middleware_prompt import TODO_LIST_MIDDLEWARE_PROMPT
+        from app.prompts.standards_guidelines_prompt import STANDARDS_GUIDELINES_PROMPT
 
         DEFAULT_PROMPTS["analyst_prompt"]["content"] = ANALYST_PROMPT
         DEFAULT_PROMPTS["cypher_agent_prompt"]["content"] = CYPHER_AGENT_PROMPT
         DEFAULT_PROMPTS["todo_list_middleware_prompt"]["content"] = TODO_LIST_MIDDLEWARE_PROMPT
+        DEFAULT_PROMPTS["standards_guidelines_prompt"]["content"] = STANDARDS_GUIDELINES_PROMPT
         logger.debug("Default prompts loaded from files")
     except ImportError as e:
         logger.warning(f"Could not load default prompts from files: {e}")
@@ -341,4 +347,11 @@ def get_todo_list_middleware_prompt() -> str:
     if not prompt:
         logger.warning("TodoListMiddleware prompt not found, using empty string")
         return ""
+    return prompt
+
+
+def get_standards_guidelines_prompt() -> str:
+    """Get the Standards & Guidelines agent prompt"""
+    manager = get_prompt_manager()
+    prompt = manager.get_prompt("standards_guidelines_prompt")
     return prompt
