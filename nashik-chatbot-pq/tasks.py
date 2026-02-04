@@ -16,6 +16,7 @@ sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(project_root / "thar-quality-system"))
 
 from app.connectors.state_db_manager import StateDBManager
+from app.queries import DataloaderQueries
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -236,7 +237,6 @@ def validate_connections(ctx):
 # DOCUMENT PROCESSING TASKS (Generic Dataloader)
 # ============================================================================
 
-from app.queries import DataloaderQueries
 
 @task
 def scrape_documents(ctx, directory):
@@ -254,11 +254,12 @@ def scrape_documents(ctx, directory):
     logger.info("=" * 80)
 
     try:
-        from dataloader.scrape_process import scrape_files
+        from dataloader.document_scrape_processor import DocumentScrapeProcessor
         logger.info(f"Directory: {directory}")
         logger.info("")
         # Run scrape process
-        stats = scrape_files(directory=directory,)
+        processor = DocumentScrapeProcessor()
+        stats = processor.scrape_files(directory=directory)
         logger.info("=" * 80)
         logger.info("📊 Scraping Results:")
         logger.info(f"  Files scanned: {stats['scanned']}")

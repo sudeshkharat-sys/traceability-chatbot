@@ -15,7 +15,7 @@ from app.connectors.state_db_connector import StateDBConnector
 from app.connectors.opensearch_connector import OpenSearchConnector
 from app.queries import DataloaderQueries
 
-from embedding_creator import EmbeddingProcessor
+from dataloader.embedding.embedding_creator import EmbeddingProcessor
 
 logger = logging.getLogger(__name__)
 

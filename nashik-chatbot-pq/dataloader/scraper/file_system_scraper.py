@@ -15,7 +15,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from app.connectors.state_db_connector import StateDBConnector
 from app.queries import DataloaderQueries
-from app.config.config import get_settings
+
 
 logger = logging.getLogger(__name__)
 
@@ -160,25 +160,3 @@ class FileScraper:
             f"{stats['existing']} existing, {stats['errors']} errors"
         )
         return stats
-
-
-def scrape_files(directory: str,) -> dict:
-    """
-    Main function to scrape files from directory
-
-    Args:
-        directory: Directory path to scrape
-
-    Returns:
-        dict: Statistics of the scraping operation
-    """
-    settings = get_settings()
-    with StateDBConnector(
-        host=settings.POSTGRES_HOST,
-        port=settings.POSTGRES_PORT,
-        database=settings.POSTGRES_DB,
-        user=settings.POSTGRES_USER,
-        password=settings.POSTGRES_PASSWORD,
-    ) as db:
-        scraper = FileScraper(db, settings.OPENSEARCH_INDEX_NAME)
-        return scraper.scrape_directory(Path(directory))
