@@ -9,7 +9,7 @@ import json
 import hashlib
 import logging
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 from datetime import datetime
 
 import sys
@@ -58,21 +58,6 @@ class EmbeddingProcessor:
         # Combine text and relevant metadata for hashing
         content = f"{chunk_text}:{json.dumps(metadata, sort_keys=True)}"
         return hashlib.sha256(content.encode()).hexdigest()
-
-    def get_incomplete_documents(self) -> List[Dict[str, Any]]:
-        """
-        Get all documents with status 'incomplete' from scraped_docs table
-
-        Returns:
-            list: List of documents to process
-        """
-        query = """
-        SELECT id, index_name, doc_name, doc_path, doc_hash
-        FROM scraped_docs
-        WHERE status = 'incomplete'
-        ORDER BY created_at ASC
-        """
-        return self.db.execute_query(query)
 
     def chunk_exists_in_db(self, chunk_hash: str) -> tuple[bool, Optional[int], Optional[str]]:
         """
@@ -331,71 +316,3 @@ class EmbeddingProcessor:
         """
         self.db.execute_insert_update(query, (status, datetime.utcnow(), doc_id))
         logger.info(f"Updated document {doc_id} status to '{status}'")
-
-    def process_incomplete_documents(self) -> Dict[str, Any]:
-        """
-        Process all incomplete documents
-
-        Returns:
-            dict: Overall processing statistics
-        """
-        overall_stats = {
-            "documents_processed": 0,
-            "documents_completed": 0,
-            "documents_failed": 0,
-            "total_chunks_processed": 0,
-            "total_chunks_created": 0,
-            "total_chunks_updated": 0,
-            "total_chunks_skipped": 0,
-            "total_errors": 0,
-        }
-
-        # Get incomplete documents
-        docs = self.get_incomplete_documents()
-        logger.info(f"Found {len(docs)} incomplete documents to process")
-
-        if not docs:
-            logger.info("No incomplete documents to process")
-            return overall_stats
-
-        # Process each document
-        for doc in docs:
-            logger.info(f"\n{'='*60}")
-            logger.info(f"Processing document {doc['id']}: {doc['doc_name']}")
-            logger.info(f"{'='*60}")
-
-            stats = self.process_document(doc)
-
-            overall_stats["documents_processed"] += 1
-            overall_stats["total_chunks_processed"] += stats["chunks_processed"]
-            overall_stats["total_chunks_created"] += stats["chunks_created"]
-            overall_stats["total_chunks_updated"] += stats["chunks_updated"]
-            overall_stats["total_chunks_skipped"] += stats["chunks_skipped"]
-            overall_stats["total_errors"] += stats["errors"]
-
-            # Update document status ONLY if successful (no errors)
-            if stats["success"]:
-                self.update_document_status(doc["id"], "complete")
-                overall_stats["documents_completed"] += 1
-            else:
-                logger.warning(
-                    f"Document {doc['id']} has errors, keeping status as 'incomplete'"
-                )
-                overall_stats["documents_failed"] += 1
-
-        logger.info(f"\n{'='*60}")
-        logger.info("Overall Processing Summary")
-        logger.info(f"{'='*60}")
-        logger.info(f"Documents processed: {overall_stats['documents_processed']}")
-        logger.info(f"Documents completed: {overall_stats['documents_completed']}")
-        logger.info(f"Documents failed: {overall_stats['documents_failed']}")
-        logger.info(f"Total chunks processed: {overall_stats['total_chunks_processed']}")
-        logger.info(f"Total chunks created: {overall_stats['total_chunks_created']}")
-        logger.info(f"Total chunks updated: {overall_stats['total_chunks_updated']}")
-        logger.info(f"Total chunks skipped: {overall_stats['total_chunks_skipped']}")
-        logger.info(f"Total errors: {overall_stats['total_errors']}")
-        logger.info(f"{'='*60}\n")
-
-        return overall_stats
-
-
