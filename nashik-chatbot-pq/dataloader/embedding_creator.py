@@ -16,6 +16,7 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent))
 
 from app.connectors.state_db_connector import StateDBConnector
+from app.queries import DataloaderQueries
 import pipeline_factory
 
 logger = logging.getLogger(__name__)
@@ -69,11 +70,7 @@ class EmbeddingProcessor:
         Returns:
             tuple: (exists, chunk_id, existing_hash)
         """
-        query = """
-        SELECT chunk_id, chunk_hash FROM chunks
-        WHERE chunk_hash = %s
-        """
-        result = self.db.execute_query(query, (chunk_hash,))
+        result = self.db.execute_query(DataloaderQueries.GET_CHUNK_BY_HASH, (chunk_hash,))
         if result:
             return True, result[0]["chunk_id"], result[0]["chunk_hash"]
         return False, None, None
@@ -107,43 +104,18 @@ class EmbeddingProcessor:
         now = datetime.utcnow()
 
         if not exists:
-            # Insert new chunk
-            query = """
-            INSERT INTO chunks (doc_id, index_name, chunk_hash, chunk_text, chunk_metadata, opensearch_id, created_at, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING chunk_id
-            """
             params = (
-                doc_id,
-                index_name,
-                chunk_hash,
-                chunk_text,
-                json.dumps(chunk_metadata),
-                opensearch_id,
-                now,
-                now,
+                doc_id, index_name, chunk_hash, chunk_text,
+                json.dumps(chunk_metadata), opensearch_id, now, now,
             )
-            result = self.db.execute_insert_update(query, params)
+            result = self.db.execute_insert_update(DataloaderQueries.INSERT_CHUNK, params)
             return result[0]["chunk_id"] if result else None
         else:
-            # Update existing chunk
-            query = """
-            UPDATE chunks
-            SET doc_id = %s, index_name = %s, chunk_text = %s, chunk_metadata = %s,
-                opensearch_id = %s, updated_at = %s
-            WHERE chunk_hash = %s
-            RETURNING chunk_id
-            """
             params = (
-                doc_id,
-                index_name,
-                chunk_text,
-                json.dumps(chunk_metadata),
-                opensearch_id,
-                now,
-                chunk_hash,
+                doc_id, index_name, chunk_text,
+                json.dumps(chunk_metadata), opensearch_id, now, chunk_hash,
             )
-            result = self.db.execute_insert_update(query, params)
+            result = self.db.execute_insert_update(DataloaderQueries.UPDATE_CHUNK, params)
             return result[0]["chunk_id"] if result else chunk_id
 
 
@@ -291,10 +263,7 @@ class EmbeddingProcessor:
             doc_id: ID of the document
             status: New status (incomplete/complete)
         """
-        query = """
-        UPDATE scraped_docs
-        SET status = %s, updated_at = %s
-        WHERE id = %s
-        """
-        self.db.execute_insert_update(query, (status, datetime.utcnow(), doc_id))
+        self.db.execute_insert_update(
+            DataloaderQueries.UPDATE_DOCUMENT_STATUS, (status, datetime.utcnow(), doc_id)
+        )
         logger.info(f"Updated document {doc_id} status to '{status}'")

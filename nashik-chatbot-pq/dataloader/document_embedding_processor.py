@@ -13,6 +13,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from app.connectors.state_db_connector import StateDBConnector
 from app.connectors.opensearch_connector import OpenSearchConnector
+from app.queries import DataloaderQueries
 
 from embedding_creator import EmbeddingProcessor
 
@@ -49,13 +50,7 @@ class DocumentEmbeddingProcessor:
         Returns:
             list of dicts – one per incomplete document
         """
-        query = """
-        SELECT id, index_name, doc_name, doc_path, doc_hash
-        FROM scraped_docs
-        WHERE status = 'incomplete'
-        ORDER BY created_at ASC
-        """
-        rows = self.db.execute_query(query)
+        rows = self.db.execute_query(DataloaderQueries.GET_INCOMPLETE_DOCUMENTS)
         logger.info(f"Fetched {len(rows)} incomplete document(s) from scraped_docs")
         return rows
 

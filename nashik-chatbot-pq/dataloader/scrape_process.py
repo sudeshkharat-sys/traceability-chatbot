@@ -14,6 +14,7 @@ import sys
 sys.path.append(str(Path(__file__).parent.parent))
 
 from app.connectors.state_db_connector import StateDBConnector
+from app.queries import DataloaderQueries
 from app.config.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -62,11 +63,7 @@ class FileScraper:
         Returns:
             bool: True if file already exists with same hash
         """
-        query = """
-        SELECT COUNT(*) as count FROM scraped_docs
-        WHERE doc_path = %s AND doc_hash = %s
-        """
-        result = self.db.execute_query(query, (doc_path, doc_hash))
+        result = self.db.execute_query(DataloaderQueries.CHECK_DOCUMENT_SCRAPED, (doc_path, doc_hash))
         return result[0]["count"] > 0 if result else False
 
     def insert_scraped_doc(
@@ -88,23 +85,12 @@ class FileScraper:
             logger.info(f"Document already scraped: {doc_name} (hash: {doc_hash[:8]}...)")
             return None
 
-        query = """
-        INSERT INTO scraped_docs (index_name, doc_name, doc_path, doc_hash, status, created_at, updated_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s)
-        RETURNING id
-        """
         now = datetime.utcnow()
         params = (
-            self.index_name,
-            doc_name,
-            doc_path,
-            doc_hash,
-            "incomplete",
-            now,
-            now,
+            self.index_name, doc_name, doc_path,
+            doc_hash, "incomplete", now, now,
         )
-
-        result = self.db.execute_insert_update(query, params)
+        result = self.db.execute_insert_update(DataloaderQueries.INSERT_SCRAPED_DOC, params)
         if result:
             doc_id = result[0]["id"]
             logger.info(

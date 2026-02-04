@@ -7,6 +7,7 @@ from app.queries.chat_queries import ChatQueries
 from app.queries.prompt_queries import PromptQueries
 from app.queries.database_queries import DatabaseQueries
 from app.queries.common_queries import CommonQueries
+from app.queries.dataloader_queries import DataloaderQueries
 from app.queries.query_validator import QueryValidator
 
 __all__ = [
@@ -14,5 +15,6 @@ __all__ = [
     "PromptQueries",
     "DatabaseQueries",
     "CommonQueries",
+    "DataloaderQueries",
     "QueryValidator",
 ]

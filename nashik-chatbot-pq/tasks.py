@@ -236,6 +236,8 @@ def validate_connections(ctx):
 # DOCUMENT PROCESSING TASKS (Generic Dataloader)
 # ============================================================================
 
+from app.queries import DataloaderQueries
+
 @task
 def scrape_documents(ctx, directory):
     """
@@ -402,7 +404,7 @@ def list_documents(ctx, status=None, index_name=None, limit=10):
             user=settings.POSTGRES_USER,
             password=settings.POSTGRES_PASSWORD,
         ) as db:
-            # Build query
+            # Build dynamic WHERE clause on top of the base SELECT
             conditions = []
             params = []
 
@@ -415,15 +417,13 @@ def list_documents(ctx, status=None, index_name=None, limit=10):
                 params.append(index_name)
 
             where_clause = "WHERE " + " AND ".join(conditions) if conditions else ""
-
-            query = f"""
-            SELECT id, index_name, doc_name, status, created_at, updated_at
-            FROM scraped_docs
-            {where_clause}
-            ORDER BY created_at DESC
-            LIMIT %s
-            """
             params.append(limit)
+
+            query = DataloaderQueries.LIST_DOCUMENTS_BASE + f"""
+                {where_clause}
+                ORDER BY created_at DESC
+                LIMIT %s
+            """
 
             docs = db.execute_query(query, tuple(params) if params else None)
 
@@ -438,13 +438,7 @@ def list_documents(ctx, status=None, index_name=None, limit=10):
                     logger.info(f"     Created: {doc['created_at']}")
                     logger.info("")
 
-            # Get status counts
-            count_query = """
-            SELECT status, COUNT(*) as count
-            FROM scraped_docs
-            GROUP BY status
-            """
-            counts = db.execute_query(count_query)
+            counts = db.execute_query(DataloaderQueries.STATUS_COUNTS)
 
             logger.info("=" * 80)
             logger.info("📊 Status Summary:")
@@ -493,21 +487,15 @@ def reset_document_status(ctx, doc_id=None, index_name=None):
             password=settings.POSTGRES_PASSWORD,
         ) as db:
             if doc_id:
-                query = """
-                UPDATE scraped_docs
-                SET status = 'incomplete', updated_at = %s
-                WHERE id = %s
-                """
-                db.execute_insert_update(query, (datetime.utcnow(), doc_id))
+                db.execute_insert_update(
+                    DataloaderQueries.RESET_STATUS_BY_ID, (datetime.utcnow(), doc_id)
+                )
                 logger.info(f"✅ Reset document ID {doc_id} to 'incomplete'")
 
             elif index_name:
-                query = """
-                UPDATE scraped_docs
-                SET status = 'incomplete', updated_at = %s
-                WHERE index_name = %s
-                """
-                db.execute_insert_update(query, (datetime.utcnow(), index_name))
+                db.execute_insert_update(
+                    DataloaderQueries.RESET_STATUS_BY_INDEX, (datetime.utcnow(), index_name)
+                )
                 logger.info(f"✅ Reset all documents in index '{index_name}' to 'incomplete'")
 
             logger.info("=" * 80)
