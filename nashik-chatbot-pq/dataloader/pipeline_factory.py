@@ -46,10 +46,16 @@ def get_pipeline_options():
     )
     
     # 3. Image Generation Settings
-    pipeline_options.images_scale = 2.0
-    pipeline_options.generate_page_images = True
+    # Optimized for memory efficiency
+    pipeline_options.images_scale = 1.0  # Reduced from 2.0 to save memory
+    pipeline_options.generate_page_images = False # Disable full page images to save memory
     pipeline_options.generate_picture_images = True
     pipeline_options.generate_table_images = True
+    
+    # 4. Threading
+    # Limit threads to prevent memory explosion on multi-core systems
+    # Using 4 threads is a safe default for most containers
+    pipeline_options.accelerator_options.num_threads = 4
     
     return pipeline_options
 

@@ -10,7 +10,7 @@ import ChartComponent from "./ChartComponent";
 import CitationsTable from "./CitationsTable";
 import { fixMarkdownTables } from "../utils/markdownUtils";
 
-const ChatMessage = ({ message, conversationId, thinkingSteps }) => {
+const ChatMessage = ({ message, conversationId, thinkingSteps, onOpenPdf }) => {
   const isUser = message.sender === "user";
   const [feedback, setFeedback] = useState(null);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -111,6 +111,7 @@ const ChatMessage = ({ message, conversationId, thinkingSteps }) => {
                   {/* Render citations table if available */}
                   <CitationsTable 
                     citations={message.citations || message.similar_docs} 
+                    onOpenPdf={onOpenPdf}
                   />
                 </>
               ) : (

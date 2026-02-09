@@ -1,25 +1,85 @@
-### Top Warranty Concerns SummaryHere are the top warranty concerns based on distinct claim counts across all available data. Head Lamp and Sun Roof-related issues lead the list, followed by electronics (RPAS sensor, infotainment) and mechanical noise concerns.
-
----
-
-## Detailed Analysis**Chart: Top10 Warranty Concerns - All Data**
-
-The distribution shows lighting and sunroof mechanisms as dominant concerns, with notable electronics and NVH (noise) issues. This suggests focus areas for corrective actions: supplier capability for head lamps and sunroof assemblies, diagnostic robustness for RPAS and infotainment, and NVH root-cause isolation for engine/steering.
-
-| Complaint | Claim Count |
-|------------------------------------|-------------|
-| HEAD LAMP FAILURE |324 |
-| SUN ROOF MECHANISM FAILURE |301 |
-| RPAS SENSOR FAILURE |212 |
-| INFOTAINMENT SYSTEM HANGS |191 |
-| ABNORMAL NOISE FROM ENGINE |187 |
-| NOISE WHILE TURNING THE STEERING |180 |
-| A/C LOUVERS FAILURE - FRONT |153 |
-| - |144 |
-| BRAKE SWITCH FAILURE |135 |
-| SUN ROOF MOTOR FAILURE |126 |
-
-### Next Steps- Drill down by zone to see regional concentration for these top concerns.
-- Traceability deep-dive for “HEAD LAMP FAILURE” and “SUN ROOF MECHANISM FAILURE”: parts, batches, vendors, Cp/Cpk, and eSQA incoming concerns.
-- Trend analysis over available months to identify rising issues (e.g., RPAS sensor vs. infotainment).
-- Prioritize supplier audits for top two concerns and review PPCM capability (flag Cp/Cpk <1.33).
+model_artifacts/tableformer/accurate/tab(…): 100%|██████████████████████████████████████████████████| 213M/213M [00:15<00:00, 13.9MB/s]
+Fetching 8 files: 100%|██████████████████████████████████████████████████████████████████████████████████| 8/8 [00:15<00:00,  1.98s/it]
+Downloading picture classifier model...                                                                          d=246188;file:///home/
+maiuser/miniconda3/envs/chatbot/lib/python3.11/site-packages/docling/utils/model_downloader.pymodel_downloader.py:d=100024;file:///home
+/maiuser/miniconda3/envs/chatbot/lib/python3.11/site-packages/docling/utils/model_downloader.py#7878
+README.md: 4.83kB [00:00, 17.1MB/s]                                                                              | 0/6 [00:00<?, ?it/s]
+.gitattributes: 1.52kB [00:00, 14.9MB/s]
+preprocessor_config.json: 100%|███████████████████████████████████████████████████████████████████████| 377/377 [00:00<00:00, 4.60MB/s]
+config.json: 2.52kB [00:00, 23.6MB/s]                                                                    | 1/6 [00:00<00:01,  3.37it/s]
+model.onnx: 100%|█████████████████████████████████████████████████████████████████████████████████| 16.8M/16.8M [00:02<00:00, 6.76MB/s]
+model.safetensors: 100%|██████████████████████████████████████████████████████████████████████████| 16.4M/16.4M [00:03<00:00, 4.52MB/s]
+Fetching 6 files: 100%|██████████████████████████████████████████████████████████████████████████████████| 6/6 [00:04<00:00,  1.46it/s]
+Downloading code formula model...                                                                                d=251321;file:///home/
+maiuser/miniconda3/envs/chatbot/lib/python3.11/site-packages/docling/utils/model_downloader.pymodel_downloader.py:d=291960;file:///home
+/maiuser/miniconda3/envs/chatbot/lib/python3.11/site-packages/docling/utils/model_downloader.py#8989
+added_tokens.json: 100%|██████████████████████████████████████████████████████████████████████████████| 975/975 [00:00<00:00, 11.6MB/s]
+preprocessor_config.json: 100%|███████████████████████████████████████████████████████████████████████| 486/486 [00:00<00:00, 3.83MB/s]
+config.json: 2.64kB [00:00, 13.6MB/s]                                                                        | 0.00/486 [00:00<?, ?B/s]
+.gitattributes: 1.52kB [00:00, 15.7MB/s]
+generation_config.json: 100%|█████████████████████████████████████████████████████████████████████████| 169/169 [00:00<00:00, 2.47MB/s]
+README.md: 1.51kB [00:00, 13.3MB/s]                                                                          | 0.00/169 [00:00<?, ?B/s]
+chat_template.json: 100%|█████████████████████████████████████████████████████████████████████████████| 422/422 [00:00<00:00, 5.65MB/s]
+processor_config.json: 100%|█████████████████████████████████████████████████████████████████████████| 68.0/68.0 [00:00<00:00, 822kB/s]
+special_tokens_map.json: 1.07kB [00:00, 10.4MB/s]                                                           | 0.00/631M [00:00<?, ?B/s]
+tokenizer_config.json: 25.0kB [00:00, 157MB/s]                                                              | 0.00/68.0 [00:00<?, ?B/s]
+tokenizer.json: 7.16MB [00:00, 136MB/s]?B/s]
+vocab.json: 1.61MB [00:00, 37.1MB/s]
+model.safetensors: 100%|████████████████████████████████████████████████████████████████████████████| 631M/631M [00:16<00:00, 38.6MB/s]
+Fetching 13 files: 100%|███████████████████████████████████████████████████████████████████████████████| 13/13 [00:16<00:00,  1.29s/it]
+Downloading rapidocr torch models...                                                                            d=670609;file:///home/m
+aiuser/miniconda3/envs/chatbot/lib/python3.11/site-packages/docling/utils/model_downloader.pymodel_downloader.py:d=27569;file:///home/m
+aiuser/miniconda3/envs/chatbot/lib/python3.11/site-packages/docling/utils/model_downloader.py#152152
+Traceback (most recent call last):
+  File "/home/maiuser/miniconda3/envs/chatbot/lib/python3.11/site-packages/urllib3/connectionpool.py", line 464, in _make_request
+    self._validate_conn(conn)
+  File "/home/maiuser/miniconda3/envs/chatbot/lib/python3.11/site-packages/urllib3/connectionpool.py", line 1093, in _validate_conn
+    conn.connect()
+  File "/home/maiuser/miniconda3/envs/chatbot/lib/python3.11/site-packages/urllib3/connection.py", line 796, in connect
+    sock_and_verified = _ssl_wrap_socket_and_match_hostname(
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/maiuser/miniconda3/envs/chatbot/lib/python3.11/site-packages/urllib3/connection.py", line 975, in _ssl_wrap_socket_and_ma
+tch_hostname
+    ssl_sock = ssl_wrap_socket(
+               ^^^^^^^^^^^^^^^^
+  File "/home/maiuser/miniconda3/envs/chatbot/lib/python3.11/site-packages/urllib3/util/ssl_.py", line 483, in ssl_wrap_socket
+    ssl_sock = _ssl_wrap_socket_impl(sock, context, tls_in_tls, server_hostname)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/maiuser/miniconda3/envs/chatbot/lib/python3.11/site-packages/urllib3/util/ssl_.py", line 527, in _ssl_wrap_socket_impl
+    return ssl_context.wrap_socket(sock, server_hostname=server_hostname)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/maiuser/miniconda3/envs/chatbot/lib/python3.11/ssl.py", line 517, in wrap_socket
+    return self.sslsocket_class._create(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/maiuser/miniconda3/envs/chatbot/lib/python3.11/ssl.py", line 1104, in _create
+    self.do_handshake()
+  File "/home/maiuser/miniconda3/envs/chatbot/lib/python3.11/ssl.py", line 1382, in do_handshake
+    self._sslobj.do_handshake()
+ssl.SSLCertVerificationError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.
+c:1006)dels
+    RapidOcrModel.download_models(
+  File "/home/maiuser/miniconda3/envs/chatbot/lib/python3.11/site-packages/docling/models/stages/ocr/rapid_ocr_model.py", line 243, in 
+download_models
+    buf = download_url_with_progress(model_details["url"], progress=progress)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/maiuser/miniconda3/envs/chatbot/lib/python3.11/site-packages/docling/utils/utils.py", line 49, in download_url_with_progr
+ess
+    with requests.get(url, stream=True, allow_redirects=True) as response:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/maiuser/miniconda3/envs/chatbot/lib/python3.11/site-packages/requests/api.py", line 73, in get
+    return request("get", url, params=params, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/maiuser/miniconda3/envs/chatbot/lib/python3.11/site-packages/requests/api.py", line 59, in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/maiuser/miniconda3/envs/chatbot/lib/python3.11/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/maiuser/miniconda3/envs/chatbot/lib/python3.11/site-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/maiuser/miniconda3/envs/chatbot/lib/python3.11/site-packages/requests/adapters.py", line 675, in send
+    raise SSLError(e, request=request)
+requests.exceptions.SSLError: HTTPSConnectionPool(host='www.modelscope.cn', port=443): Max retries exceeded with url: /models/RapidAI/R
+apidOCR/resolve/v3.5.0/torch/PP-OCRv4/det/ch_PP-OCRv4_det_infer.pth (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_
+VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1006)')))

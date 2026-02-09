@@ -39,3 +39,11 @@ pytest-asyncio
 httpx
 black
 flake8
+
+# Document Processing (Docling & OCR)
+docling>=2.0.0
+docling-core
+docling-parse
+tiktoken
+rapidocr-onnxruntime
+easyocr

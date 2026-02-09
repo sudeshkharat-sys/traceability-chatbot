@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import "./ChatPage.css";
 import Sidebar from "./Sidebar";
 import ChatArea from "./ChatArea";
+import PdfViewerModal from "./PdfViewerModal";
 import { conversationService } from "../services/api";
 
 function ChatPage() {
@@ -23,6 +24,12 @@ function ChatPage() {
   const [agentType, setAgentType] = useState(() => getAgentType(feature));
   const [thinkingSteps, setThinkingSteps] = useState([]);
   const [currentThinkingStep, setCurrentThinkingStep] = useState("");
+  
+  // PDF Viewer State
+  const [isPdfOpen, setIsPdfOpen] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [pdfScrollTo, setPdfScrollTo] = useState(null);
+
   const websocketRef = useRef(null);
 
   // Message ref to track without causing re-renders (like Agentic-AI-Framework)
@@ -126,6 +133,22 @@ function ChatPage() {
     setIsSidebarCollapsed(!isSidebarCollapsed);
   };
 
+  const handleOpenPdf = (url, scrollTo) => {
+      setPdfUrl(url);
+      setPdfScrollTo(scrollTo);
+      setIsPdfOpen(true);
+      // Auto-collapse left sidebar to give room
+      setIsSidebarCollapsed(true);
+  };
+
+  const handleClosePdf = () => {
+      setIsPdfOpen(false);
+      setPdfUrl(null);
+      setPdfScrollTo(null);
+      // Restore left sidebar
+      setIsSidebarCollapsed(false);
+  };
+
   const handleNewChat = async () => {
     try {
       // Close existing WebSocket if any
@@ -143,6 +166,8 @@ function ChatPage() {
       setIsLoading(false);
       isNearBottomRef.current = true;
       setIsUserScrolling(false);
+      // Close PDF if open
+      handleClosePdf();
 
       console.log("Ready for new conversation");
     } catch (error) {
@@ -155,6 +180,8 @@ function ChatPage() {
 
     try {
       setIsLoading(true);
+      // Close PDF if open
+      handleClosePdf();
 
       // Close existing WebSocket if any
       if (websocketRef.current) {
@@ -247,7 +274,7 @@ function ChatPage() {
               minute: "2-digit",
             }),
             cypher_query: response?.cypher_query,
-            similar_docs: response?.similar_docs,
+            similar_docs: response?.similar_docs || response?.citations,
             // Include chart_data if present in historical message
             ...(response?.chart_data && { chart_data: response.chart_data }),
           });
@@ -654,15 +681,32 @@ function ChatPage() {
           </svg>
         )}
       </button>
-      <ChatArea
-        messages={messages}
-        onSendMessage={handleSendMessage}
-        userName={userName}
-        isLoading={isLoading}
-        currentConversationId={currentConversationId}
-        thinkingSteps={thinkingSteps}
-        currentThinkingStep={currentThinkingStep}
-      />
+      
+      {/* Main Content Layout - Flex container for ChatArea and PdfViewer */}
+      <div className="main-content-layout" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+          <ChatArea
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            userName={userName}
+            isLoading={isLoading}
+            currentConversationId={currentConversationId}
+            thinkingSteps={thinkingSteps}
+            currentThinkingStep={currentThinkingStep}
+            onOpenPdf={handleOpenPdf}
+          />
+          
+          {/* Render PDF Viewer as a sidebar if open */}
+          {isPdfOpen && (
+              <div className="pdf-sidebar-wrapper" style={{ width: '45%', borderLeft: '1px solid #ddd' }}>
+                  <PdfViewerModal 
+                    pdfUrl={pdfUrl} 
+                    initialScrollTo={pdfScrollTo}
+                    onClose={handleClosePdf}
+                    isSidebar={true}
+                  />
+              </div>
+          )}
+      </div>
     </div>
   );
 }

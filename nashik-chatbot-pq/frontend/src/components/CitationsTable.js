@@ -1,36 +1,47 @@
-import React, { useState } from "react";
+import React from "react";
 import "./CitationsTable.css";
-import PdfViewerModal from "./PdfViewerModal";
 
 // Base URL for the Apache server hosting the PDFs
-// We add /documents/ because that is where we created the folder in Apache htdocs
-const BASE_PDF_URL = "http://localhost:8081/documents/"; 
+// In production, this can be set to "/documents/" via environment variables
+const BASE_PDF_URL = process.env.REACT_APP_PDF_BASE_URL || "http://localhost:8081/documents/"; 
 
-const CitationsTable = ({ citations }) => {
-  const [selectedPdf, setSelectedPdf] = useState(null);
-
+const CitationsTable = ({ citations, onOpenPdf }) => {
   if (!citations || citations.length === 0) return null;
 
-  const handleOpenPdf = (docName, pageNum) => {
+  const handleOpenPdf = (citation) => {
+      // Extract metadata regardless of format
+      const metadata = citation.metadata || {};
+      const docName = metadata.doc_name || citation.doc_name || "Unknown Document";
+      
       const originalFileName = docName + (docName.toLowerCase().endsWith('.pdf') ? '' : '.pdf');
       const pdfUrl = `${BASE_PDF_URL}${encodeURIComponent(originalFileName)}`;
       
+      // Extract Page Number
+      let pageNum = metadata.page_label || metadata.page_number || citation.page_number;
+      
+      // Extract BBox from Docling structure if available
+      let bbox = null;
+      
+      if (metadata.doc_items && metadata.doc_items.length > 0) {
+         const firstItem = metadata.doc_items[0];
+         if (firstItem.prov && firstItem.prov.length > 0) {
+             if (!pageNum) pageNum = firstItem.prov[0].page_no;
+             bbox = firstItem.prov[0].bbox;
+         }
+      }
+      
+      const targetPage = parseInt(pageNum) || 1;
+
       // Construct highlight/scroll data
-      // For now, we mainly rely on page number. 
-      // Highlighting logic can be extended here if bbox conversion is reliable.
       const scrollTo = {
-          pageNumber: parseInt(pageNum) || 1,
-          boundingRect: { x1: 0, y1: 0, x2: 0, y2: 0, width: 0, height: 0, pageNumber: parseInt(pageNum) || 1 }
+          pageNumber: targetPage,
+          // Pass the raw Docling bbox (l, b, r, t)
+          boundingRect: bbox ? { ...bbox, page_no: targetPage } : null
       };
 
-      setSelectedPdf({
-          url: pdfUrl,
-          scrollTo: scrollTo
-      });
-  };
-
-  const handleClosePdf = () => {
-      setSelectedPdf(null);
+      if (onOpenPdf) {
+          onOpenPdf(pdfUrl, scrollTo);
+      }
   };
 
   return (
@@ -54,17 +65,14 @@ const CitationsTable = ({ citations }) => {
               // Remove .pdf extension for cleaner display
               const displayName = docName.replace(/\.pdf$/i, "");
               
-              // Extract Page Number: Check flat fields first, then deep Docling structure
+              // Extract Page Number for display
               let pageNum = metadata.page_label || metadata.page_number || citation.page_number;
-              
               if (!pageNum && metadata.doc_items && metadata.doc_items.length > 0) {
-                 // Try to find page_no in the first item's provenance
                  const firstItem = metadata.doc_items[0];
                  if (firstItem.prov && firstItem.prov.length > 0) {
                      pageNum = firstItem.prov[0].page_no;
                  }
               }
-              
               pageNum = pageNum || "N/A";
 
               return (
@@ -75,7 +83,7 @@ const CitationsTable = ({ citations }) => {
                   <td className="page-cell">{pageNum}</td>
                   <td className="action-cell">
                     <button 
-                      onClick={() => handleOpenPdf(docName, pageNum)}
+                      onClick={() => handleOpenPdf(citation)}
                       className="open-pdf-btn"
                     >
                       Open PDF
@@ -87,14 +95,6 @@ const CitationsTable = ({ citations }) => {
           </tbody>
         </table>
       </div>
-
-      {selectedPdf && (
-          <PdfViewerModal 
-            pdfUrl={selectedPdf.url} 
-            initialScrollTo={selectedPdf.scrollTo}
-            onClose={handleClosePdf}
-          />
-      )}
     </div>
   );
 };
