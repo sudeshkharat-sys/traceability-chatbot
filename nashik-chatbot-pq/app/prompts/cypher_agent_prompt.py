@@ -273,9 +273,44 @@ ORDER BY claim_count DESC
 LIMIT 10
 ```
 
-### Batch Failure Rate (Produced vs Failed)
-Use this when user asks for "batch-wise failure rate", "produced vs failed", or "concentration".
-**IMPORTANT: Show ALL parts per batch, not just the queried complaint's part.** This gives a complete batch picture rather than single-part bias.
+### Issue-Specific Batch Grouping (DEFAULT)
+Use this when user asks about a SPECIFIC issue and wants batch grouping.
+**IMPORTANT: Maintain the issue filter when grouping by batch!** Only show failures related to the queried issue, NOT all failures in the batch.
+**This is the DEFAULT behavior when user asks about a specific complaint/issue grouped by batch.**
+```cypher
+// User asks: "show me head lamp failures grouped by batch"
+// CORRECT: Only count head lamp failures per batch
+MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
+WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
+MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc)
+MATCH (p)-[f:FITTED_ON]->(v)
+OPTIONAL MATCH (b:Batch)
+WHERE b.lot_no = f.scan_value AND f.scan_value <> 'unknown'
+
+RETURN b.batch_code AS batch_code,
+       b.batch_date AS batch_date,
+       b.shift AS shift,
+       p.part_no AS part_no,
+       p.name AS part_name,
+       COUNT(DISTINCT wc.claim_no) AS issue_failures
+ORDER BY issue_failures DESC
+LIMIT 20
+```
+
+**WRONG - Losing the issue filter (do NOT do this for specific issue queries):**
+```cypher
+// This finds batches related to the issue, then shows ALL failures
+// from those batches regardless of complaint type - CONFUSING!
+// User asks about "head lamp" but sees steering, sunroof failures too
+WITH DISTINCT b.batch_code AS b_code
+MATCH (p_all:Part)-[f_all:FITTED_ON]->(v_all:Vehicle)
+WHERE f_all.scan_value IN lot_list
+// ... counts ALL parts, ALL failures - NOT what user asked for!
+```
+
+### Batch Production Analysis (Produced vs Failed)
+Use this ONLY when user explicitly asks for "produced vs failed", "failure rate", or "batch production analysis".
+This shows ALL parts per batch with production volumes - use when user wants complete batch picture.
 ```cypher
 // 1. Identify batch codes that have failures for the specific complaint
 MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
@@ -308,13 +343,6 @@ RETURN b_code AS batch_code,
        qty_failed
 ORDER BY b_code, qty_failed DESC
 LIMIT 30
-```
-
-**WRONG - Single-part bias (do NOT do this):**
-```cypher
-// Filtering by specific part_no makes every row show the SAME part
-WITH DISTINCT b.batch_code AS b_code, p.part_no AS p_no
-// ... returns only the one part related to the complaint
 ```
 
 ### Vendor Analysis

@@ -202,17 +202,19 @@ User: "Can you show batch-wise failure counts?"
 Bot: [Shows WRONG counts - all batches have 316 failures due to cartesian product]
 ```
 
-✅ GOOD - End-to-end traceability in ONE response:
+✅ GOOD - End-to-end traceability in ONE response (issue filter maintained):
 ```
 User: "Give me detailed analysis for head lamp failure"
-Bot: [Executes complete end-to-end query]
+Bot: [Executes complete end-to-end query - ONLY head lamp failures]
 Bot: "Head lamp failure analysis:
 
-     Parts involved: 0315CBG00011N (238 failures)
+     Parts involved (for HEAD LAMP only):
+     - 0315CBG00011N (238 head lamp failures)
 
-     Batch concentration:
-     - Batch 280425 Shift 02: 45 failures
-     - Batch 230725 Shift 03: 12 failures
+     Batch concentration (for HEAD LAMP failures only):
+     - Batch 280425 Shift 02: 45 head lamp failures
+     - Batch 230725 Shift 03: 12 head lamp failures
+     (These counts are ONLY head lamp failures, not all failures in the batch)
 
      Vendor: ABC Lights Co (Cp: 1.45, Cpk: 1.21)
      ESQA concerns: 3 incoming rejections (15 units rejected)
@@ -224,8 +226,8 @@ Bot: "Head lamp failure analysis:
 1. You have data source priority and schema knowledge. Use them. Don't ask obvious questions.
 2. For specific issues, ALWAYS show complete traceability (Part→Batch→Vendor+Cpk→ESQA) in ONE response.
 3. Use `COUNT(DISTINCT wc.claim_no)` when counting batch-wise failures to avoid cartesian product!
-4. **Batch-wise analysis must include ALL parts per batch** - Do NOT focus on a single part. Show every part in the affected batches with their qty_produced and qty_failed counts.
-5. **Supplier/Incoming Quality table should include batch-wise summary** - When showing supplier capability (Cp/Cpk) and ESQA data, also include a batch-wise breakdown showing all parts and their failure counts per batch. The batch table should NOT be limited to only the queried complaint's part.
+4. **CRITICAL: Maintain the issue filter when grouping by batch!** When user asks about a specific issue (e.g., "head lamp failure"), the batch grouping must ONLY show failures for THAT issue. Do NOT show all failures from the batch regardless of complaint type. Only show "all parts per batch" when user explicitly asks for "produced vs failed" or "batch production analysis".
+5. **Issue-specific flow**: Specific issue → Parts failing for THAT issue → Group by batch (only that issue's failures per batch) → Vendor/ESQA for involved parts. The issue filter must be maintained through the entire drill-down.
 6. **"Top" queries must return at least 5 results** - Never return a single item for "top issue/failure" queries. Default to Top 5 minimum, Top 10 for detailed analysis.
 
 ## RESPONSE FORMAT
@@ -389,54 +391,67 @@ Based on the data...
 
 ## CRITICAL QUERY PATTERNS
 
-### For Batch-Wise Failure Counts (Produced vs Failed):
+### For Issue-Specific Batch Grouping (DEFAULT):
 
-**IMPORTANT: Show ALL parts per batch, not just the queried complaint's part.**
-When showing batch-wise data, include every part that was fitted in those batches along with their total production quantity and total field failures (for any complaint). This gives a complete batch picture rather than a single-part bias.
+**IMPORTANT: When user asks about a specific issue, MAINTAIN the issue filter when grouping by batch!**
+Only show parts and failures RELATED TO THE QUERIED ISSUE, grouped by batch. Do NOT show unrelated failures from the same batch.
 
-**CORRECT - Group by batch_code and show ALL parts in those batches:**
+**CORRECT - Issue-specific batch grouping (DEFAULT for specific issue queries):**
 ```cypher
-// 1. Identify batch codes that have failures for the specific complaint
+// User asks: "show me head lamp failures grouped by batch"
+// Only count head lamp failures per batch - maintain the issue filter!
+MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
+WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
+MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc)
+MATCH (p)-[f:FITTED_ON]->(v)
+OPTIONAL MATCH (b:Batch)
+WHERE b.lot_no = f.scan_value AND f.scan_value <> 'unknown'
+
+RETURN b.batch_code AS batch_code,
+       b.batch_date AS batch_date,
+       b.shift AS shift,
+       p.part_no AS part_no,
+       p.name AS part_name,
+       COUNT(DISTINCT wc.claim_no) AS issue_failures
+ORDER BY issue_failures DESC
+LIMIT 20
+```
+
+**WRONG - Losing the issue filter (do NOT do this for specific issue queries):**
+```cypher
+// This finds batches related to the issue, then shows ALL failures
+// from those batches regardless of complaint type - CONFUSING for users!
+// User asks about "head lamp" but sees steering, sunroof, etc. failures
+WITH DISTINCT b.batch_code AS b_code
+MATCH (p_all:Part)-[f_all:FITTED_ON]->(v_all:Vehicle)
+WHERE f_all.scan_value IN lot_list
+// ... counts ALL parts, ALL failures - NOT what user asked for!
+```
+
+### For Batch Production Analysis (Produced vs Failed) - ONLY when explicitly asked:
+
+Use this ONLY when user explicitly asks for "produced vs failed", "failure rate", or "batch production analysis".
+This shows ALL parts per batch with production volumes.
+```cypher
 MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
 WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
 MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc)
 MATCH (p)-[f:FITTED_ON]->(v)
 MATCH (b:Batch {lot_no: f.scan_value})
 WITH DISTINCT b.batch_code AS b_code
-
-// 2. Get all lot numbers for these batches
 MATCH (tb:Batch {batch_code: b_code})
 WITH b_code, collect(tb.lot_no) AS lots
-
-// 3. Find ALL parts fitted in these batches and count production + failures
 MATCH (p_all:Part)-[f_all:FITTED_ON]->(v_all:Vehicle)
 WHERE f_all.scan_value IN lots
 WITH b_code, lots, p_all.part_no AS part_no, p_all.name AS part_name,
      count(DISTINCT v_all) AS qty_produced
-
-// 4. Count failures (any complaint) for each part in these batches
 OPTIONAL MATCH (v_f:Vehicle)-[f_f:FITTED_ON]->(p_f:Part {part_no: part_no})
 WHERE f_f.scan_value IN lots
 MATCH (v_f)-[:HAS_CLAIM]->(wc_f:WarrantyClaim)-[:INVOLVES_PART]->(p_f)
 WITH b_code, part_no, part_name, qty_produced, count(DISTINCT wc_f) AS qty_failed
-
-RETURN b_code AS batch_code,
-       part_no,
-       part_name,
-       qty_produced,
-       qty_failed
+RETURN b_code AS batch_code, part_no, part_name, qty_produced, qty_failed
 ORDER BY b_code, qty_failed DESC
 LIMIT 30
-```
-
-**WRONG - Single-part bias (do NOT do this):**
-```cypher
-// This only shows the ONE part related to the complaint, ignoring all other parts in the batch
-MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
-WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
-...
-RETURN b_code, p.part_no, qty_produced, qty_failed
-// Result: Every row shows the same part number!
 ```
 
 ### For End-to-End Traceability (Include ALL data sources):
