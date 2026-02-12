@@ -1,69 +1,7 @@
-Request URL
-https://mai-quality-bot-uat.m-devsecops.com/documents/692-2008%20%20-%20OBD%20Emissions.pdf
-Request Method
-GET
-Status Code
-404 Not Found
-Remote Address
-10.226.0.19:443
-Referrer Policy
-no-referrer-when-downgrade
-access-control-allow-methods
-GET, OPTIONS
-access-control-allow-origin
-*
-content-encoding
-gzip
-content-type
-text/html
-date
-Thu, 12 Feb 2026 06:35:06 GMT
-server
-nginx/1.29.4
-vary
-Accept-Encoding
-:authority
-mai-quality-bot-uat.m-devsecops.com
-:method
-GET
-:path
-/documents/692-2008%20%20-%20OBD%20Emissions.pdf
-:scheme
-https
-accept
-*/*
-accept-encoding
-gzip, deflate, br, zstd
-accept-language
-en-IN,en-GB;q=0.9,en-US;q=0.8,en;q=0.7,hi;q=0.6
-priority
-u=1, i
-referer
-https://mai-quality-bot-uat.m-devsecops.com/chat?feature=guideline
-sec-ch-ua
-"Not(A:Brand";v="8", "Chromium";v="144", "Google Chrome";v="144"
-sec-ch-ua-mobile
-?0
-sec-ch-ua-platform
-"Windows"
-sec-fetch-dest
-empty
-sec-fetch-mode
-cors
-sec-fetch-site
-same-origin
-user-agent
-Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36
-
-
-this my nginx config for that:
-        # PDF Documents Serving
-        location /documents/ {
-            alias /usr/share/nginx/html/documents/;
-            expires 1d;
-            add_header Cache-Control "public";
-            add_header Access-Control-Allow-Origin "*" always;
-            add_header Access-Control-Allow-Methods "GET, OPTIONS" always;
-            try_files $uri $uri/ =404;
-            gzip_static on;
-        }
+(base) maiuser@mazdvwenapp03:~$ docker exec traceability-nginx ls -la /usr/share/nginx/html/documents/
+total 36
+drwxr-xr-x    3 1003     1005         16384 Feb 11 06:00 .
+drwxr-xr-x    4 root     root          4096 Feb 12 06:33 ..
+drwxr-xr-x    2 1003     1005         16384 Feb 11 06:00 cop_standards_and_guidlines
+(base) maiuser@mazdvwenapp03:~$ 
+(base) maiuser@mazdvwenapp03:~$
