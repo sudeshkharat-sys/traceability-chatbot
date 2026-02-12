@@ -2,7 +2,8 @@ import React from "react";
 import "./CitationsTable.css";
 
 // Base URL for PDFs - use relative path so nginx proxies the request correctly
-const BASE_PDF_URL = "/documents/"; 
+// PDFs are stored under documents/cop_standards_and_guidlines/ on the server
+const BASE_PDF_URL = "/documents/cop_standards_and_guidlines/"; 
 
 const CitationsTable = ({ citations, onOpenPdf }) => {
   if (!citations || citations.length === 0) return null;
