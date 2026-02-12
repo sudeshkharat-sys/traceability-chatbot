@@ -1,9 +1,8 @@
 import React from "react";
 import "./CitationsTable.css";
 
-// Base URL for the Apache server hosting the PDFs
-// We add /documents/ because that is where we created the folder in Apache htdocs
-const BASE_PDF_URL = "http://localhost:8081/documents/"; 
+// Base URL for PDFs - use relative path so nginx proxies the request correctly
+const BASE_PDF_URL = "/documents/"; 
 
 const CitationsTable = ({ citations, onOpenPdf }) => {
   if (!citations || citations.length === 0) return null;
