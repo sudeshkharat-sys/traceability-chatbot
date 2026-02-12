@@ -4,6 +4,7 @@ Orchestrator that initialises all connections, fetches incomplete documents
 from the state database, and drives them through the EmbeddingProcessor pipeline.
 """
 
+import gc
 import logging
 import sys
 from pathlib import Path
@@ -95,9 +96,10 @@ class DocumentEmbeddingProcessor:
         if not docs:
             logger.info("No incomplete documents – nothing to do")
             return overall_stats
-        for doc in docs:
+        total_docs = len(docs)
+        for idx, doc in enumerate(docs, 1):
             logger.info(f"\n{'=' * 60}")
-            logger.info(f"Processing document {doc['id']}: {doc['doc_name']}")
+            logger.info(f"[{idx}/{total_docs}] Processing document {doc['id']}: {doc['doc_name']}")
             logger.info(f"{'=' * 60}")
 
             # delegate per-document work to EmbeddingProcessor
@@ -119,6 +121,10 @@ class DocumentEmbeddingProcessor:
                     f"Document {doc['id']} had errors – status stays 'incomplete'"
                 )
                 overall_stats["documents_failed"] += 1
+
+            # Force garbage collection between documents to prevent OOM
+            gc.collect()
+            logger.debug(f"GC completed after document {idx}/{total_docs}")
 
         # ---- summary ----
         logger.info(f"\n{'=' * 60}")

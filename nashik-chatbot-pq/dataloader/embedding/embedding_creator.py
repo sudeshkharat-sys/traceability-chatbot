@@ -4,12 +4,13 @@ Takes documents from scraped_docs, processes through pipeline, and upserts to Op
 Uses LangChain's OpenSearchVectorSearch for vector operations
 """
 
+import gc
 import time
 import json
 import hashlib
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime
 
 import sys
@@ -135,9 +136,54 @@ class EmbeddingProcessor:
             return updated_id if updated_id else chunk_id
 
 
+    # Maximum chunks to send to OpenSearch in a single batch
+    CHUNK_BATCH_SIZE = 50
+
+    def _flush_batch(
+        self,
+        doc: Dict[str, Any],
+        chunk_texts: List[str],
+        chunk_metadatas: List[Dict],
+        chunk_ids: List[str],
+        chunk_data: List[Dict],
+        stats: Dict[str, Any],
+    ) -> None:
+        """Send one batch of chunks to OpenSearch and upsert metadata to DB."""
+        if not chunk_texts:
+            return
+
+        logger.info(f"Flushing batch of {len(chunk_texts)} chunks to OpenSearch")
+        try:
+            self.opensearch.add_texts(
+                texts=chunk_texts,
+                metadatas=chunk_metadatas,
+                ids=chunk_ids,
+            )
+            stats["chunks_processed"] += len(chunk_texts)
+
+            for chunk_info in chunk_data:
+                try:
+                    self.upsert_chunk_to_db(
+                        doc["id"],
+                        doc["index_name"],
+                        chunk_info["hash"],
+                        chunk_info["text"],
+                        chunk_info["metadata"],
+                        chunk_info["opensearch_id"],
+                    )
+                except Exception as e:
+                    logger.error(f"Error updating DB for chunk {chunk_info['index']}: {e}")
+                    stats["errors"] += 1
+
+        except Exception as e:
+            logger.error(f"Error during LangChain batch processing: {e}")
+            stats["errors"] += len(chunk_texts)
+
     def process_document(self, doc: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Process a single document: convert, chunk, embed, and upsert
+        Process a single document: convert, chunk, embed, and upsert.
+        Chunks are sent in batches of CHUNK_BATCH_SIZE to limit memory usage.
+        Memory is explicitly freed after processing.
 
         Args:
             doc: Document info from scraped_docs table
@@ -155,6 +201,9 @@ class EmbeddingProcessor:
             "errors": 0,
             "success": False,
         }
+
+        conv_res = None
+        chunks = None
 
         try:
             doc_path = Path(doc["doc_path"])
@@ -175,11 +224,16 @@ class EmbeddingProcessor:
             chunks = list(chunk_iter)
             logger.info(f"Document chunked into {len(chunks)} chunks")
 
-            # Process each chunk
-            chunk_texts = []
-            chunk_metadatas = []
-            chunk_ids = []
-            chunk_data = []
+            # Free the heavy conversion result now that chunking is done
+            del conv_res
+            conv_res = None
+            gc.collect()
+
+            # Process chunks in batches to limit memory
+            batch_texts: List[str] = []
+            batch_metadatas: List[Dict] = []
+            batch_ids: List[str] = []
+            batch_data: List[Dict] = []
 
             for i, chunk in enumerate(chunks):
                 chunk_text = self.chunker.contextualize(chunk=chunk)
@@ -215,10 +269,10 @@ class EmbeddingProcessor:
                     "doc_id": doc["id"],
                     "chunk_hash": chunk_hash,
                 }
-                chunk_texts.append(chunk_text)
-                chunk_metadatas.append(enriched_metadata)
-                chunk_ids.append(opensearch_id)
-                chunk_data.append({
+                batch_texts.append(chunk_text)
+                batch_metadatas.append(enriched_metadata)
+                batch_ids.append(opensearch_id)
+                batch_data.append({
                     "index": i,
                     "text": chunk_text,
                     "metadata": chunk_metadata,
@@ -226,36 +280,16 @@ class EmbeddingProcessor:
                     "opensearch_id": opensearch_id,
                 })
 
-            # LangChain handles embedding generation and bulk indexing
-            if chunk_texts:
-                logger.info(f"Processing {len(chunk_texts)} chunks using LangChain")
+                # Flush batch when it reaches the limit
+                if len(batch_texts) >= self.CHUNK_BATCH_SIZE:
+                    self._flush_batch(doc, batch_texts, batch_metadatas, batch_ids, batch_data, stats)
+                    batch_texts.clear()
+                    batch_metadatas.clear()
+                    batch_ids.clear()
+                    batch_data.clear()
 
-                try:
-                    self.opensearch.add_texts(
-                        texts=chunk_texts,
-                        metadatas=chunk_metadatas,
-                        ids=chunk_ids,
-                    )
-                    stats["chunks_processed"] += len(chunk_texts)
-
-                    # Upsert each chunk to the state database
-                    for chunk_info in chunk_data:
-                        try:
-                            self.upsert_chunk_to_db(
-                                doc["id"],
-                                doc["index_name"],
-                                chunk_info["hash"],
-                                chunk_info["text"],
-                                chunk_info["metadata"],
-                                chunk_info["opensearch_id"],
-                            )
-                        except Exception as e:
-                            logger.error(f"Error updating DB for chunk {chunk_info['index']}: {e}")
-                            stats["errors"] += 1
-
-                except Exception as e:
-                    logger.error(f"Error during LangChain processing: {e}")
-                    stats["errors"] += len(chunk_texts)
+            # Flush remaining chunks
+            self._flush_batch(doc, batch_texts, batch_metadatas, batch_ids, batch_data, stats)
 
             # Mark as successful if no errors or only skipped chunks
             stats["success"] = stats["errors"] == 0
@@ -274,6 +308,11 @@ class EmbeddingProcessor:
             traceback.print_exc()
             stats["errors"] += 1
             return stats
+        finally:
+            # Explicitly free heavy objects and force garbage collection
+            del conv_res, chunks
+            gc.collect()
+            logger.debug(f"Memory released after processing {doc['doc_name']}")
 
     def update_document_status(self, doc_id: int, status: str):
         """
