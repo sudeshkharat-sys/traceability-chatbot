@@ -11,6 +11,8 @@ import mahindraRiseLogo from "../assests/mahindra_rise_logo.png";
 function LandingPage() {
   const navigate = useNavigate();
 
+  const enabledFeatures = ["traceability", "guideline"];
+
   const features = [
     {
       id: "traceability",
@@ -20,18 +22,18 @@ function LandingPage() {
       route: "/chat?feature=traceability",
     },
     {
-      id: "quality-assistant",
-      title: "Qlense Quality assistant",
-      icon: qualityIcon,
-      description: "AI-powered quality analysis and insights",
-      route: "/chat?feature=quality-assistant",
-    },
-    {
       id: "guideline",
       title: "Qlense guideline and standard",
       icon: guidelineIcon,
       description: "Access quality guidelines and industry standards",
       route: "/chat?feature=guideline",
+    },
+    {
+      id: "quality-assistant",
+      title: "Qlense Quality assistant",
+      icon: qualityIcon,
+      description: "AI-powered quality analysis and insights",
+      route: "/chat?feature=quality-assistant",
     },
     {
       id: "diagnostic",
@@ -77,46 +79,47 @@ function LandingPage() {
 
         {/* Right Section - Features List */}
         <div className="features-container">
-          {features.map((feature) => (
-            <div
-              key={feature.id}
-              className="feature-card"
-              onClick={() => feature.id === "traceability" && handleGetStarted(feature.route)}
-              style={
-                feature.id !== "traceability"
-                  ? { cursor: "not-allowed", opacity: 0.6 }
-                  : { cursor: "pointer" }
-              }
-            >
-              <div className="feature-content">
-                <img
-                  src={feature.icon}
-                  alt={feature.title}
-                  className="feature-icon"
-                />
-                <div className="feature-info">
-                  <h3 className="feature-title">{feature.title}</h3>
-                  <p className="feature-description">{feature.description}</p>
-                </div>
-              </div>
-              <button
-                className="get-started-btn"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (feature.id === "traceability") {
-                    handleGetStarted(feature.route);
-                  }
-                }}
-                disabled={feature.id !== "traceability"}
+          {features.map((feature) => {
+            const isEnabled = enabledFeatures.includes(feature.id);
+            return (
+              <div
+                key={feature.id}
+                className="feature-card"
+                onClick={() => isEnabled && handleGetStarted(feature.route)}
                 style={
-                  feature.id !== "traceability" ? { cursor: "not-allowed" } : {}
+                  !isEnabled
+                    ? { cursor: "not-allowed", opacity: 0.6 }
+                    : { cursor: "pointer" }
                 }
               >
-                Get started
-                <span className="arrow-icon">→</span>
-              </button>
-            </div>
-          ))}
+                <div className="feature-content">
+                  <img
+                    src={feature.icon}
+                    alt={feature.title}
+                    className="feature-icon"
+                  />
+                  <div className="feature-info">
+                    <h3 className="feature-title">{feature.title}</h3>
+                    <p className="feature-description">{feature.description}</p>
+                  </div>
+                </div>
+                <button
+                  className="get-started-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isEnabled) {
+                      handleGetStarted(feature.route);
+                    }
+                  }}
+                  disabled={!isEnabled}
+                  style={!isEnabled ? { cursor: "not-allowed" } : {}}
+                >
+                  Get started
+                  <span className="arrow-icon">→</span>
+                </button>
+              </div>
+            );
+          })}
         </div>
       </div>
     </div>
