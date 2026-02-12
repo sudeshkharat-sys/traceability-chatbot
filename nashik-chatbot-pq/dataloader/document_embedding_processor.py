@@ -95,9 +95,7 @@ class DocumentEmbeddingProcessor:
         if not docs:
             logger.info("No incomplete documents – nothing to do")
             return overall_stats
-        test=[doc[1]]
-        print(test)
-        for doc in test:
+        for doc in docs:
             logger.info(f"\n{'=' * 60}")
             logger.info(f"Processing document {doc['id']}: {doc['doc_name']}")
             logger.info(f"{'=' * 60}")
