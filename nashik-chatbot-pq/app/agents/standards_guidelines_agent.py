@@ -231,18 +231,29 @@ class StandardsGuidelinesAgent:
                                                 "content": f"**Task Plan:**\n\n{todo_text}",
                                             }
 
-                            # --- ToolMessage (result after execution) ---------
-                            msg_type = type(last_msg).__name__
-                            if msg_type == "ToolMessage" or (
-                                hasattr(last_msg, "name") and hasattr(last_msg, "content")
-                            ):
-                                tool_name = getattr(last_msg, "name", "")
-                                tool_content = getattr(last_msg, "content", "")
+                            # --- ToolMessage results (after execution) ---------
+                            # Iterate ALL messages, not just last_msg, because
+                            # multiple tools may execute in one step (e.g.,
+                            # search_standards + think) and we must capture
+                            # citations from search_standards even if it's not last.
+                            for msg in messages:
+                                msg_type = type(msg).__name__
+                                if not (
+                                    msg_type == "ToolMessage"
+                                    or (
+                                        hasattr(msg, "tool_call_id")
+                                        and hasattr(msg, "content")
+                                    )
+                                ):
+                                    continue
+
+                                tool_name = getattr(msg, "name", "")
+                                tool_content = getattr(msg, "content", "")
                                 logger.info(
                                     f"🔧 Tool result: name='{tool_name}', "
                                     f"content type={type(tool_content).__name__}"
                                 )
-                                
+
                                 # Capture citations from search_standards
                                 if tool_name == "search_standards":
                                     import json
@@ -255,7 +266,7 @@ class StandardsGuidelinesAgent:
                                                 doc_name = meta.get("doc_name")
                                                 # Use page_label if available, else page_number, else "N/A"
                                                 page_num = meta.get("page_label") or meta.get("page_number")
-                                                
+
                                                 if doc_name:
                                                     # Removed deduplication to show all chunks
                                                     citations.append(res)
