@@ -1,55 +1,36 @@
-2026-02-12 08:06:51.004461782 [W:onnxruntime:Default, device_discovery.cc:131 GetPciBusId] Skipping pci_bus_id for PCI path at "/sys/de
-vices/LNXSYSTM:00/LNXSYBUS:00/ACPI0004:00/VMBUS:00/5620e0c7-8062-4dce-aeb7-520c7ef76171" because filename ""5620e0c7-8062-4dce-aeb7-520
-c7ef76171"" dit not match expected pattern of [0-9a-f]+:[0-9a-f]+:[0-9a-f]+[.][0-9a-f]+
-2026-02-12 08:06:51,297 [INFO] docling.utils.accelerator_utils: Accelerator device: 'cpu'
-[INFO] 2026-02-12 08:06:51,317 [RapidOCR] base.py:22: Using engine_name: onnxruntime
-[INFO] 2026-02-12 08:06:51,320 [RapidOCR] main.py:53: Using /app/docling_models/RapidOcr/onnx/PP-OCRv4/det/ch_PP-OCRv4_det_infer.onnx
-[INFO] 2026-02-12 08:06:51,406 [RapidOCR] base.py:22: Using engine_name: onnxruntime
-[INFO] 2026-02-12 08:06:51,406 [RapidOCR] main.py:53: Using /app/docling_models/RapidOcr/onnx/PP-OCRv4/cls/ch_ppocr_mobile_v2.0_cls_inf
-er.onnx
-[INFO] 2026-02-12 08:06:51,452 [RapidOCR] base.py:22: Using engine_name: onnxruntime
-[INFO] 2026-02-12 08:06:51,452 [RapidOCR] main.py:53: Using /app/docling_models/RapidOcr/onnx/PP-OCRv4/rec/ch_PP-OCRv4_rec_infer.onnx
-2026-02-12 08:06:51,562 [INFO] docling.models.stages.ocr.auto_ocr_model: Auto OCR model selected rapidocr with onnxruntime.
-2026-02-12 08:06:51,569 [INFO] docling.models.factories.base_factory: Loading plugin 'docling_defaults'
-2026-02-12 08:06:51,573 [INFO] docling.models.factories: Registered layout engines: ['layout_object_detection', 'docling_layout_default
-', 'docling_experimental_table_crops_layout']
-2026-02-12 08:06:51,579 [INFO] docling.utils.accelerator_utils: Accelerator device: 'cpu'
-2026-02-12 08:06:51,810 [INFO] docling.models.factories.base_factory: Loading plugin 'docling_defaults'
-2026-02-12 08:06:51,811 [INFO] docling.models.factories: Registered table structure engines: ['docling_tableformer']
-2026-02-12 08:06:51,828 [INFO] docling.utils.accelerator_utils: Accelerator device: 'cpu'
-2026-02-12 08:06:52,243 [INFO] docling.pipeline.base_pipeline: Processing document Reg 14.07 - Seat Belt Anchorages.pdf
-2026-02-12 08:07:17,274 [WARNING] docling.models.stages.ocr.rapid_ocr_model: RapidOCR returned empty result!
-Truncation was not explicitly activated but `max_length` is provided a specific value, please use `truncation=True` to explicitly trunc
-ate examples to max length. Defaulting to 'longest_first' truncation strategy. If you encode pairs of sequences (GLUE-style) with the t
-okenizer you can select this strategy more precisely by providing a specific strategy to `truncation`.
-`generation_config` default values have been modified to match model-specific defaults: {'pad_token_id': 2, 'bos_token_id': 0, 'eos_tok
-en_id': 49279}. If this is not desired, please set these values explicitly.
+(chatbot) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ sudo docker system df
+
+
+
+
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          43        6         89.01GB   86.81GB (97%)
+Containers      7         5         461.7MB   229.9MB (49%)
+Local Volumes   10        8         5.727GB   220.4kB (0%)
+Build Cache     341       0         16.66GB   16.66GB
 (chatbot) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ ^C
-(chatbot) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ 
+(chatbot) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$
 
 
-
-(chatbot) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ df -h 
-Filesystem      Size  Used Avail Use% Mounted on
-/dev/root       146G  139G  6.3G  96% /
-tmpfs            16G     0   16G   0% /dev/shm
-tmpfs           6.3G  1.6M  6.3G   1% /run
-tmpfs           5.0M     0  5.0M   0% /run/lock
-efivarfs        128M   26K  128M   1% /sys/firmware/efi/efivars
-/dev/sda15      105M  6.2M   99M   6% /boot/efi
-tmpfs           3.2G   24K  3.2G   1% /run/user/1003
-(chatbot) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ 
-
-CONTAINER ID   IMAGE                                 COMMAND                  CREATED          STATUS                      PORTS       
-                                                                                                   NAMES
-7bbd8e6237ee   nginx:alpine                          "/docker-entrypoint.…"   16 minutes ago   Up 15 minutes (unhealthy)   0.0.0.0:80->
-80/tcp, [::]:80->80/tcp, 0.0.0.0:443->443/tcp, [::]:443->443/tcp                                   traceability-nginx
-cd3a165da420   nashik-chatbot-pq-app                 "python main.py"         16 minutes ago   Up 15 minutes (healthy)     0.0.0.0:5000
-->5000/tcp, [::]:5000->5000/tcp                                                                    traceability-app
-8ec4737d9696   postgres:17-alpine                    "docker-entrypoint.s…"   16 minutes ago   Up 16 minutes (healthy)     0.0.0.0:5432
-->5432/tcp, [::]:5432->5432/tcp                                                                    traceability-postgres
-dda83f5022ed   neo4j:2025.12.1                       "tini -g -- /startup…"   16 minutes ago   Up 16 minutes (healthy)     0.0.0.0:7474
-->7474/tcp, [::]:7474->7474/tcp, 7473/tcp, 0.0.0.0:7687->7687/tcp, [::]:7687->7687/tcp             traceability-neo4j
-bdbe8a21dfdd   opensearchproject/opensearch:2.11.0   "./opensearch-docker…"   16 minutes ago   Up 16 minutes               0.0.0.0:9200
-->9200/tcp, [::]:9200->9200/tcp, 9300/tcp, 0.0.0.0:9600->9600/tcp, [::]:9600->9600/tcp, 9650/tcp   traceability-opensearch
+(chatbot) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ docker logs traceability-nginx --tail 20
+::1 - - [12/Feb/2026:08:52:15 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
+::1 - - [12/Feb/2026:08:52:46 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
+::1 - - [12/Feb/2026:08:53:16 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
+::1 - - [12/Feb/2026:08:53:46 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
+::1 - - [12/Feb/2026:08:54:16 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
+::1 - - [12/Feb/2026:08:54:46 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
+::1 - - [12/Feb/2026:08:55:16 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
+::1 - - [12/Feb/2026:08:55:46 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
+::1 - - [12/Feb/2026:08:56:16 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
+::1 - - [12/Feb/2026:08:56:46 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
+::1 - - [12/Feb/2026:08:57:16 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
+::1 - - [12/Feb/2026:08:57:46 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
+::1 - - [12/Feb/2026:08:58:17 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
+::1 - - [12/Feb/2026:08:58:47 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
+::1 - - [12/Feb/2026:08:59:17 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
+::1 - - [12/Feb/2026:08:59:47 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
+::1 - - [12/Feb/2026:09:00:17 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
+::1 - - [12/Feb/2026:09:00:47 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
+::1 - - [12/Feb/2026:09:01:17 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
+::1 - - [12/Feb/2026:09:01:47 +0000] "GET /health HTTP/1.1" 301 169 "-" "Wget"
 (chatbot) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ 
