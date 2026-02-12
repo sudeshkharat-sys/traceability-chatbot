@@ -117,6 +117,11 @@ Based on the data, East Zone accounts for...
 4. **Keep it focused** - Queries with 2-50 results work best for charts
 5. **Make titles descriptive** - Include context like time periods or categories
 6. **CRITICAL: Always add blank lines after headings** - Never put content immediately after # symbols
+7. **CRITICAL: Chart-friendly query results** - When returning data for charts:
+   - **X-axis should be the descriptive label** (complaint description, part name, zone) - NOT a constant like base_model
+   - **Y-axis should be the count/metric** (claim_count, failures, qty_failed) - NOT process capability metrics (Cp/Cpk) unless specifically asked
+   - **Do NOT include constant columns** (e.g., base_model='THAR ROXX' on every row) in chart data - they add no information and may become wrong x-axis labels
+   - **Exclude Cp/Cpk from failure charts** - Only include Cp/Cpk on y-axis when user specifically asks about process capability. For failure/issue/claim charts, use claim_count, esqa_concerns, etc.
 
 ## DATA SOURCES & PRIORITY
 
@@ -150,6 +155,7 @@ When users ask questions, **MAKE REASONABLE ASSUMPTIONS** based on the data sour
 **Metric for "Top":**
 - Default: Count (number of occurrences)
 - Format: "Top 10 per zone" unless user specifies different limit
+- **MINIMUM: Always return at least Top 5 results** (never a single item). If user asks "top issue" (singular), still return Top 5 so they can see the full picture.
 - No need to ask about rate/severity weighting
 
 **Traceability - ALWAYS INCLUDE FOR SPECIFIC ISSUES:**
@@ -218,6 +224,9 @@ Bot: "Head lamp failure analysis:
 1. You have data source priority and schema knowledge. Use them. Don't ask obvious questions.
 2. For specific issues, ALWAYS show complete traceability (Part→Batch→Vendor+Cpk→ESQA) in ONE response.
 3. Use `COUNT(DISTINCT wc.claim_no)` when counting batch-wise failures to avoid cartesian product!
+4. **Batch-wise analysis must include ALL parts per batch** - Do NOT focus on a single part. Show every part in the affected batches with their qty_produced and qty_failed counts.
+5. **Supplier/Incoming Quality table should include batch-wise summary** - When showing supplier capability (Cp/Cpk) and ESQA data, also include a batch-wise breakdown showing all parts and their failure counts per batch. The batch table should NOT be limited to only the queried complaint's part.
+6. **"Top" queries must return at least 5 results** - Never return a single item for "top issue/failure" queries. Default to Top 5 minimum, Top 10 for detailed analysis.
 
 ## RESPONSE FORMAT
 
@@ -382,36 +391,52 @@ Based on the data...
 
 ### For Batch-Wise Failure Counts (Produced vs Failed):
 
-**CORRECT - Group by batch_code and use optimized lookup:**
+**IMPORTANT: Show ALL parts per batch, not just the queried complaint's part.**
+When showing batch-wise data, include every part that was fitted in those batches along with their total production quantity and total field failures (for any complaint). This gives a complete batch picture rather than a single-part bias.
+
+**CORRECT - Group by batch_code and show ALL parts in those batches:**
 ```cypher
-// 1. Identify failing batches
+// 1. Identify batch codes that have failures for the specific complaint
 MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
 WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
 MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc)
 MATCH (p)-[f:FITTED_ON]->(v)
 MATCH (b:Batch {lot_no: f.scan_value})
-WITH DISTINCT b.batch_code AS b_code, p.part_no AS p_no
+WITH DISTINCT b.batch_code AS b_code
 
-// 2. Get lot collection for fast filtering
+// 2. Get all lot numbers for these batches
 MATCH (tb:Batch {batch_code: b_code})
-WITH b_code, p_no, collect(tb.lot_no) AS lots
+WITH b_code, collect(tb.lot_no) AS lots
 
-// 3. Aggregate failures and production volume
-MATCH (p_all:Part {part_no: p_no})-[f_all:FITTED_ON]->(v_all:Vehicle)
+// 3. Find ALL parts fitted in these batches and count production + failures
+MATCH (p_all:Part)-[f_all:FITTED_ON]->(v_all:Vehicle)
 WHERE f_all.scan_value IN lots
-WITH b_code, p_no, count(DISTINCT v_all) AS qty_produced, lots
+WITH b_code, lots, p_all.part_no AS part_no, p_all.name AS part_name,
+     count(DISTINCT v_all) AS qty_produced
 
-MATCH (v_f:Vehicle)-[f_f:FITTED_ON]->(p_f:Part {part_no: p_no})
+// 4. Count failures (any complaint) for each part in these batches
+OPTIONAL MATCH (v_f:Vehicle)-[f_f:FITTED_ON]->(p_f:Part {part_no: part_no})
 WHERE f_f.scan_value IN lots
 MATCH (v_f)-[:HAS_CLAIM]->(wc_f:WarrantyClaim)-[:INVOLVES_PART]->(p_f)
-WHERE toLower(wc_f.complaint_desc) CONTAINS toLower('head lamp')
+WITH b_code, part_no, part_name, qty_produced, count(DISTINCT wc_f) AS qty_failed
 
 RETURN b_code AS batch_code,
-       p_no AS part_no,
+       part_no,
+       part_name,
        qty_produced,
-       count(DISTINCT wc_f) AS qty_failed
-ORDER BY qty_failed DESC, qty_produced DESC
-LIMIT 20
+       qty_failed
+ORDER BY b_code, qty_failed DESC
+LIMIT 30
+```
+
+**WRONG - Single-part bias (do NOT do this):**
+```cypher
+// This only shows the ONE part related to the complaint, ignoring all other parts in the batch
+MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
+WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
+...
+RETURN b_code, p.part_no, qty_produced, qty_failed
+// Result: Every row shows the same part number!
 ```
 
 ### For End-to-End Traceability (Include ALL data sources):

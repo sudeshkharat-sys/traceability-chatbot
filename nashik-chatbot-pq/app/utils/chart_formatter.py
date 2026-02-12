@@ -438,7 +438,12 @@ def format_neo4j_results_for_chart(
 
     # Find likely keys for axes
     time_keys = ["date", "time", "month", "year", "quarter", "week", "day"]
-    category_keys = ["category", "type", "name", "status", "label", "zone", "part"]
+    category_keys = [
+        "category", "type", "name", "status", "label", "zone", "part",
+        "complaint", "issue", "failure", "defect", "problem",
+        "model", "description", "desc", "vendor", "supplier",
+        "dealer", "commodity", "plant", "batch", "region",
+    ]
 
     x_key = None
     y_keys = []
@@ -464,10 +469,46 @@ def format_neo4j_results_for_chart(
             if not value_key:
                 value_key = key
 
-    # Default to first key if no x_key found
+    # Default to first non-numeric key if no x_key found
     if not x_key and keys:
-        x_key = keys[0]
-        name_key = keys[0]
+        for key in keys:
+            if not isinstance(first_record.get(key), (int, float, bool)):
+                x_key = key
+                name_key = key
+                break
+        if not x_key:
+            x_key = keys[0]
+            name_key = keys[0]
+
+    # If x_key has all identical values (e.g., base_model='THAR ROXX' for every row),
+    # find a better key with more unique values to use as x-axis
+    if x_key and len(results) > 1:
+        unique_x_values = set(str(r.get(x_key, '')) for r in results)
+        if len(unique_x_values) <= 1:
+            # Current x_key is constant - find a string key with more variety
+            for key in keys:
+                if key == x_key or key in y_keys:
+                    continue
+                if not isinstance(first_record.get(key), (int, float, bool)):
+                    alt_unique = set(str(r.get(key, '')) for r in results)
+                    if len(alt_unique) > 1:
+                        x_key = key
+                        name_key = key
+                        break
+
+    # Context-aware y-key filtering: when question is about failures/claims,
+    # exclude process capability metrics (cp, cpk) from chart y-axis
+    question_lower = user_question.lower()
+    capability_fields = [k for k in y_keys if k.lower() in ('cp', 'cpk')]
+    count_fields = [k for k in y_keys if any(
+        w in k.lower() for w in ['count', 'failure', 'failed', 'claim',
+                                   'incident', 'rejection', 'concern', 'qty',
+                                   'produced', 'sample']
+    )]
+    if count_fields and capability_fields:
+        # Only keep cp/cpk if user explicitly asks about capability
+        if not any(w in question_lower for w in ['cp', 'cpk', 'capability', 'process capability']):
+            y_keys = [k for k in y_keys if k not in capability_fields]
 
     # Try to extract title from user's question/response first
     # The user_question might contain agent's response with chart title

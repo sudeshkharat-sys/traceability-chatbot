@@ -251,47 +251,70 @@ ORDER BY zone ASC, failures DESC
 ## OTHER PATTERNS
 
 ### Overall Top Failures
+**IMPORTANT:** Always return at least Top 5 results. Never return a single item.
+**IMPORTANT:** Do NOT include constant columns like base_model when all rows have the same value - they add no information and cause chart x-axis label issues.
 ```cypher
 MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
 WHERE wc.complaint_desc <> 'unknown'
-WITH p.name AS part_name, p.part_no AS part_no, wc.complaint_desc AS complaint, COUNT(*) AS failures
-RETURN part_name, part_no, complaint, failures
-ORDER BY failures DESC
-LIMIT 20
+WITH wc.complaint_desc AS complaint, COUNT(*) AS claim_count
+RETURN complaint, claim_count
+ORDER BY claim_count DESC
+LIMIT 10
+```
+
+### Top Failures for a specific model (e.g., Thar Roxx)
+**Do NOT include base_model as a column** - it will be the same value for every row and causes x-axis issues in charts.
+```cypher
+MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc:WarrantyClaim)
+WHERE toLower(v.base_model) CONTAINS 'thar roxx'
+  AND wc.complaint_desc <> 'unknown'
+RETURN wc.complaint_desc AS complaint, COUNT(*) AS claim_count
+ORDER BY claim_count DESC
+LIMIT 10
 ```
 
 ### Batch Failure Rate (Produced vs Failed)
-Use this when user asks for "batch-wise failure rate", "produced vs failed", or "concentration":
+Use this when user asks for "batch-wise failure rate", "produced vs failed", or "concentration".
+**IMPORTANT: Show ALL parts per batch, not just the queried complaint's part.** This gives a complete batch picture rather than single-part bias.
 ```cypher
-// 1. Identify specific batch codes that have failures
+// 1. Identify batch codes that have failures for the specific complaint
 MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
 WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
 MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc)
 MATCH (p)-[f:FITTED_ON]->(v)
 MATCH (b:Batch {lot_no: f.scan_value})
+WITH DISTINCT b.batch_code AS b_code
+
+// 2. Get all lot numbers for these batches
+MATCH (tb:Batch {batch_code: b_code})
+WITH b_code, collect(tb.lot_no) AS lot_list
+
+// 3. Find ALL parts fitted in these batches and count production
+MATCH (p_all:Part)-[f_all:FITTED_ON]->(v_all:Vehicle)
+WHERE f_all.scan_value IN lot_list
+WITH b_code, lot_list, p_all.part_no AS part_no, p_all.name AS part_name,
+     count(DISTINCT v_all) AS qty_produced
+
+// 4. Count failures (any complaint) for each part in these batches
+OPTIONAL MATCH (v_f:Vehicle)-[f_f:FITTED_ON]->(p_f:Part {part_no: part_no})
+WHERE f_f.scan_value IN lot_list
+MATCH (v_f)-[:HAS_CLAIM]->(wc_f:WarrantyClaim)-[:INVOLVES_PART]->(p_f)
+WITH b_code, part_no, part_name, qty_produced, count(DISTINCT wc_f) AS qty_failed
+
+RETURN b_code AS batch_code,
+       part_no,
+       part_name,
+       qty_produced,
+       qty_failed
+ORDER BY b_code, qty_failed DESC
+LIMIT 30
+```
+
+**WRONG - Single-part bias (do NOT do this):**
+```cypher
+// Filtering by specific part_no makes every row show the SAME part
 WITH DISTINCT b.batch_code AS b_code, p.part_no AS p_no
-
-// 2. Get all lot numbers for these batches (Fast index lookup)
-MATCH (target_b:Batch {batch_code: b_code})
-WITH b_code, p_no, collect(target_b.lot_no) AS lot_list
-
-// 3. Count failures across the whole lot
-MATCH (v_fail:Vehicle)-[f_fail:FITTED_ON]->(p_fail:Part {part_no: p_no})
-WHERE f_fail.scan_value IN lot_list
-MATCH (v_fail)-[:HAS_CLAIM]->(wc_fail:WarrantyClaim)-[:INVOLVES_PART]->(p_fail)
-WHERE toLower(wc_fail.complaint_desc) CONTAINS toLower('head lamp')
-WITH b_code, p_no, lot_list, count(DISTINCT wc_fail) AS qty_failed
-
-// 4. Count total produced for the whole lot
-MATCH (p_prod:Part {part_no: p_no})-[f_prod:FITTED_ON]->(v_prod:Vehicle)
-WHERE f_prod.scan_value IN lot_list
-RETURN b_code AS batch, 
-       p_no AS part, 
-       count(DISTINCT v_prod) AS qty_produced, 
-       qty_failed,
-       round(toFloat(qty_failed)/count(DISTINCT v_prod) * 100, 4) AS failure_rate_pct
-ORDER BY qty_failed DESC, qty_produced DESC
-LIMIT 20
+// ... returns only the one part related to the complaint
 ```
 
 ### Vendor Analysis
@@ -557,13 +580,14 @@ ORDER BY failure_count DESC
     - If `b.batch_code` is NULL in the result, it means the part was fitted but no batch traceability record exists for that specific instance.
 
 **Example - Top Issues for Thar Roxx:**
+**Do NOT include base_model as a return column** - it's the same for every row and causes chart x-axis issues.
 ```cypher
 MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc:WarrantyClaim)
 WHERE toLower(v.base_model) CONTAINS 'thar roxx'
   AND wc.complaint_desc <> 'unknown'
-RETURN wc.complaint_desc AS complaint, COUNT(*) AS failures
-ORDER BY failures DESC
-LIMIT 20
+RETURN wc.complaint_desc AS complaint, COUNT(*) AS claim_count
+ORDER BY claim_count DESC
+LIMIT 10
 ```
 
 ---
