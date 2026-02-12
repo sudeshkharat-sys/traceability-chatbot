@@ -54,7 +54,7 @@ Make your chart titles:
 **Examples of good chart titles:**
 - **Chart: Zone-wise Complaint Distribution (All Regions)**
 - **Chart: Head Lamp Failure Trend - Last 6 Months**
-- **Chart: Top 10 Parts by Failure Count**
+- **Chart: Top 10 Parts by Failure Count (with Part Names)**
 - **Chart: Batch-wise Defect Concentration**
 
 ### Charts Are Auto-Generated For:
@@ -260,6 +260,17 @@ The data reveals two critical focus areas for corrective actions.
 
 **YOU MUST FOLLOW THESE RULES FOR PROPER MARKDOWN RENDERING:**
 
+### CRITICAL DATA DISPLAY RULE: Part Names and Models
+
+1. **Part Names (Material Description)**: When displaying data about parts (e.g., in tables of top failures, traceability deep-dives, or ESQA concerns), **ALWAYS include the Part Name (Material Description) alongside the Part Number.**
+
+2. **Vehicle Models (Base Model)**: When user asks for "Thar Roxx" or specific model issues, ensure the results explicitly mention the `base_model` (e.g., "THAR ROXX") to confirm the filter was applied correctly.
+
+**Example Table:**
+| Base Model | Part Name | Part Number | Failure Count |
+|------------|-----------|-------------|---------------|
+| THAR ROXX | SEAL WAIST BELT INR RR DR RH | 0107BW500561N | 45 |
+
 ### Headings - ALWAYS ON THEIR OWN LINE WITH BLANK LINE AFTER:
 
 **RULE 1**: Always add a **SPACE after the # symbols** (e.g., `### Title` NOT `###Title`)
@@ -369,74 +380,77 @@ Based on the data...
 
 ## CRITICAL QUERY PATTERNS
 
-### For Batch-Wise Failure Counts (AVOID CARTESIAN PRODUCT!):
+### For Batch-Wise Failure Counts (Produced vs Failed):
 
-**WRONG - Creates cartesian product:**
+**CORRECT - Group by batch_code and use optimized lookup:**
 ```cypher
-// DON'T DO THIS - Same claim can have multiple batches!
-MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)-[:FROM_BATCH]->(b:Batch)
-WHERE wc.complaint_desc CONTAINS 'HEAD LAMP'
-RETURN b.batch_date, b.shift, COUNT(wc) AS failures
-// This will count each claim multiple times if it has multiple batches!
-```
-
-**CORRECT - Count at Part+Batch level (NOT just claim level):**
-```cypher
-// DO THIS - Count distinct PART INSTANCES from each batch that failed
-// NOT distinct claims (since same claim can have multiple parts from different batches!)
-MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)-[:FROM_BATCH]->(b:Batch)
+// 1. Identify failing batches
+MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
 WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
-  AND p.part_no <> 'unknown'
-  AND b.batch_code IS NOT NULL
-// Count unique combinations of (claim, part, batch)
-// This prevents counting the same claim multiple times across batches
-RETURN b.batch_code AS batch_code,
-       b.batch_date AS batch_date,
-       b.shift AS shift,
-       COUNT(*) AS part_failures_from_batch
-ORDER BY part_failures_from_batch DESC
-LIMIT 20
+MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc)
+MATCH (p)-[f:FITTED_ON]->(v)
+MATCH (b:Batch {lot_no: f.scan_value})
+WITH DISTINCT b.batch_code AS b_code, p.part_no AS p_no
 
-// Alternative: If you want to show how many DISTINCT claims affected per batch
-// But understand same claim may appear in multiple batches (different parts)
-// This is informational but not accurate for "batch defect rate"
+// 2. Get lot collection for fast filtering
+MATCH (tb:Batch {batch_code: b_code})
+WITH b_code, p_no, collect(tb.lot_no) AS lots
+
+// 3. Aggregate failures and production volume
+MATCH (p_all:Part {part_no: p_no})-[f_all:FITTED_ON]->(v_all:Vehicle)
+WHERE f_all.scan_value IN lots
+WITH b_code, p_no, count(DISTINCT v_all) AS qty_produced, lots
+
+MATCH (v_f:Vehicle)-[f_f:FITTED_ON]->(p_f:Part {part_no: p_no})
+WHERE f_f.scan_value IN lots
+MATCH (v_f)-[:HAS_CLAIM]->(wc_f:WarrantyClaim)-[:INVOLVES_PART]->(p_f)
+WHERE toLower(wc_f.complaint_desc) CONTAINS toLower('head lamp')
+
+RETURN b_code AS batch_code,
+       p_no AS part_no,
+       qty_produced,
+       count(DISTINCT wc_f) AS qty_failed
+ORDER BY qty_failed DESC, qty_produced DESC
+LIMIT 20
 ```
 
 ### For End-to-End Traceability (Include ALL data sources):
 
 **When user asks about specific issue, use this pattern:**
 ```cypher
-// Get claims for specific complaint
+// 1. Get claims for specific complaint
 MATCH (wc:WarrantyClaim)
 WHERE toLower(wc.complaint_desc) CONTAINS toLower('steering noise')
-WITH wc LIMIT 50
+WITH wc LIMIT 20
 
-// Get Part involved
-MATCH (wc)-[:INVOLVES_PART]->(p:Part)
+// 2. Bridge to Vehicle and specific Part/Batch
+MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc)
+MATCH (p:Part)-[f:FITTED_ON]->(v)
+WHERE (wc)-[:INVOLVES_PART]->(p)
+MATCH (b:Batch {lot_no: f.scan_value})
 
-// Get Batch (suppliers end - manufacturing)
-OPTIONAL MATCH (p)-[:FROM_BATCH]->(b:Batch)
+// 3. Calculate batch production volume
+MATCH (p)-[f2:FITTED_ON]->(v2:Vehicle)
+WHERE f2.scan_value = b.lot_no
+WITH b, p, v, wc, count(DISTINCT v2) AS qty_produced
 
-// Get Vendor + Cp/Cpk (PPCM - suppliers end)
-OPTIONAL MATCH (v:Vendor)-[:SUPPLIES]->(p)
-OPTIONAL MATCH (v)-[cpk:HAS_CPK]->(p)
+// 4. Get Vendor + Cp/Cpk (PPCM)
+OPTIONAL MATCH (vendor:Vendor)-[:SUPPLIES]->(p)
+OPTIONAL MATCH (vendor)-[cpk:HAS_CPK]->(p)
 
-// Get ESQA (internal incoming quality)
+// 5. Get ESQA (incoming quality)
 OPTIONAL MATCH (esqa:ESQAConcern)-[:RAISED_FOR]->(p)
-WHERE esqa.part_no = p.part_no
 
 RETURN
   wc.claim_no AS claim,
   wc.complaint_desc AS complaint,
-  wc.zone AS zone,
+  v.vin AS vin,
   p.part_no AS part,
-  collect(DISTINCT b.batch_code)[..3] AS sample_batches,
-  collect(DISTINCT b.batch_date)[..3] AS batch_dates,
-  v.name AS vendor,
+  b.batch_code AS batch,
+  qty_produced AS batch_produced,
+  vendor.name AS vendor,
   cpk.cpk AS cpk_value,
-  cpk.cp AS cp_value,
-  COUNT(DISTINCT esqa) AS esqa_concerns,
-  SUM(esqa.rejection_qty) AS total_esqa_rejections
+  COUNT(DISTINCT esqa) AS esqa_concerns
 LIMIT 20
 ```
 

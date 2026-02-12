@@ -19,6 +19,8 @@ app/config/.env
 # Node artifact files
 node_modules/
 dist/
+build/
+nashik-chatbot-pq/frontend/build/
 
 # Compiled Java class files
 *.class
@@ -61,11 +63,11 @@ Thumbs.db
 *.flv
 *.mov
 *.wmv
-*.csv
-*.xlsx
 *.toc
 *.pkg
 *.pyz
 *.zip
 *.spec
-
+*.xls
+*.xlsx
+*.csv

@@ -52,6 +52,7 @@ COPY main.py .
 COPY tasks.py .
 COPY app/ ./app/
 COPY backend/ ./backend/
+COPY dataloader/ ./dataloader/
 COPY scripts/ ./scripts/
 
 # Copy frontend build from stage 1

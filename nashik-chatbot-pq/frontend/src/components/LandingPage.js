@@ -81,7 +81,12 @@ function LandingPage() {
             <div
               key={feature.id}
               className="feature-card"
-              onClick={() => handleGetStarted(feature.route)}
+              onClick={() => feature.id === "traceability" && handleGetStarted(feature.route)}
+              style={
+                feature.id !== "traceability"
+                  ? { cursor: "not-allowed", opacity: 0.6 }
+                  : { cursor: "pointer" }
+              }
             >
               <div className="feature-content">
                 <img
@@ -98,8 +103,14 @@ function LandingPage() {
                 className="get-started-btn"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleGetStarted(feature.route);
+                  if (feature.id === "traceability") {
+                    handleGetStarted(feature.route);
+                  }
                 }}
+                disabled={feature.id !== "traceability"}
+                style={
+                  feature.id !== "traceability" ? { cursor: "not-allowed" } : {}
+                }
               >
                 Get started
                 <span className="arrow-icon">→</span>

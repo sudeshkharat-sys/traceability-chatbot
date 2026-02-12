@@ -4,11 +4,12 @@
 
 import pandas as pd
 from neo4j import GraphDatabase
+import time
 import gc
 import os
 import re
 
-NEO4J_URI = "neo4j://127.0.0.1:7687"
+NEO4J_URI = "neo4j://neo4j:7687"
 NEO4J_USERNAME = "neo4j"
 NEO4J_PASSWORD = "dataeaze@12345"
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USERNAME, NEO4J_PASSWORD))
@@ -33,7 +34,7 @@ print("=" * 80)
 print("LOADING CSV FILES (Memory-Optimized)")
 print("=" * 80)
 
-folder = "../../csv_output"
+folder = "/app/csv-data"
 
 # Load smaller datasets (these fit in memory)
 ppcm = pd.read_csv(f"{folder}/1. THAR ROXX PPCM_Sheet1.csv")
@@ -233,10 +234,45 @@ print("(VIN and Part matching stats will be shown during traceability loading)")
 # STEP 3: CLEAR EXISTING DATA
 # ═══════════════════════════════════════════════════════════
 print("\n" + "=" * 80)
-print("CLEARING EXISTING DATA")
+print("CLEARING EXISTING DATA (Batch-wise to prevent timeout)")
 print("=" * 80)
 
-run_query("MATCH (n) DETACH DELETE n")
+# Delete relationships first (it's often faster than DETACH DELETE)
+print("Deleting relationships...")
+delete_rels_query = """
+MATCH ()-[r]->() 
+WITH r LIMIT 10000
+DELETE r
+RETURN count(*) as deleted
+"""
+
+while True:
+    with driver.session() as session:
+        result = session.run(delete_rels_query)
+        count = result.single()["deleted"]
+        if count == 0:
+            break
+        print(f"  Deleted {count} relationships...")
+        time.sleep(0.5)
+
+# Then delete nodes
+print("Deleting nodes...")
+delete_nodes_query = """
+MATCH (n) 
+WITH n LIMIT 10000
+DELETE n
+RETURN count(*) as deleted
+"""
+
+while True:
+    with driver.session() as session:
+        result = session.run(delete_nodes_query)
+        count = result.single()["deleted"]
+        if count == 0:
+            break
+        print(f"  Deleted {count} nodes...")
+        time.sleep(0.5)
+
 print("✅ Database cleared")
 
 # ═══════════════════════════════════════════════════════════
@@ -253,6 +289,12 @@ constraints = [
     "CREATE CONSTRAINT IF NOT EXISTS FOR (c:Commodity) REQUIRE c.name IS UNIQUE",
     "CREATE CONSTRAINT IF NOT EXISTS FOR (pl:Plant) REQUIRE pl.code IS UNIQUE",
     "CREATE CONSTRAINT IF NOT EXISTS FOR (b:Batch) REQUIRE b.lot_no IS UNIQUE",
+     
+    # PERFORMANCE INDEXES
+    "CREATE INDEX batch_code_idx IF NOT EXISTS FOR (b:Batch) ON (b.batch_code)",
+    "CREATE INDEX complaint_desc_idx IF NOT EXISTS FOR (wc:WarrantyClaim) ON (wc.complaint_desc)",
+    "CREATE INDEX fitted_on_scan_idx IF NOT EXISTS FOR ()-[f:FITTED_ON]-() ON (f.scan_value)",
+    "CREATE INDEX fitted_on_date_idx IF NOT EXISTS FOR ()-[f:FITTED_ON]-() ON (f.batch_date)"
 ]
 
 for c in constraints:
@@ -299,36 +341,42 @@ MERGE (p)-[:FROM_BATCH]->(b)
 
 def process_trace_chunk(chunk_df):
     """Process a chunk of traceability data with memory-efficient operations."""
+    # Handle different column names across files
+    col_mapping = {
+        "VINNumber": "full_vin",
+        "BOMPARTNO": "part_no",
+        "ScanValue": "scan_value"
+    }
+    
+    # Check for date column variations
+    if "TDATE" in chunk_df.columns:
+        col_mapping["TDATE"] = "tdate"
+    elif "Tracebility_Date" in chunk_df.columns:
+        col_mapping["Tracebility_Date"] = "tdate"
+    
+    # Rename only columns that exist
+    available_cols = {k: v for k, v in col_mapping.items() if k in chunk_df.columns}
+    chunk_df = chunk_df.rename(columns=available_cols)
+
     # Fill NaN
     chunk_df = chunk_df.fillna("unknown")
 
     # Extract VIN suffix (last 8 chars)
-    chunk_df["VIN_SHORT"] = chunk_df["VINNumber"].astype(str).str[-8:]
+    chunk_df["vin_short"] = chunk_df["full_vin"].astype(str).str[-8:]
 
     # Normalize part numbers
-    chunk_df["BOMPARTNO"] = chunk_df["BOMPARTNO"].apply(normalize_part_number)
+    chunk_df["part_no"] = chunk_df["part_no"].apply(normalize_part_number)
 
     # Parse ScanValue
-    scan_parsed = chunk_df["ScanValue"].apply(lambda x: pd.Series(parse_scan_value(x)))
-    scan_parsed.columns = ["BATCH_DATE", "SHIFT", "BATCH_CODE"]
+    scan_parsed = chunk_df["scan_value"].apply(lambda x: pd.Series(parse_scan_value(x)))
+    scan_parsed.columns = ["batch_date", "shift", "batch_code"]
     chunk_df = pd.concat([chunk_df, scan_parsed], axis=1)
 
-    # Rename and convert to records
-    rows = chunk_df.rename(
-        columns={
-            "VINNumber": "full_vin",
-            "VIN_SHORT": "vin_short",
-            "BOMPARTNO": "part_no",
-            "TDATE": "tdate",
-            "ScanValue": "scan_value",
-            "BATCH_DATE": "batch_date",
-            "SHIFT": "shift",
-            "BATCH_CODE": "batch_code",
-        }
-    ).to_dict("records")
+    # Convert to records
+    rows = chunk_df.to_dict("records")
 
     # Filter valid records
-    rows = [r for r in rows if r.get("vin_short") != "unknown" and r.get("part_no") != "unknown"]
+    rows = [r for r in rows if str(r.get("vin_short")) != "unknown" and str(r.get("part_no")) != "unknown"]
 
     return rows
 
@@ -433,6 +481,7 @@ SET w.complaint_code = row.complaint_code,
 // Link to Vehicle (using 8-char VIN - same as trace)
 MERGE (v:Vehicle {vin: row.serial_no})
 SET v.model = row.model_code, 
+    v.base_model = row.base_model,
     v.engine_no = row.engine_no
 
 // Dealer
@@ -448,6 +497,7 @@ MERGE (c:Commodity {name: row.commodity})
 
 // Part
 MERGE (p:Part {part_no: row.part})
+SET p.name = row.part_name
 
 // Create relationships
 MERGE (v)-[:HAS_CLAIM]->(w)
@@ -480,9 +530,11 @@ rows = warranty.rename(
         "PlantDesc": "plant_desc",
         "part": "part",
         "vender": "vendor",
+        "BASE MODEL": "base_model",
         "Model Code": "model_code",
         "ENGINE NUMBER": "engine_no",
         "Commodity": "commodity",
+        "Material Description": "part_name",
     }
 ).to_dict("records")
 

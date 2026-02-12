@@ -136,7 +136,7 @@ class FileScraper:
         
         files = []
         files.extend(directory.glob(f"*.Pdf"))
-
+        files.extend(directory.glob(f"*.pdf"))
         logger.info(
             f"Found {len(files)} files in {directory}"
         )

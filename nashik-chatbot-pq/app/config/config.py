@@ -84,12 +84,12 @@ class Settings(BaseSettings):
     OPENSEARCH_INDEX_NAME: str = "standard_guidelines_index"
 
     # Document Processing Configuration (Dataloader)
-    DOCLING_ARTIFACTS_PATH: str = "C:\\Users\\50014665\\Doc_processing\\docling_models\\docling_all_models"
-    DOCLING_VLM_MODEL: str = "SmolDocling-256M-preview"
+    DOCLING_ARTIFACTS_PATH: str = "/app/docling_models"
+    DOCLING_VLM_MODEL_PATH: str = "/app/docling_models/ds4sd--SmolDocling-256M-preview"
     DOCLING_LAYOUT_MODEL: str = "docling-layout-heron"
     
     # Directory to scrape documents from
-    DOCUMENT_INPUT_DIRECTORY: str = "C:\\Users\\50014665\\Doc_processing\\test"
+    DOCUMENT_INPUT_DIRECTORY: str = "/app/documents"
 
     # Agent Configuration
     MAX_CHAT_HISTORY: int = 10

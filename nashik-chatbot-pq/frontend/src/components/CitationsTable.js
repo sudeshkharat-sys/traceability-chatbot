@@ -2,8 +2,8 @@ import React from "react";
 import "./CitationsTable.css";
 
 // Base URL for the Apache server hosting the PDFs
-// In production, this can be set to "/documents/" via environment variables
-const BASE_PDF_URL = process.env.REACT_APP_PDF_BASE_URL || "http://localhost:8081/documents/"; 
+// We add /documents/ because that is where we created the folder in Apache htdocs
+const BASE_PDF_URL = "http://localhost:8081/documents/"; 
 
 const CitationsTable = ({ citations, onOpenPdf }) => {
   if (!citations || citations.length === 0) return null;

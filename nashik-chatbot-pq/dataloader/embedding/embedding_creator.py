@@ -185,6 +185,10 @@ class EmbeddingProcessor:
                 chunk_text = self.chunker.contextualize(chunk=chunk)
                 chunk_metadata = chunk.meta.export_json_dict()
 
+                # Fix for OpenSearch long overflow: convert binary_hash to string
+                if "origin" in chunk_metadata and "binary_hash" in chunk_metadata["origin"]:
+                    chunk_metadata["origin"]["binary_hash"] = str(chunk_metadata["origin"]["binary_hash"])
+
                 chunk_hash = self.calculate_chunk_hash(chunk_text, chunk_metadata)
                 opensearch_id = f"{doc['id']}_{i}"
 

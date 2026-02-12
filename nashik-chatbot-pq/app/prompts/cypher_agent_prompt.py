@@ -14,6 +14,7 @@ Generate FAST, EFFICIENT Neo4j Cypher queries. Avoid complex nested queries.
 
 2. **Part**
    - `part_no` (STRING, UNIQUE) - Part number
+   - `name` (STRING) - Part name (Material Description)
    - `model` (STRING) - Model
    - `specification` (STRING) - Specification
    - `characteristic` (STRING) - Characteristic
@@ -21,7 +22,8 @@ Generate FAST, EFFICIENT Neo4j Cypher queries. Avoid complex nested queries.
 3. **Vehicle**
    - `vin` (STRING, UNIQUE) - VIN (8-char short)
    - `full_vin` (STRING) - Full VIN
-   - `model` (STRING) - Vehicle model
+   - `base_model` (STRING) - Base model (e.g., "THAR ROXX")
+   - `model` (STRING) - Vehicle model code (e.g., "J60", "J59")
    - `engine_no` (STRING) - Engine number
 
 4. **WarrantyClaim**
@@ -167,7 +169,10 @@ CALL {
     LIMIT 10
     
     MATCH (wc2:WarrantyClaim {complaint_desc: complaint, zone: 'East Zone'})
-    OPTIONAL MATCH (wc2)-[:INVOLVES_PART]->(p:Part)-[:FROM_BATCH]->(b:Batch)
+    MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc2)
+    MATCH (p:Part)-[f:FITTED_ON]->(v)
+    WHERE (wc2)-[:INVOLVES_PART]->(p)
+    MATCH (b:Batch {lot_no: f.scan_value})
     
     WITH 'East Zone' AS zone, complaint, failures,
          COUNT(DISTINCT b.batch_code) AS batch_count,
@@ -183,7 +188,10 @@ CALL {
     LIMIT 10
     
     MATCH (wc2:WarrantyClaim {complaint_desc: complaint, zone: 'North Zone'})
-    OPTIONAL MATCH (wc2)-[:INVOLVES_PART]->(p:Part)-[:FROM_BATCH]->(b:Batch)
+    MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc2)
+    MATCH (p:Part)-[f:FITTED_ON]->(v)
+    WHERE (wc2)-[:INVOLVES_PART]->(p)
+    MATCH (b:Batch {lot_no: f.scan_value})
     
     WITH 'North Zone' AS zone, complaint, failures,
          COUNT(DISTINCT b.batch_code) AS batch_count,
@@ -199,7 +207,10 @@ CALL {
     LIMIT 10
     
     MATCH (wc2:WarrantyClaim {complaint_desc: complaint, zone: 'South Zone'})
-    OPTIONAL MATCH (wc2)-[:INVOLVES_PART]->(p:Part)-[:FROM_BATCH]->(b:Batch)
+    MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc2)
+    MATCH (p:Part)-[f:FITTED_ON]->(v)
+    WHERE (wc2)-[:INVOLVES_PART]->(p)
+    MATCH (b:Batch {lot_no: f.scan_value})
     
     WITH 'South Zone' AS zone, complaint, failures,
          COUNT(DISTINCT b.batch_code) AS batch_count,
@@ -215,7 +226,10 @@ CALL {
     LIMIT 10
     
     MATCH (wc2:WarrantyClaim {complaint_desc: complaint, zone: 'West Zone'})
-    OPTIONAL MATCH (wc2)-[:INVOLVES_PART]->(p:Part)-[:FROM_BATCH]->(b:Batch)
+    MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc2)
+    MATCH (p:Part)-[f:FITTED_ON]->(v)
+    WHERE (wc2)-[:INVOLVES_PART]->(p)
+    MATCH (b:Batch {lot_no: f.scan_value})
     
     WITH 'West Zone' AS zone, complaint, failures,
          COUNT(DISTINCT b.batch_code) AS batch_count,
@@ -238,28 +252,45 @@ ORDER BY zone ASC, failures DESC
 
 ### Overall Top Failures
 ```cypher
-MATCH (wc:WarrantyClaim)
+MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
 WHERE wc.complaint_desc <> 'unknown'
-WITH wc.complaint_desc AS complaint, COUNT(*) AS failures
-RETURN complaint, failures
+WITH p.name AS part_name, p.part_no AS part_no, wc.complaint_desc AS complaint, COUNT(*) AS failures
+RETURN part_name, part_no, complaint, failures
 ORDER BY failures DESC
 LIMIT 20
 ```
 
-### Batch Failure Rate
+### Batch Failure Rate (Produced vs Failed)
+Use this when user asks for "batch-wise failure rate", "produced vs failed", or "concentration":
 ```cypher
-MATCH (b:Batch)<-[:FROM_BATCH]-(p:Part)
-WITH b, COUNT(DISTINCT p) AS parts
-WHERE parts >= 10
-WITH b, parts LIMIT 100
+// 1. Identify specific batch codes that have failures
+MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
+WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
+MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc)
+MATCH (p)-[f:FITTED_ON]->(v)
+MATCH (b:Batch {lot_no: f.scan_value})
+WITH DISTINCT b.batch_code AS b_code, p.part_no AS p_no
 
-OPTIONAL MATCH (b)<-[:FROM_BATCH]-(p2:Part)<-[:INVOLVES_PART]-(wc:WarrantyClaim)
+// 2. Get all lot numbers for these batches (Fast index lookup)
+MATCH (target_b:Batch {batch_code: b_code})
+WITH b_code, p_no, collect(target_b.lot_no) AS lot_list
 
-WITH b.batch_code AS batch, parts,
-     COUNT(DISTINCT wc) AS failures
-RETURN batch, parts, failures,
-       round(toFloat(failures)/parts * 100, 2) AS failure_rate
-ORDER BY failure_rate DESC
+// 3. Count failures across the whole lot
+MATCH (v_fail:Vehicle)-[f_fail:FITTED_ON]->(p_fail:Part {part_no: p_no})
+WHERE f_fail.scan_value IN lot_list
+MATCH (v_fail)-[:HAS_CLAIM]->(wc_fail:WarrantyClaim)-[:INVOLVES_PART]->(p_fail)
+WHERE toLower(wc_fail.complaint_desc) CONTAINS toLower('head lamp')
+WITH b_code, p_no, lot_list, count(DISTINCT wc_fail) AS qty_failed
+
+// 4. Count total produced for the whole lot
+MATCH (p_prod:Part {part_no: p_no})-[f_prod:FITTED_ON]->(v_prod:Vehicle)
+WHERE f_prod.scan_value IN lot_list
+RETURN b_code AS batch, 
+       p_no AS part, 
+       count(DISTINCT v_prod) AS qty_produced, 
+       qty_failed,
+       round(toFloat(qty_failed)/count(DISTINCT v_prod) * 100, 4) AS failure_rate_pct
+ORDER BY qty_failed DESC, qty_produced DESC
 LIMIT 20
 ```
 
@@ -338,39 +369,39 @@ LIMIT 20
 MATCH (wc:WarrantyClaim)
 WHERE toLower(wc.complaint_desc) CONTAINS toLower('steering')
   AND wc.complaint_desc <> 'unknown'
-WITH wc LIMIT 5
+WITH wc LIMIT 10
 
-// Get the Part involved
-MATCH (wc)-[:INVOLVES_PART]->(p:Part)
-WHERE p.part_no <> 'unknown'
+// Bridge to specific Vehicle and Part
+MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc)
+MATCH (p:Part)-[f:FITTED_ON]->(v)
+WHERE (wc)-[:INVOLVES_PART]->(p)
 
-// Get Batch information
-OPTIONAL MATCH (p)-[:FROM_BATCH]->(b:Batch)
+// Use OPTIONAL MATCH for Batch to avoid losing the whole record if batch is missing
+OPTIONAL MATCH (b:Batch) 
+WHERE b.lot_no = f.scan_value AND f.scan_value <> 'unknown'
+
+// Calculate batch production volume (only if batch exists)
+OUTER CALL {
+  WITH b, p
+  MATCH (p)-[f2:FITTED_ON]->(v2:Vehicle)
+  WHERE f2.scan_value = b.lot_no AND b IS NOT NULL
+  RETURN count(DISTINCT v2) AS qty_produced
+}
 
 // Get Vendor and Cp/Cpk
-OPTIONAL MATCH (v:Vendor)-[:SUPPLIES]->(p)
-OPTIONAL MATCH (v)-[cpk:HAS_CPK]->(p)
-
-// Get ESQA concerns
-OPTIONAL MATCH (e:ESQAConcern)-[:RAISED_FOR]->(p)
-
-// Get Vehicle details
-MATCH (vh:Vehicle)-[:HAS_CLAIM]->(wc)
+OPTIONAL MATCH (vendor:Vendor)-[:SUPPLIES]->(p)
+OPTIONAL MATCH (vendor)-[cpk:HAS_CPK]->(p)
 
 RETURN
   wc.claim_no AS claim,
   wc.complaint_desc AS complaint,
-  wc.failure_date AS failure_date,
-  vh.vin AS vin,
-  p.part_no AS part,
-  collect(DISTINCT b.batch_code)[..3] AS sample_batches,
-  COUNT(DISTINCT b) AS batch_count,
-  v.name AS vendor,
-  cpk.cpk AS cpk_value,
-  cpk.cp AS cp_value,
-  COUNT(DISTINCT e) AS esqa_concerns,
-  SUM(e.rejection_qty) AS total_rejections
-LIMIT 10
+  p.name AS part_name,
+  p.part_no AS part_no,
+  b.batch_code AS batch_code,
+  qty_produced AS batch_produced,
+  vendor.name AS vendor,
+  cpk.cpk AS cpk_value
+LIMIT 20
 ```
 
 **Traceability by Claim Number:**
@@ -380,7 +411,10 @@ MATCH (wc:WarrantyClaim {claim_no: 123456})
 MATCH (wc)-[:INVOLVES_PART]->(p:Part)
 MATCH (wc)<-[:HAS_CLAIM]-(v:Vehicle)
 
-OPTIONAL MATCH (p)-[:FROM_BATCH]->(b:Batch)
+// Bridge to specific Batch
+MATCH (p)-[f:FITTED_ON]->(v)
+OPTIONAL MATCH (b:Batch) WHERE b.lot_no = f.scan_value AND f.scan_value <> 'unknown'
+
 OPTIONAL MATCH (vendor:Vendor)-[:SUPPLIES]->(p)
 OPTIONAL MATCH (vendor)-[cpk:HAS_CPK]->(p)
 OPTIONAL MATCH (esqa:ESQAConcern)-[:RAISED_FOR]->(p)
@@ -395,17 +429,19 @@ RETURN {
   },
   vehicle: {
     vin: v.vin,
-    model: v.model
+    model: v.model,
+    base_model: v.base_model
   },
   part: {
+    part_name: p.name,
     part_no: p.part_no,
     model: p.model,
     characteristic: p.characteristic
   },
   batch: {
-    codes: collect(DISTINCT b.batch_code)[..5],
-    dates: collect(DISTINCT b.batch_date)[..5],
-    shifts: collect(DISTINCT b.shift)[..5]
+    code: b.batch_code,
+    date: b.batch_date,
+    shift: b.shift
   },
   vendor: {
     name: vendor.name,
@@ -420,27 +456,28 @@ RETURN {
 } AS traceability
 ```
 
-**Batch-Centric Traceability:**
+**Batch-Centric Traceability (Safe Version):**
 ```cypher
-// Find all failures from a specific batch
-MATCH (b:Batch {batch_code: '4SH078823'})
-MATCH (p:Part)-[:FROM_BATCH]->(b)
+// Find all failures from a specific batch code
+MATCH (b:Batch) 
+WHERE b.batch_code = '4SH078823'
+WITH b, collect(DISTINCT b.lot_no) AS lot_list
 
-OPTIONAL MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p)
-OPTIONAL MATCH (v:Vendor)-[:SUPPLIES]->(p)
-OPTIONAL MATCH (v)-[cpk:HAS_CPK]->(p)
-OPTIONAL MATCH (e:ESQAConcern)-[:RAISED_FOR]->(p)
+MATCH (p:Part)-[f:FITTED_ON]->(v:Vehicle)
+WHERE f.scan_value IN lot_list
+
+// Match only claims that involve this specific vehicle AND this specific part
+MATCH (v)-[:HAS_CLAIM]->(wc:WarrantyClaim)
+WHERE (wc)-[:INVOLVES_PART]->(p)
 
 RETURN
   b.batch_code AS batch,
   b.batch_date AS mfg_date,
-  b.shift AS shift,
-  COUNT(DISTINCT p) AS parts_count,
+  p.name AS part_name,
+  p.part_no AS part_no,
   COUNT(DISTINCT wc) AS failure_count,
-  collect(DISTINCT wc.complaint_desc)[..5] AS top_complaints,
-  v.name AS vendor,
-  cpk.cpk AS cpk_value,
-  COUNT(DISTINCT e) AS esqa_concerns
+  collect(DISTINCT wc.complaint_desc)[..5] AS top_complaints
+ORDER BY failure_count DESC
 ```
 
 **Important Notes:**
@@ -472,49 +509,62 @@ RETURN
     - `:FITTED_ON` (Part → Vehicle) - 1.7M relationships, only use when absolutely necessary
     - Long paths through multiple relationships
 
-11. ✅ **CRITICAL: Count at PART+BATCH Level, NOT Claim Level!**
-    - **PROBLEM**: Same claim (VIN) can have MULTIPLE parts from DIFFERENT batches
-    - **Example**: VIN S2G18326 has head lamp failure
-      - Left lamp from Batch 436
-      - Right lamp from Batch 245
-      - Both batches would count this VIN → DOUBLE COUNTING!
+11. ✅ **CRITICAL: Count at PART+BATCH Level using FITTED_ON!**
+    - **PROBLEM**: `Part` nodes are Part Numbers (Types), not instances. One `Part` node is linked to ALL its batches via `:FROM_BATCH`.
+    - **WRONG**: `MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)-[:FROM_BATCH]->(b:Batch)`
+      - This matches every failure of that part type with EVERY batch that part was ever in.
+      - **Result**: Every batch shows the SAME failure count (the total for that part type).
 
-    - **WRONG #1**: `COUNT(wc)` - Counts relationships (very wrong)
-    - **WRONG #2**: `COUNT(DISTINCT wc.claim_no)` - Counts same claim across multiple batches!
-    - **CORRECT**: `COUNT(*)` at Part→Batch level - Counts distinct part instances from batch
+    - **CORRECT**: Use `Vehicle` and `FITTED_ON` to bridge the specific failure to its specific batch.
+    - **Logic**: A `WarrantyClaim` is for a `Vehicle`. That `Vehicle` had a specific `Part` instance `FITTED_ON` it from a specific `Batch`.
 
-    **Example - WRONG (counts claims, not parts):**
+    **Example - CORRECT Traceability Query:**
     ```cypher
-    MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)-[:FROM_BATCH]->(b:Batch)
+    MATCH (wc:WarrantyClaim)
     WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
-    WITH b.batch_date AS batch_date, b.shift AS shift,
-         COUNT(DISTINCT wc.claim_no) AS failures
-    RETURN batch_date, shift, failures
-    // This counts the SAME claim in MULTIPLE batches if it has multiple parts!
-    // Result: Batch 436 shows 62 claims, Batch 245 shows 62 claims
-    // But only 64 total claims exist! (Same claims counted twice)
-    ```
-
-    **Example - CORRECT (counts part instances from batch):**
-    ```cypher
-    MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)-[:FROM_BATCH]->(b:Batch)
-    WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
-      AND p.part_no <> 'unknown'
-      AND b.batch_code IS NOT NULL
+      AND wc.zone = 'East Zone'
+    
+    // Bridge to the specific Vehicle and the Part fitted on it
+    MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc)
+    MATCH (p:Part)-[f:FITTED_ON]->(v)
+    WHERE (wc)-[:INVOLVES_PART]->(p) // Ensure we look at the part that failed
+    
+    // Match the specific Batch safely
+    OPTIONAL MATCH (b:Batch) 
+    WHERE b.lot_no = f.scan_value AND f.scan_value <> 'unknown'
+    
     RETURN b.batch_code AS batch_code,
            b.batch_date AS batch_date,
            b.shift AS shift,
            COUNT(*) AS part_failures_from_batch
     ORDER BY part_failures_from_batch DESC
     LIMIT 20
-    // This counts PART INSTANCES from each batch that failed
-    // Correct interpretation: "How many failed parts came from this batch?"
     ```
 
     **CRITICAL UNDERSTANDING:**
-    - **Batch-wise defect rate** = Count failed PART INSTANCES from that batch
-    - **NOT** = Count how many VINs were affected by that batch
-    - Same VIN can have multiple parts → Each part counted separately
+    - `:INVOLVES_PART` connects Claim to Part Number (Fast).
+    - `f.scan_value` on `FITTED_ON` connects the specific installation to a `Batch.lot_no`.
+    - This path is the ONLY way to get accurate batch-wise failure counts.
+
+12. ✅ **MODEL FILTERING RULE:**
+    - When user mentions "Thar Roxx", filter by `v.base_model = 'THAR ROXX'`.
+    - If user mentions "J60" or "J59", filter by `v.model`.
+    - Always use `toLower(v.base_model) CONTAINS 'thar roxx'` for flexible matching.
+
+13. ✅ **DEBUGGING TRACEABILITY:**
+    - If a traceability query returns no results, it is usually because of a hard `MATCH` on `Batch`. 
+    - ALWAYS use `OPTIONAL MATCH (b:Batch)` and check `f.scan_value <> 'unknown'`.
+    - If `b.batch_code` is NULL in the result, it means the part was fitted but no batch traceability record exists for that specific instance.
+
+**Example - Top Issues for Thar Roxx:**
+```cypher
+MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc:WarrantyClaim)
+WHERE toLower(v.base_model) CONTAINS 'thar roxx'
+  AND wc.complaint_desc <> 'unknown'
+RETURN wc.complaint_desc AS complaint, COUNT(*) AS failures
+ORDER BY failures DESC
+LIMIT 20
+```
 
 ---
 
