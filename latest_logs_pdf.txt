@@ -1,0 +1,34 @@
+Request URL
+http://localhost:8081/documents/692-2008%20%20-%20OBD%20Emissions.pdf
+Request Method
+GET
+Status Code
+404 Not Found
+Referrer Policy
+no-referrer-when-downgrade
+accept
+*/*
+accept-encoding
+gzip, deflate, br, zstd
+accept-language
+en-US,en;q=0.9,en-IN;q=0.8
+connection
+keep-alive
+host
+localhost:8081
+origin
+https://mai-quality-bot-uat.m-devsecops.com
+sec-ch-ua
+"Not(A:Brand";v="8", "Chromium";v="144", "Microsoft Edge";v="144"
+sec-ch-ua-mobile
+?0
+sec-ch-ua-platform
+"Windows"
+sec-fetch-dest
+empty
+sec-fetch-mode
+cors
+sec-fetch-site
+cross-site
+user-agent
+Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36 Edg/144.0.0.0
