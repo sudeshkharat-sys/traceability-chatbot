@@ -254,22 +254,16 @@ class StandardsGuidelinesAgent:
                                     f"content type={type(tool_content).__name__}"
                                 )
 
-                                # Capture citations from search_standards
+                                # Capture ALL citations from search_standards
                                 if tool_name == "search_standards":
                                     import json
                                     try:
                                         data = json.loads(tool_content) if isinstance(tool_content, str) else tool_content
                                         if isinstance(data, dict) and data.get("found"):
                                             results = data.get("results", [])
-                                            for res in results:
-                                                meta = res.get("metadata", {})
-                                                doc_name = meta.get("doc_name")
-                                                # Use page_label if available, else page_number, else "N/A"
-                                                page_num = meta.get("page_label") or meta.get("page_number")
-
-                                                if doc_name:
-                                                    # Removed deduplication to show all chunks
-                                                    citations.append(res)
+                                            # Send full results — don't filter by doc_name
+                                            citations.extend(results)
+                                            logger.info(f"Captured {len(results)} citations from search_standards")
                                     except Exception as e:
                                         logger.warning(f"Error parsing search_standards output for citations: {e}")
 
