@@ -44,6 +44,25 @@ const CitationsTable = ({ citations, onOpenPdf }) => {
       }
   };
 
+  // Deduplicate citations by doc_name + page number
+  const seen = new Set();
+  const uniqueCitations = citations.filter((citation) => {
+    const metadata = citation.metadata || {};
+    const docName = metadata.doc_name || citation.doc_name || "Unknown Document";
+    let pageNum = metadata.page_label || metadata.page_number || citation.page_number;
+    if (!pageNum && metadata.doc_items && metadata.doc_items.length > 0) {
+      const firstItem = metadata.doc_items[0];
+      if (firstItem.prov && firstItem.prov.length > 0) {
+        pageNum = firstItem.prov[0].page_no;
+      }
+    }
+    pageNum = pageNum || "N/A";
+    const key = `${docName}::${pageNum}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
   return (
     <div className="citations-container">
       <h4 className="citations-title">Sources & Citations</h4>
@@ -57,15 +76,11 @@ const CitationsTable = ({ citations, onOpenPdf }) => {
             </tr>
           </thead>
           <tbody>
-            {citations.map((citation, index) => {
-              // Extract metadata regardless of format (full object or simplified)
+            {uniqueCitations.map((citation, index) => {
               const metadata = citation.metadata || {};
               let docName = metadata.doc_name || citation.doc_name || "Unknown Document";
-              
-              // Remove .pdf extension for cleaner display
               const displayName = docName.replace(/\.pdf$/i, "");
-              
-              // Extract Page Number for display
+
               let pageNum = metadata.page_label || metadata.page_number || citation.page_number;
               if (!pageNum && metadata.doc_items && metadata.doc_items.length > 0) {
                  const firstItem = metadata.doc_items[0];
@@ -82,7 +97,7 @@ const CitationsTable = ({ citations, onOpenPdf }) => {
                   </td>
                   <td className="page-cell">{pageNum}</td>
                   <td className="action-cell">
-                    <button 
+                    <button
                       onClick={() => handleOpenPdf(citation)}
                       className="open-pdf-btn"
                     >
