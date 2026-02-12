@@ -58,8 +58,8 @@ def get_pipeline_options():
     pipeline_options.generate_picture_images = True
     pipeline_options.generate_table_images = True
     
-    pipeline_options.accelerator_options.num_threads = 4 
-    
+    pipeline_options.accelerator_options.num_threads = 1
+
     return pipeline_options
 
 def get_converter():
