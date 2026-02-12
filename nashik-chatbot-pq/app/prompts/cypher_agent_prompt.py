@@ -273,35 +273,90 @@ ORDER BY claim_count DESC
 LIMIT 10
 ```
 
-### Issue-Specific Batch Grouping (DEFAULT)
-Use this when user asks about a SPECIFIC issue and wants batch grouping.
-**IMPORTANT: Maintain the issue filter when grouping by batch!** Only show failures related to the queried issue, NOT all failures in the batch.
-**This is the DEFAULT behavior when user asks about a specific complaint/issue grouped by batch.**
+### Parts Involved for a Specific Issue
+**CRITICAL: Filter parts by name relevance!** When user asks about a specific issue, only show parts whose names match the complaint.
+The `INVOLVES_PART` relationship may connect a claim to unrelated parts (co-involved during repair).
+**Always add a part name filter** to exclude unrelated parts.
 ```cypher
-// User asks: "show me head lamp failures grouped by batch"
-// CORRECT: Only count head lamp failures per batch
+// User asks: "give me head lamp failure details"
+// Filter parts to only show lamp-related parts
 MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
 WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
+  AND p.part_no <> 'unknown'
+  AND toLower(p.name) CONTAINS toLower('lamp')  // CRITICAL: filter by part name!
+RETURN p.part_no AS part_no,
+       p.name AS part_name,
+       COUNT(DISTINCT wc.claim_no) AS failure_count
+ORDER BY failure_count DESC
+LIMIT 10
+```
+
+**WRONG - No part name filter (shows unrelated parts):**
+```cypher
+// This shows ALL parts linked via INVOLVES_PART, including
+// "Engine Lub Oil", "FRONT TP POSITION LH" etc. that are NOT head lamps
+MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
+WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
+// Missing: AND toLower(p.name) CONTAINS toLower('lamp')
+RETURN p.part_no, p.name, COUNT(*) AS failures
+// Result: Shows Engine Lub Oil, Front Position LH - CONFUSING!
+```
+
+**Part name filter mapping (use keywords from the complaint):**
+- "head lamp" → filter `toLower(p.name) CONTAINS 'lamp'`
+- "steering" → filter `toLower(p.name) CONTAINS 'steer'`
+- "sun roof" → filter `toLower(p.name) CONTAINS 'roof'`
+- "brake" → filter `toLower(p.name) CONTAINS 'brake'`
+- For generic/unclear complaints, skip the part name filter but note potential data quality issues
+
+### Issue-Specific Batch Grouping (DEFAULT)
+Use this when user asks about a SPECIFIC issue and wants batch grouping.
+**IMPORTANT: Maintain the issue filter AND part name filter when grouping by batch!**
+**IMPORTANT: Always include qty_produced alongside issue_failures for context!**
+```cypher
+// User asks: "show me head lamp failures grouped by batch"
+// CORRECT: Only count head lamp failures, with production volume for context
+MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
+WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
+  AND p.part_no <> 'unknown'
+  AND toLower(p.name) CONTAINS toLower('lamp')  // Part name filter!
 MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc)
 MATCH (p)-[f:FITTED_ON]->(v)
 OPTIONAL MATCH (b:Batch)
 WHERE b.lot_no = f.scan_value AND f.scan_value <> 'unknown'
+
+WITH b, p, COUNT(DISTINCT wc.claim_no) AS issue_failures
+
+// Get production volume for this batch
+OUTER CALL {
+  WITH b, p
+  MATCH (p)-[f2:FITTED_ON]->(v2:Vehicle)
+  WHERE f2.scan_value = b.lot_no AND b IS NOT NULL
+  RETURN count(DISTINCT v2) AS qty_produced
+}
 
 RETURN b.batch_code AS batch_code,
        b.batch_date AS batch_date,
        b.shift AS shift,
        p.part_no AS part_no,
        p.name AS part_name,
-       COUNT(DISTINCT wc.claim_no) AS issue_failures
+       qty_produced,
+       issue_failures
 ORDER BY issue_failures DESC
 LIMIT 20
+```
+
+**WRONG - No qty_produced (failures without context are meaningless):**
+```cypher
+// "6 failures" means nothing without knowing "out of how many produced"
+RETURN batch_code, batch_date, shift, part_no, part_name, issue_failures
+// User sees "6 failures" but is it 6 out of 50 (12% - BAD) or 6 out of 5000 (0.1% - OK)?
 ```
 
 **WRONG - Losing the issue filter (do NOT do this for specific issue queries):**
 ```cypher
 // This finds batches related to the issue, then shows ALL failures
 // from those batches regardless of complaint type - CONFUSING!
-// User asks about "head lamp" but sees steering, sunroof failures too
 WITH DISTINCT b.batch_code AS b_code
 MATCH (p_all:Part)-[f_all:FITTED_ON]->(v_all:Vehicle)
 WHERE f_all.scan_value IN lot_list
@@ -389,11 +444,11 @@ ORDER BY claim_count DESC
 LIMIT 20
 ```
 
-### ESQA Concern Analysis
+### ESQA Concern Analysis (General)
 ```cypher
 MATCH (e:ESQAConcern)-[:RAISED_FOR]->(p:Part)
 WHERE e.esqa_no IS NOT NULL
-RETURN e.esqa_no AS esqa_no, 
+RETURN e.esqa_no AS esqa_no,
        e.description AS description,
        e.qty_reported AS qty_reported,
        e.rejection_qty AS rejection_qty,
@@ -402,12 +457,44 @@ ORDER BY e.date DESC
 LIMIT 20
 ```
 
+### ESQA for Specific Parts (Used in Traceability Deep-Dives)
+**CRITICAL: Always show qty_reported alongside rejection_qty!** Just showing "15 rejections" is meaningless.
+"15 rejected out of 5000 reported" gives actual context about rejection rate.
+```cypher
+// Show ESQA concerns for parts involved in a specific issue
+MATCH (e:ESQAConcern)-[:RAISED_FOR]->(p:Part)
+WHERE p.part_no IN ['1731AM03057N', '1731AM03054N']  // parts from the issue query
+RETURN p.part_no AS part_no,
+       p.name AS part_name,
+       e.esqa_no AS esqa_no,
+       e.description AS description,
+       e.qty_reported AS qty_reported,
+       e.rejection_qty AS rejection_qty,
+       e.scrap_qty AS scrap_qty,
+       e.rework_qty AS rework_qty,
+       e.date AS date
+ORDER BY e.date DESC
+LIMIT 20
+```
+
+**WRONG - Aggregate counts without production context (meaningless numbers):**
+```cypher
+// "15 ESQA concerns, 15 rejections" tells user nothing
+// Is 15 rejections out of 100 (15% - TERRIBLE) or out of 50000 (0.03% - FINE)?
+RETURN p.part_no, COUNT(e) AS esqa_concerns, SUM(e.rejection_qty) AS rejected_qty
+// Missing: qty_reported for context!
+```
+
 ### Vendor-Part-ESQA Correlation
+**Always include qty_reported for rejection rate context.**
 ```cypher
 MATCH (v:Vendor)<-[:RAISED_AGAINST]-(e:ESQAConcern)-[:RAISED_FOR]->(p:Part)
 WHERE v.name <> 'unknown'
-WITH v, p, COUNT(e) AS esqa_count, SUM(e.rejection_qty) AS total_rejections
-RETURN v.name AS vendor, p.part_no AS part_no, esqa_count, total_rejections
+WITH v, p, COUNT(e) AS esqa_count,
+     SUM(e.qty_reported) AS total_reported,
+     SUM(e.rejection_qty) AS total_rejections
+RETURN v.name AS vendor, p.part_no AS part_no, p.name AS part_name,
+       esqa_count, total_reported, total_rejections
 ORDER BY total_rejections DESC
 LIMIT 20
 ```
@@ -422,13 +509,15 @@ WHERE toLower(wc.complaint_desc) CONTAINS toLower('steering')
   AND wc.complaint_desc <> 'unknown'
 WITH wc LIMIT 10
 
-// Bridge to specific Vehicle and Part
+// Bridge to specific Vehicle and Part - FILTER by part name!
 MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc)
 MATCH (p:Part)-[f:FITTED_ON]->(v)
 WHERE (wc)-[:INVOLVES_PART]->(p)
+  AND p.part_no <> 'unknown'
+  AND toLower(p.name) CONTAINS toLower('steer')  // Filter relevant parts!
 
 // Use OPTIONAL MATCH for Batch to avoid losing the whole record if batch is missing
-OPTIONAL MATCH (b:Batch) 
+OPTIONAL MATCH (b:Batch)
 WHERE b.lot_no = f.scan_value AND f.scan_value <> 'unknown'
 
 // Calculate batch production volume (only if batch exists)
@@ -597,12 +686,19 @@ ORDER BY failure_count DESC
     - `f.scan_value` on `FITTED_ON` connects the specific installation to a `Batch.lot_no`.
     - This path is the ONLY way to get accurate batch-wise failure counts.
 
-12. ✅ **MODEL FILTERING RULE:**
+12. ✅ **CRITICAL: Filter parts by name relevance for specific issue queries!**
+    - `INVOLVES_PART` may connect a claim to parts that were co-involved during repair but are NOT the actual failing part.
+    - Example: A "HEAD LAMP FAILURE" claim may have INVOLVES_PART links to "Engine Lub Oil" or "FRONT TP POSITION LH" — these are NOT head lamp parts!
+    - **ALWAYS** add a part name filter: `AND toLower(p.name) CONTAINS toLower('lamp')` for head lamp, `toLower(p.name) CONTAINS toLower('steer')` for steering, etc.
+    - Also exclude unknown parts: `AND p.part_no <> 'unknown'`
+    - For generic complaints where you can't determine a keyword, skip the name filter but note potential data quality issues.
+
+13. ✅ **MODEL FILTERING RULE:**
     - When user mentions "Thar Roxx", filter by `v.base_model = 'THAR ROXX'`.
     - If user mentions "J60" or "J59", filter by `v.model`.
     - Always use `toLower(v.base_model) CONTAINS 'thar roxx'` for flexible matching.
 
-13. ✅ **DEBUGGING TRACEABILITY:**
+14. ✅ **DEBUGGING TRACEABILITY:**
     - If a traceability query returns no results, it is usually because of a hard `MATCH` on `Batch`. 
     - ALWAYS use `OPTIONAL MATCH (b:Batch)` and check `f.scan_value <> 'unknown'`.
     - If `b.batch_code` is NULL in the result, it means the part was fitted but no batch traceability record exists for that specific instance.
