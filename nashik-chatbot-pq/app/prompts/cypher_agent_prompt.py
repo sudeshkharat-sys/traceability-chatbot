@@ -342,11 +342,13 @@ WITH b.batch_code AS batch_code, b.batch_date AS batch_date, b.shift AS shift,
      COUNT(DISTINCT wc.claim_no) AS issue_failures
 
 // Get production volume across ALL lot_nos in this batch_code
+// Get ACTUAL production volume: count ALL Batch nodes with same batch_code + part_no
+// Batch nodes exist for every unit produced (2.7M total), not just warranty-linked ones
 CALL {
-  WITH lot_nos, part_no
-  MATCH (p2:Part {part_no: part_no})-[f2:FITTED_ON]->(v2:Vehicle)
-  WHERE f2.scan_value IN lot_nos
-  RETURN count(DISTINCT v2) AS qty_produced
+  WITH batch_code, part_no
+  MATCH (b2:Batch)
+  WHERE b2.batch_code = batch_code AND b2.lot_no CONTAINS part_no
+  RETURN count(b2) AS qty_produced
 }
 
 RETURN batch_code, batch_date, shift, part_no, part_name,
@@ -355,16 +357,22 @@ ORDER BY issue_failures DESC
 LIMIT 20
 ```
 
-**WRONG - Grouping by individual Batch node (gives qty_produced=1 per row):**
+**WRONG - Counting FITTED_ON vehicles (gives qty_produced=1-2, not actual production):**
 ```cypher
-// Each Batch node has a UNIQUE lot_no, so grouping by b gives 1 vehicle per row
-WITH b, p, COUNT(DISTINCT wc.claim_no) AS issue_failures
-OUTER CALL {
-  WITH b, p
-  MATCH (p)-[f2:FITTED_ON]->(v2:Vehicle)
-  WHERE f2.scan_value = b.lot_no  // Only matches 1 lot_no → qty_produced = 1!
+// This only counts vehicles in warranty data, NOT total production!
+CALL {
+  WITH lot_nos, part_no
+  MATCH (p2:Part {part_no: part_no})-[f2:FITTED_ON]->(v2:Vehicle)
+  WHERE f2.scan_value IN lot_nos
+  RETURN count(DISTINCT v2) AS qty_produced  // Only 1-2! NOT real production!
 }
-// RESULT: Every row shows qty_produced=1, issue_failures=1 - MEANINGLESS!
+// RESULT: Shows qty_produced=1-2 even when real batch size is 45-55 units!
+```
+
+**WRONG - Grouping by individual Batch node:**
+```cypher
+WITH b, p, COUNT(DISTINCT wc.claim_no) AS issue_failures
+// b is single Batch node with one lot_no → same problem as above
 ```
 
 **WRONG - Only showing ONE part when multiple were identified:**
@@ -403,20 +411,24 @@ MATCH (p)-[f:FITTED_ON]->(v)
 MATCH (b:Batch {lot_no: f.scan_value})
 WITH DISTINCT b.batch_code AS b_code
 
-// 2. Get all lot numbers for these batches
-MATCH (tb:Batch {batch_code: b_code})
+// 2. Count ACTUAL production per batch_code per part (from Batch node count)
+MATCH (tb:Batch)
+WHERE tb.batch_code = b_code
 WITH b_code, collect(tb.lot_no) AS lot_list
 
-// 3. Find ALL parts fitted in these batches and count production
-MATCH (p_all:Part)-[f_all:FITTED_ON]->(v_all:Vehicle)
-WHERE f_all.scan_value IN lot_list
-WITH b_code, lot_list, p_all.part_no AS part_no, p_all.name AS part_name,
-     count(DISTINCT v_all) AS qty_produced
+// 3. Find all parts in these batches and count actual production from Batch nodes
+UNWIND lot_list AS lot
+WITH b_code, lot_list,
+     // Extract part_no from lot_no format: "177:PARTNO:VENDOR:DATE:SHIFT:CODE"
+     split(lot, ':')[1] AS part_no_from_lot
+WITH b_code, lot_list, part_no_from_lot AS part_no, count(*) AS qty_produced
+MATCH (p_all:Part {part_no: part_no})
+WITH b_code, lot_list, part_no, p_all.name AS part_name, qty_produced
 
 // 4. Count failures (any complaint) for each part in these batches
 OPTIONAL MATCH (v_f:Vehicle)-[f_f:FITTED_ON]->(p_f:Part {part_no: part_no})
 WHERE f_f.scan_value IN lot_list
-MATCH (v_f)-[:HAS_CLAIM]->(wc_f:WarrantyClaim)-[:INVOLVES_PART]->(p_f)
+OPTIONAL MATCH (v_f)-[:HAS_CLAIM]->(wc_f:WarrantyClaim)-[:INVOLVES_PART]->(p_f)
 WITH b_code, part_no, part_name, qty_produced, count(DISTINCT wc_f) AS qty_failed
 
 RETURN b_code AS batch_code,
@@ -556,11 +568,13 @@ WITH b.batch_code AS batch_code, b.batch_date AS batch_date, b.shift AS shift,
      COUNT(DISTINCT wc.claim_no) AS issue_failures
 
 // Calculate batch production volume across ALL lot_nos in this batch_code
+// Get ACTUAL production volume: count ALL Batch nodes with same batch_code + part_no
+// Batch nodes exist for every unit produced (2.7M total), not just warranty-linked ones
 CALL {
-  WITH lot_nos, part_no
-  MATCH (p2:Part {part_no: part_no})-[f2:FITTED_ON]->(v2:Vehicle)
-  WHERE f2.scan_value IN lot_nos
-  RETURN count(DISTINCT v2) AS qty_produced
+  WITH batch_code, part_no
+  MATCH (b2:Batch)
+  WHERE b2.batch_code = batch_code AND b2.lot_no CONTAINS part_no
+  RETURN count(b2) AS qty_produced
 }
 
 // Get Vendor and Cp/Cpk
@@ -717,11 +731,12 @@ ORDER BY failure_count DESC
          collect(DISTINCT b.lot_no) AS lot_nos,
          COUNT(DISTINCT wc.claim_no) AS issue_failures
 
+    // Get ACTUAL production volume from Batch node count (not FITTED_ON vehicle count)
     CALL {
-      WITH lot_nos, part_no
-      MATCH (p2:Part {part_no: part_no})-[f2:FITTED_ON]->(v2:Vehicle)
-      WHERE f2.scan_value IN lot_nos
-      RETURN count(DISTINCT v2) AS qty_produced
+      WITH batch_code, part_no
+      MATCH (b2:Batch)
+      WHERE b2.batch_code = batch_code AND b2.lot_no CONTAINS part_no
+      RETURN count(b2) AS qty_produced
     }
 
     RETURN batch_code, batch_date, shift, part_no, part_name,
@@ -758,7 +773,7 @@ ORDER BY failure_count DESC
     - Each `Batch` node has a unique `lot_no`. A `batch_code` groups many `lot_no`s together.
     - **WRONG**: `WITH b, p, COUNT(...) AS failures` — groups by individual lot_no → qty_produced=1 per row
     - **CORRECT**: `WITH b.batch_code AS batch_code, ..., collect(DISTINCT b.lot_no) AS lot_nos, COUNT(...) AS failures`
-    - Then use `WHERE f2.scan_value IN lot_nos` to count qty_produced across all lot_nos in the batch_code.
+    - Then use `MATCH (b2:Batch) WHERE b2.batch_code = batch_code AND b2.lot_no CONTAINS part_no` to count actual qty_produced from all Batch nodes in the batch_code.
 
 16. ✅ **CRITICAL: Show batch data for ALL identified parts!**
     - If the parts query found 3 lamp parts, the batch query must return batches for ALL 3 parts.
