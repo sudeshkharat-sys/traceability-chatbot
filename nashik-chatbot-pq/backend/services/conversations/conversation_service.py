@@ -17,20 +17,32 @@ class ConversationService:
     """
     Service class for handling conversation flow and agent orchestration.
 
-    Neo4jConnector and AgentPool are imported lazily in __init__ so that
-    langchain_neo4j / langgraph are not pulled in at module load time.
+    Neo4jConnector and AgentPool are initialised lazily — only when the
+    first message is actually sent (process_streaming).  This keeps the
+    chat-history endpoints fast because they only need PostgreSQL.
     """
 
     def __init__(self):
-        """Initialize the ConversationService"""
-        from app.connectors.neo4j_connector import Neo4jConnector
-        from app.agents.agent_pool import AgentPool
-
-        self.neo4j = Neo4jConnector()
+        """Initialize the ConversationService (lightweight — PostgreSQL only)"""
         self.state_db = StateDBConnector()
         self.chat_manager = ChatManager(self.state_db)
-        self.agent_pool = AgentPool(self.neo4j)
-        logger.info("ConversationService initialized")
+
+        # Heavy deps — created on first use via _get_agent_pool()
+        self._neo4j = None
+        self._agent_pool = None
+        logger.info("ConversationService initialized (lightweight)")
+
+    def _get_agent_pool(self):
+        """Lazy-init Neo4j + AgentPool on first use (heavy imports)."""
+        if self._agent_pool is None:
+            from app.connectors.neo4j_connector import Neo4jConnector
+            from app.agents.agent_pool import AgentPool
+
+            logger.info("Initializing Neo4j + AgentPool (first message)...")
+            self._neo4j = Neo4jConnector()
+            self._agent_pool = AgentPool(self._neo4j)
+            logger.info("Neo4j + AgentPool ready")
+        return self._agent_pool
 
     def start_new_chat(self, payload, agent_type: str = "analyst") -> int:
         """
@@ -84,8 +96,8 @@ class ConversationService:
             citations_data = []
             response_saved = False
 
-            # Get agent from pool
-            with self.agent_pool.get_agent(conversation_id, agent_type) as agent:
+            # Get agent from pool (lazy-inits Neo4j + AgentPool on first call)
+            with self._get_agent_pool().get_agent(conversation_id, agent_type) as agent:
                 logger.info(
                     f"Using {agent_type} agent for conversation {conversation_id}"
                 )
