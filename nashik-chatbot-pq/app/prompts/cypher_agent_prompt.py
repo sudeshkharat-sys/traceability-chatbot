@@ -121,7 +121,7 @@ Use this when user asks "zone-wise top failures" WITHOUT "traceability":
 ```cypher
 CALL {
     MATCH (wc:WarrantyClaim)
-    WHERE wc.zone = 'East Zone' AND wc.complaint_desc <> 'unknown'
+    WHERE wc.zone = 'East Zone' AND wc.complaint_desc <> 'unknown' AND wc.complaint_desc <> '-' AND wc.complaint_desc <> '' AND trim(wc.complaint_desc) <> ''
     WITH wc.complaint_desc AS complaint, COUNT(*) AS failures
     RETURN 'East Zone' AS zone, complaint, failures
     ORDER BY failures DESC
@@ -130,7 +130,7 @@ CALL {
     UNION ALL
     
     MATCH (wc:WarrantyClaim)
-    WHERE wc.zone = 'North Zone' AND wc.complaint_desc <> 'unknown'
+    WHERE wc.zone = 'North Zone' AND wc.complaint_desc <> 'unknown' AND wc.complaint_desc <> '-' AND wc.complaint_desc <> '' AND trim(wc.complaint_desc) <> ''
     WITH wc.complaint_desc AS complaint, COUNT(*) AS failures
     RETURN 'North Zone' AS zone, complaint, failures
     ORDER BY failures DESC
@@ -139,7 +139,7 @@ CALL {
     UNION ALL
     
     MATCH (wc:WarrantyClaim)
-    WHERE wc.zone = 'South Zone' AND wc.complaint_desc <> 'unknown'
+    WHERE wc.zone = 'South Zone' AND wc.complaint_desc <> 'unknown' AND wc.complaint_desc <> '-' AND wc.complaint_desc <> '' AND trim(wc.complaint_desc) <> ''
     WITH wc.complaint_desc AS complaint, COUNT(*) AS failures
     RETURN 'South Zone' AS zone, complaint, failures
     ORDER BY failures DESC
@@ -148,7 +148,7 @@ CALL {
     UNION ALL
     
     MATCH (wc:WarrantyClaim)
-    WHERE wc.zone = 'West Zone' AND wc.complaint_desc <> 'unknown'
+    WHERE wc.zone = 'West Zone' AND wc.complaint_desc <> 'unknown' AND wc.complaint_desc <> '-' AND wc.complaint_desc <> '' AND trim(wc.complaint_desc) <> ''
     WITH wc.complaint_desc AS complaint, COUNT(*) AS failures
     RETURN 'West Zone' AS zone, complaint, failures
     ORDER BY failures DESC
@@ -163,7 +163,7 @@ Use this when user asks "zone-wise WITH traceability":
 ```cypher
 CALL {
     MATCH (wc:WarrantyClaim)
-    WHERE wc.zone = 'East Zone' AND wc.complaint_desc <> 'unknown'
+    WHERE wc.zone = 'East Zone' AND wc.complaint_desc <> 'unknown' AND wc.complaint_desc <> '-' AND wc.complaint_desc <> '' AND trim(wc.complaint_desc) <> ''
     WITH wc.complaint_desc AS complaint, COUNT(*) AS failures
     ORDER BY failures DESC
     LIMIT 10
@@ -182,7 +182,7 @@ CALL {
     UNION ALL
     
     MATCH (wc:WarrantyClaim)
-    WHERE wc.zone = 'North Zone' AND wc.complaint_desc <> 'unknown'
+    WHERE wc.zone = 'North Zone' AND wc.complaint_desc <> 'unknown' AND wc.complaint_desc <> '-' AND wc.complaint_desc <> '' AND trim(wc.complaint_desc) <> ''
     WITH wc.complaint_desc AS complaint, COUNT(*) AS failures
     ORDER BY failures DESC
     LIMIT 10
@@ -201,7 +201,7 @@ CALL {
     UNION ALL
     
     MATCH (wc:WarrantyClaim)
-    WHERE wc.zone = 'South Zone' AND wc.complaint_desc <> 'unknown'
+    WHERE wc.zone = 'South Zone' AND wc.complaint_desc <> 'unknown' AND wc.complaint_desc <> '-' AND wc.complaint_desc <> '' AND trim(wc.complaint_desc) <> ''
     WITH wc.complaint_desc AS complaint, COUNT(*) AS failures
     ORDER BY failures DESC
     LIMIT 10
@@ -220,7 +220,7 @@ CALL {
     UNION ALL
     
     MATCH (wc:WarrantyClaim)
-    WHERE wc.zone = 'West Zone' AND wc.complaint_desc <> 'unknown'
+    WHERE wc.zone = 'West Zone' AND wc.complaint_desc <> 'unknown' AND wc.complaint_desc <> '-' AND wc.complaint_desc <> '' AND trim(wc.complaint_desc) <> ''
     WITH wc.complaint_desc AS complaint, COUNT(*) AS failures
     ORDER BY failures DESC
     LIMIT 10
@@ -253,9 +253,13 @@ ORDER BY zone ASC, failures DESC
 ### Overall Top Failures
 **IMPORTANT:** Always return at least Top 5 results. Never return a single item.
 **IMPORTANT:** Do NOT include constant columns like base_model when all rows have the same value - they add no information and cause chart x-axis label issues.
+**IMPORTANT:** Always filter out junk complaint descriptions: `'unknown'`, `'-'`, empty strings, and whitespace-only values.
 ```cypher
 MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
 WHERE wc.complaint_desc <> 'unknown'
+  AND wc.complaint_desc <> '-'
+  AND wc.complaint_desc <> ''
+  AND trim(wc.complaint_desc) <> ''
 WITH wc.complaint_desc AS complaint, COUNT(*) AS claim_count
 RETURN complaint, claim_count
 ORDER BY claim_count DESC
@@ -264,10 +268,14 @@ LIMIT 10
 
 ### Top Failures for a specific model (e.g., Thar Roxx)
 **Do NOT include base_model as a column** - it will be the same value for every row and causes x-axis issues in charts.
+**Always filter out junk complaint descriptions:** `'unknown'`, `'-'`, empty strings.
 ```cypher
 MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc:WarrantyClaim)
 WHERE toLower(v.base_model) CONTAINS 'thar roxx'
   AND wc.complaint_desc <> 'unknown'
+  AND wc.complaint_desc <> '-'
+  AND wc.complaint_desc <> ''
+  AND trim(wc.complaint_desc) <> ''
 RETURN wc.complaint_desc AS complaint, COUNT(*) AS claim_count
 ORDER BY claim_count DESC
 LIMIT 10
@@ -313,9 +321,11 @@ RETURN p.part_no, p.name, COUNT(*) AS failures
 Use this when user asks about a SPECIFIC issue and wants batch grouping.
 **IMPORTANT: Maintain the issue filter AND part name filter when grouping by batch!**
 **IMPORTANT: Always include qty_produced alongside issue_failures for context!**
+**CRITICAL: Group by batch_code (NOT individual lot_no/Batch nodes)!** Each batch_code contains many lot_nos. Grouping by individual Batch nodes gives qty_produced=1 per row which is meaningless. Always aggregate across all lot_nos within a batch_code.
+**CRITICAL: Include ALL identified parts!** If the parts query found 3 lamp parts, show batches for ALL 3, not just one.
 ```cypher
 // User asks: "show me head lamp failures grouped by batch"
-// CORRECT: Only count head lamp failures, with production volume for context
+// CORRECT: Group by batch_code (not individual lot_no), include ALL lamp parts
 MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part)
 WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
   AND p.part_no <> 'unknown'
@@ -325,25 +335,43 @@ MATCH (p)-[f:FITTED_ON]->(v)
 OPTIONAL MATCH (b:Batch)
 WHERE b.lot_no = f.scan_value AND f.scan_value <> 'unknown'
 
-WITH b, p, COUNT(DISTINCT wc.claim_no) AS issue_failures
+// Group by batch_code (NOT individual Batch/lot_no) to get meaningful volumes
+WITH b.batch_code AS batch_code, b.batch_date AS batch_date, b.shift AS shift,
+     p.part_no AS part_no, p.name AS part_name,
+     collect(DISTINCT b.lot_no) AS lot_nos,
+     COUNT(DISTINCT wc.claim_no) AS issue_failures
 
-// Get production volume for this batch
-OUTER CALL {
-  WITH b, p
-  MATCH (p)-[f2:FITTED_ON]->(v2:Vehicle)
-  WHERE f2.scan_value = b.lot_no AND b IS NOT NULL
+// Get production volume across ALL lot_nos in this batch_code
+CALL {
+  WITH lot_nos, part_no
+  MATCH (p2:Part {part_no: part_no})-[f2:FITTED_ON]->(v2:Vehicle)
+  WHERE f2.scan_value IN lot_nos
   RETURN count(DISTINCT v2) AS qty_produced
 }
 
-RETURN b.batch_code AS batch_code,
-       b.batch_date AS batch_date,
-       b.shift AS shift,
-       p.part_no AS part_no,
-       p.name AS part_name,
-       qty_produced,
-       issue_failures
+RETURN batch_code, batch_date, shift, part_no, part_name,
+       qty_produced, issue_failures
 ORDER BY issue_failures DESC
 LIMIT 20
+```
+
+**WRONG - Grouping by individual Batch node (gives qty_produced=1 per row):**
+```cypher
+// Each Batch node has a UNIQUE lot_no, so grouping by b gives 1 vehicle per row
+WITH b, p, COUNT(DISTINCT wc.claim_no) AS issue_failures
+OUTER CALL {
+  WITH b, p
+  MATCH (p)-[f2:FITTED_ON]->(v2:Vehicle)
+  WHERE f2.scan_value = b.lot_no  // Only matches 1 lot_no → qty_produced = 1!
+}
+// RESULT: Every row shows qty_produced=1, issue_failures=1 - MEANINGLESS!
+```
+
+**WRONG - Only showing ONE part when multiple were identified:**
+```cypher
+// If parts query found 3 lamp parts but batch query narrows to just 1
+AND p.part_no = '1701AW500091N'  // DON'T do this! Show ALL lamp parts
+// User expects batch data for ALL 3 parts, not just one
 ```
 
 **WRONG - No qty_produced (failures without context are meaningless):**
@@ -500,13 +528,14 @@ LIMIT 20
 ```
 
 ### END-TO-END TRACEABILITY (Complete Path)
-**Use this when user asks to "trace" a specific failure or wants complete traceability:**
+**Use this when user asks to "trace" a specific failure or wants complete traceability.**
+**CRITICAL: Group by batch_code (not individual lot_no) for meaningful production volumes!**
 
 ```cypher
 // Example: Trace a specific complaint end-to-end
 MATCH (wc:WarrantyClaim)
 WHERE toLower(wc.complaint_desc) CONTAINS toLower('steering')
-  AND wc.complaint_desc <> 'unknown'
+  AND wc.complaint_desc <> 'unknown' AND wc.complaint_desc <> '-'
 WITH wc LIMIT 10
 
 // Bridge to specific Vehicle and Part - FILTER by part name!
@@ -520,27 +549,35 @@ WHERE (wc)-[:INVOLVES_PART]->(p)
 OPTIONAL MATCH (b:Batch)
 WHERE b.lot_no = f.scan_value AND f.scan_value <> 'unknown'
 
-// Calculate batch production volume (only if batch exists)
-OUTER CALL {
-  WITH b, p
-  MATCH (p)-[f2:FITTED_ON]->(v2:Vehicle)
-  WHERE f2.scan_value = b.lot_no AND b IS NOT NULL
+// Group by batch_code (NOT individual lot_no) for meaningful production volumes
+WITH b.batch_code AS batch_code, b.batch_date AS batch_date, b.shift AS shift,
+     p.part_no AS part_no, p.name AS part_name,
+     collect(DISTINCT b.lot_no) AS lot_nos,
+     COUNT(DISTINCT wc.claim_no) AS issue_failures
+
+// Calculate batch production volume across ALL lot_nos in this batch_code
+CALL {
+  WITH lot_nos, part_no
+  MATCH (p2:Part {part_no: part_no})-[f2:FITTED_ON]->(v2:Vehicle)
+  WHERE f2.scan_value IN lot_nos
   RETURN count(DISTINCT v2) AS qty_produced
 }
 
 // Get Vendor and Cp/Cpk
-OPTIONAL MATCH (vendor:Vendor)-[:SUPPLIES]->(p)
-OPTIONAL MATCH (vendor)-[cpk:HAS_CPK]->(p)
+OPTIONAL MATCH (vendor:Vendor)-[:SUPPLIES]->(p3:Part {part_no: part_no})
+OPTIONAL MATCH (vendor)-[cpk:HAS_CPK]->(p3)
 
 RETURN
-  wc.claim_no AS claim,
-  wc.complaint_desc AS complaint,
-  p.name AS part_name,
-  p.part_no AS part_no,
-  b.batch_code AS batch_code,
-  qty_produced AS batch_produced,
+  batch_code,
+  batch_date,
+  shift,
+  part_name,
+  part_no,
+  qty_produced,
+  issue_failures,
   vendor.name AS vendor,
   cpk.cpk AS cpk_value
+ORDER BY issue_failures DESC
 LIMIT 20
 ```
 
@@ -658,26 +695,38 @@ ORDER BY failure_count DESC
     - **CORRECT**: Use `Vehicle` and `FITTED_ON` to bridge the specific failure to its specific batch.
     - **Logic**: A `WarrantyClaim` is for a `Vehicle`. That `Vehicle` had a specific `Part` instance `FITTED_ON` it from a specific `Batch`.
 
-    **Example - CORRECT Traceability Query:**
+    **Example - CORRECT Traceability Query (grouped by batch_code, not individual lot_no):**
     ```cypher
     MATCH (wc:WarrantyClaim)
     WHERE toLower(wc.complaint_desc) CONTAINS toLower('head lamp')
       AND wc.zone = 'East Zone'
-    
+
     // Bridge to the specific Vehicle and the Part fitted on it
     MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc)
     MATCH (p:Part)-[f:FITTED_ON]->(v)
     WHERE (wc)-[:INVOLVES_PART]->(p) // Ensure we look at the part that failed
-    
+
     // Match the specific Batch safely
-    OPTIONAL MATCH (b:Batch) 
+    OPTIONAL MATCH (b:Batch)
     WHERE b.lot_no = f.scan_value AND f.scan_value <> 'unknown'
-    
-    RETURN b.batch_code AS batch_code,
-           b.batch_date AS batch_date,
-           b.shift AS shift,
-           COUNT(*) AS part_failures_from_batch
-    ORDER BY part_failures_from_batch DESC
+
+    // CRITICAL: Group by batch_code (NOT individual lot_no/Batch nodes)
+    // Each batch_code has many lot_nos; grouping by individual Batch gives qty_produced=1
+    WITH b.batch_code AS batch_code, b.batch_date AS batch_date, b.shift AS shift,
+         p.part_no AS part_no, p.name AS part_name,
+         collect(DISTINCT b.lot_no) AS lot_nos,
+         COUNT(DISTINCT wc.claim_no) AS issue_failures
+
+    CALL {
+      WITH lot_nos, part_no
+      MATCH (p2:Part {part_no: part_no})-[f2:FITTED_ON]->(v2:Vehicle)
+      WHERE f2.scan_value IN lot_nos
+      RETURN count(DISTINCT v2) AS qty_produced
+    }
+
+    RETURN batch_code, batch_date, shift, part_no, part_name,
+           qty_produced, issue_failures
+    ORDER BY issue_failures DESC
     LIMIT 20
     ```
 
@@ -685,6 +734,8 @@ ORDER BY failure_count DESC
     - `:INVOLVES_PART` connects Claim to Part Number (Fast).
     - `f.scan_value` on `FITTED_ON` connects the specific installation to a `Batch.lot_no`.
     - This path is the ONLY way to get accurate batch-wise failure counts.
+    - **ALWAYS group by `batch_code`** (NOT individual Batch nodes which have unique lot_no). Each batch_code has many lot_nos. Grouping by lot_no gives qty_produced=1 per row.
+    - **ALWAYS include ALL identified parts** in batch results. If 3 parts were found, show batches for all 3.
 
 12. ✅ **CRITICAL: Filter parts by name relevance for specific issue queries!**
     - `INVOLVES_PART` may connect a claim to parts that were co-involved during repair but are NOT the actual failing part.
@@ -698,17 +749,36 @@ ORDER BY failure_count DESC
     - If user mentions "J60" or "J59", filter by `v.model`.
     - Always use `toLower(v.base_model) CONTAINS 'thar roxx'` for flexible matching.
 
-14. ✅ **DEBUGGING TRACEABILITY:**
+14. ✅ **CRITICAL: Filter out junk complaint descriptions!**
+    - Always exclude `'-'`, `''`, and whitespace-only values in addition to `'unknown'`.
+    - Use: `AND wc.complaint_desc <> 'unknown' AND wc.complaint_desc <> '-' AND wc.complaint_desc <> '' AND trim(wc.complaint_desc) <> ''`
+    - A dash `-` is NOT a valid complaint — it's missing data that should never appear in top issues.
+
+15. ✅ **CRITICAL: Group by batch_code, NOT individual Batch nodes!**
+    - Each `Batch` node has a unique `lot_no`. A `batch_code` groups many `lot_no`s together.
+    - **WRONG**: `WITH b, p, COUNT(...) AS failures` — groups by individual lot_no → qty_produced=1 per row
+    - **CORRECT**: `WITH b.batch_code AS batch_code, ..., collect(DISTINCT b.lot_no) AS lot_nos, COUNT(...) AS failures`
+    - Then use `WHERE f2.scan_value IN lot_nos` to count qty_produced across all lot_nos in the batch_code.
+
+16. ✅ **CRITICAL: Show batch data for ALL identified parts!**
+    - If the parts query found 3 lamp parts, the batch query must return batches for ALL 3 parts.
+    - Do NOT add extra part_no filters that narrow to a single part. The part_name filter (e.g., `CONTAINS 'lamp'`) already ensures relevance.
+
+17. ✅ **DEBUGGING TRACEABILITY:**
     - If a traceability query returns no results, it is usually because of a hard `MATCH` on `Batch`. 
     - ALWAYS use `OPTIONAL MATCH (b:Batch)` and check `f.scan_value <> 'unknown'`.
     - If `b.batch_code` is NULL in the result, it means the part was fitted but no batch traceability record exists for that specific instance.
 
 **Example - Top Issues for Thar Roxx:**
 **Do NOT include base_model as a return column** - it's the same for every row and causes chart x-axis issues.
+**Always filter out junk complaint descriptions:** `'unknown'`, `'-'`, empty strings.
 ```cypher
 MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc:WarrantyClaim)
 WHERE toLower(v.base_model) CONTAINS 'thar roxx'
   AND wc.complaint_desc <> 'unknown'
+  AND wc.complaint_desc <> '-'
+  AND wc.complaint_desc <> ''
+  AND trim(wc.complaint_desc) <> ''
 RETURN wc.complaint_desc AS complaint, COUNT(*) AS claim_count
 ORDER BY claim_count DESC
 LIMIT 10
