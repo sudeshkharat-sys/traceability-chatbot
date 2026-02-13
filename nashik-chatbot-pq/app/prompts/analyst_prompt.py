@@ -249,6 +249,7 @@ Bot: "Head lamp failure analysis:
 10. **CRITICAL: Group batches by batch_code, NOT by individual lot_no!** Each batch_code contains many lot_nos. Grouping by individual Batch nodes gives qty_produced=1 per row (meaningless). Always use `b.batch_code` in the WITH/GROUP BY clause and `collect(DISTINCT b.lot_no)` to aggregate lot_nos, then count all Batch nodes with same batch_code + part_no for actual qty_produced.
 11. **"Top" queries must return at least 5 results** - Never return a single item for "top issue/failure" queries. Default to Top 5 minimum, Top 10 for detailed analysis.
 12. **CRITICAL: Filter out junk complaint descriptions!** Always exclude `'-'`, `''`, and whitespace-only values in addition to `'unknown'`. Use: `AND wc.complaint_desc <> 'unknown' AND wc.complaint_desc <> '-' AND wc.complaint_desc <> '' AND trim(wc.complaint_desc) <> ''`
+13. **CRITICAL: Filter out junk ESQA records!** ESQA data may contain incorrectly coded records (e.g., `esqa_no = unknown`, or unrelated descriptions like "Handbrake Fouling to Air Bag ECU" linked to HEAD LAMP parts). ALWAYS filter: `AND toString(e.esqa_no) <> 'unknown' AND e.description IS NOT NULL AND trim(e.description) <> ''`. Showing junk ESQA records misleads the user — they will think "Handbrake Fouling" is a head lamp concern!
 
 ## RESPONSE FORMAT
 
@@ -618,10 +619,16 @@ RETURN p.part_no, p.name, vendor.name AS vendor, cpk.cp AS cp, cpk.cpk AS cpk
 **CRITICAL: Show qty_reported alongside rejection_qty!** Showing "15 rejections" alone is meaningless.
 "15 rejected out of 5000 reported" gives actual rejection rate context.
 **CRITICAL: ALWAYS format ESQA results as a PROPER MARKDOWN TABLE — NEVER as inline text or bullet lists!**
+**CRITICAL: Filter out junk ESQA records!** Records with `esqa_no = unknown` or completely unrelated descriptions (e.g., "Handbrake Fouling to Air Bag ECU" showing up for HEAD LAMP parts) are data quality issues that MISLEAD users. Always filter these out in the query.
 ```cypher
 // Run this as a SEPARATE query for the parts identified in the traceability query
 MATCH (e:ESQAConcern)-[:RAISED_FOR]->(p:Part)
 WHERE p.part_no IN ['1731AM03057N', '1731AM03054N']  // parts from the issue
+  AND e.esqa_no IS NOT NULL
+  AND toString(e.esqa_no) <> 'unknown'   // Filter out junk records with no ESQA number!
+  AND e.description IS NOT NULL
+  AND e.description <> 'unknown'
+  AND trim(e.description) <> ''
 RETURN p.part_no AS part_no, p.name AS part_name,
        e.esqa_no, e.description,
        e.qty_reported,     // HOW MANY INSPECTED (gives context!)
@@ -639,6 +646,15 @@ ORDER BY e.date DESC LIMIT 20
 | 1701AW500091N | HEAD LAMP | 2014133047 | LH head lamp DRL inoperative | 1 | 1 | 2025-09-12 |
 | 1701AW500091N | HEAD LAMP | 2014137424 | Loose assembly inside headlamp | 1 | 1 | 2025-07-22 |
 | 1701AW500101N | HEAD LAMP ASSY RH HIGH | 2014139139 | DRL inoperative | 1 | 1 | 2025-09-02 |
+```
+
+**WRONG - Including junk ESQA records (misleads users!):**
+```cypher
+// No filter on esqa_no or description → shows junk like:
+// "Handbrake Fouling to Air Bag ECU" for HEAD LAMP parts (esqa_no = unknown)
+// This is NOT a head lamp issue! It confuses the analysis.
+MATCH (e:ESQAConcern)-[:RAISED_FOR]->(p:Part)
+WHERE p.part_no IN [...]  // Missing: AND toString(e.esqa_no) <> 'unknown'
 ```
 
 **WRONG - NEVER format ESQA as inline text or bullet list (unreadable!):**

@@ -488,6 +488,10 @@ LIMIT 20
 ```cypher
 MATCH (e:ESQAConcern)-[:RAISED_FOR]->(p:Part)
 WHERE e.esqa_no IS NOT NULL
+  AND toString(e.esqa_no) <> 'unknown'
+  AND e.description IS NOT NULL
+  AND e.description <> 'unknown'
+  AND trim(e.description) <> ''
 RETURN e.esqa_no AS esqa_no,
        e.description AS description,
        e.qty_reported AS qty_reported,
@@ -500,10 +504,16 @@ LIMIT 20
 ### ESQA for Specific Parts (Used in Traceability Deep-Dives)
 **CRITICAL: Always show qty_reported alongside rejection_qty!** Just showing "15 rejections" is meaningless.
 "15 rejected out of 5000 reported" gives actual context about rejection rate.
+**CRITICAL: Filter out junk ESQA records!** Records with `esqa_no = unknown` or unrelated descriptions (e.g., "Handbrake Fouling" in a head lamp query) are data quality issues that mislead users.
 ```cypher
 // Show ESQA concerns for parts involved in a specific issue
 MATCH (e:ESQAConcern)-[:RAISED_FOR]->(p:Part)
 WHERE p.part_no IN ['1731AM03057N', '1731AM03054N']  // parts from the issue query
+  AND e.esqa_no IS NOT NULL
+  AND toString(e.esqa_no) <> 'unknown'
+  AND e.description IS NOT NULL
+  AND e.description <> 'unknown'
+  AND trim(e.description) <> ''
 RETURN p.part_no AS part_no,
        p.name AS part_name,
        e.esqa_no AS esqa_no,
@@ -779,7 +789,12 @@ ORDER BY failure_count DESC
     - If the parts query found 3 lamp parts, the batch query must return batches for ALL 3 parts.
     - Do NOT add extra part_no filters that narrow to a single part. The part_name filter (e.g., `CONTAINS 'lamp'`) already ensures relevance.
 
-17. ✅ **DEBUGGING TRACEABILITY:**
+18. ✅ **CRITICAL: Filter out junk ESQA records!**
+    - ESQA data contains incorrectly coded records: `esqa_no = unknown`, or unrelated descriptions (e.g., "Handbrake Fouling to Air Bag ECU" linked to HEAD LAMP parts).
+    - ALWAYS filter: `AND toString(e.esqa_no) <> 'unknown' AND e.description IS NOT NULL AND trim(e.description) <> ''`
+    - Showing junk ESQA records misleads users into thinking unrelated issues affect their parts.
+
+19. ✅ **DEBUGGING TRACEABILITY:**
     - If a traceability query returns no results, it is usually because of a hard `MATCH` on `Batch`. 
     - ALWAYS use `OPTIONAL MATCH (b:Batch)` and check `f.scan_value <> 'unknown'`.
     - If `b.batch_code` is NULL in the result, it means the part was fitted but no batch traceability record exists for that specific instance.
