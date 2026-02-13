@@ -13,8 +13,11 @@ function LandingPage() {
   const navigate = useNavigate();
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [justLoggedIn, setJustLoggedIn] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
   const [username, setUsername] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
@@ -68,6 +71,7 @@ function LandingPage() {
 
     try {
       await authService.login(username, password);
+      setJustLoggedIn(true);
       setIsLoggedIn(true);
       setUsername("");
       setPassword("");
@@ -84,11 +88,14 @@ function LandingPage() {
     setLoading(true);
 
     try {
-      await authService.signup(username, email, password);
+      await authService.signup(username, firstName, lastName, email, password);
       // After signup, auto-login
       await authService.login(username, password);
+      setJustLoggedIn(true);
       setIsLoggedIn(true);
       setUsername("");
+      setFirstName("");
+      setLastName("");
       setPassword("");
       setEmail("");
       setIsSignup(false);
@@ -103,6 +110,8 @@ function LandingPage() {
     setIsSignup(!isSignup);
     setError("");
     setUsername("");
+    setFirstName("");
+    setLastName("");
     setPassword("");
     setEmail("");
   };
@@ -165,6 +174,31 @@ function LandingPage() {
                 </div>
 
                 {isSignup && (
+                  <div className="auth-name-row">
+                    <div className="auth-field">
+                      <label>First Name</label>
+                      <input
+                        type="text"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        placeholder="First name"
+                        required
+                      />
+                    </div>
+                    <div className="auth-field">
+                      <label>Last Name</label>
+                      <input
+                        type="text"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        placeholder="Last name"
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {isSignup && (
                   <div className="auth-field">
                     <label>Email</label>
                     <input
@@ -221,19 +255,30 @@ function LandingPage() {
             </div>
           </div>
         ) : (
-          <div className="features-container">
-            {features.map((feature) => {
+          <div
+            className={`features-container ${
+              justLoggedIn ? "features-enter" : ""
+            }`}
+          >
+            {features.map((feature, index) => {
               const isEnabled = enabledFeatures.includes(feature.id);
               return (
                 <div
                   key={feature.id}
-                  className="feature-card"
-                  onClick={() => isEnabled && handleGetStarted(feature.route)}
+                  className={`feature-card ${
+                    justLoggedIn ? "feature-card-enter" : ""
+                  }`}
                   style={
-                    !isEnabled
+                    justLoggedIn
+                      ? {
+                          animationDelay: `${index * 0.12}s`,
+                          ...(! isEnabled && { cursor: "not-allowed", opacity: 0.6 }),
+                        }
+                      : !isEnabled
                       ? { cursor: "not-allowed", opacity: 0.6 }
                       : { cursor: "pointer" }
                   }
+                  onClick={() => isEnabled && handleGetStarted(feature.route)}
                 >
                   <div className="feature-content">
                     <img

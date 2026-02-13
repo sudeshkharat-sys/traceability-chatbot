@@ -19,7 +19,7 @@ const Sidebar = ({
   const optionsMenuRef = useRef(null);
   const settingsMenuRef = useRef(null);
 
-  const currentUsername = authService.getUsername() || "User";
+  const currentUsername = authService.getFullName();
 
   // Close options menu when clicking outside
   useEffect(() => {

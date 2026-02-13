@@ -9,15 +9,23 @@ class AuthService {
   /**
    * Sign up a new user
    * @param {string} username
+   * @param {string} firstName
+   * @param {string} lastName
    * @param {string} email
    * @param {string} password
-   * @returns {Promise<{user_id: number, username: string, message: string}>}
+   * @returns {Promise<{user_id: number, username: string, first_name: string, last_name: string, message: string}>}
    */
-  async signup(username, email, password) {
+  async signup(username, firstName, lastName, email, password) {
     const response = await fetch(`${backend_url}/auth/signup`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, email, password }),
+      body: JSON.stringify({
+        username,
+        first_name: firstName,
+        last_name: lastName,
+        email,
+        password,
+      }),
     });
 
     if (!response.ok) {
@@ -52,6 +60,8 @@ class AuthService {
     // Save session to sessionStorage
     sessionStorage.setItem("user_id", data.user_id);
     sessionStorage.setItem("username", data.username);
+    sessionStorage.setItem("first_name", data.first_name || "");
+    sessionStorage.setItem("last_name", data.last_name || "");
     sessionStorage.setItem("isLoggedIn", "true");
 
     return data;
@@ -73,6 +83,8 @@ class AuthService {
     // Always clear session regardless of API result
     sessionStorage.removeItem("user_id");
     sessionStorage.removeItem("username");
+    sessionStorage.removeItem("first_name");
+    sessionStorage.removeItem("last_name");
     sessionStorage.removeItem("isLoggedIn");
   }
 
@@ -99,6 +111,17 @@ class AuthService {
    */
   getUsername() {
     return sessionStorage.getItem("username");
+  }
+
+  /**
+   * Get user's full name from session
+   * @returns {string}
+   */
+  getFullName() {
+    const first = sessionStorage.getItem("first_name") || "";
+    const last = sessionStorage.getItem("last_name") || "";
+    const full = `${first} ${last}`.trim();
+    return full || this.getUsername() || "User";
   }
 }
 

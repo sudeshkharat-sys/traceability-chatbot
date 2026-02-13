@@ -29,12 +29,15 @@ async def signup(payload: SignupDto):
     """Register a new user"""
     try:
         result = get_auth_service().signup(
-            payload.username, payload.email, payload.password
+            payload.username, payload.first_name, payload.last_name,
+            payload.email, payload.password
         )
         return JSONResponse(
             content={
                 "user_id": result["user_id"],
                 "username": result["username"],
+                "first_name": result["first_name"],
+                "last_name": result["last_name"],
                 "message": "Signup successful",
             },
             status_code=201,
@@ -55,6 +58,8 @@ async def login(payload: LoginDto):
             content={
                 "user_id": result["user_id"],
                 "username": result["username"],
+                "first_name": result["first_name"],
+                "last_name": result["last_name"],
                 "message": "Login successful",
             }
         )

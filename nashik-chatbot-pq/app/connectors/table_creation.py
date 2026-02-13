@@ -79,6 +79,8 @@ create_dynamic_table(
             server_default=user_id_seq.next_value(),
         ),
         Column("username", String(100), nullable=False, unique=True),
+        Column("first_name", String(100), nullable=False),
+        Column("last_name", String(100), nullable=False),
         Column("email", String(255), nullable=False, unique=True),
         Column("password_hash", String(255), nullable=False),
         Column(

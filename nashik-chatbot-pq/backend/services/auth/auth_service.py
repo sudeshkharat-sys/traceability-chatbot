@@ -21,12 +21,12 @@ class AuthService:
     def _hash_password(password: str) -> str:
         return hashlib.sha256(password.encode()).hexdigest()
 
-    def signup(self, username: str, email: str, password: str) -> dict:
+    def signup(self, username: str, first_name: str, last_name: str, email: str, password: str) -> dict:
         """
         Register a new user.
 
         Returns:
-            dict with user_id and username on success
+            dict with user_id, username, first_name, last_name on success
 
         Raises:
             ValueError if username or email already exists
@@ -50,13 +50,19 @@ class AuthService:
         password_hash = self._hash_password(password)
 
         user_id = self.db.execute_insert(
-            "INSERT INTO users (username, email, password_hash) "
-            "VALUES (:username, :email, :password_hash) RETURNING user_id",
-            {"username": username, "email": email, "password_hash": password_hash},
+            "INSERT INTO users (username, first_name, last_name, email, password_hash) "
+            "VALUES (:username, :first_name, :last_name, :email, :password_hash) RETURNING user_id",
+            {
+                "username": username,
+                "first_name": first_name,
+                "last_name": last_name,
+                "email": email,
+                "password_hash": password_hash,
+            },
         )
 
         logger.info(f"New user registered: {username} (id={user_id})")
-        return {"user_id": user_id, "username": username}
+        return {"user_id": user_id, "username": username, "first_name": first_name, "last_name": last_name}
 
     def login(self, username: str, password: str) -> dict:
         """
@@ -71,7 +77,7 @@ class AuthService:
         password_hash = self._hash_password(password)
 
         rows = self.db.execute_query(
-            "SELECT user_id, username FROM users "
+            "SELECT user_id, username, first_name, last_name FROM users "
             "WHERE username = :username AND password_hash = :password_hash",
             {"username": username, "password_hash": password_hash},
         )
@@ -81,4 +87,4 @@ class AuthService:
 
         row = rows[0]
         logger.info(f"User logged in: {row[1]} (id={row[0]})")
-        return {"user_id": row[0], "username": row[1]}
+        return {"user_id": row[0], "username": row[1], "first_name": row[2], "last_name": row[3]}
