@@ -62,6 +62,34 @@ message_id_seq = Sequence("message_id_seq")
 feedback_id_seq = Sequence("feedback_id_seq")
 scraped_doc_id_seq = Sequence("scraped_doc_id_seq")
 chunk_id_seq = Sequence("chunk_id_seq")
+user_id_seq = Sequence("user_id_seq")
+
+
+# =====================================================
+# USERS TABLE (stores user accounts for login/signup)
+# =====================================================
+create_dynamic_table(
+    "users",
+    [
+        Column(
+            "user_id",
+            BigInteger,
+            user_id_seq,
+            primary_key=True,
+            server_default=user_id_seq.next_value(),
+        ),
+        Column("username", String(100), nullable=False, unique=True),
+        Column("email", String(255), nullable=False, unique=True),
+        Column("password_hash", String(255), nullable=False),
+        Column(
+            "created_at", DateTime, default=datetime.datetime.utcnow, nullable=False
+        ),
+    ],
+    indexes=[
+        Index("idx_users_username", "username"),
+        Index("idx_users_email", "email"),
+    ],
+)
 
 
 # =====================================================

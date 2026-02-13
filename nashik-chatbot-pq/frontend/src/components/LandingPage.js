@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "./LandingPage.css";
 import traceabilityIcon from "../assests/traceability.png";
@@ -7,9 +7,22 @@ import guidelineIcon from "../assests/guideline.png";
 import supportIcon from "../assests/support.png";
 import utilityLogo from "../assests/Mahindra_Logo_utilty.png";
 import mahindraRiseLogo from "../assests/mahindra_rise_logo.png";
+import { authService } from "../services/api";
 
 function LandingPage() {
   const navigate = useNavigate();
+
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isSignup, setIsSignup] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setIsLoggedIn(authService.isLoggedIn());
+  }, []);
 
   const enabledFeatures = ["traceability", "guideline"];
 
@@ -48,6 +61,52 @@ function LandingPage() {
     navigate(route);
   };
 
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      await authService.login(username, password);
+      setIsLoggedIn(true);
+      setUsername("");
+      setPassword("");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignup = async (e) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      await authService.signup(username, email, password);
+      // After signup, auto-login
+      await authService.login(username, password);
+      setIsLoggedIn(true);
+      setUsername("");
+      setPassword("");
+      setEmail("");
+      setIsSignup(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleMode = () => {
+    setIsSignup(!isSignup);
+    setError("");
+    setUsername("");
+    setPassword("");
+    setEmail("");
+  };
+
   return (
     <div className="landing-page">
       {/* Top Corner Logos */}
@@ -72,55 +131,142 @@ function LandingPage() {
               <span className="word word-3">Management</span>
             </h1>
             <p className="sub-heading">
-              Intelligent solutions for traceability, quality assurance, and diagnostic support
+              Intelligent solutions for traceability, quality assurance, and
+              diagnostic support
             </p>
           </div>
         </div>
 
-        {/* Right Section - Features List */}
-        <div className="features-container">
-          {features.map((feature) => {
-            const isEnabled = enabledFeatures.includes(feature.id);
-            return (
-              <div
-                key={feature.id}
-                className="feature-card"
-                onClick={() => isEnabled && handleGetStarted(feature.route)}
-                style={
-                  !isEnabled
-                    ? { cursor: "not-allowed", opacity: 0.6 }
-                    : { cursor: "pointer" }
-                }
-              >
-                <div className="feature-content">
-                  <img
-                    src={feature.icon}
-                    alt={feature.title}
-                    className="feature-icon"
+        {/* Right Section - Auth Form or Features */}
+        {!isLoggedIn ? (
+          <div className="auth-container">
+            <div className="auth-card">
+              <h2 className="auth-title">
+                {isSignup ? "Create Account" : "Welcome Back"}
+              </h2>
+              <p className="auth-subtitle">
+                {isSignup
+                  ? "Sign up to get started"
+                  : "Login to access your dashboard"}
+              </p>
+
+              {error && <div className="auth-error">{error}</div>}
+
+              <form onSubmit={isSignup ? handleSignup : handleLogin}>
+                <div className="auth-field">
+                  <label>Username</label>
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="Enter your username"
+                    required
                   />
-                  <div className="feature-info">
-                    <h3 className="feature-title">{feature.title}</h3>
-                    <p className="feature-description">{feature.description}</p>
-                  </div>
                 </div>
+
+                {isSignup && (
+                  <div className="auth-field">
+                    <label>Email</label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="Enter your email"
+                      required
+                    />
+                  </div>
+                )}
+
+                <div className="auth-field">
+                  <label>Password</label>
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    required
+                  />
+                </div>
+
                 <button
-                  className="get-started-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (isEnabled) {
-                      handleGetStarted(feature.route);
-                    }
-                  }}
-                  disabled={!isEnabled}
-                  style={!isEnabled ? { cursor: "not-allowed" } : {}}
+                  type="submit"
+                  className="auth-submit-btn"
+                  disabled={loading}
                 >
-                  Get started
-                  <span className="arrow-icon">→</span>
+                  {loading
+                    ? "Please wait..."
+                    : isSignup
+                    ? "Sign Up"
+                    : "Login"}
                 </button>
+              </form>
+
+              <div className="auth-toggle">
+                {isSignup ? (
+                  <span>
+                    Already have an account?{" "}
+                    <button className="auth-toggle-btn" onClick={toggleMode}>
+                      Login
+                    </button>
+                  </span>
+                ) : (
+                  <span>
+                    Don't have an account?{" "}
+                    <button className="auth-toggle-btn" onClick={toggleMode}>
+                      Sign Up
+                    </button>
+                  </span>
+                )}
               </div>
-            );
-          })}
-        </div>
+            </div>
+          </div>
+        ) : (
+          <div className="features-container">
+            {features.map((feature) => {
+              const isEnabled = enabledFeatures.includes(feature.id);
+              return (
+                <div
+                  key={feature.id}
+                  className="feature-card"
+                  onClick={() => isEnabled && handleGetStarted(feature.route)}
+                  style={
+                    !isEnabled
+                      ? { cursor: "not-allowed", opacity: 0.6 }
+                      : { cursor: "pointer" }
+                  }
+                >
+                  <div className="feature-content">
+                    <img
+                      src={feature.icon}
+                      alt={feature.title}
+                      className="feature-icon"
+                    />
+                    <div className="feature-info">
+                      <h3 className="feature-title">{feature.title}</h3>
+                      <p className="feature-description">
+                        {feature.description}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    className="get-started-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isEnabled) {
+                        handleGetStarted(feature.route);
+                      }
+                    }}
+                    disabled={!isEnabled}
+                    style={!isEnabled ? { cursor: "not-allowed" } : {}}
+                  >
+                    Get started
+                    <span className="arrow-icon">&rarr;</span>
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

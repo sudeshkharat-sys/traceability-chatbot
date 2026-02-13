@@ -3,7 +3,11 @@
  * Handles all API calls related to conversations
  */
 
-import { backend_url, backend_url_ws, CURRENT_USER_ID } from "./config";
+import { backend_url, backend_url_ws } from "./config";
+
+function getCurrentUserId() {
+  return parseInt(sessionStorage.getItem("user_id"), 10) || 1001;
+}
 
 class ConversationService {
   /**
@@ -19,7 +23,7 @@ class ConversationService {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          user_id: CURRENT_USER_ID,
+          user_id: getCurrentUserId(),
           agent_type: agentType,
         }),
       });
@@ -44,7 +48,7 @@ class ConversationService {
   async getConversationHistory(agentType = "analyst") {
     try {
       const response = await fetch(
-        `${backend_url}/conversations/user/${CURRENT_USER_ID}/history?agent_type=${agentType}`,
+        `${backend_url}/conversations/user/${getCurrentUserId()}/history?agent_type=${agentType}`,
         {
           method: "GET",
           headers: {
@@ -140,7 +144,7 @@ class ConversationService {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            user_id: CURRENT_USER_ID,
+            user_id: getCurrentUserId(),
             feedback: feedback,
             negative_feedback_comment: comment,
           }),
@@ -211,7 +215,7 @@ class ConversationService {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(
         JSON.stringify({
-          user_id: CURRENT_USER_ID,
+          user_id: getCurrentUserId(),
           user_message: userMessage,
           agent_type: agentType,
         })
