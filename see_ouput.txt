@@ -1,27 +1,28 @@
 (base) maiuser@mazdvwenapp03:~$ sudo docker exec traceability-neo4j cypher-shell -u neo4j -p "dataeaze@12345" \
-> "MATCH (b:Batch) WHERE b.qty_produced IS NOT NULL RETURN count(b) AS batches_with_qty, b.qty_produced AS sample LIMIT 5;"
+> "MATCH (b:Batch) WHERE b.batch_code = '872' AND b.lot_no CONTAINS '1701AW500091N' RETURN count(b) AS total_in_batch;"
 
-(base) maiuser@mazdvwenapp03:~$ sudo docker exec traceability-neo4j cypher-shell -u neo4j -p "dataeaze@12345" "MATCH (b:Batch) WHERE b.
-qty_produced IS NOT NULL RETURN count(b) AS batches_with_qty, b.qty_produced AS sample LIMIT 5;"
-(base) maiuser@mazdvwenapp03:~$ # Check what properties Batch nodes actually have
+total_in_batch
+45
+(base) maiuser@mazdvwenapp03:~$ # Compare: for batch_code "563" for HEAD LAMP ASSY RH HIGH
 (base) maiuser@mazdvwenapp03:~$ sudo docker exec traceability-neo4j cypher-shell -u neo4j -p "dataeaze@12345" \
-> "MATCH (b:Batch) RETURN keys(b) AS properties LIMIT 1;"
+> "MATCH (b:Batch) WHERE b.batch_code = '563' AND b.lot_no CONTAINS '1701AW500101N' RETURN count(b) AS total_in_batch;"
 
-properties
-["lot_no", "batch_code", "batch_date", "shift"]
-(base) maiuser@mazdvwenapp03:~$ # Check what properties ESQAConcern nodes actually have
-(base) maiuser@mazdvwenapp03:~$ sudo docker exec traceability-neo4j cypher-shell -u neo4j -p "dataeaze@12345" \
-> "MATCH (e:ESQAConcern) RETURN keys(e) AS properties LIMIT 1;"
-
-properties
-["rejection_qty", "qty_reported", "scrap_qty", "esqa_no", "date", "vehicle_model", "rework_qty", "description"]
-(base) maiuser@mazdvwenapp03:~$ # Check ESQA links for all 3 lamp parts
+total_in_batch
+55
+(base) maiuser@mazdvwenapp03:~$ # Also verify the ESQA description field actually has data
 (base) maiuser@mazdvwenapp03:~$ sudo docker exec traceability-neo4j cypher-shell -u neo4j -p "dataeaze@12345" \
 > "MATCH (e:ESQAConcern)-[:RAISED_FOR]->(p:Part) WHERE p.part_no IN ['1701AW500091N','1701AW500101N','1701AW500121N'] RETURN p.part_no,
- count(e) AS esqa_count;"
+ p.name, e.description, e.qty_reported, e.rejection_qty ORDER BY p.part_no LIMIT 10;"
 
-p.part_no, esqa_count
-"1701AW500091N", 15
-"1701AW500101N", 13
-"1701AW500121N", 3
-(base) maiuser@mazdvwenapp03:~$ 
+p.part_no, p.name, e.description, e.qty_reported, e.rejection_qty
+"1701AW500091N", "HEAD LAMP", "Shade Variation Between Head Lamp DRL RH To LH", 1, 1
+"1701AW500091N", "HEAD LAMP", "Auto Aiming not proper", 1, 1
+"1701AW500091N", "HEAD LAMP", "Head lamp fitment not possible.", 1, 1
+"1701AW500091N", "HEAD LAMP", "Loose assembly inside the headlamp.", 1, 1
+"1701AW500091N", "HEAD LAMP", "Traceability not Done", 1, 0
+"1701AW500091N", "HEAD LAMP", "RH head lamp intermittent.", 1, 1
+"1701AW500091N", "HEAD LAMP", "Traceability not Done", 1, 1
+"1701AW500091N", "HEAD LAMP", "Fitment Not Possible", 1, 1
+"1701AW500091N", "HEAD LAMP", "Handbrake Fouling to Air Bag ECU.", 1, 0
+"1701AW500091N", "HEAD LAMP", "Pink Mark Observe on the LH head Lamp", 1, 1
+(base) maiuser@mazdvwenapp03:~$
