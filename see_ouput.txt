@@ -1,94 +1,68 @@
-give me for the head lamp failure
-
-Bot
-Part-wise Failures - THAR ROXX Head Lamp
-1701AW500091N
-1701AW500101N
-1701AW500121N
-Part No
-0
-0.5
-1
-1.5
-2
-Cp
-THAR ROXX – Head Lamp Failure:
-End-to-End AnalysisFocused on THAR ROXX vehicles with complaint descriptions containing “head lamp,” filtered to lamp-related parts only and excluding unknown/empty descriptions.
-
-Parts Involved (Issue-Filtered)
-Chart: Part-wise Failures - THAR ROXX Head Lamp
-
-Part Number	Part Name	Claim Count
-1701AW500101N	HEAD LAMP ASSY RH (HIGH)	44
-1701AW500091N	HEAD LAMP	35
-1701AW500121N	HEAD LAMP ASSY RH (BASE)	2
-Batch-wise Concentration (Grouped by Batch Code, with Production Context)
-Chart: Batch-wise Concentration - Head Lamp (THAR ROXX)
-
-Batch Code	Batch Date	Shift	Part Number	Part Name	Qty Produced	Issue Failures
-062	100625	01	1701AW500091N	HEAD LAMP	42	1
-562	220625	01	1701AW500091N	HEAD LAMP	30	1
-866	300425	01	1701AW500091N	HEAD LAMP	37	1
-184	030425	01	1701AW500091N	HEAD LAMP	46	1
-957	310125	01	1701AW500091N	HEAD LAMP	38	1
-025	120625	01	1701AW500091N	HEAD LAMP	44	1
-959	030525	01	1701AW500091N	HEAD LAMP	39	1
-384	260525	01	1701AW500091N	HEAD LAMP	33	1
-235	250325	01	1701AW500091N	HEAD LAMP	42	1
-829	170325	01	1701AW500091N	HEAD LAMP	35	1
-732	240325	01	1701AW500091N	HEAD LAMP	37	1
-901	170325	01	1701AW500091N	HEAD LAMP	45	1
-345	040525	01	1701AW500091N	HEAD LAMP	36	1
-412	040525	01	1701AW500091N	HEAD LAMP	35	1
-604	080625	01	1701AW500091N	HEAD LAMP	40	1
-554	240525	01	1701AW500091N	HEAD LAMP	29	1
-575	120325	01	1701AW500091N	HEAD LAMP	32	1
-299	270325	01	1701AW500091N	HEAD LAMP	37	1
-640	060425	01	1701AW500091N	HEAD LAMP	41	1
-398	300125	01	1701AW500091N	HEAD LAMP	36	1
-Note: Batch production volumes are counted from Batch nodes for each batch_code and part_no. Failures are strictly for head lamp complaints.
-
-Supplier and Capability (PPCM)
-Part Number	Part Name	Vendor	Cp	Cpk
-1701AW500091N	HEAD LAMP	LUMAX INDUSTRIES LIMITED	1.9	1.71
-1701AW500101N	HEAD LAMP ASSY RH (HIGH)	LUMAX INDUSTRIES LIMITED	1.9	1.69
-1701AW500121N	HEAD LAMP ASSY RH (BASE)	LUMAX INDUSTRIES LIMITED	1.87	1.71
-Interpretation: Cp/Cpk values are above1.33, indicating nominally capable processes at the supplier for the measured characteristics. Field failures may be linked to specific batches, assembly variation, or usage/environmental factors rather than overall process capability.
-
-ESQA Incoming Quality (Context with Qty Reported)
-Part Number	Part Name	ESQA No	Description	Qty Reported	Rejection Qty	Date
-1701AW500101N	HEAD LAMP ASSY RH (HIGH)	unknown	Handbrake Fouling to Air Bag ECU.	1	0	2025-09-26
-1701AW500091N	HEAD LAMP	unknown	Handbrake Fouling to Air Bag ECU.	1	0	2025-09-26
-1701AW500091N	HEAD LAMP	2014133047	LH head lamp DRL inoperative	1	1	2025-09-12
-1701AW500101N	HEAD LAMP ASSY RH (HIGH)	2014139139	DRL inoperative	1	1	2025-09-02
-1701AW500101N	HEAD LAMP ASSY RH (HIGH)	2014132278	DRL Shade variation	1	1	2025-09-02
-1701AW500091N	HEAD LAMP	2014137424	Loose assembly inside the headlamp.	1	1	2025-07-22
-1701AW500091N	HEAD LAMP	2014137397	Head lamp fitment not possible.	1	1	2025-07-22
-1701AW500121N	HEAD LAMP ASSY RH (BASE)	2014137270	Headlamp Inoperative	1	1	2025-07-17
-1701AW500101N	HEAD LAMP ASSY RH (HIGH)	2014126053	RH head lamp DRL Inoperative	1	1	2025-07-15
-1701AW500091N	HEAD LAMP	2014136497	Auto Aiming not proper	1	1	2025-06-26
-1701AW500091N	HEAD LAMP	2014132107	Traceability not Done	1	0	2025-06-10
-1701AW500101N	HEAD LAMP ASSY RH (HIGH)	2014135186	High beam Inoperative	1	1	2025-05-26
-1701AW500091N	HEAD LAMP	2014134234	Fitment Not Possible	1	1	2025-05-02
-1701AW500101N	HEAD LAMP ASSY RH (HIGH)	2014133281	RH head lamp DRL Inoperative	1	1	2025-04-22
-1701AW500091N	HEAD LAMP	2014133803	Traceability not Done	1	1	2025-04-19
-1701AW500101N	HEAD LAMP ASSY RH (HIGH)	2014133240	RH Head Lamp Wrong	1	1	2025-04-05
-1701AW500121N	HEAD LAMP ASSY RH (BASE)	2014132937	RHS DRL black cap missing	1	1	2025-04-01
-1701AW500121N	HEAD LAMP ASSY RH (BASE)	2014132880	Poor appearance on head lamp.	1	1	2025-03-26
-1701AW500091N	HEAD LAMP	2014126322	DRL inoperative.	1	1	2025-03-20
-1701AW500101N	HEAD LAMP ASSY RH (HIGH)	2014132289	Poor appearance on head lamp	1	1	2025-03-13
-Note: ESQA rows with “unknown” ESQA No are likely incorrectly coded records and should be cleaned; all other rows show1 rejected out of1 reported, indicating low-volume but recurring issues (DRL inoperative, fitment, appearance).
-
-Key Insights
-Parts involved:
-1701AW500101N (44 claims) and1701AW500091N (35 claims) are the primary contributors;1701AW500121N is rare but present.
-
-Batch concentration: Failures are sparse across many batches (typically1 per batch) with batch production volumes around29 to46 units, pointing to sporadic defects rather than a single bad batch.
-Supplier capability: Cp/Cpk >1.33 for all three lamp parts suggests supplier process capability is generally under control; field issues may stem from assembly handling, fitment, or component interactions (e.g., DRL control, aiming).
-ESQA alignment: Multiple incoming concerns mirror field symptoms (DRL inoperative, fitment not possible, loose assembly, appearance), reinforcing an assembly/fitment robustness focus.
-Next Steps
-Zone-wise drill down for head lamp failures to find any regional spikes (service practices or environmental factors).
-VIN-level trace for clusters within the same dealer or production day to isolate handling or assembly-related causes.
-Review DRL and aiming calibration procedures at plant and service; audit torque/clip engagement for lamp assemblies.
-Supplier joint investigation with Lumax on DRL module reliability and assembly integrity; verify packaging/transport controls.
-Monitor trends over the next two months post-actions to confirm effectiveness.
+INFO:     127.0.0.1:53922 - "GET /api/conversations/user/2/history?agent_type=standards_guidelines HTTP/1.1" 200 OK
+2026-02-13 13:02:37,209 [INFO] app.chat_history.chat_manager: Retrieved 0 chats for user 2
+2026-02-13 13:02:37,210 [INFO] backend.services.conversations.conversation_service: Listed 0 chats for user 2 (type: standards_guidelines)
+INFO:     127.0.0.1:53922 - "GET /api/conversations/user/2/history?agent_type=standards_guidelines HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57708 - "POST /api/auth/logout HTTP/1.1" 200 OK
+(ai) PS C:\Users\50014665\GraphRag\Traceability\nashik-chatbot-pq> python .\main.py
+INFO:     Will watch for changes in these directories: ['C:\\Users\\50014665\\GraphRag\\Traceability\\nashik-chatbot-pq\\app', 'C:\\Users\\50014665\\GraphRag\\Traceability\\nashik-chatbot-pq\\backend']
+INFO:     Uvicorn running on http://0.0.0.0:5000 (Press CTRL+C to quit)
+INFO:     Started reloader process [31196] using WatchFiles
+INFO:     Started server process [23068]
+INFO:     Waiting for application startup.
+2026-02-13 13:08:06,015 [INFO] main: 🚀 Application starting up...
+2026-02-13 13:08:06,357 [INFO] app.connectors.table_creation: All table definitions created successfully
+2026-02-13 13:08:06,357 [INFO] app.services.startup_initializer: ============================================================
+2026-02-13 13:08:06,357 [INFO] app.services.startup_initializer: 🚀 Starting Application Initialization...
+2026-02-13 13:08:06,357 [INFO] app.services.startup_initializer: ============================================================
+2026-02-13 13:08:06,357 [INFO] app.services.startup_initializer:
+📊 Step 1/4: Initializing Database...
+2026-02-13 13:08:06,577 [INFO] app.connectors.state_db_manager: Database 'chatbot' already exists
+2026-02-13 13:08:06,577 [INFO] app.services.startup_initializer:   ✅ Database initialized
+2026-02-13 13:08:06,577 [INFO] app.services.startup_initializer:
+📋 Step 2/4: Creating Tables...
+2026-02-13 13:08:06,577 [INFO] app.services.startup_initializer: 📝 Step 3/4: Seeding Prompts...
+2026-02-13 13:08:06,712 [INFO] app.services.startup_initializer:   ✅ Tables ready (11)
+2026-02-13 13:08:06,731 [INFO] app.services.startup_initializer:   ✅ Prompts seeded (4/4)
+2026-02-13 13:08:06,731 [INFO] app.services.prompt_manager: Prompt cache cleared
+2026-02-13 13:08:06,883 [INFO] app.services.prompt_manager: Refreshed cache with 4 prompts
+2026-02-13 13:08:06,883 [INFO] app.services.startup_initializer:
+🔌 Step 4/4: Validating Connections...
+2026-02-13 13:08:06,883 [INFO] app.services.startup_initializer:   ✅ PostgreSQL — already validated by steps 1-3
+2026-02-13 13:08:56,982 [INFO] app.connectors.neo4j_connector: Successfully connected to Neo4j at neo4j://127.0.0.1:7687
+2026-02-13 13:08:56,982 [INFO] app.connectors.neo4j_connector: Neo4j connection closed
+2026-02-13 13:08:56,982 [INFO] app.services.startup_initializer:   ✅ Neo4j connection validated
+2026-02-13 13:08:57,816 [INFO] opensearch: GET http://localhost:9200/ [status:200 request:0.119s]
+2026-02-13 13:08:57,816 [INFO] app.services.startup_initializer:   ✅ OpenSearch connection validated
+2026-02-13 13:08:57,816 [INFO] main: ✅ Application initialized successfully
+INFO:     Application startup complete.
+2026-02-13 13:08:58,915 [INFO] app.connectors.state_db_connector: Successfully connected to PostgreSQL at localhost
+2026-02-13 13:08:58,919 [INFO] backend.services.auth.auth_service: User logged in: pj (id=2)
+INFO:     127.0.0.1:64548 - "POST /api/auth/login HTTP/1.1" 200 OK
+2026-02-13 13:09:44,780 [INFO] app.connectors.neo4j_connector: Successfully connected to Neo4j at neo4j://127.0.0.1:7687
+2026-02-13 13:09:44,891 [INFO] app.connectors.state_db_connector: Successfully connected to PostgreSQL at localhost
+2026-02-13 13:09:45,081 [INFO] app.agents.checkpointer_manager: Initializing PostgreSQL checkpointer: localhost:5432/chatbot
+2026-02-13 13:09:45,208 [INFO] app.agents.checkpointer_manager: ✅ PostgreSQL checkpointer initialized successfully
+2026-02-13 13:09:45,208 [INFO] app.agents.agent_pool: 🧠 Agent pool initialized with PostgreSQL conversation memory
+2026-02-13 13:09:45,208 [INFO] backend.services.conversations.conversation_service: ConversationService initialized
+2026-02-13 13:09:45,208 [INFO] app.chat_history.chat_manager: Retrieved 0 chats for user 2
+2026-02-13 13:09:45,208 [INFO] backend.services.conversations.conversation_service: Listed 0 chats for user 2 (type: analyst)
+INFO:     127.0.0.1:61905 - "GET /api/conversations/user/2/history?agent_type=analyst HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63143 - "OPTIONS /api/conversations/user/1001/history?agent_type=analyst HTTP/1.1" 200 OK
+2026-02-13 13:09:45,224 [INFO] app.chat_history.chat_manager: Retrieved 0 chats for user 2
+2026-02-13 13:09:45,224 [INFO] backend.services.conversations.conversation_service: Listed 0 chats for user 2 (type: analyst)
+INFO:     127.0.0.1:61693 - "GET /api/conversations/user/2/history?agent_type=analyst HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61557 - "POST /api/auth/logout HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64970 - "OPTIONS /api/conversations/user/1001/history?agent_type=analyst HTTP/1.1" 200 OK
+2026-02-13 13:09:45,224 [INFO] app.chat_history.chat_manager: Retrieved 0 chats for user 1001
+2026-02-13 13:09:45,224 [INFO] backend.services.conversations.conversation_service: Listed 0 chats for user 1001 (type: analyst)
+INFO:     127.0.0.1:63143 - "GET /api/conversations/user/1001/history?agent_type=analyst HTTP/1.1" 200 OK
+2026-02-13 13:09:45,232 [INFO] app.chat_history.chat_manager: Retrieved 0 chats for user 1001
+2026-02-13 13:09:45,232 [INFO] backend.services.conversations.conversation_service: Listed 0 chats for user 1001 (type: analyst)
+INFO:     127.0.0.1:63143 - "GET /api/conversations/user/1001/history?agent_type=analyst HTTP/1.1" 200 OK
+2026-02-13 13:10:09,084 [INFO] app.chat_history.chat_manager: Retrieved 0 chats for user 1001
+2026-02-13 13:10:09,084 [INFO] backend.services.conversations.conversation_service: Listed 0 chats for user 1001 (type: analyst)
+INFO:     127.0.0.1:62296 - "GET /api/conversations/user/1001/history?agent_type=analyst HTTP/1.1" 200 OK
+2026-02-13 13:10:09,096 [INFO] app.chat_history.chat_manager: Retrieved 0 chats for user 1001
+2026-02-13 13:10:09,097 [INFO] backend.services.conversations.conversation_service: Listed 0 chats for user 1001 (type: analyst)
+INFO:     127.0.0.1:62296 - "GET /api/conversations/user/1001/history?agent_type=analyst HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55818 - "POST /api/auth/logout HTTP/1.1" 200 OK

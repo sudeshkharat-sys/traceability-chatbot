@@ -9,8 +9,11 @@
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
+  padding-top: 80px; /* Space for logos */
   position: relative;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  box-sizing: border-box;
 }
 
 /* Corner Logos */
@@ -20,7 +23,7 @@
   height: 60px;
   width: auto;
   object-fit: contain;
-  z-index: 10;
+  z-index: 100;
   animation: fadeIn 1s ease;
 }
 
@@ -302,21 +305,21 @@
   width: 100%;
   background: #ffffff;
   border-radius: 12px;
-  padding: 2rem 2rem 1.5rem;
+  padding: 1.5rem 1.75rem 1.25rem;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
   border-top: 4px solid #DC143C;
 }
 
 .auth-title {
-  margin: 0 0 0.25rem;
-  font-size: 1.4rem;
+  margin: 0 0 0.2rem;
+  font-size: 1.35rem;
   font-weight: 700;
   color: #1a1a1a;
 }
 
 .auth-subtitle {
-  margin: 0 0 1.25rem;
-  font-size: 0.85rem;
+  margin: 0 0 1rem;
+  font-size: 0.82rem;
   color: #666666;
 }
 
@@ -325,29 +328,29 @@
   color: #cc0000;
   border: 1px solid #ffcccc;
   border-radius: 6px;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.8rem;
-  margin-bottom: 1rem;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.78rem;
+  margin-bottom: 0.8rem;
 }
 
 .auth-field {
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
 }
 
 .auth-field label {
   display: block;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 600;
   color: #333;
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.25rem;
 }
 
 .auth-field input {
   width: 100%;
-  padding: 0.6rem 0.75rem;
+  padding: 0.5rem 0.75rem;
   border: 1px solid #ddd;
   border-radius: 6px;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   outline: none;
   transition: border-color 0.2s ease;
   box-sizing: border-box;
@@ -360,16 +363,16 @@
 
 .auth-submit-btn {
   width: 100%;
-  padding: 0.7rem;
+  padding: 0.65rem;
   background: #DC143C;
   color: #fff;
   border: none;
   border-radius: 8px;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s ease;
-  margin-top: 0.25rem;
+  margin-top: 0.15rem;
 }
 
 .auth-submit-btn:hover:not(:disabled) {
@@ -383,8 +386,8 @@
 
 .auth-toggle {
   text-align: center;
-  margin-top: 1rem;
-  font-size: 0.8rem;
+  margin-top: 0.75rem;
+  font-size: 0.78rem;
   color: #666;
 }
 
@@ -457,29 +460,38 @@
   }
 }
 
-/* Responsive Design */
 @media (max-width: 1024px) {
+  .landing-page {
+    padding-top: 100px;
+  }
+  
   .landing-content {
     flex-direction: column;
     gap: 2rem;
+    justify-content: flex-start;
   }
 
   .left-section {
     width: 100%;
     max-width: 500px;
-    padding-left: 2rem;
+    padding: 1rem;
+    align-items: center;
   }
 
   .ai-solution-text {
     max-width: 400px;
-    padding: 1.5rem 2rem;
+    padding: 0;
+    margin-bottom: 40px;
+    text-align: center;
   }
 
   .main-heading {
+    justify-content: center;
     font-size: 2.5rem;
   }
 
   .sub-heading {
+    text-align: center;
     font-size: 1.1rem;
   }
 
@@ -491,11 +503,13 @@
 
 @media (max-width: 768px) {
   .landing-page {
-    padding: 2rem 1.5rem;
+    padding: 1.5rem;
+    padding-top: 90px;
+    align-items: flex-start;
   }
 
   .corner-logo {
-    height: 50px;
+    height: 45px;
     top: 1rem;
   }
 
@@ -508,13 +522,12 @@
   }
 
   .left-section {
-    padding: 1.5rem;
-    padding-left: 2rem;
+    padding: 1rem;
   }
 
   .ai-solution-text {
-    max-width: 360px;
-    padding: 1.5rem 1.75rem;
+    max-width: 100%;
+    margin-bottom: 30px;
   }
 
   .main-heading {
@@ -527,86 +540,26 @@
 
   .features-container {
     max-width: 600px;
-    padding: 1rem;
-    gap: 1rem;
+    padding: 0.5rem;
+    gap: 0.75rem;
   }
 
   .feature-card {
-    padding: 1.25rem 1.5rem;
-  }
-
-  .feature-title {
-    font-size: 1.1rem;
-  }
-
-  .feature-description {
-    font-size: 0.85rem;
+    padding: 1rem;
   }
 }
 
 @media (max-width: 480px) {
   .landing-page {
-    padding: 1.5rem 1rem;
+    padding-top: 80px;
   }
 
   .corner-logo {
-    height: 40px;
+    height: 35px;
     top: 0.75rem;
   }
 
-  .corner-logo-left {
-    left: 0.75rem;
-  }
-
-  .corner-logo-right {
-    right: 0.75rem;
-  }
-
-  .left-section {
-    max-width: 100%;
-    padding: 1rem;
-    padding-left: 1.5rem;
-  }
-
-  .ai-solution-text {
-    max-width: 100%;
-    padding: 1.25rem 1.5rem;
-  }
-
   .main-heading {
-    font-size: 1.5rem;
-    gap: 0.3rem;
-  }
-
-  .sub-heading {
-    font-size: 0.9rem;
-  }
-
-  .features-container {
-    max-width: 100%;
-  }
-
-  .feature-card {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-  }
-
-  .feature-content {
-    width: 100%;
-  }
-
-  .get-started-btn {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .feature-icon {
-    width: 40px;
-    height: 40px;
-  }
-
-  .feature-title {
-    font-size: 1rem;
+    font-size: 1.6rem;
   }
 }

@@ -66,10 +66,16 @@ const Sidebar = ({
   };
 
   const handleLogout = async () => {
-    await authService.logout();
-    setShowSettingsMenu(false);
-    navigate("/");
-    window.location.reload();
+    try {
+      await authService.logout();
+      setShowSettingsMenu(false);
+      // Use window.location.href for a complete refresh and redirect to landing page
+      window.location.href = "/";
+    } catch (error) {
+      console.error("Logout failed:", error);
+      // Still redirect even if API call fails
+      window.location.href = "/";
+    }
   };
 
   return (

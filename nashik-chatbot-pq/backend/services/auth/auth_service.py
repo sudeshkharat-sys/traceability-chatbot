@@ -5,8 +5,10 @@ Handles user signup, login, and session management
 
 import hashlib
 import logging
+import datetime
 
 from app.connectors.state_db_connector import StateDBConnector
+from app.queries import AuthQueries
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,7 @@ class AuthService:
         """
         # Check if username already exists
         rows = self.db.execute_query(
-            "SELECT user_id FROM users WHERE username = :username",
+            AuthQueries.CHECK_USERNAME_EXISTS,
             {"username": username},
         )
         if rows:
@@ -41,7 +43,7 @@ class AuthService:
 
         # Check if email already exists
         rows = self.db.execute_query(
-            "SELECT user_id FROM users WHERE email = :email",
+            AuthQueries.CHECK_EMAIL_EXISTS,
             {"email": email},
         )
         if rows:
@@ -50,14 +52,14 @@ class AuthService:
         password_hash = self._hash_password(password)
 
         user_id = self.db.execute_insert(
-            "INSERT INTO users (username, first_name, last_name, email, password_hash) "
-            "VALUES (:username, :first_name, :last_name, :email, :password_hash) RETURNING user_id",
+            AuthQueries.REGISTER_USER,
             {
                 "username": username,
                 "first_name": first_name,
                 "last_name": last_name,
                 "email": email,
                 "password_hash": password_hash,
+                "created_at": datetime.datetime.utcnow(),
             },
         )
 
@@ -77,8 +79,7 @@ class AuthService:
         password_hash = self._hash_password(password)
 
         rows = self.db.execute_query(
-            "SELECT user_id, username, first_name, last_name FROM users "
-            "WHERE username = :username AND password_hash = :password_hash",
+            AuthQueries.AUTHENTICATE_USER,
             {"username": username, "password_hash": password_hash},
         )
 
