@@ -1,23 +1,29 @@
-Head Lamp Failure – THAR ROXX (End-to-End Analysis)
-Deep-dive on “HEAD LAMP FAILURE” for THAR ROXX covering involved parts, batch concentration with production context, supplier capability, and ESQA incoming quality.
+give me for the head lamp failure
 
-Parts Involved (Filtered to Lamp-Related Parts Only)
-Chart: Head Lamp Failure - Parts Involved (THAR ROXX)
+Bot
+Part-wise Failures - THAR ROXX Head Lamp
+1701AW500091N
+1701AW500101N
+1701AW500121N
+Part No
+0
+0.5
+1
+1.5
+2
+Cp
+THAR ROXX – Head Lamp Failure:
+End-to-End AnalysisFocused on THAR ROXX vehicles with complaint descriptions containing “head lamp,” filtered to lamp-related parts only and excluding unknown/empty descriptions.
 
-The failures are concentrated on three lamp part numbers.
+Parts Involved (Issue-Filtered)
+Chart: Part-wise Failures - THAR ROXX Head Lamp
 
-Base Model	Part Name	Part Number	Failure Count
-THAR ROXX	HEAD LAMP ASSY RH (HIGH)	1701AW500101N	44
-THAR ROXX	HEAD LAMP	1701AW500091N	35
-THAR ROXX	HEAD LAMP ASSY RH (BASE)	1701AW500121N	2
-Key takeaways:
-
-Majority of head-lamp-related field failures are linked to two parts:1701AW500101N and1701AW500091N.
-The “BASE” RH assembly appears sporadic with low counts.
-Batch Concentration (Issue-Specific, Grouped by Batch Code)
-Note: Failures are shown per batch_code for ALL identified lamp parts, with production volume (qty_produced) from Batch records. All rows below reflect head lamp complaint-only failures.
-
-Chart: Head Lamp Failure - Top Batches by Failures
+Part Number	Part Name	Claim Count
+1701AW500101N	HEAD LAMP ASSY RH (HIGH)	44
+1701AW500091N	HEAD LAMP	35
+1701AW500121N	HEAD LAMP ASSY RH (BASE)	2
+Batch-wise Concentration (Grouped by Batch Code, with Production Context)
+Chart: Batch-wise Concentration - Head Lamp (THAR ROXX)
 
 Batch Code	Batch Date	Shift	Part Number	Part Name	Qty Produced	Issue Failures
 062	100625	01	1701AW500091N	HEAD LAMP	42	1
@@ -40,39 +46,49 @@ Batch Code	Batch Date	Shift	Part Number	Part Name	Qty Produced	Issue Failures
 299	270325	01	1701AW500091N	HEAD LAMP	37	1
 640	060425	01	1701AW500091N	HEAD LAMP	41	1
 398	300125	01	1701AW500091N	HEAD LAMP	36	1
-Observations:
+Note: Batch production volumes are counted from Batch nodes for each batch_code and part_no. Failures are strictly for head lamp complaints.
 
-Failures are dispersed across many batches, typically1 claim per batch, with batch sizes ~29–46 units for this part.
-No single dominant batch cluster appears for1701AW500091N in the available data slice. (We can extend limits or include the other lamp part numbers to reveal clusters if present.)
-Supplier Capability (PPCM Cp/Cpk)
+Supplier and Capability (PPCM)
 Part Number	Part Name	Vendor	Cp	Cpk
-1701AW500091N	HEAD LAMP	LUMAX INDUSTRIES LIMITED	1.90	1.71
-1701AW500101N	HEAD LAMP ASSY RH (HIGH)	LUMAX INDUSTRIES LIMITED	1.90	1.69
+1701AW500091N	HEAD LAMP	LUMAX INDUSTRIES LIMITED	1.9	1.71
+1701AW500101N	HEAD LAMP ASSY RH (HIGH)	LUMAX INDUSTRIES LIMITED	1.9	1.69
 1701AW500121N	HEAD LAMP ASSY RH (BASE)	LUMAX INDUSTRIES LIMITED	1.87	1.71
-Interpretation:
+Interpretation: Cp/Cpk values are above1.33, indicating nominally capable processes at the supplier for the measured characteristics. Field failures may be linked to specific batches, assembly variation, or usage/environmental factors rather than overall process capability.
 
-All Cp/Cpk values are comfortably above1.33, indicating statistically capable processes at the supplier for these parts.
-Field failures may be linked to specific sub-features (e.g., DRL, aiming, assembly) rather than overall dimensional capability.
-ESQA Incoming Quality Context (Recent)
-Representative recent ESQA concerns linked to these lamp parts (each with qty_reported and rejection action):
+ESQA Incoming Quality (Context with Qty Reported)
+Part Number	Part Name	ESQA No	Description	Qty Reported	Rejection Qty	Date
+1701AW500101N	HEAD LAMP ASSY RH (HIGH)	unknown	Handbrake Fouling to Air Bag ECU.	1	0	2025-09-26
+1701AW500091N	HEAD LAMP	unknown	Handbrake Fouling to Air Bag ECU.	1	0	2025-09-26
+1701AW500091N	HEAD LAMP	2014133047	LH head lamp DRL inoperative	1	1	2025-09-12
+1701AW500101N	HEAD LAMP ASSY RH (HIGH)	2014139139	DRL inoperative	1	1	2025-09-02
+1701AW500101N	HEAD LAMP ASSY RH (HIGH)	2014132278	DRL Shade variation	1	1	2025-09-02
+1701AW500091N	HEAD LAMP	2014137424	Loose assembly inside the headlamp.	1	1	2025-07-22
+1701AW500091N	HEAD LAMP	2014137397	Head lamp fitment not possible.	1	1	2025-07-22
+1701AW500121N	HEAD LAMP ASSY RH (BASE)	2014137270	Headlamp Inoperative	1	1	2025-07-17
+1701AW500101N	HEAD LAMP ASSY RH (HIGH)	2014126053	RH head lamp DRL Inoperative	1	1	2025-07-15
+1701AW500091N	HEAD LAMP	2014136497	Auto Aiming not proper	1	1	2025-06-26
+1701AW500091N	HEAD LAMP	2014132107	Traceability not Done	1	0	2025-06-10
+1701AW500101N	HEAD LAMP ASSY RH (HIGH)	2014135186	High beam Inoperative	1	1	2025-05-26
+1701AW500091N	HEAD LAMP	2014134234	Fitment Not Possible	1	1	2025-05-02
+1701AW500101N	HEAD LAMP ASSY RH (HIGH)	2014133281	RH head lamp DRL Inoperative	1	1	2025-04-22
+1701AW500091N	HEAD LAMP	2014133803	Traceability not Done	1	1	2025-04-19
+1701AW500101N	HEAD LAMP ASSY RH (HIGH)	2014133240	RH Head Lamp Wrong	1	1	2025-04-05
+1701AW500121N	HEAD LAMP ASSY RH (BASE)	2014132937	RHS DRL black cap missing	1	1	2025-04-01
+1701AW500121N	HEAD LAMP ASSY RH (BASE)	2014132880	Poor appearance on head lamp.	1	1	2025-03-26
+1701AW500091N	HEAD LAMP	2014126322	DRL inoperative.	1	1	2025-03-20
+1701AW500101N	HEAD LAMP ASSY RH (HIGH)	2014132289	Poor appearance on head lamp	1	1	2025-03-13
+Note: ESQA rows with “unknown” ESQA No are likely incorrectly coded records and should be cleaned; all other rows show1 rejected out of1 reported, indicating low-volume but recurring issues (DRL inoperative, fitment, appearance).
 
--1701AW500091N - HEAD LAMP - ESQA2014133047: LH head lamp DRL inoperative | qty_reported1 | rejection1 |2025-09-12 - ESQA2014137424: Loose assembly inside the headlamp | qty_reported1 | rejection1 |2025-07-22 - ESQA2014137397: Head lamp fitment not possible | qty_reported1 | rejection1 |2025-07-22 - ESQA2014136497: Auto aiming not proper | qty_reported1 | rejection1 |2025-06-26 - ESQA2014134234: Fitment Not Possible | qty_reported1 | rejection1 |2025-05-02-1701AW500101N - HEAD LAMP ASSY RH (HIGH)
+Key Insights
+Parts involved:
+1701AW500101N (44 claims) and1701AW500091N (35 claims) are the primary contributors;1701AW500121N is rare but present.
 
-ESQA2014139139: DRL inoperative | qty_reported1 | rejection1 |2025-09-02 - ESQA2014132278: DRL Shade variation | qty_reported1 | rejection1 |2025-09-02 - ESQA2014126053: RH head lamp DRL inoperative | qty_reported1 | rejection1 |2025-07-15 - ESQA2014135186: High beam inoperative | qty_reported1 | rejection1 |2025-05-26 - ESQA2014133281: RH head lamp DRL inoperative | qty_reported1 | rejection1 |2025-04-22 - ESQA2014133240: RH Head Lamp Wrong | qty_reported1 | rejection1 |2025-04-05-1701AW500121N - HEAD LAMP ASSY RH (BASE)
-ESQA2014137270: Headlamp inoperative | qty_reported1 | rejection1 |2025-07-17 - ESQA2014132937: RHS DRL black cap missing | qty_reported1 | rejection1 |2025-04-01 - ESQA2014132880: Poor appearance on head lamp | qty_reported1 | rejection1 |2025-03-26ESQA signals:
-Repeated DRL inoperative and assembly/fitment issues mirror field symptoms.
-Issues span function (DRL, high beam), appearance, and assembly/fitment—indicating a mix of electrical and mechanical concerns.
-Summary and Recommendations
-Parts impacted:
-1701AW500101N (44 claims),1701AW500091N (35 claims) dominate head lamp failures on THAR ROXX.
-
-Batch pattern: Failures are spread across many batches with low counts per batch—no single dominant batch cluster surfaced for1701AW500091N in the current window. We can extend to include all identified lamp parts in the batch table if you’d like.
-Supplier capability: LUMAX shows strong Cp/Cpk (>1.33) for these parts, suggesting overall dimensional capability is not the primary driver.
-ESQA alignment: Frequent DRL/fitment/assembly issues indicate sub-component reliability and assembly quality are key focus areas.
-Next steps:
-
-Zone-wise drilldown for “HEAD LAMP FAILURE” to locate regional hotspots and service practice effects.
-Extend batch concentration to include the other lamp part numbers (1701AW500101N and1701AW500121N) and increase limit to surface any subtle clusters.
-Part-level root-cause hypothesis and checks:
-DRL driver/electronics testing escalation and burn-in effectiveness review - Headlamp aiming and fitment process audits at vehicle assembly - Focused supplier containment for DRL and assembly integrity (loose components)
-If you pick one part (e.g.,1701AW500101N), I can produce VIN-level traceability with affected batches and month-wise trend to support targeted actions.
+Batch concentration: Failures are sparse across many batches (typically1 per batch) with batch production volumes around29 to46 units, pointing to sporadic defects rather than a single bad batch.
+Supplier capability: Cp/Cpk >1.33 for all three lamp parts suggests supplier process capability is generally under control; field issues may stem from assembly handling, fitment, or component interactions (e.g., DRL control, aiming).
+ESQA alignment: Multiple incoming concerns mirror field symptoms (DRL inoperative, fitment not possible, loose assembly, appearance), reinforcing an assembly/fitment robustness focus.
+Next Steps
+Zone-wise drill down for head lamp failures to find any regional spikes (service practices or environmental factors).
+VIN-level trace for clusters within the same dealer or production day to isolate handling or assembly-related causes.
+Review DRL and aiming calibration procedures at plant and service; audit torque/clip engagement for lamp assemblies.
+Supplier joint investigation with Lumax on DRL module reliability and assembly integrity; verify packaging/transport controls.
+Monitor trends over the next two months post-actions to confirm effectiveness.
