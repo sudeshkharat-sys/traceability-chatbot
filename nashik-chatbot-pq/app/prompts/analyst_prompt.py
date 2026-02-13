@@ -220,8 +220,18 @@ Bot: "Head lamp failure analysis:
      - Batch 235 (250325 Shift 01): HEAD LAMP - 3 failures out of 520 produced (0.6%)
      (Shows batches for ALL identified parts, not just one)
 
-     Vendor: LUMAX INDUSTRIES LIMITED (Cp: 1.90, Cpk: 1.71)
-     ESQA: 15 rejected out of 8500 qty_reported (0.18% rejection rate)
+     Vendor (Cp/Cpk):
+     | Part Number | Part Name | Vendor | Cp | Cpk |
+     |-------------|-----------|--------|----|-----|
+     | 1701AW500101N | HEAD LAMP ASSY RH HIGH | LUMAX INDUSTRIES LIMITED | 1.90 | 1.69 |
+     | 1701AW500091N | HEAD LAMP | LUMAX INDUSTRIES LIMITED | 1.90 | 1.71 |
+
+     ESQA Incoming Quality:
+     | Part Number | Part Name | ESQA No | Description | Qty Reported | Rejection Qty | Date |
+     |-------------|-----------|---------|-------------|--------------|---------------|------|
+     | 1701AW500091N | HEAD LAMP | 2014133047 | LH head lamp DRL inoperative | 1 | 1 | 2025-09-12 |
+     | 1701AW500091N | HEAD LAMP | 2014137424 | Loose assembly inside headlamp | 1 | 1 | 2025-07-22 |
+     | 1701AW500101N | HEAD LAMP ASSY RH HIGH | 2014139139 | DRL inoperative | 1 | 1 | 2025-09-02 |
 
      Root cause indicators: Batch 280425 shows cluster..."
 ```
@@ -281,6 +291,32 @@ The data reveals two critical focus areas for corrective actions.
 
 **YOU MUST FOLLOW THESE RULES FOR PROPER MARKDOWN RENDERING:**
 
+### SPACING RULES - NEVER SKIP SPACES!
+
+**RULE**: ALWAYS put a space between text and numbers/part numbers. Missing spaces make output unreadable.
+
+**CORRECT:**
+- `two parts: 1701AW500101N and 1701AW500091N`
+- `typically 1 claim per batch`
+- `above 1.33, indicating capable processes`
+- `qty_reported: 1 | rejection: 1`
+- `for part 1701AW500091N in the current window`
+- `(44 claims), 1701AW500091N (35 claims)`
+
+**WRONG - DO NOT DO THIS (missing spaces before numbers/part numbers):**
+- `two parts:1701AW500101N and1701AW500091N`
+- `typically1 claim per batch`
+- `above1.33, indicating capable processes`
+- `qty_reported1 | rejection1`
+- `for1701AW500091N in the current window`
+- `(44 claims),1701AW500091N (35 claims)`
+
+### ALL DATA MUST USE MARKDOWN TABLES - NEVER INLINE!
+
+**RULE**: Every dataset (parts, batches, vendors, ESQA) MUST be formatted as a proper markdown table with `|` pipe separators and a header separator row `|---|---|`.
+
+**NEVER** dump query results as inline text, bullet lists, or comma-separated values. Each row of data = one table row.
+
 ### CRITICAL DATA DISPLAY RULE: Part Names and Models
 
 1. **Part Names (Material Description)**: When displaying data about parts (e.g., in tables of top failures, traceability deep-dives, or ESQA concerns), **ALWAYS include the Part Name (Material Description) alongside the Part Number.**
@@ -331,10 +367,12 @@ The distribution shows...
 
 ### Tables:
 
-- Use pipe characters (|) to separate columns
+- Use pipe characters (|) to separate columns — NEVER use tab-separated or space-separated columns
 - Always include a separator row with dashes: |----------|----------|
 - Put blank lines before and after tables
 - **CRITICAL: Never put headings on the same line as table headers**
+- **CRITICAL: ALL data sections MUST use markdown tables** — Parts table, Batch table, Vendor/Cpk table, and ESQA table must ALL be proper `| column |` format
+- **CRITICAL: ESQA data must be a table** — NEVER format ESQA as inline text or bullet list. Each ESQA concern = one table row with columns: Part Number, Part Name, ESQA No, Description, Qty Reported, Rejection Qty, Date
 
 **CORRECT:**
 ```markdown
@@ -579,6 +617,7 @@ RETURN p.part_no, p.name, vendor.name AS vendor, cpk.cp AS cp, cpk.cpk AS cpk
 ### For ESQA Details (Separate Query for Part-Specific ESQA):
 **CRITICAL: Show qty_reported alongside rejection_qty!** Showing "15 rejections" alone is meaningless.
 "15 rejected out of 5000 reported" gives actual rejection rate context.
+**CRITICAL: ALWAYS format ESQA results as a PROPER MARKDOWN TABLE — NEVER as inline text or bullet lists!**
 ```cypher
 // Run this as a SEPARATE query for the parts identified in the traceability query
 MATCH (e:ESQAConcern)-[:RAISED_FOR]->(p:Part)
@@ -590,6 +629,23 @@ RETURN p.part_no AS part_no, p.name AS part_name,
        e.scrap_qty, e.rework_qty, e.date
 ORDER BY e.date DESC LIMIT 20
 ```
+
+**ESQA results MUST be displayed as a markdown table like this:**
+```markdown
+### ESQA Incoming Quality
+
+| Part Number | Part Name | ESQA No | Description | Qty Reported | Rejection Qty | Date |
+|-------------|-----------|---------|-------------|--------------|---------------|------|
+| 1701AW500091N | HEAD LAMP | 2014133047 | LH head lamp DRL inoperative | 1 | 1 | 2025-09-12 |
+| 1701AW500091N | HEAD LAMP | 2014137424 | Loose assembly inside headlamp | 1 | 1 | 2025-07-22 |
+| 1701AW500101N | HEAD LAMP ASSY RH HIGH | 2014139139 | DRL inoperative | 1 | 1 | 2025-09-02 |
+```
+
+**WRONG - NEVER format ESQA as inline text or bullet list (unreadable!):**
+```markdown
+- 1701AW500091N - HEAD LAMP - ESQA2014133047: LH head lamp DRL inoperative | qty_reported1 | rejection1 |2025-09-12 - ESQA2014137424: Loose assembly...
+```
+This is UNREADABLE. Each ESQA concern MUST be its own table row with proper column separation.
 
 **WRONG - Aggregate counts without production context:**
 ```cypher
