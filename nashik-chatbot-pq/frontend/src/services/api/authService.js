@@ -68,24 +68,25 @@ class AuthService {
   }
 
   /**
-   * Log out the current user and clear session
+   * Log out the current user and clear session.
+   * Clears session immediately (synchronous) so redirect is instant.
+   * The API call is fire-and-forget to avoid being blocked by pending requests.
    */
-  async logout() {
-    try {
-      await fetch(`${backend_url}/auth/logout`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-    } catch (e) {
-      console.error("Logout API call failed:", e);
-    }
-
-    // Always clear session regardless of API result
+  logout() {
+    // Clear session FIRST - this is instant, no network dependency
     sessionStorage.removeItem("user_id");
     sessionStorage.removeItem("username");
     sessionStorage.removeItem("first_name");
     sessionStorage.removeItem("last_name");
     sessionStorage.removeItem("isLoggedIn");
+
+    // Fire-and-forget the API call — don't await it
+    fetch(`${backend_url}/auth/logout`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    }).catch((e) => {
+      console.error("Logout API call failed:", e);
+    });
   }
 
   /**

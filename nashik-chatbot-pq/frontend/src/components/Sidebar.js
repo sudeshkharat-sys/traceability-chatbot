@@ -65,17 +65,12 @@ const Sidebar = ({
     onSelectChat(chatId);
   };
 
-  const handleLogout = async () => {
-    try {
-      await authService.logout();
-      setShowSettingsMenu(false);
-      // Use window.location.href for a complete refresh and redirect to landing page
-      window.location.href = "/";
-    } catch (error) {
-      console.error("Logout failed:", error);
-      // Still redirect even if API call fails
-      window.location.href = "/";
-    }
+  const handleLogout = () => {
+    // logout() is now synchronous (clears session instantly, API is fire-and-forget)
+    authService.logout();
+    setShowSettingsMenu(false);
+    // Full page redirect — instant, no waiting for pending API calls
+    window.location.href = "/";
   };
 
   return (
