@@ -1,148 +1,115 @@
-give me top issue for the thar roxx ?
+(base) maiuser@mazdvwenapp03:~$ sudo docker exec traceability-neo4j cypher-shell -u neo4j -p "dataeaze@12345" "MATCH (n) RETURN labels(
+n)[0] AS label, count(n) AS count ORDER BY count DESC;"
+label, count
+"Batch", 2747787
+"Vehicle", 56209
+"WarrantyClaim", 2952
+"Part", 1155
+"ESQAConcern", 965
+"Vendor", 385
+"Dealer", 337
+"Commodity", 19
+"Plant", 1
+(base) maiuser@mazdvwenapp03:~$ 
 
-Bot
-Top10 Warranty Issues - THAR ROXX
-Top Warranty Issues for THAR ROXXBased on all available warranty claim data for the THAR ROXX, here are the leading field issues by distinct claim count.
-Detailed Analysis
-**Chart:
-
-Top10 Warranty Issues - THAR ROXX**
-
-The data indicates that sunroof mechanism and steering-related concerns dominate THAR ROXX warranty claims, followed by RPAS sensors and lighting. Electronics (infotainment, silver box) and minor trim/leak issues also appear in the top10.
-
-Complaint	Claim Count
-SUN ROOF MECHANISM FAILURE	168
-NOISE WHILE TURNING THE STEERING	149
-RPAS SENSOR FAILURE	112
-HEAD LAMP FAILURE	82
-A/C LOUVERS FAILURE - FRONT	74
-BRAKE SWITCH FAILURE	71
-INFOTAINMENT SYSTEM HANGS	70
-ANTENNA FAILURE	57
-WATER LEAK - WINDSHIELD GLASS	54
-SILVER BOX FAILURE	46
-Key Insights
-Sunroof mechanism and steering noise are the most frequent concerns and likely need immediate cross-functional attention (design, supplier, and service).
-Multiple electrical/electronic items (RPAS sensors, head lamps, infotainment, silver box) suggest focus on supplier capability and diagnostics.
-Appearance/trim and sealing issues (A/C louvers, windshield leak) indicate body/trim quality and sealing processes review.
-Next Steps
-Drill down by zone to identify regional concentration for the top3 issues.
-Run end-to-end traceability for the top issue (sunroof mechanism): part numbers, batch concentration (with qty produced), vendor and Cp/Cpk, and any ESQA concerns.
-Evaluate monthly trend for the top5 issues to check for recent spikes indicating batch/vendor changes.
+(base) maiuser@mazdvwenapp03:~$ sudo docker exec traceability-neo4j cypher-shell -u neo4j -p "dataeaze@12345" \
+> "MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part) WHERE toLower(wc.complaint_desc) CONTAINS 'head lamp' AND toLower(p.name) CONTAI
+NS 'lamp' AND p.part_no <> 'unknown' RETURN p.part_no, p.name, count(DISTINCT wc.claim_no) AS failures ORDER BY failures DESC LIMIT 10;
+"
+p.part_no, p.name, failures
+"1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 44
+"1701AW500091N", "HEAD LAMP", 35
+"1701AW500121N", "HEAD LAMP ASSY RH (BASE)", 2
 
 
-i want analysis for the HEAD LAMP FAILURE?
-
-Bot
-Part-wise Head Lamp Failures - THAR ROXX
-2025-03-13
-2025-03-26
-2025-04-05
-2025-04-22
-2025-05-26
-2025-06-26
-2025-07-17
-2025-07-22
-2025-09-02
-2025-09-26
-Date
-0
-0.25
-0.5
-0.75
-1
-Qty Reported
-HEAD LAMP FAILURE – THAR ROXX End-to-End Analysis
-Below is a consolidated view of head lamp failures on THAR ROXX, including involved parts, batch concentration with production context, supplier capability (Cp/Cpk), and ESQA signals.
-
-Detailed Analysis
-**Chart:
-
-Part-wise Head Lamp Failures - THAR ROXX**
-
-The failures are concentrated in a small set of lamp assemblies, led by the RH High variant.
-
-Base Model	Part Name	Part Number	Failure Count
-THAR ROXX	HEAD LAMP ASSY RH (HIGH)	1701AW500101N	44
-THAR ROXX	HEAD LAMP	1701AW500091N	35
-THAR ROXX	HEAD LAMP ASSY RH (BASE)	1701AW500121N	2
-Batch Concentration (Grouped by batch_code, with production context)
-Note: Grouping is by batch_code across all lot_nos within the batch. Issue filter maintained strictly for “head lamp” claims and lamp parts only.
-
-Chart: Batch-wise Head Lamp Failures (Top20)
-
-Batch Code	Batch Date	Shift	Part Number	Part Name	Qty Produced	Issue Failures
-062	100625	01	1701AW500091N	HEAD LAMP	1	1
-562	220625	01	1701AW500091N	HEAD LAMP	1	1
-866	300425	01	1701AW500091N	HEAD LAMP	1	1
-184	030425	01	1701AW500091N	HEAD LAMP	1	1
-957	310125	01	1701AW500091N	HEAD LAMP	1	1
-025	120625	01	1701AW500091N	HEAD LAMP	1	1
-959	030525	01	1701AW500091N	HEAD LAMP	1	1
-384	260525	01	1701AW500091N	HEAD LAMP	1	1
-235	250325	01	1701AW500091N	HEAD LAMP	2	1
-829	170325	01	1701AW500091N	HEAD LAMP	1	1
-732	240325	01	1701AW500091N	HEAD LAMP	1	1
-901	170325	01	1701AW500091N	HEAD LAMP	1	1
-345	040525	01	1701AW500091N	HEAD LAMP	1	1
-412	040525	01	1701AW500091N	HEAD LAMP	1	1
-604	080625	01	1701AW500091N	HEAD LAMP	2	1
-554	240525	01	1701AW500091N	HEAD LAMP	1	1
-575	120325	01	1701AW500091N	HEAD LAMP	1	1
-299	270325	01	1701AW500091N	HEAD LAMP	1	1
-640	060425	01	1701AW500091N	HEAD LAMP	1	1
-398	300125	01	1701AW500091N	HEAD LAMP	1	1
-Observation: Failures are dispersed across many batches with very small observed production quantities per batch_code in the linked data (1–2 units). This suggests scattered occurrences rather than a single high-defect batch cluster for the part numbers currently tied to claims. We can further expand the production context if you want a wider “produced vs. failed” analysis.
-
-Supplier & Capability (PPCM)
-Part Number	Part Name	Vendor	Cp	Cpk
-1701AW500091N	HEAD LAMP	LUMAX INDUSTRIES LIMITED	1.90	1.71
-1701AW500101N	HEAD LAMP ASSY RH (HIGH)	LUMAX INDUSTRIES LIMITED	1.90	1.69
-1701AW500121N	HEAD LAMP ASSY RH (BASE)	LUMAX INDUSTRIES LIMITED	1.87	1.71
-Interpretation: Vendor capability indices are above1.33 for all involved parts, indicating statistically capable processes on the monitored characteristics. Field failures may be tied to specific sub-features (e.g., DRL, fitment) or handling/assembly factors rather than general process spread.
-
-ESQA Signals (Incoming Quality)
-Showing latest ESQA concerns for the same lamp parts, with qty_reported and rejection_qty for context.
-
-Part Number	Part Name	ESQA No	Description	Qty Reported	Rejection Qty	Scrap	Rework	Date
-1701AW500101N	HEAD LAMP ASSY RH (HIGH)	2014139139	DRL inoperative	1	1	0	0	2025-09-02
-1701AW500101N	HEAD LAMP ASSY RH (HIGH)	2014132278	DRL Shade variation	1	1	0	0	2025-09-02
-1701AW500091N	HEAD LAMP	2014133047	LH head lamp DRL inoperative	1	1	0	0	2025-09-12
-1701AW500091N	HEAD LAMP	2014137424	Loose assembly inside the headlamp.	1	1	0	0	2025-07-22
-1701AW500091N	HEAD LAMP	2014137397	Head lamp fitment not possible.	1	1	0	0	2025-07-22
-1701AW500121N	HEAD LAMP ASSY RH (BASE)	2014137270	Headlamp Inoperative	1	1	0	0	2025-07-17
-1701AW500091N	HEAD LAMP	2014136497	Auto Aiming not proper	1	1	0	0	2025-06-26
-1701AW500091N	HEAD LAMP	2014134234	Fitment Not Possible	1	1	0	0	2025-05-02
-1701AW500091N	HEAD LAMP	2014126322	DRL inoperative.	1	1	0	0	2025-03-20
-1701AW500101N	HEAD LAMP ASSY RH (HIGH)	2014135186	High beam Inoperative	1	1	0	0	2025-05-26
-1701AW500101N	HEAD LAMP ASSY RH (HIGH)	2014133240	RH Head Lamp Wrong	1	1	0	0	2025-04-05
-1701AW500121N	HEAD LAMP ASSY RH (BASE)	2014132937	RHS DRL black cap missing	1	1	0	0	2025-04-01
-1701AW500121N	HEAD LAMP ASSY RH (BASE)	2014132880	Poor appearance on head lamp.	1	1	0	0	2025-03-26
-Interpretation: ESQA concerns mirror field symptoms: DRL inoperative, fitment/assembly issues, aiming, and appearance. Even though each record shows small inspection lots (qty_reported often1), the types align closely with field complaints, pointing to specific sub-component/assembly failure modes (DRL, internal assembly looseness, aiming, fitment).
-
-Key Insights
-Concentrated Parts:
-Failures are primarily tied to three lamp assemblies, with the RH (HIGH) variant leading.
-
-Dispersed Batches: No single dominant batch cluster appears in the current linkage; occurrences are scattered across many batch_codes with low observed volumes.
-Capability Looks Adequate: Supplier Cp/Cpk values are healthy (>1.33), suggesting targeted issues (DRL electronics, assembly fitment/retention, aiming) rather than general process variation.
-ESQA Alignment: Incoming quality flags correlate with field complaints—DRL function, assembly looseness, aiming accuracy, and cosmetic/fitment issues.
-Recommendations
-DRL Sub-Function Deep Dive:
-Request supplier8D focused on DRL electronics and solder/connector robustness.
-Audit DRL functional test coverage and stress conditions at supplier end.
-Assembly/Fitment Controls:
-Check torque/retention specs and poka-yokes for internal assemblies.
-Validate vehicle-side mounting interfaces and aiming procedures.
-Aiming Verification:
-Reinforce end-of-line aiming checks and calibration; verify aiming fixtures and tolerances.
-Traceability Expansion:
-Expand produced vs. failed analysis for these batches to capture full quantities per batch_code and quantify failure rates.
-Field Segmentation:
-Drill down by zone and month for these lamp parts to spot any regional or temporal spikes.
-If you’d like, I can:
-
-Show zone-wise distribution for head lamp failures on THAR ROXX- Run a produced-vs-failed rate analysis by batch_code for these lamp parts- Trend head lamp failures month-on-month for THAR ROXX
+(base) maiuser@mazdvwenapp03:~$ sudo docker exec traceability-neo4j cypher-shell -u neo4j -p "dataeaze@12345" \
+> "MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part) MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc) MATCH (p)-[f:FITTED_ON]->(v) MATCH (b:Batch
+) WHERE f.scan_value = b.lot_no AND toLower(wc.complaint_desc) CONTAINS 'head lamp' AND toLower(p.name) CONTAINS 'lamp' AND p.part_no <
+> 'unknown' WITH b.batch_code AS batch_code, p.part_no AS part_no, p.name AS part_name, collect(DISTINCT b.lot_no) AS lot_nos, COUNT(DI
+STINCT wc.claim_no) AS issue_failures CALL { WITH lot_nos, part_no MATCH (p2:Part {part_no: part_no})-[f2:FITTED_ON]->(v2:Vehicle) WHER
+E f2.scan_value IN lot_nos RETURN count(DISTINCT v2) AS qty_produced } RETURN batch_code, part_no, part_name, size(lot_nos) AS lot_coun
+t, qty_produced, issue_failures ORDER BY issue_failures DESC LIMIT 15;"
+batch_code, part_no, part_name, lot_count, qty_produced, issue_failures
+"872", "1701AW500091N", "HEAD LAMP", 2, 2, 2
+"078", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
+"402", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
+"424", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
+"563", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 2, 1
+"184", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
+"403", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
+"412", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
+"493", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
+"421", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
+"207", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
+"534", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
+"043", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
+"161", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 2, 1
+"002", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
+(base) maiuser@mazdvwenapp03:~$ ^C
 
 
+
+(base) maiuser@mazdvwenapp03:~$ sudo docker exec traceability-neo4j cypher-shell -u neo4j -p "dataeaze@12345" \
+> "MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part) MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc) MATCH (p)-[f:FITTED_ON]->(v) MATCH (b:Batch
+) WHERE f.scan_value = b.lot_no AND toLower(wc.complaint_desc) CONTAINS 'head lamp' AND toLower(p.name) CONTAINS 'lamp' AND p.part_no <
+> 'unknown' WITH b, p, COUNT(DISTINCT wc.claim_no) AS issue_failures RETURN b.batch_code, b.lot_no, p.part_no, b.qty_produced AS qty_pr
+oduced, issue_failures ORDER BY issue_failures DESC LIMIT 15;"
+
+b.batch_code, b.lot_no, p.part_no, qty_produced, issue_failures
+"002", "177:1701AW500101N:DL026I:040625:01:002", "1701AW500101N", NULL, 1
+"078", "177:1701AW500101N:DL026I:070325:01:078", "1701AW500101N", NULL, 1
+"403", "177:1701AW500101N:DL026I:080325:01:403", "1701AW500101N", NULL, 1
+"424", "177:1701AW500101N:DL026I:080325:01:424", "1701AW500101N", NULL, 1
+"563", "177:1701AW500101N:DL026I:080625:01:563", "1701AW500101N", NULL, 1
+"184", "177:1701AW500101N:DL026I:090425:01:184", "1701AW500101N", NULL, 1
+"402", "177:1701AW500101N:DL026I:110325:01:402", "1701AW500101N", NULL, 1
+"412", "177:1701AW500101N:DL026I:110325:01:412", "1701AW500101N", NULL, 1
+"493", "177:1701AW500101N:DL026I:110325:01:493", "1701AW500101N", NULL, 1
+"421", "177:1701AW500101N:DL026I:110625:01:421", "1701AW500101N", NULL, 1
+"207", "177:1701AW500101N:DL026I:120625:01:207", "1701AW500101N", NULL, 1
+"534", "177:1701AW500101N:DL026I:130325:01:534", "1701AW500101N", NULL, 1
+"043", "177:1701AW500101N:DL026I:150425:01:043", "1701AW500101N", NULL, 1
+"161", "177:1701AW500101N:DL026I:150825:01:161", "1701AW500101N", NULL, 1
+"167", "177:1701AW500101N:DL026I:010325:01:167", "1701AW500101N", NULL, 1
+(base) maiuser@mazdvwenapp03:~$
+
+
+
+(base) maiuser@mazdvwenapp03:~$ sudo docker exec traceability-neo4j cypher-shell -u neo4j -p "dataeaze@12345" \
+> "MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part) WHERE toLower(wc.complaint_desc) CONTAINS 'head lamp' AND toLower(p.name) CONTAI
+NS 'lamp' AND p.part_no <> 'unknown' WITH DISTINCT p.part_no AS part_no, p.name AS part_name OPTIONAL MATCH (v:Vendor)-[:SUPPLIES]->(p2
+:Part {part_no: part_no}) OPTIONAL MATCH (v)-[cpk:HAS_CPK]->(p2) RETURN part_no, part_name, v.name AS vendor, cpk.cp AS cp, cpk.cpk AS 
+cpk LIMIT 10;"
+part_no, part_name, vendor, cp, cpk
+"1701AW500091N", "HEAD LAMP", "LUMAX INDUSTRIES LIMITED", 1.9, 1.71
+"1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", "LUMAX INDUSTRIES LIMITED", 1.9, 1.69
+"1701AW500121N", "HEAD LAMP ASSY RH (BASE)", "LUMAX INDUSTRIES LIMITED", 1.87, 1.71
+(base) maiuser@mazdvwenapp03:~$ 
+
+
+(base) maiuser@mazdvwenapp03:~$ sudo docker exec traceability-neo4j cypher-shell -u neo4j -p "dataeaze@12345" "MATCH (wc:WarrantyClaim)
+-[:INVOLVES_PART]->(p:Part) WHERE toLower(wc.complaint_desc) CONTAINS 'head lamp' AND toLower(p.name) CONTAINS 'lamp' AND p.part_no <> 
+'unknown' WITH DISTINCT p.part_no AS part_no, p.name AS part_name OPTIONAL MATCH (e:ESQAConcern)-[:RAISED_FOR]->(p2:Part {part_no: part
+_no}) RETURN part_no, part_name, e.concern_desc, e.qty_reported, e.rejection_qty LIMIT 10;"
+part_no, part_name, e.concern_desc, e.qty_reported, e.rejection_qty
+"1701AW500091N", "HEAD LAMP", NULL, 1, 1
+"1701AW500091N", "HEAD LAMP", NULL, 1, 1
+"1701AW500091N", "HEAD LAMP", NULL, 1, 1
+"1701AW500091N", "HEAD LAMP", NULL, 1, 1
+"1701AW500091N", "HEAD LAMP", NULL, 1, 0
+"1701AW500091N", "HEAD LAMP", NULL, 1, 1
+"1701AW500091N", "HEAD LAMP", NULL, 1, 1
+"1701AW500091N", "HEAD LAMP", NULL, 1, 1
+"1701AW500091N", "HEAD LAMP", NULL, 1, 0
+"1701AW500091N", "HEAD LAMP", NULL, 1, 1
+(base) maiuser@mazdvwenapp03:~$ 
+
+
+> "MATCH (wc:WarrantyClaim) WHERE wc.complaint_desc IN ['-', '', 'unknown'] RETURN wc.complaint_desc AS junk_value, count(wc) AS count 
+ORDER BY count DESC;"
+
+
+junk_value, count
+"-", 59
+(base) maiuser@mazdvwenapp03:~$ 
 
