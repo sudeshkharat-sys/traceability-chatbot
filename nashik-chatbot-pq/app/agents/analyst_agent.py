@@ -103,8 +103,10 @@ class AnalystAgent:
                         chart_data = format_neo4j_results_for_chart(
                             result["records"], user_question
                         )
-                        if chart_data:
-                            # Store chart data for later emission
+                        if chart_data and not self.current_chart_data:
+                            # Keep the FIRST chart data (parts overview) for simplicity
+                            # Don't overwrite with subsequent complex queries
+                            # (batch/vendor/ESQA charts are too detailed)
                             self.current_chart_data = chart_data
                             logger.info(f"Generated chart data: {chart_data.get('type')} chart")
                     except Exception as e:
