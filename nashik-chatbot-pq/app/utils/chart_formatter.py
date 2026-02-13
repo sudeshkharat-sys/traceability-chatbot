@@ -452,22 +452,23 @@ def format_neo4j_results_for_chart(
 
     for key in keys:
         key_lower = key.lower()
+        value = first_record[key]
+        is_numeric = isinstance(value, (int, float)) and not isinstance(value, bool)
 
         # Check for time keys
         if any(tk in key_lower for tk in time_keys):
             x_key = key
-        # Check for category keys
+        # Numeric values always go to y-axis (even if key name matches category_keys
+        # e.g., "failure_count" contains "failure" but is numeric → y-axis)
+        elif is_numeric:
+            y_keys.append(key)
+            if not value_key:
+                value_key = key
+        # Check for category keys (only for non-numeric string values)
         elif any(ck in key_lower for ck in category_keys):
             if not x_key:
                 x_key = key
             name_key = key
-        # Numeric keys become y-axis values
-        elif isinstance(first_record[key], (int, float)) and not isinstance(
-            first_record[key], bool
-        ):
-            y_keys.append(key)
-            if not value_key:
-                value_key = key
 
     # Default to first non-numeric key if no x_key found
     if not x_key and keys:
@@ -479,6 +480,11 @@ def format_neo4j_results_for_chart(
         if not x_key:
             x_key = keys[0]
             name_key = keys[0]
+
+    # Prefer "name" keys over "no/code" keys for x-axis (more readable labels)
+    # e.g., "HEAD LAMP ASSY RH (HIGH)" is better than "1701AW500091N" on x-axis
+    if name_key and name_key != x_key and 'name' in name_key.lower():
+        x_key = name_key
 
     # If x_key has all identical values (e.g., base_model='THAR ROXX' for every row),
     # find a better key with more unique values to use as x-axis
