@@ -1,115 +1,27 @@
-(base) maiuser@mazdvwenapp03:~$ sudo docker exec traceability-neo4j cypher-shell -u neo4j -p "dataeaze@12345" "MATCH (n) RETURN labels(
-n)[0] AS label, count(n) AS count ORDER BY count DESC;"
-label, count
-"Batch", 2747787
-"Vehicle", 56209
-"WarrantyClaim", 2952
-"Part", 1155
-"ESQAConcern", 965
-"Vendor", 385
-"Dealer", 337
-"Commodity", 19
-"Plant", 1
-(base) maiuser@mazdvwenapp03:~$ 
-
 (base) maiuser@mazdvwenapp03:~$ sudo docker exec traceability-neo4j cypher-shell -u neo4j -p "dataeaze@12345" \
-> "MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part) WHERE toLower(wc.complaint_desc) CONTAINS 'head lamp' AND toLower(p.name) CONTAI
-NS 'lamp' AND p.part_no <> 'unknown' RETURN p.part_no, p.name, count(DISTINCT wc.claim_no) AS failures ORDER BY failures DESC LIMIT 10;
-"
-p.part_no, p.name, failures
-"1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 44
-"1701AW500091N", "HEAD LAMP", 35
-"1701AW500121N", "HEAD LAMP ASSY RH (BASE)", 2
+> "MATCH (b:Batch) WHERE b.qty_produced IS NOT NULL RETURN count(b) AS batches_with_qty, b.qty_produced AS sample LIMIT 5;"
 
-
+(base) maiuser@mazdvwenapp03:~$ sudo docker exec traceability-neo4j cypher-shell -u neo4j -p "dataeaze@12345" "MATCH (b:Batch) WHERE b.
+qty_produced IS NOT NULL RETURN count(b) AS batches_with_qty, b.qty_produced AS sample LIMIT 5;"
+(base) maiuser@mazdvwenapp03:~$ # Check what properties Batch nodes actually have
 (base) maiuser@mazdvwenapp03:~$ sudo docker exec traceability-neo4j cypher-shell -u neo4j -p "dataeaze@12345" \
-> "MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part) MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc) MATCH (p)-[f:FITTED_ON]->(v) MATCH (b:Batch
-) WHERE f.scan_value = b.lot_no AND toLower(wc.complaint_desc) CONTAINS 'head lamp' AND toLower(p.name) CONTAINS 'lamp' AND p.part_no <
-> 'unknown' WITH b.batch_code AS batch_code, p.part_no AS part_no, p.name AS part_name, collect(DISTINCT b.lot_no) AS lot_nos, COUNT(DI
-STINCT wc.claim_no) AS issue_failures CALL { WITH lot_nos, part_no MATCH (p2:Part {part_no: part_no})-[f2:FITTED_ON]->(v2:Vehicle) WHER
-E f2.scan_value IN lot_nos RETURN count(DISTINCT v2) AS qty_produced } RETURN batch_code, part_no, part_name, size(lot_nos) AS lot_coun
-t, qty_produced, issue_failures ORDER BY issue_failures DESC LIMIT 15;"
-batch_code, part_no, part_name, lot_count, qty_produced, issue_failures
-"872", "1701AW500091N", "HEAD LAMP", 2, 2, 2
-"078", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
-"402", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
-"424", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
-"563", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 2, 1
-"184", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
-"403", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
-"412", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
-"493", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
-"421", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
-"207", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
-"534", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
-"043", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
-"161", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 2, 1
-"002", "1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", 1, 1, 1
-(base) maiuser@mazdvwenapp03:~$ ^C
+> "MATCH (b:Batch) RETURN keys(b) AS properties LIMIT 1;"
 
-
-
+properties
+["lot_no", "batch_code", "batch_date", "shift"]
+(base) maiuser@mazdvwenapp03:~$ # Check what properties ESQAConcern nodes actually have
 (base) maiuser@mazdvwenapp03:~$ sudo docker exec traceability-neo4j cypher-shell -u neo4j -p "dataeaze@12345" \
-> "MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part) MATCH (v:Vehicle)-[:HAS_CLAIM]->(wc) MATCH (p)-[f:FITTED_ON]->(v) MATCH (b:Batch
-) WHERE f.scan_value = b.lot_no AND toLower(wc.complaint_desc) CONTAINS 'head lamp' AND toLower(p.name) CONTAINS 'lamp' AND p.part_no <
-> 'unknown' WITH b, p, COUNT(DISTINCT wc.claim_no) AS issue_failures RETURN b.batch_code, b.lot_no, p.part_no, b.qty_produced AS qty_pr
-oduced, issue_failures ORDER BY issue_failures DESC LIMIT 15;"
+> "MATCH (e:ESQAConcern) RETURN keys(e) AS properties LIMIT 1;"
 
-b.batch_code, b.lot_no, p.part_no, qty_produced, issue_failures
-"002", "177:1701AW500101N:DL026I:040625:01:002", "1701AW500101N", NULL, 1
-"078", "177:1701AW500101N:DL026I:070325:01:078", "1701AW500101N", NULL, 1
-"403", "177:1701AW500101N:DL026I:080325:01:403", "1701AW500101N", NULL, 1
-"424", "177:1701AW500101N:DL026I:080325:01:424", "1701AW500101N", NULL, 1
-"563", "177:1701AW500101N:DL026I:080625:01:563", "1701AW500101N", NULL, 1
-"184", "177:1701AW500101N:DL026I:090425:01:184", "1701AW500101N", NULL, 1
-"402", "177:1701AW500101N:DL026I:110325:01:402", "1701AW500101N", NULL, 1
-"412", "177:1701AW500101N:DL026I:110325:01:412", "1701AW500101N", NULL, 1
-"493", "177:1701AW500101N:DL026I:110325:01:493", "1701AW500101N", NULL, 1
-"421", "177:1701AW500101N:DL026I:110625:01:421", "1701AW500101N", NULL, 1
-"207", "177:1701AW500101N:DL026I:120625:01:207", "1701AW500101N", NULL, 1
-"534", "177:1701AW500101N:DL026I:130325:01:534", "1701AW500101N", NULL, 1
-"043", "177:1701AW500101N:DL026I:150425:01:043", "1701AW500101N", NULL, 1
-"161", "177:1701AW500101N:DL026I:150825:01:161", "1701AW500101N", NULL, 1
-"167", "177:1701AW500101N:DL026I:010325:01:167", "1701AW500101N", NULL, 1
-(base) maiuser@mazdvwenapp03:~$
-
-
-
+properties
+["rejection_qty", "qty_reported", "scrap_qty", "esqa_no", "date", "vehicle_model", "rework_qty", "description"]
+(base) maiuser@mazdvwenapp03:~$ # Check ESQA links for all 3 lamp parts
 (base) maiuser@mazdvwenapp03:~$ sudo docker exec traceability-neo4j cypher-shell -u neo4j -p "dataeaze@12345" \
-> "MATCH (wc:WarrantyClaim)-[:INVOLVES_PART]->(p:Part) WHERE toLower(wc.complaint_desc) CONTAINS 'head lamp' AND toLower(p.name) CONTAI
-NS 'lamp' AND p.part_no <> 'unknown' WITH DISTINCT p.part_no AS part_no, p.name AS part_name OPTIONAL MATCH (v:Vendor)-[:SUPPLIES]->(p2
-:Part {part_no: part_no}) OPTIONAL MATCH (v)-[cpk:HAS_CPK]->(p2) RETURN part_no, part_name, v.name AS vendor, cpk.cp AS cp, cpk.cpk AS 
-cpk LIMIT 10;"
-part_no, part_name, vendor, cp, cpk
-"1701AW500091N", "HEAD LAMP", "LUMAX INDUSTRIES LIMITED", 1.9, 1.71
-"1701AW500101N", "HEAD LAMP ASSY RH (HIGH)", "LUMAX INDUSTRIES LIMITED", 1.9, 1.69
-"1701AW500121N", "HEAD LAMP ASSY RH (BASE)", "LUMAX INDUSTRIES LIMITED", 1.87, 1.71
+> "MATCH (e:ESQAConcern)-[:RAISED_FOR]->(p:Part) WHERE p.part_no IN ['1701AW500091N','1701AW500101N','1701AW500121N'] RETURN p.part_no,
+ count(e) AS esqa_count;"
+
+p.part_no, esqa_count
+"1701AW500091N", 15
+"1701AW500101N", 13
+"1701AW500121N", 3
 (base) maiuser@mazdvwenapp03:~$ 
-
-
-(base) maiuser@mazdvwenapp03:~$ sudo docker exec traceability-neo4j cypher-shell -u neo4j -p "dataeaze@12345" "MATCH (wc:WarrantyClaim)
--[:INVOLVES_PART]->(p:Part) WHERE toLower(wc.complaint_desc) CONTAINS 'head lamp' AND toLower(p.name) CONTAINS 'lamp' AND p.part_no <> 
-'unknown' WITH DISTINCT p.part_no AS part_no, p.name AS part_name OPTIONAL MATCH (e:ESQAConcern)-[:RAISED_FOR]->(p2:Part {part_no: part
-_no}) RETURN part_no, part_name, e.concern_desc, e.qty_reported, e.rejection_qty LIMIT 10;"
-part_no, part_name, e.concern_desc, e.qty_reported, e.rejection_qty
-"1701AW500091N", "HEAD LAMP", NULL, 1, 1
-"1701AW500091N", "HEAD LAMP", NULL, 1, 1
-"1701AW500091N", "HEAD LAMP", NULL, 1, 1
-"1701AW500091N", "HEAD LAMP", NULL, 1, 1
-"1701AW500091N", "HEAD LAMP", NULL, 1, 0
-"1701AW500091N", "HEAD LAMP", NULL, 1, 1
-"1701AW500091N", "HEAD LAMP", NULL, 1, 1
-"1701AW500091N", "HEAD LAMP", NULL, 1, 1
-"1701AW500091N", "HEAD LAMP", NULL, 1, 0
-"1701AW500091N", "HEAD LAMP", NULL, 1, 1
-(base) maiuser@mazdvwenapp03:~$ 
-
-
-> "MATCH (wc:WarrantyClaim) WHERE wc.complaint_desc IN ['-', '', 'unknown'] RETURN wc.complaint_desc AS junk_value, count(wc) AS count 
-ORDER BY count DESC;"
-
-
-junk_value, count
-"-", 59
-(base) maiuser@mazdvwenapp03:~$ 
-
