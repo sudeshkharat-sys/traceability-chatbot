@@ -7,6 +7,7 @@ from the state database, and drives them through the EmbeddingProcessor pipeline
 import gc
 import logging
 import sys
+import os
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -39,6 +40,31 @@ class DocumentEmbeddingProcessor:
             db_connector=self.db,
             opensearch_connector=self.opensearch,
         )
+
+    # ------------------------------------------------------------------
+    # Memory Management
+    # ------------------------------------------------------------------
+
+    def reload_processor(self):
+        """
+        Reload the EmbeddingProcessor to clear accumulated memory.
+        This forces Python to release model weights and caches.
+        """
+        logger.info("Reloading processor to clear accumulated memory...")
+
+        # Delete old processor to free references
+        del self.processor
+
+        # Force garbage collection
+        gc.collect()
+
+        # Recreate processor (reloads all models fresh)
+        self.processor = EmbeddingProcessor(
+            db_connector=self.db,
+            opensearch_connector=self.opensearch,
+        )
+
+        logger.info("Processor reloaded successfully")
 
     # ------------------------------------------------------------------
     # Database queries
@@ -84,6 +110,8 @@ class DocumentEmbeddingProcessor:
             batch_size: Optional limit on number of documents to process in this run.
                        Useful for preventing OOM by processing in smaller batches.
         """
+        # Get reload interval from environment (default: 3 documents)
+        reload_interval = int(os.environ.get('RELOAD_INTERVAL', '3'))
         overall_stats = {
             "documents_processed": 0,
             "documents_completed": 0,
@@ -132,9 +160,22 @@ class DocumentEmbeddingProcessor:
                 )
                 overall_stats["documents_failed"] += 1
 
-            # Force garbage collection between documents to prevent OOM
-            gc.collect()
-            logger.debug(f"GC completed after document {idx}/{total_docs}")
+            # Force aggressive garbage collection between documents to prevent OOM
+            # Clear any document-specific caches
+            if hasattr(self.processor.doc_converter, '_model_cache'):
+                self.processor.doc_converter._model_cache.clear()
+
+            # Force multiple GC passes to break circular references
+            collected = gc.collect()  # Full collection
+            collected += gc.collect(generation=0)  # Young generation
+            collected += gc.collect(generation=1)  # Middle generation
+
+            logger.debug(f"GC completed after document {idx}/{total_docs}, collected {collected} objects")
+
+            # Reload processor periodically to fully clear accumulated memory
+            if reload_interval > 0 and idx % reload_interval == 0 and idx < total_docs:
+                logger.info(f"Reached reload interval ({reload_interval} docs), reloading processor...")
+                self.reload_processor()
 
         # ---- summary ----
         logger.info(f"\n{'=' * 60}")
