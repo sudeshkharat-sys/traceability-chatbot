@@ -28,7 +28,7 @@ for i in $(seq 1 $MAX_ITERATIONS); do
 
     # Process one batch
     echo "Processing batch of $BATCH_SIZE PDFs..."
-    docker exec -e BATCH_SIZE=$BATCH_SIZE -it traceability-app python -m dataloader.document_embedding_processor || {
+    docker exec -e BATCH_SIZE=$BATCH_SIZE -it traceability-app python -m dataloader || {
         echo "⚠️  Batch $i had errors, continuing to next batch..."
     }
 
