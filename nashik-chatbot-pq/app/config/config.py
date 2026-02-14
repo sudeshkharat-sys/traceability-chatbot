@@ -85,9 +85,10 @@ class Settings(BaseSettings):
 
     # Document Processing Configuration (Dataloader)
     DOCLING_ARTIFACTS_PATH: str = "/app/docling_models"
+    DOCLING_VLM_MODEL: str = "SmolDocling-256M-preview"  # Model name for VLM
     DOCLING_VLM_MODEL_PATH: str = "/app/docling_models/ds4sd--SmolDocling-256M-preview"
     DOCLING_LAYOUT_MODEL: str = "docling-layout-heron"
-    
+
     # Directory to scrape documents from
     DOCUMENT_INPUT_DIRECTORY: str = "/app/documents"
 
