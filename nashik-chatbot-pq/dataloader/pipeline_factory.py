@@ -7,7 +7,8 @@ from docling.datamodel.pipeline_options import (
     PdfPipelineOptions,
     TableFormerMode,
     PictureDescriptionVlmOptions,
-    TableStructureOptions
+    TableStructureOptions,
+    RapidOcrOptions
 )
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
@@ -31,6 +32,14 @@ os.environ["DOCLING_ARTIFACTS_PATH"] = str(ARTIFACTS_PATH)
 
 def get_pipeline_options():
     pipeline_options = PdfPipelineOptions(artifacts_path=ARTIFACTS_PATH)
+
+    # 0. OCR Settings - Disable if PDFs have native text, or configure RapidOCR
+    # Option A: Disable OCR for text-based PDFs (recommended if PDFs aren't scanned)
+    pipeline_options.do_ocr = False
+
+    # Option B: Enable OCR with RapidOCR for scanned PDFs/images (uncomment if needed)
+    # pipeline_options.do_ocr = True
+    # pipeline_options.ocr_options = RapidOcrOptions()
 
     # 1. Table Settings
     pipeline_options.do_table_structure = True
