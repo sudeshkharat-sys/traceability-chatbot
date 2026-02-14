@@ -83,4 +83,20 @@ TTP/1.1 200 OK"
 2026-02-14 09:32:43,723 [INFO] docling.models.inference_engines.vlm.transformers_engine: Batch processed 1 images in 13.52s (13.52s per image)
 2026-02-14 09:33:15,701 [INFO] docling.models.inference_engines.vlm.transformers_engine: Batch processed 2 images in 31.38s (15.69s per image)
 (chatbot) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$  
-[data] 0:[tmux]*                                                                                                                                              "mazdvwenapp03" 11:37 14-Feb-26
+
+
+
+2026-02-14 09:30:10,483 [INFO] dataloader.document_embedding_processor: [12/223] Processing document 23: Reg 43.01 - Safety Glazing.pdf
+2026-02-14 09:30:10,483 [INFO] dataloader.document_embedding_processor: ============================================================
+2026-02-14 09:30:10,483 [INFO] dataloader.embedding.embedding_creator: Processing document: Reg 43.01 - Safety Glazing.pdf
+2026-02-14 09:30:10,483 [INFO] dataloader.embedding.embedding_creator:   [1/3] Converting PDF with Docling...
+2026-02-14 09:30:10,506 [INFO] docling.datamodel.document: detected formats: [<InputFormat.PDF: 'pdf'>]
+2026-02-14 09:30:10,600 [INFO] docling.document_converter: Going to convert document batch...
+2026-02-14 09:30:10,601 [INFO] docling.pipeline.base_pipeline: Processing document Reg 43.01 - Safety Glazing.pdf
+2026-02-14 09:32:43,723 [INFO] docling.models.inference_engines.vlm.transformers_engine: Batch processed 1 images in 13.52s (13.52s per image)
+2026-02-14 09:33:15,701 [INFO] docling.models.inference_engines.vlm.transformers_engine: Batch processed 2 images in 31.38s (15.69s per image)
+(chatbot) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ docker compose logs app | tail -500 | grep -E "error|Error|ERROR|exception|Exception|traceback|Traceback" -A 5
+(chatbot) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ docker compose logs app | tail -500 | grep -E "error|Error|ERROR|exception|Exception|traceback|Traceback" -A 5
+(chatbot) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ docker compose logs app | tail -500 | grep -E "error|Error|ERROR|exception|Exception|traceback|Traceback" -A 5
+(chatbot) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$ docker compose logs app | tail -100 | grep -E "killed|Killed|OOM|memory|exit"
+(chatbot) maiuser@mazdvwenapp03:~/nashik-chatbot-pq$                                                                                                                                             "mazdvwenapp03" 11:37 14-Feb-26
