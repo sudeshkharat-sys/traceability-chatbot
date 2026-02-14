@@ -45,22 +45,24 @@ def get_pipeline_options():
     # 1. Table Settings
     pipeline_options.do_table_structure = True
     pipeline_options.table_structure_options = TableStructureOptions(
-        mode=TableFormerMode.ACCURATE,
+        mode=TableFormerMode.FAST,  # Changed from ACCURATE to FAST for better performance
         do_cell_matching=False
     )
 
     # 2. VLM / Picture Description Settings
-    pipeline_options.do_picture_description = True
-    
-    # Ensure repo_id is a valid Hugging Face repo ID (namespace/repo), not a path
-    vlm_repo_id = str(VLM_MODEL_FOLDER)
-    if vlm_repo_id.startswith("/") or "--" in vlm_repo_id:
-        if "SmolDocling" in vlm_repo_id:
-            vlm_repo_id = "ds4sd/SmolDocling-256M-preview"
-            
-    pipeline_options.picture_description_options = PictureDescriptionVlmOptions(
-        repo_id=vlm_repo_id
-    )
+    # DISABLED: VLM runs on CPU and is extremely slow (13-31s per image)
+    # For 8-core VM without GPU, this kills performance
+    # Re-enable only if GPU is available or if picture descriptions are critical
+    pipeline_options.do_picture_description = False
+
+    # VLM options (kept for reference if re-enabling)
+    # vlm_repo_id = str(VLM_MODEL_FOLDER)
+    # if vlm_repo_id.startswith("/") or "--" in vlm_repo_id:
+    #     if "SmolDocling" in vlm_repo_id:
+    #         vlm_repo_id = "ds4sd/SmolDocling-256M-preview"
+    # pipeline_options.picture_description_options = PictureDescriptionVlmOptions(
+    #     repo_id=vlm_repo_id
+    # )
     
     # 3. Image Generation Settings
     pipeline_options.images_scale = 2.0
@@ -68,8 +70,9 @@ def get_pipeline_options():
     pipeline_options.generate_picture_images = True
     pipeline_options.generate_table_images = True
 
-    # Use 4 threads for better performance on 8-core VM (leave headroom for other processes)
-    pipeline_options.accelerator_options.num_threads = 4
+    # Use 6 threads for better performance on 8-core VM (leave 2 cores for other processes)
+    # Increased from 4 to utilize more CPU cores
+    pipeline_options.accelerator_options.num_threads = 6
 
     return pipeline_options
 
