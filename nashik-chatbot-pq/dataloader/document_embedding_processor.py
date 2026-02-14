@@ -7,6 +7,7 @@ from the state database, and drives them through the EmbeddingProcessor pipeline
 import gc
 import logging
 import sys
+import os
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -41,6 +42,31 @@ class DocumentEmbeddingProcessor:
         )
 
     # ------------------------------------------------------------------
+    # Memory Management
+    # ------------------------------------------------------------------
+
+    def reload_processor(self):
+        """
+        Reload the EmbeddingProcessor to clear accumulated memory.
+        This forces Python to release model weights and caches.
+        """
+        logger.info("Reloading processor to clear accumulated memory...")
+
+        # Delete old processor to free references
+        del self.processor
+
+        # Force garbage collection
+        gc.collect()
+
+        # Recreate processor (reloads all models fresh)
+        self.processor = EmbeddingProcessor(
+            db_connector=self.db,
+            opensearch_connector=self.opensearch,
+        )
+
+        logger.info("Processor reloaded successfully")
+
+    # ------------------------------------------------------------------
     # Database queries
     # ------------------------------------------------------------------
 
@@ -72,14 +98,20 @@ class DocumentEmbeddingProcessor:
     # Orchestration
     # ------------------------------------------------------------------
 
-    def run(self) -> Dict[str, Any]:
+    def run(self, batch_size: int = None) -> Dict[str, Any]:
         """
         Main entry-point.
         1. Fetches all incomplete documents from the database.
         2. Passes each document to EmbeddingProcessor.process_document().
         3. Marks the document complete only when processing succeeds with zero errors.
         4. Returns aggregate statistics.
+
+        Args:
+            batch_size: Optional limit on number of documents to process in this run.
+                       Useful for preventing OOM by processing in smaller batches.
         """
+        # Get reload interval from environment (default: 3 documents)
+        reload_interval = int(os.environ.get('RELOAD_INTERVAL', '3'))
         overall_stats = {
             "documents_processed": 0,
             "documents_completed": 0,
@@ -96,6 +128,12 @@ class DocumentEmbeddingProcessor:
         if not docs:
             logger.info("No incomplete documents – nothing to do")
             return overall_stats
+
+        # Limit batch size if specified
+        if batch_size and batch_size > 0:
+            docs = docs[:batch_size]
+            logger.info(f"Batch size limit: processing {len(docs)} of {len(self.fetch_incomplete_documents())} incomplete documents")
+
         total_docs = len(docs)
         for idx, doc in enumerate(docs, 1):
             logger.info(f"\n{'=' * 60}")
@@ -122,9 +160,22 @@ class DocumentEmbeddingProcessor:
                 )
                 overall_stats["documents_failed"] += 1
 
-            # Force garbage collection between documents to prevent OOM
-            gc.collect()
-            logger.debug(f"GC completed after document {idx}/{total_docs}")
+            # Force aggressive garbage collection between documents to prevent OOM
+            # Clear any document-specific caches
+            if hasattr(self.processor.doc_converter, '_model_cache'):
+                self.processor.doc_converter._model_cache.clear()
+
+            # Force multiple GC passes to break circular references
+            collected = gc.collect()  # Full collection
+            collected += gc.collect(generation=0)  # Young generation
+            collected += gc.collect(generation=1)  # Middle generation
+
+            logger.debug(f"GC completed after document {idx}/{total_docs}, collected {collected} objects")
+
+            # Reload processor periodically to fully clear accumulated memory
+            if reload_interval > 0 and idx % reload_interval == 0 and idx < total_docs:
+                logger.info(f"Reached reload interval ({reload_interval} docs), reloading processor...")
+                self.reload_processor()
 
         # ---- summary ----
         logger.info(f"\n{'=' * 60}")

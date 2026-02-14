@@ -9,6 +9,8 @@ import time
 import json
 import hashlib
 import logging
+import os
+import signal
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from datetime import datetime
@@ -21,6 +23,41 @@ from app.queries import DataloaderQueries
 import pipeline_factory
 
 logger = logging.getLogger(__name__)
+
+# Timeout for PDF conversion (in seconds) - prevents hanging on problematic PDFs
+# Default: 300 seconds (5 minutes), configurable via environment variable
+PDF_CONVERSION_TIMEOUT = int(os.environ.get('PDF_CONVERSION_TIMEOUT', '300'))
+
+
+class TimeoutError(Exception):
+    """Raised when PDF conversion times out"""
+    pass
+
+
+def timeout_handler(signum, frame):
+    """Signal handler for timeout"""
+    raise TimeoutError("PDF conversion timed out")
+
+
+def with_timeout(timeout_seconds):
+    """
+    Decorator to add timeout to a function.
+    Only works on Unix-like systems (Linux, macOS).
+    """
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            # Set the signal handler and alarm
+            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(timeout_seconds)
+            try:
+                result = func(*args, **kwargs)
+            finally:
+                # Cancel the alarm and restore old handler
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
+            return result
+        return wrapper
+    return decorator
 
 
 class EmbeddingProcessor:
@@ -222,11 +259,30 @@ class EmbeddingProcessor:
             logger.info(f"Processing document: {doc['doc_name']}")
             doc_start_time = time.time()
 
-            # Convert document using Docling
-            logger.info("  [1/3] Converting PDF with Docling...")
+            # Convert document using Docling with timeout protection
+            logger.info(f"  [1/3] Converting PDF with Docling (timeout: {PDF_CONVERSION_TIMEOUT}s)...")
             conv_start = time.time()
-            conv_res = self.doc_converter.convert(doc_path)
-            logger.info(f"  ✓ Conversion completed in {time.time() - conv_start:.2f}s")
+
+            try:
+                # Set timeout alarm
+                old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+                signal.alarm(PDF_CONVERSION_TIMEOUT)
+                conv_res = self.doc_converter.convert(doc_path)
+                signal.alarm(0)  # Cancel alarm on success
+                signal.signal(signal.SIGALRM, old_handler)  # Restore old handler
+                logger.info(f"  ✓ Conversion completed in {time.time() - conv_start:.2f}s")
+            except TimeoutError:
+                signal.alarm(0)  # Cancel alarm
+                signal.signal(signal.SIGALRM, old_handler)  # Restore old handler
+                logger.error(f"  ✗ PDF conversion timed out after {PDF_CONVERSION_TIMEOUT}s")
+                logger.error(f"  Skipping document {doc['doc_name']} due to timeout")
+                stats["errors"] += 1
+                return stats
+            except Exception as e:
+                signal.alarm(0)  # Cancel alarm
+                signal.signal(signal.SIGALRM, old_handler)  # Restore old handler
+                logger.error(f"  ✗ PDF conversion failed: {str(e)}")
+                raise  # Re-raise to be caught by outer try-except
 
             # Chunk document
             logger.info("  [2/3] Chunking document...")
