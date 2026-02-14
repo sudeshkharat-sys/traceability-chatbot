@@ -33,13 +33,14 @@ os.environ["DOCLING_ARTIFACTS_PATH"] = str(ARTIFACTS_PATH)
 def get_pipeline_options():
     pipeline_options = PdfPipelineOptions(artifacts_path=ARTIFACTS_PATH)
 
-    # 0. OCR Settings - Disable if PDFs have native text, or configure RapidOCR
-    # Option A: Disable OCR for text-based PDFs (recommended if PDFs aren't scanned)
-    pipeline_options.do_ocr = False
+    # 0. OCR Settings - Handle both text and scanned PDFs
+    # Docling automatically skips OCR for text PDFs, runs OCR for scanned PDFs
+    pipeline_options.do_ocr = True
+    pipeline_options.ocr_options = RapidOcrOptions()
 
-    # Option B: Enable OCR with RapidOCR for scanned PDFs/images (uncomment if needed)
-    # pipeline_options.do_ocr = True
-    # pipeline_options.ocr_options = RapidOcrOptions()
+    # Use hybrid mode (default): OCR only when needed
+    # Set force_full_page_ocr=True only if layout extraction fails
+    pipeline_options.ocr_options.force_full_page_ocr = False
 
     # 1. Table Settings
     pipeline_options.do_table_structure = True
