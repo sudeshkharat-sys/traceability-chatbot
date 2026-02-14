@@ -72,13 +72,17 @@ class DocumentEmbeddingProcessor:
     # Orchestration
     # ------------------------------------------------------------------
 
-    def run(self) -> Dict[str, Any]:
+    def run(self, batch_size: int = None) -> Dict[str, Any]:
         """
         Main entry-point.
         1. Fetches all incomplete documents from the database.
         2. Passes each document to EmbeddingProcessor.process_document().
         3. Marks the document complete only when processing succeeds with zero errors.
         4. Returns aggregate statistics.
+
+        Args:
+            batch_size: Optional limit on number of documents to process in this run.
+                       Useful for preventing OOM by processing in smaller batches.
         """
         overall_stats = {
             "documents_processed": 0,
@@ -96,6 +100,12 @@ class DocumentEmbeddingProcessor:
         if not docs:
             logger.info("No incomplete documents – nothing to do")
             return overall_stats
+
+        # Limit batch size if specified
+        if batch_size and batch_size > 0:
+            docs = docs[:batch_size]
+            logger.info(f"Batch size limit: processing {len(docs)} of {len(self.fetch_incomplete_documents())} incomplete documents")
+
         total_docs = len(docs)
         for idx, doc in enumerate(docs, 1):
             logger.info(f"\n{'=' * 60}")
