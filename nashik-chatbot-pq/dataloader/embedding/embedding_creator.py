@@ -152,15 +152,19 @@ class EmbeddingProcessor:
         if not chunk_texts:
             return
 
-        logger.info(f"Flushing batch of {len(chunk_texts)} chunks to OpenSearch")
+        logger.info(f"Flushing batch of {len(chunk_texts)} chunks to OpenSearch...")
+        batch_start = time.time()
         try:
             self.opensearch.add_texts(
                 texts=chunk_texts,
                 metadatas=chunk_metadatas,
                 ids=chunk_ids,
             )
+            logger.info(f"✓ OpenSearch batch upsert completed in {time.time() - batch_start:.2f}s")
             stats["chunks_processed"] += len(chunk_texts)
 
+            # Upsert chunk metadata to Postgres
+            db_start = time.time()
             for chunk_info in chunk_data:
                 try:
                     self.upsert_chunk_to_db(
@@ -172,11 +176,14 @@ class EmbeddingProcessor:
                         chunk_info["opensearch_id"],
                     )
                 except Exception as e:
-                    logger.error(f"Error updating DB for chunk {chunk_info['index']}: {e}")
+                    logger.error(f"Error updating Postgres for chunk {chunk_info['index']}: {e}")
                     stats["errors"] += 1
+            logger.info(f"✓ Postgres batch upsert completed in {time.time() - db_start:.2f}s")
 
         except Exception as e:
-            logger.error(f"Error during LangChain batch processing: {e}")
+            logger.error(f"Error during OpenSearch batch processing: {e}")
+            import traceback
+            traceback.print_exc()
             stats["errors"] += len(chunk_texts)
 
     def process_document(self, doc: Dict[str, Any]) -> Dict[str, Any]:
@@ -213,16 +220,20 @@ class EmbeddingProcessor:
                 return stats
 
             logger.info(f"Processing document: {doc['doc_name']}")
+            doc_start_time = time.time()
 
             # Convert document using Docling
-            start_time = time.time()
+            logger.info("  [1/3] Converting PDF with Docling...")
+            conv_start = time.time()
             conv_res = self.doc_converter.convert(doc_path)
-            logger.info(f"Document converted in {time.time() - start_time:.2f}s")
+            logger.info(f"  ✓ Conversion completed in {time.time() - conv_start:.2f}s")
 
             # Chunk document
+            logger.info("  [2/3] Chunking document...")
+            chunk_start = time.time()
             chunk_iter = self.chunker.chunk(dl_doc=conv_res.document)
             chunks = list(chunk_iter)
-            logger.info(f"Document chunked into {len(chunks)} chunks")
+            logger.info(f"  ✓ Chunking completed in {time.time() - chunk_start:.2f}s - {len(chunks)} chunks created")
 
             # Free the heavy conversion result now that chunking is done
             del conv_res
@@ -230,6 +241,8 @@ class EmbeddingProcessor:
             gc.collect()
 
             # Process chunks in batches to limit memory
+            logger.info(f"  [3/3] Embedding and upserting {len(chunks)} chunks to OpenSearch & Postgres...")
+            embed_start = time.time()
             batch_texts: List[str] = []
             batch_metadatas: List[Dict] = []
             batch_ids: List[str] = []
@@ -290,12 +303,15 @@ class EmbeddingProcessor:
 
             # Flush remaining chunks
             self._flush_batch(doc, batch_texts, batch_metadatas, batch_ids, batch_data, stats)
+            logger.info(f"  ✓ Embedding phase completed in {time.time() - embed_start:.2f}s")
 
             # Mark as successful if no errors or only skipped chunks
             stats["success"] = stats["errors"] == 0
 
+            total_time = time.time() - doc_start_time
             logger.info(
-                f"Document processed: {stats['chunks_processed']} processed, "
+                f"✓ Document processed in {total_time:.2f}s: "
+                f"{stats['chunks_processed']} processed, "
                 f"{stats['chunks_created']} created, {stats['chunks_updated']} updated, "
                 f"{stats['chunks_skipped']} skipped, {stats['errors']} errors"
             )

@@ -29,18 +29,19 @@ services:
           memory: 512M
 
   # Neo4j Graph Database (2025.12.1 optimized for 32GB RAM Ubuntu VM)
-  # MEMORY ALLOCATION: App 16GB (priority) + Neo4j 12GB + Postgres 2GB + OS 2GB = 32GB
+  # MEMORY ALLOCATION: App 12GB + Neo4j 10GB + OpenSearch 6GB + Postgres 2GB + OS 2GB = 32GB
+  # Adjusted to give OpenSearch sufficient memory for document embeddings
   neo4j:
     image: neo4j:2025.12.1
     container_name: traceability-neo4j
     environment:
       NEO4J_AUTH: ${NEO4J_USERNAME}/${NEO4J_PASSWORD}
-      # Memory configuration - REDUCED to prioritize app for data loading
-      # Page cache: 6GB - for caching graph data and indexes
-      NEO4J_server_memory_pagecache_size: 6G
-      # Heap: 4-5GB - for transaction processing and query execution
-      NEO4J_server_memory_heap_initial__size: 4G
-      NEO4J_server_memory_heap_max__size: 5G
+      # Memory configuration - Balanced for data loading and query performance
+      # Page cache: 5GB - for caching graph data and indexes
+      NEO4J_server_memory_pagecache_size: 5G
+      # Heap: 3-4GB - for transaction processing and query execution
+      NEO4J_server_memory_heap_initial__size: 3G
+      NEO4J_server_memory_heap_max__size: 4G
       # APOC Plugin configuration
       NEO4J_PLUGINS: '["apoc"]'
       NEO4J_dbms_security_procedures_unrestricted: apoc.*
@@ -65,18 +66,20 @@ services:
     deploy:
       resources:
         limits:
-          memory: 12G
+          memory: 10G
         reservations:
-          memory: 8G
+          memory: 6G
 
   # OpenSearch Vector Database
+  # MEMORY: Increased to 4GB for handling large document embeddings (234 PDFs)
+  # Previous 512MB was causing OOM during bulk indexing
   opensearch:
     image: opensearchproject/opensearch:2.11.0
     container_name: traceability-opensearch
     environment:
       - discovery.type=single-node
       - bootstrap.memory_lock=true # along with the memlock settings below, disables swapping
-      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m" # Set heap size to 512m
+      - "OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx4g" # Increased heap: 2GB initial, 4GB max (was 512m)
       - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_PASSWORD}
       - "plugins.security.disabled=true" # DISABLE SSL/Security for internal Docker network
     ports:
@@ -87,6 +90,12 @@ services:
     networks:
       - traceability-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 6G  # Container limit (includes heap + off-heap)
+        reservations:
+          memory: 3G
     ulimits:
       memlock:
         soft: -1
@@ -96,8 +105,8 @@ services:
         hard: 65536
 
   # Application (FastAPI + React)
-  # Memory limit: 16GB for data loading with large CSV files (500k+ rows)
-  # App gets priority memory allocation since data loading is the main task
+  # Memory limit: 12GB for data loading with large CSV files and PDF processing
+  # Balanced allocation with OpenSearch for optimal embedding pipeline performance
   app:
     build:
       context: .
@@ -106,9 +115,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 16G
+          memory: 12G
         reservations:
-          memory: 8G
+          memory: 6G
     environment:
       # Azure OpenAI (Set these in .env file)
       AZURE_API_KEY: ${AZURE_API_KEY}

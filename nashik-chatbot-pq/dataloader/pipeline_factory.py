@@ -57,8 +57,9 @@ def get_pipeline_options():
     pipeline_options.generate_page_images = False
     pipeline_options.generate_picture_images = True
     pipeline_options.generate_table_images = True
-    
-    pipeline_options.accelerator_options.num_threads = 1
+
+    # Use 4 threads for better performance on 8-core VM (leave headroom for other processes)
+    pipeline_options.accelerator_options.num_threads = 4
 
     return pipeline_options
 
