@@ -50,6 +50,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY main.py .
 COPY tasks.py .
+COPY diagnostic_check.py .
+COPY check_status.py .
 COPY app/ ./app/
 COPY backend/ ./backend/
 COPY dataloader/ ./dataloader/
