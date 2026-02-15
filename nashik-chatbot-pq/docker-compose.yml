@@ -1,3 +1,31 @@
+# ============================================================================
+# RESOURCE ALLOCATION STRATEGY (32GB RAM, 8 CPU cores)
+# ============================================================================
+#
+# MEMORY LIMITS (30GB allocated, 2GB for OS):
+#   App:        12GB  (PDF processing, CSV loading, embedding creation)
+#   Neo4j:      10GB  (5GB pagecache + 4GB heap - graph database)
+#   OpenSearch:  5GB  (4GB heap + 1GB off-heap - vector search)
+#   Postgres:    2GB  (relational data, metadata)
+#   Nginx:     256MB  (static files, reverse proxy)
+#   OS/Buffer:   2GB  (system overhead, disk cache)
+#
+# CPU LIMITS (8 cores total):
+#   App:         3.0 cores  (Docling PDF processing is CPU-intensive)
+#   Neo4j:       2.0 cores  (Graph queries, relationship traversal)
+#   OpenSearch:  2.0 cores  (Indexing, vector search)
+#   Postgres:    1.0 cores  (SQL queries, joins)
+#   Nginx:       0.5 cores  (Static file serving)
+#   Buffer:     -0.5 cores  (oversubscription OK for burst workloads)
+#
+# NOTES:
+# - During embedding creation, app uses most CPU (PDF → chunks → embeddings)
+# - OpenSearch indexing happens in batches (concurrent with app processing)
+# - Neo4j is mostly idle during embedding creation
+# - CPU limits allow oversubscription for bursty workloads
+# - Memory limits are hard (OOM killer will terminate if exceeded)
+# ============================================================================
+
 services:
   # PostgreSQL Database (Alpine 17)
   postgres:
@@ -24,13 +52,14 @@ services:
     deploy:
       resources:
         limits:
+          cpus: '1.0'      # 1 core max (lightweight queries)
           memory: 2G
         reservations:
+          cpus: '0.25'     # 0.25 cores baseline
           memory: 512M
 
   # Neo4j Graph Database (2025.12.1 optimized for 32GB RAM Ubuntu VM)
-  # MEMORY ALLOCATION: App 12GB + Neo4j 10GB + OpenSearch 6GB + Postgres 2GB + OS 2GB = 32GB
-  # Adjusted to give OpenSearch sufficient memory for document embeddings
+  # See resource allocation strategy at top of file for details
   neo4j:
     image: neo4j:2025.12.1
     container_name: traceability-neo4j
@@ -66,13 +95,14 @@ services:
     deploy:
       resources:
         limits:
+          cpus: '2.0'      # 2 cores for graph queries
           memory: 10G
         reservations:
+          cpus: '0.5'      # 0.5 cores baseline
           memory: 6G
 
   # OpenSearch Vector Database
-  # MEMORY: Increased to 4GB for handling large document embeddings (234 PDFs)
-  # Previous 512MB was causing OOM during bulk indexing
+  # 5GB container limit: 4GB heap + 1GB off-heap (Lucene, segment merging)
   opensearch:
     image: opensearchproject/opensearch:2.11.0
     container_name: traceability-opensearch
@@ -93,9 +123,11 @@ services:
     deploy:
       resources:
         limits:
-          memory: 6G  # Container limit (includes heap + off-heap)
+          cpus: '2.0'      # 2 cores for indexing/search
+          memory: 5G       # Container limit (4GB heap + 1GB off-heap)
         reservations:
-          memory: 3G
+          cpus: '0.5'      # 0.5 cores baseline
+          memory: 2500M
     ulimits:
       memlock:
         soft: -1
@@ -105,18 +137,22 @@ services:
         hard: 65536
 
   # Application (FastAPI + React)
-  # Memory limit: 12GB for data loading with large CSV files and PDF processing
-  # Balanced allocation with OpenSearch for optimal embedding pipeline performance
+  # 12GB RAM: CSV loading + PDF processing (Docling) + embedding batches
+  # 3 CPUs: Docling is CPU-intensive (DOCLING_NUM_THREADS=8 with oversubscription)
+  # 2GB shm: Shared memory for multiprocessing PDF conversion
   app:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: traceability-app
+    shm_size: '2gb'  # Shared memory for PDF processing (Docling multiprocessing)
     deploy:
       resources:
         limits:
+          cpus: '3.0'      # 3 cores for PDF processing (Docling DOCLING_NUM_THREADS=8)
           memory: 12G
         reservations:
+          cpus: '1.0'      # 1 core baseline
           memory: 6G
     environment:
       # Azure OpenAI (Set these in .env file)
@@ -203,6 +239,14 @@ services:
     networks:
       - traceability-network
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'      # 0.5 cores (lightweight proxy)
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
 
 networks:
   traceability-network:

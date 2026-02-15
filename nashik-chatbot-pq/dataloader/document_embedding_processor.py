@@ -47,24 +47,33 @@ class DocumentEmbeddingProcessor:
 
     def reload_processor(self):
         """
-        Reload the EmbeddingProcessor to clear accumulated memory.
-        This forces Python to release model weights and caches.
+        Clear processor caches without reloading Docling models.
+
+        CRITICAL FIX: Docling models (~1-2GB) are now singletons and should NOT
+        be reloaded. This function now only clears document-specific caches.
+
+        Old behavior (BUG):
+        - Deleted and recreated processor
+        - Recreated DocumentConverter with NEW models (1-2GB each time!)
+        - After 32 reloads: 32GB of leaked model weights
+
+        New behavior (FIXED):
+        - Keep same converter/chunker (singleton)
+        - Only clear document-specific caches
+        - Memory stays stable
         """
-        logger.info("Reloading processor to clear accumulated memory...")
+        logger.info("Clearing processor caches (models are reused)...")
 
-        # Delete old processor to free references
-        del self.processor
+        # Clear document-specific caches if they exist
+        if hasattr(self.processor, 'doc_converter') and hasattr(self.processor.doc_converter, '_model_cache'):
+            self.processor.doc_converter._model_cache.clear()
 
-        # Force garbage collection
-        gc.collect()
+        # Force garbage collection to free document data
+        collected = gc.collect()
+        collected += gc.collect(generation=0)
+        collected += gc.collect(generation=1)
 
-        # Recreate processor (reloads all models fresh)
-        self.processor = EmbeddingProcessor(
-            db_connector=self.db,
-            opensearch_connector=self.opensearch,
-        )
-
-        logger.info("Processor reloaded successfully")
+        logger.info(f"Caches cleared, {collected} objects collected. Models reused (no reload).")
 
     # ------------------------------------------------------------------
     # Database queries
@@ -110,8 +119,9 @@ class DocumentEmbeddingProcessor:
             batch_size: Optional limit on number of documents to process in this run.
                        Useful for preventing OOM by processing in smaller batches.
         """
-        # Get reload interval from environment (default: 3 documents)
-        reload_interval = int(os.environ.get('RELOAD_INTERVAL', '3'))
+        # Get reload interval from environment (default: 1 document to prevent memory accumulation)
+        # With 32GB, memory leaked ~1GB/PDF, so reload after every document
+        reload_interval = int(os.environ.get('RELOAD_INTERVAL', '1'))
         overall_stats = {
             "documents_processed": 0,
             "documents_completed": 0,

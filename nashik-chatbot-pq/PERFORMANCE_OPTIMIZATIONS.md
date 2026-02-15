@@ -244,30 +244,6 @@ docker compose up app
 
 ---
 
-### Option 3: Batch Processing (Safest for Large Runs)
-
-```bash
-cd ~/Traceability/nashik-chatbot-pq
-
-cat > process_batches.sh << 'EOF'
-#!/bin/bash
-BATCH_SIZE=10
-TOTAL_DOCS=229
-
-for ((start=0; start<TOTAL_DOCS; start+=BATCH_SIZE)); do
-    echo "Processing batch: documents $start to $((start+BATCH_SIZE))"
-    docker compose up app
-    docker compose down
-    sleep 5
-done
-EOF
-
-chmod +x process_batches.sh
-./process_batches.sh
-```
-
----
-
 ## Monitoring
 
 ### Check Progress:
