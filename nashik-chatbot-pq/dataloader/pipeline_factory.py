@@ -37,6 +37,11 @@ ENABLE_VLM = os.environ.get('ENABLE_VLM', 'false').lower() == 'true'
 ENABLE_TABLES = os.environ.get('ENABLE_TABLES', 'true').lower() == 'true'
 NUM_THREADS = int(os.environ.get('DOCLING_NUM_THREADS', '8'))  # Use all 8 logical cores by default
 
+# Module-level cache for converter and chunker (singleton pattern)
+# Prevents memory leak from recreating Docling models on every processor reload
+_converter_instance = None
+_chunker_instance = None
+
 def get_pipeline_options():
     pipeline_options = PdfPipelineOptions(artifacts_path=ARTIFACTS_PATH)
 
@@ -91,18 +96,43 @@ def get_pipeline_options():
     return pipeline_options
 
 def get_converter():
-    return DocumentConverter(
-        format_options={
-            InputFormat.PDF: PdfFormatOption(pipeline_options=get_pipeline_options())
-        }
-    )
+    """
+    Get DocumentConverter instance using singleton pattern.
+    Creates converter only once to prevent memory leak from reloading ML models.
+
+    CRITICAL: Docling loads ~1-2GB of models (OCR, tables, layout).
+    Recreating converter on every processor reload caused 32GB memory leak!
+    """
+    global _converter_instance
+
+    if _converter_instance is None:
+        print("🔧 Creating DocumentConverter (loading Docling models ~1-2GB)...")
+        _converter_instance = DocumentConverter(
+            format_options={
+                InputFormat.PDF: PdfFormatOption(pipeline_options=get_pipeline_options())
+            }
+        )
+        print("✅ DocumentConverter created and cached (will be reused)")
+
+    return _converter_instance
 
 def get_chunker():
-    tokenizer = OpenAITokenizer(
-        tokenizer=tiktoken.get_encoding("cl100k_base"),
-        max_tokens=8191,
-    )
-    return HybridChunker(
-        tokenizer=tokenizer,
-        serializer_provider=CustomSerializerProvider(),
-    )
+    """
+    Get HybridChunker instance using singleton pattern.
+    Reuses tokenizer and chunker to prevent memory overhead.
+    """
+    global _chunker_instance
+
+    if _chunker_instance is None:
+        print("🔧 Creating HybridChunker (loading tiktoken encoder)...")
+        tokenizer = OpenAITokenizer(
+            tokenizer=tiktoken.get_encoding("cl100k_base"),
+            max_tokens=8191,
+        )
+        _chunker_instance = HybridChunker(
+            tokenizer=tokenizer,
+            serializer_provider=CustomSerializerProvider(),
+        )
+        print("✅ HybridChunker created and cached (will be reused)")
+
+    return _chunker_instance
