@@ -64,9 +64,12 @@ class PartLabelerQueries:
     """
 
     GET_UNIQUE_MFG_MONTHS = """
-        SELECT DISTINCT manufac_yr_mon FROM raw_warranty_data
-        WHERE manufac_yr_mon IS NOT NULL AND manufac_yr_mon != '' AND user_id = :user_id
-        ORDER BY TO_DATE(manufac_yr_mon, 'Mon-YYYY') DESC
+        SELECT mfg_month FROM (
+            SELECT DISTINCT manufac_yr_mon AS mfg_month,
+                   TO_DATE(manufac_yr_mon, 'Mon-YYYY') AS sort_key
+            FROM raw_warranty_data
+            WHERE manufac_yr_mon IS NOT NULL AND manufac_yr_mon != '' AND user_id = :user_id
+        ) sub ORDER BY sort_key DESC
     """
 
     GET_MFG_DATE_RANGE = """
@@ -261,9 +264,11 @@ class PartLabelerQueries:
     """
 
     RPT_GET_UNIQUE_MFG_MONTHS = """
-        SELECT DISTINCT mfg_month FROM raw_rpt_data
-        WHERE mfg_month IS NOT NULL AND mfg_month != '' AND user_id = :user_id
-        ORDER BY TO_DATE(mfg_month, 'Mon-YY') DESC
+        SELECT mfg_month FROM (
+            SELECT DISTINCT mfg_month, TO_DATE(mfg_month, 'Mon-YY') AS sort_key
+            FROM raw_rpt_data
+            WHERE mfg_month IS NOT NULL AND mfg_month != '' AND user_id = :user_id
+        ) sub ORDER BY sort_key DESC
     """
 
     RPT_SEARCH_DATA = """
@@ -408,9 +413,11 @@ class PartLabelerQueries:
     """
 
     GNOVAC_GET_UNIQUE_MFG_MONTHS = """
-        SELECT DISTINCT mfg_month FROM raw_gnovac_data
-        WHERE mfg_month IS NOT NULL AND mfg_month != '' AND user_id = :user_id
-        ORDER BY TO_DATE(mfg_month, 'Mon-YY') DESC
+        SELECT mfg_month FROM (
+            SELECT DISTINCT mfg_month, TO_DATE(mfg_month, 'Mon-YY') AS sort_key
+            FROM raw_gnovac_data
+            WHERE mfg_month IS NOT NULL AND mfg_month != '' AND user_id = :user_id
+        ) sub ORDER BY sort_key DESC
     """
 
     GNOVAC_SEARCH_DATA = """
@@ -527,9 +534,11 @@ class PartLabelerQueries:
     """
 
     RFI_GET_UNIQUE_MFG_MONTHS = """
-        SELECT DISTINCT mfg_month FROM raw_rfi_data
-        WHERE mfg_month IS NOT NULL AND mfg_month != '' AND user_id = :user_id
-        ORDER BY TO_DATE(mfg_month, 'Mon-YY') DESC
+        SELECT mfg_month FROM (
+            SELECT DISTINCT mfg_month, TO_DATE(mfg_month, 'Mon-YY') AS sort_key
+            FROM raw_rfi_data
+            WHERE mfg_month IS NOT NULL AND mfg_month != '' AND user_id = :user_id
+        ) sub ORDER BY sort_key DESC
     """
 
     RFI_SEARCH_DATA = """
@@ -652,9 +661,11 @@ class PartLabelerQueries:
     """
 
     ESQA_GET_UNIQUE_MFG_MONTHS = """
-        SELECT DISTINCT mfg_month FROM raw_esqa_data
-        WHERE mfg_month IS NOT NULL AND mfg_month != '' AND user_id = :user_id
-        ORDER BY TO_DATE(mfg_month, 'Mon-YY') DESC
+        SELECT mfg_month FROM (
+            SELECT DISTINCT mfg_month, TO_DATE(mfg_month, 'Mon-YY') AS sort_key
+            FROM raw_esqa_data
+            WHERE mfg_month IS NOT NULL AND mfg_month != '' AND user_id = :user_id
+        ) sub ORDER BY sort_key DESC
     """
 
     ESQA_SEARCH_DATA = """
