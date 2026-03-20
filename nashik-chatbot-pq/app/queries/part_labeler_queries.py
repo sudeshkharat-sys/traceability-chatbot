@@ -291,8 +291,8 @@ class PartLabelerQueries:
           AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
           AND (:buyoff_stage IS NULL OR buyoff_stage = ANY(:buyoff_stage))
           AND (:online_offline IS NULL
-               OR ('Online' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(online_val), '')) = 'true')
-               OR ('Offline' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(offline_val), '')) = 'true'))
+               OR ('Online' = ANY(:online_offline) AND COALESCE(TRIM(online_val), '') NOT IN ('', '0', '0.0', 'false', 'no'))
+               OR ('Offline' = ANY(:online_offline) AND COALESCE(TRIM(offline_val), '') NOT IN ('', '0', '0.0', 'false', 'no')))
           AND user_id = :user_id
         GROUP BY mfg_month
         ORDER BY mfg_month DESC
@@ -341,8 +341,8 @@ class PartLabelerQueries:
           AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
           AND (:buyoff_stage IS NULL OR buyoff_stage = ANY(:buyoff_stage))
           AND (:online_offline IS NULL
-               OR ('Online' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(online_val), '')) = 'true')
-               OR ('Offline' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(offline_val), '')) = 'true'))
+               OR ('Online' = ANY(:online_offline) AND COALESCE(TRIM(online_val), '') NOT IN ('', '0', '0.0', 'false', 'no'))
+               OR ('Offline' = ANY(:online_offline) AND COALESCE(TRIM(offline_val), '') NOT IN ('', '0', '0.0', 'false', 'no')))
         GROUP BY mfg_month
         ORDER BY mfg_month ASC
     """
@@ -358,8 +358,8 @@ class PartLabelerQueries:
           AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
           AND (:buyoff_stage IS NULL OR buyoff_stage = ANY(:buyoff_stage))
           AND (:online_offline IS NULL
-               OR ('Online' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(online_val), '')) = 'true')
-               OR ('Offline' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(offline_val), '')) = 'true'))
+               OR ('Online' = ANY(:online_offline) AND COALESCE(TRIM(online_val), '') NOT IN ('', '0', '0.0', 'false', 'no'))
+               OR ('Offline' = ANY(:online_offline) AND COALESCE(TRIM(offline_val), '') NOT IN ('', '0', '0.0', 'false', 'no')))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 15
@@ -376,8 +376,8 @@ class PartLabelerQueries:
           AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
           AND (:buyoff_stage IS NULL OR buyoff_stage = ANY(:buyoff_stage))
           AND (:online_offline IS NULL
-               OR ('Online' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(online_val), '')) = 'true')
-               OR ('Offline' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(offline_val), '')) = 'true'))
+               OR ('Online' = ANY(:online_offline) AND COALESCE(TRIM(online_val), '') NOT IN ('', '0', '0.0', 'false', 'no'))
+               OR ('Offline' = ANY(:online_offline) AND COALESCE(TRIM(offline_val), '') NOT IN ('', '0', '0.0', 'false', 'no')))
         GROUP BY 1
         ORDER BY value DESC
     """
@@ -393,8 +393,8 @@ class PartLabelerQueries:
           AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
           AND (:buyoff_stage IS NULL OR buyoff_stage = ANY(:buyoff_stage))
           AND (:online_offline IS NULL
-               OR ('Online' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(online_val), '')) = 'true')
-               OR ('Offline' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(offline_val), '')) = 'true'))
+               OR ('Online' = ANY(:online_offline) AND COALESCE(TRIM(online_val), '') NOT IN ('', '0', '0.0', 'false', 'no'))
+               OR ('Offline' = ANY(:online_offline) AND COALESCE(TRIM(offline_val), '') NOT IN ('', '0', '0.0', 'false', 'no')))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 15
