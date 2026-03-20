@@ -395,9 +395,13 @@ create_dynamic_table(
         ),
     ],
     indexes=[
+        Index("idx_raw_warranty_user_id", "user_id"),
+        Index("idx_raw_warranty_user_month", "user_id", "manufac_yr_mon"),
+        Index("idx_raw_warranty_user_model", "user_id", "base_model"),
+        Index("idx_raw_warranty_user_mis", "user_id", "mis_bucket"),
+        Index("idx_raw_warranty_user_qtr", "user_id", "new_manufacturing_quater"),
         Index("idx_raw_warranty_material", "material_description"),
         Index("idx_raw_warranty_failure_date", "failure_date"),
-        Index("idx_raw_warranty_user_id", "user_id"),
     ],
 )
 
@@ -512,8 +516,10 @@ create_dynamic_table(
     ],
     indexes=[
         Index("idx_raw_rpt_user_id", "user_id"),
-        Index("idx_raw_rpt_mfg_month", "mfg_month"),
-        Index("idx_raw_rpt_model", "model"),
+        Index("idx_raw_rpt_user_month", "user_id", "mfg_month"),
+        Index("idx_raw_rpt_user_model", "user_id", "model"),
+        Index("idx_raw_rpt_user_category", "user_id", "defect_category"),
+        Index("idx_raw_rpt_user_qtr", "user_id", "mfg_quarter"),
     ],
 )
 
@@ -556,8 +562,10 @@ create_dynamic_table(
     ],
     indexes=[
         Index("idx_raw_gnovac_user_id", "user_id"),
-        Index("idx_raw_gnovac_mfg_month", "mfg_month"),
-        Index("idx_raw_gnovac_model_code", "model_code"),
+        Index("idx_raw_gnovac_user_month", "user_id", "mfg_month"),
+        Index("idx_raw_gnovac_user_model", "user_id", "model_code"),
+        Index("idx_raw_gnovac_user_pointer", "user_id", "pointer"),
+        Index("idx_raw_gnovac_user_qtr", "user_id", "mfg_quarter"),
     ],
 )
 
@@ -605,8 +613,10 @@ create_dynamic_table(
     ],
     indexes=[
         Index("idx_raw_rfi_user_id", "user_id"),
-        Index("idx_raw_rfi_mfg_month", "mfg_month"),
-        Index("idx_raw_rfi_model_name", "model_name"),
+        Index("idx_raw_rfi_user_month", "user_id", "mfg_month"),
+        Index("idx_raw_rfi_user_model", "user_id", "model_name"),
+        Index("idx_raw_rfi_user_severity", "user_id", "severity_name"),
+        Index("idx_raw_rfi_user_qtr", "user_id", "mfg_quarter"),
     ],
 )
 
@@ -659,8 +669,10 @@ create_dynamic_table(
     ],
     indexes=[
         Index("idx_raw_esqa_user_id", "user_id"),
-        Index("idx_raw_esqa_mfg_month", "mfg_month"),
-        Index("idx_raw_esqa_vehicle_model", "vehicle_model"),
+        Index("idx_raw_esqa_user_month", "user_id", "mfg_month"),
+        Index("idx_raw_esqa_user_model", "user_id", "vehicle_model"),
+        Index("idx_raw_esqa_user_category", "user_id", "concern_category"),
+        Index("idx_raw_esqa_user_qtr", "user_id", "mfg_quarter"),
     ],
 )
 
