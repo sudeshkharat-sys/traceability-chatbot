@@ -234,14 +234,15 @@
 }
 
 .workspace-header-bar {
-  height: 50px;
+  min-height: 50px;
   background: white;
   border-bottom: 1px solid var(--border-color);
   padding: 0 1.5rem;
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 1rem;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 /* Custom Filter Dropdown Styles */
@@ -1352,4 +1353,99 @@
 @keyframes scaleIn {
   from { transform: scale(0.8); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
+}
+
+/* =====================================================
+   DATA SOURCE SELECTOR
+   ===================================================== */
+.data-source-selector {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.ds-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: white;
+  border: 1.5px solid var(--mahindra-red);
+  border-radius: 8px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--mahindra-red);
+  white-space: nowrap;
+  transition: background 0.18s, box-shadow 0.18s;
+}
+
+.ds-toggle:hover {
+  background: #fff5f5;
+  box-shadow: 0 2px 8px rgba(220, 20, 60, 0.12);
+}
+
+.ds-label {
+  font-weight: 700;
+  color: var(--text-gray);
+}
+
+.ds-value {
+  font-weight: 700;
+  color: var(--mahindra-red);
+}
+
+.ds-chevron {
+  transition: transform 0.2s;
+  color: var(--text-gray);
+}
+
+.ds-chevron.open {
+  transform: rotate(180deg);
+}
+
+.ds-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 1000;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  min-width: 180px;
+  overflow: hidden;
+}
+
+.ds-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 14px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-dark);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.ds-option:hover {
+  background: #f8f9fa;
+}
+
+.ds-option.active {
+  background: #fff5f5;
+  color: var(--mahindra-red);
+  font-weight: 700;
+}
+
+.ds-check {
+  color: var(--mahindra-red);
+}
+
+/* Column hint in mapping table */
+.col-hint {
+  font-size: 0.68rem;
+  color: var(--text-gray);
+  font-weight: 400;
+  font-style: italic;
 }
