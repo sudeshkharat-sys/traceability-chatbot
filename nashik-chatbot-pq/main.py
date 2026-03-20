@@ -120,7 +120,13 @@ def create_app() -> FastAPI:
         if static_dir.exists():
             app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
         
-        # 2. Catch-all route for SPA
+        # 2. Mount /uploads explicitly for PartLabeler
+        upload_dir = frontend_path / "uploads"
+        if not upload_dir.exists():
+            upload_dir.mkdir(parents=True, exist_ok=True)
+        app.mount("/uploads", StaticFiles(directory=str(upload_dir)), name="uploads")
+        
+        # 3. Catch-all route for SPA
         # This serves files if they exist (favicon.ico, etc.), otherwise index.html
         @app.get("/{full_path:path}")
         async def serve_spa(full_path: str):

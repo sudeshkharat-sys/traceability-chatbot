@@ -65,12 +65,11 @@ const Sidebar = ({
     onSelectChat(chatId);
   };
 
-  const handleLogout = () => {
-    // logout() is now synchronous (clears session instantly, API is fire-and-forget)
-    authService.logout();
+  const handleLogout = async () => {
+    await authService.logout();
     setShowSettingsMenu(false);
-    // Full page redirect — instant, no waiting for pending API calls
-    window.location.href = "/";
+    navigate("/");
+    window.location.reload();
   };
 
   return (

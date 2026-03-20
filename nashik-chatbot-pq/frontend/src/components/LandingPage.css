@@ -9,21 +9,18 @@
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  padding-top: 80px; /* Space for logos */
   position: relative;
-  overflow-x: hidden;
-  overflow-y: auto;
-  box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* Corner Logos */
 .corner-logo {
   position: absolute;
   top: 1.5rem;
-  height: 60px;
+  height: 45px;
   width: auto;
   object-fit: contain;
-  z-index: 100;
+  z-index: 10;
   animation: fadeIn 1s ease;
 }
 
@@ -305,21 +302,21 @@
   width: 100%;
   background: #ffffff;
   border-radius: 12px;
-  padding: 1.5rem 1.75rem 1.25rem;
+  padding: 2rem 2rem 1.5rem;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
   border-top: 4px solid #DC143C;
 }
 
 .auth-title {
-  margin: 0 0 0.2rem;
-  font-size: 1.35rem;
+  margin: 0 0 0.25rem;
+  font-size: 1.4rem;
   font-weight: 700;
   color: #1a1a1a;
 }
 
 .auth-subtitle {
-  margin: 0 0 1rem;
-  font-size: 0.82rem;
+  margin: 0 0 1.25rem;
+  font-size: 0.85rem;
   color: #666666;
 }
 
@@ -328,29 +325,29 @@
   color: #cc0000;
   border: 1px solid #ffcccc;
   border-radius: 6px;
-  padding: 0.4rem 0.6rem;
-  font-size: 0.78rem;
-  margin-bottom: 0.8rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8rem;
+  margin-bottom: 1rem;
 }
 
 .auth-field {
-  margin-bottom: 0.75rem;
+  margin-bottom: 1rem;
 }
 
 .auth-field label {
   display: block;
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: #333;
-  margin-bottom: 0.25rem;
+  margin-bottom: 0.3rem;
 }
 
 .auth-field input {
   width: 100%;
-  padding: 0.5rem 0.75rem;
+  padding: 0.6rem 0.75rem;
   border: 1px solid #ddd;
   border-radius: 6px;
-  font-size: 0.88rem;
+  font-size: 0.9rem;
   outline: none;
   transition: border-color 0.2s ease;
   box-sizing: border-box;
@@ -363,16 +360,16 @@
 
 .auth-submit-btn {
   width: 100%;
-  padding: 0.65rem;
+  padding: 0.7rem;
   background: #DC143C;
   color: #fff;
   border: none;
   border-radius: 8px;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s ease;
-  margin-top: 0.15rem;
+  margin-top: 0.25rem;
 }
 
 .auth-submit-btn:hover:not(:disabled) {
@@ -386,8 +383,8 @@
 
 .auth-toggle {
   text-align: center;
-  margin-top: 0.75rem;
-  font-size: 0.78rem;
+  margin-top: 1rem;
+  font-size: 0.8rem;
   color: #666;
 }
 
@@ -460,38 +457,29 @@
   }
 }
 
+/* Responsive Design */
 @media (max-width: 1024px) {
-  .landing-page {
-    padding-top: 100px;
-  }
-  
   .landing-content {
     flex-direction: column;
     gap: 2rem;
-    justify-content: flex-start;
   }
 
   .left-section {
     width: 100%;
     max-width: 500px;
-    padding: 1rem;
-    align-items: center;
+    padding-left: 2rem;
   }
 
   .ai-solution-text {
     max-width: 400px;
-    padding: 0;
-    margin-bottom: 40px;
-    text-align: center;
+    padding: 1.5rem 2rem;
   }
 
   .main-heading {
-    justify-content: center;
     font-size: 2.5rem;
   }
 
   .sub-heading {
-    text-align: center;
     font-size: 1.1rem;
   }
 
@@ -503,13 +491,11 @@
 
 @media (max-width: 768px) {
   .landing-page {
-    padding: 1.5rem;
-    padding-top: 90px;
-    align-items: flex-start;
+    padding: 2rem 1.5rem;
   }
 
   .corner-logo {
-    height: 45px;
+    height: 50px;
     top: 1rem;
   }
 
@@ -522,12 +508,13 @@
   }
 
   .left-section {
-    padding: 1rem;
+    padding: 1.5rem;
+    padding-left: 2rem;
   }
 
   .ai-solution-text {
-    max-width: 100%;
-    margin-bottom: 30px;
+    max-width: 360px;
+    padding: 1.5rem 1.75rem;
   }
 
   .main-heading {
@@ -540,26 +527,86 @@
 
   .features-container {
     max-width: 600px;
-    padding: 0.5rem;
-    gap: 0.75rem;
+    padding: 1rem;
+    gap: 1rem;
   }
 
   .feature-card {
-    padding: 1rem;
+    padding: 1.25rem 1.5rem;
+  }
+
+  .feature-title {
+    font-size: 1.1rem;
+  }
+
+  .feature-description {
+    font-size: 0.85rem;
   }
 }
 
 @media (max-width: 480px) {
   .landing-page {
-    padding-top: 80px;
+    padding: 1.5rem 1rem;
   }
 
   .corner-logo {
-    height: 35px;
+    height: 40px;
     top: 0.75rem;
   }
 
+  .corner-logo-left {
+    left: 0.75rem;
+  }
+
+  .corner-logo-right {
+    right: 0.75rem;
+  }
+
+  .left-section {
+    max-width: 100%;
+    padding: 1rem;
+    padding-left: 1.5rem;
+  }
+
+  .ai-solution-text {
+    max-width: 100%;
+    padding: 1.25rem 1.5rem;
+  }
+
   .main-heading {
-    font-size: 1.6rem;
+    font-size: 1.5rem;
+    gap: 0.3rem;
+  }
+
+  .sub-heading {
+    font-size: 0.9rem;
+  }
+
+  .features-container {
+    max-width: 100%;
+  }
+
+  .feature-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .feature-content {
+    width: 100%;
+  }
+
+  .get-started-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .feature-icon {
+    width: 40px;
+    height: 40px;
+  }
+
+  .feature-title {
+    font-size: 1rem;
   }
 }

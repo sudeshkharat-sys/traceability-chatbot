@@ -20,6 +20,8 @@ from sqlalchemy import (
     PrimaryKeyConstraint,
     ForeignKeyConstraint,
     String,
+    Float,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 
@@ -63,6 +65,11 @@ feedback_id_seq = Sequence("feedback_id_seq")
 scraped_doc_id_seq = Sequence("scraped_doc_id_seq")
 chunk_id_seq = Sequence("chunk_id_seq")
 user_id_seq = Sequence("user_id_seq")
+image_id_seq = Sequence("image_id_seq")
+label_id_seq = Sequence("label_id_seq")
+warranty_id_seq = Sequence("warranty_id_seq")
+raw_warranty_id_seq = Sequence("raw_warranty_id_seq")
+
 
 
 # =====================================================
@@ -317,6 +324,149 @@ create_dynamic_table(
         Index("idx_chunks_opensearch_id", "opensearch_id"),
     ],
 )
+
+# =====================================================
+# RAW_WARRANTY_DATA TABLE (PartLabeler)
+# =====================================================
+create_dynamic_table(
+    "raw_warranty_data",
+    [
+        Column(
+            "id",
+            BigInteger,
+            raw_warranty_id_seq,
+            primary_key=True,
+            server_default=raw_warranty_id_seq.next_value(),
+        ),
+        Column("region", Text),
+        Column("zone", Text),
+        Column("area_office", Text),
+        Column("plant", Text),
+        Column("plant_desc", Text),
+        Column("commodity", Text),
+        Column("group_code", Text),
+        Column("group_code_desc", Text),
+        Column("complaint_code", Text),
+        Column("complaint_code_desc", Text),
+        Column("base_model", Text),
+        Column("model_code", Text),
+        Column("model_family", Text),
+        Column("claim_type", Text),
+        Column("sap_claim_no", Text),
+        Column("claim_desc", Text),
+        Column("ac_non_ac", Text),
+        Column("variant", Text),
+        Column("drive_type", Text),
+        Column("service_type", Text),
+        Column("billing_dealer", Text),
+        Column("billing_dealer_name", Text),
+        Column("serial_no", Text),
+        Column("claim_date", Text),
+        Column("failure_kms", Text),
+        Column("km_hr_group", Text),
+        Column("dealer_verbatim", Text),
+        Column("part", Text),
+        Column("vender", Text),
+        Column("material_description", Text),
+        Column("causal_flag", Text),
+        Column("jdp_city", Text),
+        Column("fisyr_qrt", Text),
+        Column("engine_number", Text),
+        Column("manufac_yr_mon", Text),
+        Column("failure_date", Text),
+        Column("mis_bucket", Text),
+        Column("walk_home", Text),
+        Column("dealer_code", Text),
+        Column("claim_dealer_name", Text),
+        Column("ro_number", Text),
+        Column("no_of_incidents", Text),
+        Column("new_manufacturing_quater", Text),
+        Column("vendor_manuf", Text),
+        Column("user_id", BigInteger, nullable=True),
+        Column(
+            "created_at", 
+            DateTime, 
+            server_default=text("CURRENT_TIMESTAMP"), 
+            nullable=False
+        ),
+    ],
+    indexes=[
+        Index("idx_raw_warranty_material", "material_description"),
+        Index("idx_raw_warranty_failure_date", "failure_date"),
+        Index("idx_raw_warranty_user_id", "user_id"),
+    ],
+)
+
+
+# =====================================================
+# IMAGES TABLE (PartLabeler)
+# =====================================================
+create_dynamic_table(
+    "images",
+    [
+        Column(
+            "id",
+            BigInteger,
+            image_id_seq,
+            primary_key=True,
+            server_default=image_id_seq.next_value(),
+        ),
+        Column("filename", Text, nullable=False),
+        Column("display_name", Text, nullable=True),
+        Column("user_id", BigInteger, nullable=True),
+        Column(
+            "created_at", 
+            DateTime, 
+            server_default=text("CURRENT_TIMESTAMP"), 
+            nullable=False
+        ),
+    ],
+    indexes=[
+        Index("idx_images_user_id", "user_id"),
+    ],
+)
+
+
+# =====================================================
+# LABELS TABLE (PartLabeler)
+# =====================================================
+create_dynamic_table(
+    "labels",
+    [
+        Column(
+            "id",
+            BigInteger,
+            label_id_seq,
+            primary_key=True,
+            server_default=label_id_seq.next_value(),
+        ),
+        Column(
+            "image_id",
+            BigInteger,
+            ForeignKey("images.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        Column("part_name", Text, nullable=False),
+        Column("description", Text, nullable=True),
+        Column("part_number", Text, nullable=True),
+        Column("failure_count", Integer, default=0),
+        Column("report_month", Text, nullable=True),
+        Column("x_coord", Float, nullable=False),
+        Column("y_coord", Float, nullable=False),
+        Column("user_id", BigInteger, nullable=True),
+        Column(
+            "created_at", 
+            DateTime, 
+            server_default=text("CURRENT_TIMESTAMP"), 
+            nullable=False
+        ),
+    ],
+    indexes=[
+        Index("idx_labels_image_id", "image_id"),
+        Index("idx_labels_user_id", "user_id"),
+    ],
+)
+
 
 
 logger.info("All table definitions created successfully")

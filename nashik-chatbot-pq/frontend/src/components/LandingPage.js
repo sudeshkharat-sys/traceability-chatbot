@@ -5,7 +5,8 @@ import traceabilityIcon from "../assests/traceability.png";
 import qualityIcon from "../assests/quality.png";
 import guidelineIcon from "../assests/guideline.png";
 import supportIcon from "../assests/support.png";
-import utilityLogo from "../assests/Mahindra_Logo_utilty.png";
+import dashboardIcon from "../assests/dashboard.png";
+import utilityLogo from "../assests/image.png";
 import mahindraRiseLogo from "../assests/mahindra_rise_logo.png";
 import { authService } from "../services/api";
 
@@ -27,8 +28,7 @@ function LandingPage() {
     setIsLoggedIn(authService.isLoggedIn());
   }, []);
 
-  const enabledFeatures = ["traceability", "guideline"];
-
+  const enabledFeatures = ["traceability", "guideline", "part-labeler"];
   const features = [
     {
       id: "traceability",
@@ -43,6 +43,13 @@ function LandingPage() {
       icon: guidelineIcon,
       description: "Access quality guidelines and industry standards",
       route: "/chat?feature=guideline",
+    },
+  {
+      id: "part-labeler",
+      title: "Part Sense Visualizer",
+      icon: dashboardIcon,
+      description: "Interactive failure trend analysis",
+      route: "/part-labeler",
     },
     {
       id: "quality-assistant",

@@ -1,8 +1,11 @@
 import logging
+import os
+import subprocess
 from invoke import task
 from dataloader.document_scrape_processor import DocumentScrapeProcessor
 from dataloader.document_embedding_processor import DocumentEmbeddingProcessor
 from app.services.startup_initializer import StartupInitializer
+from scripts.process_warranty import process_warranty_to_db
 from app.config.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -100,5 +103,20 @@ def create_embeddings(ctx):
                 f"{stats['total_chunks_skipped']} skipped")
     if stats['total_errors']:
         logger.warning(f"  Errors:    {stats['total_errors']}")
+    logger.info("=" * 80)
+
+
+@task
+def process_warranty_data(ctx):
+    """
+    Process warranty CSV and load it into raw_warranty_data database table
+
+    Usage:
+        invoke process-warranty-data
+    """
+    logger.info("=" * 80)
+    logger.info("Processing Warranty Data...")
+    logger.info("=" * 80)
+    process_warranty_to_db()
     logger.info("=" * 80)
 

@@ -81,16 +81,18 @@ class Settings(BaseSettings):
     OPENSEARCH_PASSWORD: str
     OPENSEARCH_USE_SSL: bool = False
     OPENSEARCH_VERIFY_CERTS: bool = False
-    OPENSEARCH_INDEX_NAME: str = "standard_guidelines_index"
+    OPENSEARCH_INDEX_NAME: str = "qlense_assistant_index"
 
     # Document Processing Configuration (Dataloader)
     DOCLING_ARTIFACTS_PATH: str = "/app/docling_models"
-    DOCLING_VLM_MODEL: str = "SmolDocling-256M-preview"  # Model name for VLM
-    DOCLING_VLM_MODEL_PATH: str = "/app/docling_models/ds4sd--SmolDocling-256M-preview"
+    DOCLING_VLM_MODEL: str = "ds4sd/SmolDocling-256M-preview"  # Model name for VLM
     DOCLING_LAYOUT_MODEL: str = "docling-layout-heron"
 
     # Directory to scrape documents from
-    DOCUMENT_INPUT_DIRECTORY: str = "/app/documents"
+    DOCUMENT_INPUT_DIRECTORY: str = "/app/documents/qlense_assitant_doc"
+
+    # Uploads Configuration
+    UPLOADS_DIRECTORY: str = "uploads"
 
     # Agent Configuration
     MAX_CHAT_HISTORY: int = 10

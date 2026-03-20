@@ -10,6 +10,7 @@ from app.queries.common_queries import CommonQueries
 from app.queries.dataloader_queries import DataloaderQueries
 from app.queries.auth_queries import AuthQueries
 from app.queries.query_validator import QueryValidator
+from app.queries.part_labeler_queries import PartLabelerQueries
 
 __all__ = [
     "ChatQueries",
@@ -19,4 +20,5 @@ __all__ = [
     "DataloaderQueries",
     "AuthQueries",
     "QueryValidator",
+    "PartLabelerQueries",
 ]
