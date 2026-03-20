@@ -26,6 +26,7 @@ def think(thought: str) -> None:
     - Verify you have all required information
     - Re-evaluate when new information comes in
     - Ensure your response is complete and accurate
+    - Check if data is suitable for visualization
 
     Use this tool as a scratchpad to:
     - Outline progress until now
@@ -34,6 +35,15 @@ def think(thought: str) -> None:
     - Outline the next steps
     - Re-evaluate after receiving tool results
     - Plan before taking action
+    - **Consider if query results should have a chart visualization**
+    - **If charts are appropriate, plan a descriptive chart title**
+
+    CHART VISUALIZATION REMINDER:
+    - When results show trends, distributions, or comparisons, charts will be auto-generated
+    - You MUST include a chart title in your response: **Chart: [Title]**
+    - Make titles specific: "Monthly Defect Trend - Q1 2025" not "Trend Chart"
+    - Include context: time periods, zones, categories mentioned in query
+    - Keep titles 5-10 words, professional and descriptive
 
     Args:
         thought: A thought to think about. Should include:
@@ -43,6 +53,7 @@ def think(thought: str) -> None:
             - What needs to be done next
             - Any concerns or edge cases to consider
             - Analysis of query results (if applicable)
+            - Whether data is suitable for charts and what title to use
 
     Returns:
         None (thought is captured from the tool call arguments, not the return value)

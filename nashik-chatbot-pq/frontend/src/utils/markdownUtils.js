@@ -16,6 +16,10 @@ export function fixMarkdownTables(markdown, isComplete = false) {
 
   let result = markdown;
 
+  // Fix 0: Add space after # symbols when missing (e.g., "###2025 Title" -> "### 2025 Title")
+  // The LLM sometimes generates headings without the required space after #
+  result = result.replace(/(^#{1,6})([^\s#])/gm, "$1 $2");
+
   // Fix 1: Split concatenated headings (## Heading### Subheading -> ## Heading\n\n### Subheading)
   // This is the main issue: "## Detailed Analysis### Top Complaint Descriptions"
   result = result.replace(/(^#{1,6}\s+[^\n]+?)(#{1,6}\s+)/gm, "$1\n\n$2");
@@ -83,7 +87,43 @@ export function fixMarkdownTables(markdown, isComplete = false) {
   // Pattern: ### Heading\n| Column | -> ### Heading\n\n| Column |
   result = result.replace(/(^#{1,6}\s+[^\n]+)\n(\|[^\n]+\|)/gm, "$1\n\n$2");
 
-  // Fix 6: Normalize multiple consecutive blank lines (keep max 2)
+  // Fix 6: Split heading text that runs into body text without a line break
+  // Pattern: "### January2025 Warranty ConcernHere is the January2025..."
+  // Only matches when lowercase letter is IMMEDIATELY followed by capitalized sentence-start word
+  // (no space between = concatenation, not natural heading text)
+  result = result.replace(
+    /(^#{1,6}\s+[^\n]+?[a-z])((?:Here (?:is|are)|The |This |Based on|Below |Above |I (?:traced|found|identified|analyzed|will)|Let me|Looking at|We |It |A |An )[^\n]*)/gm,
+    "$1\n\n$2"
+  );
+
+  // Fix 7: Ensure bold section headers (used as pseudo-headings) have blank lines before lists
+  // Pattern: "**Notes**\n- item" -> "**Notes**\n\n- item"
+  // Pattern: "**Next Steps**\n1. item" -> "**Next Steps**\n\n1. item"
+  result = result.replace(
+    /(\*\*[^*]+\*\*)\s*\n([-•*]\s+|\d+\.\s+)/gm,
+    "$1\n\n$2"
+  );
+
+  // Fix 8: Ensure bold section headers on same line as content get separated
+  // Pattern: "**Notes**- bullet" or "**Notes** Some text" -> "**Notes**\n\n- bullet"
+  result = result.replace(
+    /(\*\*(?:Notes?|Next Steps?|Key (?:Insights?|Findings?|Observations?)|Summary|Recommendations?|Detailed? Analysis|Conclusion|Results?|Chart:[^*]*)\*\*)\s*([^\n*])/gim,
+    (match, header, content) => {
+      // Don't split if content is just whitespace or another bold marker
+      const trimmed = content.trim();
+      if (!trimmed) return match;
+      return header + "\n\n" + content;
+    }
+  );
+
+  // Fix 9: Ensure **Chart: Title** on same line as heading gets its own line
+  // Pattern: "## Detailed Analysis**Chart: Title**" -> "## Detailed Analysis\n\n**Chart: Title**"
+  result = result.replace(
+    /(^#{1,6}\s+[^\n*]+)(\*\*Chart:\s*[^*]+\*\*)/gm,
+    "$1\n\n$2"
+  );
+
+  // Fix 10: Normalize multiple consecutive blank lines (keep max 2)
   result = result.replace(/\n{3,}/g, "\n\n");
 
   return result;

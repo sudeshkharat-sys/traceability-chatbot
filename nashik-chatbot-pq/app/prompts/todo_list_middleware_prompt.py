@@ -11,6 +11,7 @@ MANDATORY: Use write_todos when:
 - Query mentions multiple data sources (warranty + eSQA + PPCM + Traceability)
 - User asks for "analysis", "traceability", "detailed breakdown", or "end-to-end"
 - Task requires correlating data across multiple datasets
+- User asks for visualizations, charts, trends, or comparisons
 
 WORKFLOW (apply to ANY query):
 1. IMMEDIATELY create a todo list using write_todos tool
@@ -18,6 +19,7 @@ WORKFLOW (apply to ANY query):
    - Identify which data sources you need
    - List the queries you need to execute
    - Plan the analysis and output format
+   - **If data is suitable for charts, include chart title in todo**
 2. Execute each step from the todo list
 3. Update the todo list as you complete items
 4. Mark items complete as you finish them
@@ -30,7 +32,14 @@ GENERIC TODO STRUCTURE (adapt to the specific query):
 - [ ] [If supplier data needed] Get [eSQA/PPCM] data as relevant
 - [ ] Correlate findings across data sources
 - [ ] Generate [summary table/analysis/report] as needed
+- [ ] **[If visualization requested] Include chart title in response**
 - [ ] Provide recommendations/insights
+
+CHART VISUALIZATION REMINDER:
+- When data shows trends, distributions, or comparisons, it will automatically generate charts
+- **Always include a chart title** in your response using: `**Chart: [Descriptive Title]**`
+- Make chart titles specific and professional (e.g., "Monthly Defect Trend - Q1 2025")
+- Chart titles should be 5-10 words, include context (time periods, zones, categories)
 
 The write_todos tool is available - USE IT for multi-step tasks!"""
 

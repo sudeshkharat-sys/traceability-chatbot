@@ -3,31 +3,37 @@ Agent Pool
 Manages agent lifecycle and provides agent instances
 """
 
+from __future__ import annotations
+
 import logging
 from contextlib import contextmanager
-from typing import Optional
-from app.agents.cypher_agent import CypherAgent
-from app.agents.analyst_agent import AnalystAgent
 from app.agents.checkpointer_manager import get_checkpointer_manager
-from app.connectors.neo4j_connector import Neo4jConnector
 
 logger = logging.getLogger(__name__)
 
 
 class AgentPool:
     """
-    Manages pool of agents for different conversation types
-    Provides context manager for agent lifecycle
+    Manages pool of agents for different conversation types.
+    Provides context manager for agent lifecycle.
+
+    All agent classes and Neo4jConnector are imported lazily (inside methods)
+    so that the heavy langchain / langgraph packages are not loaded until
+    the first actual request.  This keeps reload time near-zero.
     """
 
-    def __init__(self, neo4j_connector: Neo4jConnector = None):
+    def __init__(self, neo4j_connector=None):
         """
         Initialize Agent Pool
 
         Args:
             neo4j_connector: Optional shared Neo4j connector
         """
-        self.neo4j = neo4j_connector or Neo4jConnector()
+        if neo4j_connector is None:
+            from app.connectors.neo4j_connector import Neo4jConnector
+
+            neo4j_connector = Neo4jConnector()
+        self.neo4j = neo4j_connector
         self._active_agents = {}
 
         # Initialize checkpointer manager for conversation memory
@@ -58,16 +64,27 @@ class AgentPool:
         agent_key = f"{conversation_id}_{agent_type}"
 
         try:
-            # Create agent instance
+            # Lazy imports — heavy langchain/langgraph packages only load here
             if agent_type == "cypher":
+                from app.agents.cypher_agent import CypherAgent
+
                 agent = CypherAgent(neo4j_connector=self.neo4j)
             elif agent_type == "analyst":
-                # Pass conversation_id as thread_id for conversation tracking
+                from app.agents.analyst_agent import AnalystAgent
+
                 thread_id = f"conv_{conversation_id}"
                 agent = AnalystAgent(
                     neo4j_connector=self.neo4j,
                     thread_id=thread_id,
-                    checkpointer=self.checkpointer,  # Enable conversation memory
+                    checkpointer=self.checkpointer,
+                )
+            elif agent_type == "standards_guidelines":
+                from app.agents.standards_guidelines_agent import StandardsGuidelinesAgent
+
+                thread_id = f"conv_{conversation_id}"
+                agent = StandardsGuidelinesAgent(
+                    thread_id=thread_id,
+                    checkpointer=self.checkpointer,
                 )
             else:
                 raise ValueError(f"Unknown agent type: {agent_type}")
@@ -88,29 +105,29 @@ class AgentPool:
                     f"Released {agent_type} agent for conversation {conversation_id}"
                 )
 
-    def get_cypher_agent(self) -> CypherAgent:
-        """
-        Get a standalone Cypher agent instance
+    def get_cypher_agent(self):
+        """Get a standalone Cypher agent instance."""
+        from app.agents.cypher_agent import CypherAgent
 
-        Returns:
-            CypherAgent instance
-        """
         return CypherAgent(neo4j_connector=self.neo4j)
 
-    def get_analyst_agent(self, thread_id: str = "default") -> AnalystAgent:
-        """
-        Get a standalone Analyst agent instance
+    def get_analyst_agent(self, thread_id: str = "default"):
+        """Get a standalone Analyst agent instance."""
+        from app.agents.analyst_agent import AnalystAgent
 
-        Args:
-            thread_id: Thread ID for conversation tracking
-
-        Returns:
-            AnalystAgent instance
-        """
         return AnalystAgent(
             neo4j_connector=self.neo4j,
             thread_id=thread_id,
-            checkpointer=self.checkpointer,  # Enable conversation memory
+            checkpointer=self.checkpointer,
+        )
+
+    def get_standards_guidelines_agent(self, thread_id: str = "default"):
+        """Get a standalone Standards & Guidelines agent instance."""
+        from app.agents.standards_guidelines_agent import StandardsGuidelinesAgent
+
+        return StandardsGuidelinesAgent(
+            thread_id=thread_id,
+            checkpointer=self.checkpointer,
         )
 
     def get_active_agent_count(self) -> int:

@@ -5,7 +5,7 @@ Provides centralized model creation and management
 
 import logging
 from typing import Optional
-from langchain_openai import AzureChatOpenAI
+from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from app.models.azure_openai_handler import AzureOpenAIHandler
 
 logger = logging.getLogger(__name__)
@@ -107,3 +107,15 @@ class ModelFactory:
         return cls._handler.get_reasoning_model(
             deployment="gpt-5", reasoning_effort="minimal", max_tokens=32096
         )
+
+    @classmethod
+    def get_embedding_model(cls) -> AzureOpenAIEmbeddings:
+        """
+        Get Azure OpenAI Embedding model instance
+
+        Returns:
+            AzureOpenAIEmbeddings instance
+        """
+        if cls._handler is None:
+            cls._handler = AzureOpenAIHandler()
+        return cls._handler.get_embedding_model()

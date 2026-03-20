@@ -8,9 +8,28 @@ from functools import lru_cache
 from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# .env file in the same folder as this config file
-CONFIG_DIR = Path(__file__).parent
-ENV_FILE = CONFIG_DIR / ".env"
+# .env file configuration
+# Prioritize .env in the current working directory (useful for production/exe)
+# Fallback to the one in this config folder (useful for dev)
+import sys
+
+def get_env_path():
+    # Check for .env in current working directory
+    cwd_env = Path.cwd() / ".env"
+    if cwd_env.exists():
+        return cwd_env
+    
+    # If frozen (PyInstaller), check executable directory
+    if getattr(sys, 'frozen', False):
+        exe_dir = Path(sys.executable).parent
+        exe_env = exe_dir / ".env"
+        if exe_env.exists():
+            return exe_env
+            
+    # Default to local config dir
+    return Path(__file__).parent / ".env"
+
+ENV_FILE = get_env_path()
 
 
 class Settings(BaseSettings):
@@ -50,10 +69,30 @@ class Settings(BaseSettings):
     SERVER_LOG_LEVEL: str = "debug"
 
     # CORS Configuration
-    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+    CORS_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000,http://localhost:5000,http://127.0.0.1:5000"
 
     # Session Configuration
     SESSION_SECRET: str = "change-me-in-production"
+
+    # OpenSearch Configuration (for document embeddings)
+    OPENSEARCH_HOST: str = "localhost"
+    OPENSEARCH_PORT: int = 9200
+    OPENSEARCH_USERNAME: str
+    OPENSEARCH_PASSWORD: str
+    OPENSEARCH_USE_SSL: bool = False
+    OPENSEARCH_VERIFY_CERTS: bool = False
+    OPENSEARCH_INDEX_NAME: str = "qlense_assistant_index"
+
+    # Document Processing Configuration (Dataloader)
+    DOCLING_ARTIFACTS_PATH: str = "/app/docling_models"
+    DOCLING_VLM_MODEL: str = "ds4sd/SmolDocling-256M-preview"  # Model name for VLM
+    DOCLING_LAYOUT_MODEL: str = "docling-layout-heron"
+
+    # Directory to scrape documents from
+    DOCUMENT_INPUT_DIRECTORY: str = "/app/documents/qlense_assitant_doc"
+
+    # Uploads Configuration
+    UPLOADS_DIRECTORY: str = "uploads"
 
     # Agent Configuration
     MAX_CHAT_HISTORY: int = 10
@@ -78,6 +117,12 @@ class Settings(BaseSettings):
     def cors_origins_list(self) -> list:
         """Get CORS origins as a list"""
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
+
+    @property
+    def opensearch_url(self) -> str:
+        """Get OpenSearch connection URL"""
+        protocol = "https" if self.OPENSEARCH_USE_SSL else "http"
+        return f"{protocol}://{self.OPENSEARCH_HOST}:{self.OPENSEARCH_PORT}"
 
 
 @lru_cache()

@@ -21,7 +21,7 @@
   left: calc(215px - 18px); /* Sidebar width minus offset */
   width: 22px;
   height: 20px;
-  background-color: #ff0000;
+  background-color: #DC143C;
   border: none;
   border-radius: 50%;
   color: #ffffff;
@@ -29,13 +29,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(255, 0, 0, 0.3);
+  box-shadow: 0 2px 8px rgba(220, 20, 60, 0.3);
   z-index: 1000;
   transition: all 0.3s ease;
 }
 
 .global-collapse-toggle:hover {
-  background-color: #cc0000;
+  background-color: #B8102E;
   transform: scale(1.1);
 }
 
@@ -51,7 +51,7 @@
   width: 29px;
   height: 35px;
   border-radius: 8px;
-  background-color: rgba(255, 0, 0, 0.95);
+  background-color: rgba(220, 20, 60, 0.95);
   backdrop-filter: blur(10px);
 }
 
@@ -61,6 +61,6 @@
 }
 
 .global-collapse-toggle.collapsed:hover {
-  background-color: #ff0000;
+  background-color: #DC143C;
   transform: scale(1.05);
 }

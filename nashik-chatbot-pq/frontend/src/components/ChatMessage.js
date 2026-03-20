@@ -6,9 +6,11 @@ import "./ChatMessage.css";
 import mahindraLogo from "../assests/logo.png";
 import { conversationService } from "../services/api";
 import FeedbackModal from "./FeedbackModal";
+import ChartComponent from "./ChartComponent";
+import CitationsTable from "./CitationsTable";
 import { fixMarkdownTables } from "../utils/markdownUtils";
 
-const ChatMessage = ({ message, conversationId, thinkingSteps }) => {
+const ChatMessage = ({ message, conversationId, thinkingSteps, onOpenPdf }) => {
   const isUser = message.sender === "user";
   const [feedback, setFeedback] = useState(null);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -95,11 +97,23 @@ const ChatMessage = ({ message, conversationId, thinkingSteps }) => {
           {!isUser ? (
             <>
               {message.text ? (
-                <div className="bot-message-markdown">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                    {fixedMarkdown}
-                  </ReactMarkdown>
-                </div>
+                <>
+                  {/* Render chart ABOVE text if chart_data is present */}
+                  {message.chart_data && (
+                    <ChartComponent chartData={message.chart_data} />
+                  )}
+                  <div className="bot-message-markdown">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {fixedMarkdown}
+                    </ReactMarkdown>
+                  </div>
+
+                  {/* Render citations table if available */}
+                  <CitationsTable 
+                    citations={message.citations || message.similar_docs} 
+                    onOpenPdf={onOpenPdf}
+                  />
+                </>
               ) : (
                 <div className="typing-indicator">
                   <span className="typing-dot"></span>

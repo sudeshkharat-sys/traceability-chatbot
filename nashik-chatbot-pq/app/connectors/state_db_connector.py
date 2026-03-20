@@ -100,6 +100,27 @@ class StateDBConnector:
             logger.error(f"Error executing query: {e}")
             raise
 
+    def execute_query_with_headers(self, query: str, params: Dict[str, Any] = None) -> tuple:
+        """
+        Execute a SQL query and return (headers, rows)
+        """
+        try:
+            with self.get_session() as session:
+                if params:
+                    result = session.execute(text(query), params)
+                else:
+                    result = session.execute(text(query))
+
+                # Get column names
+                headers = list(result.keys())
+                # Fetch all results
+                rows = result.fetchall()
+                return headers, rows
+
+        except Exception as e:
+            logger.error(f"Error executing query with headers: {e}")
+            raise
+
     def execute_insert(self, query: str, params: Dict[str, Any] = None) -> Any:
         """
         Execute an INSERT query and return the inserted ID

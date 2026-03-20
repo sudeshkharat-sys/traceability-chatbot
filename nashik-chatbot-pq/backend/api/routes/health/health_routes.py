@@ -6,8 +6,6 @@ System health and status endpoints
 import logging
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from app.connectors.neo4j_connector import Neo4jConnector
-from app.connectors.state_db_connector import StateDBConnector
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +34,9 @@ async def detailed_health_check():
         Detailed system status
     """
     try:
+        from app.connectors.neo4j_connector import Neo4jConnector
+        from app.connectors.state_db_connector import StateDBConnector
+
         # Check Neo4j
         neo4j_status = "unknown"
         neo4j_error = None
@@ -93,6 +94,8 @@ async def get_stats():
         System statistics
     """
     try:
+        from app.connectors.neo4j_connector import Neo4jConnector
+
         neo4j = Neo4jConnector()
 
         stats = {

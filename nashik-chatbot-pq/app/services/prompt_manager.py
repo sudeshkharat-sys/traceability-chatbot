@@ -30,6 +30,10 @@ DEFAULT_PROMPTS = {
         "name": "TodoListMiddleware System Prompt",
         "content": None,  # Will be loaded from file
     },
+    "standards_guidelines_prompt": {
+        "name": "Standards & Guidelines Agent Prompt",
+        "content": None,  # Will be loaded from file
+    },
 }
 
 
@@ -39,10 +43,12 @@ def _load_default_prompts_from_files():
         from app.prompts.analyst_prompt import ANALYST_PROMPT
         from app.prompts.cypher_agent_prompt import CYPHER_AGENT_PROMPT
         from app.prompts.todo_list_middleware_prompt import TODO_LIST_MIDDLEWARE_PROMPT
+        from app.prompts.standards_guidelines_prompt import STANDARDS_GUIDELINES_PROMPT
 
         DEFAULT_PROMPTS["analyst_prompt"]["content"] = ANALYST_PROMPT
         DEFAULT_PROMPTS["cypher_agent_prompt"]["content"] = CYPHER_AGENT_PROMPT
         DEFAULT_PROMPTS["todo_list_middleware_prompt"]["content"] = TODO_LIST_MIDDLEWARE_PROMPT
+        DEFAULT_PROMPTS["standards_guidelines_prompt"]["content"] = STANDARDS_GUIDELINES_PROMPT
         logger.debug("Default prompts loaded from files")
     except ImportError as e:
         logger.warning(f"Could not load default prompts from files: {e}")
@@ -227,7 +233,8 @@ class PromptManager:
 
     def seed_default_prompts(self, force_update: bool = False) -> Dict[str, bool]:
         """
-        Seed database with default prompts
+        Seed database with default prompts.
+        Uses a single engine and single transaction for all prompts.
 
         Args:
             force_update: If True, update existing prompts with defaults
@@ -236,61 +243,46 @@ class PromptManager:
             Dictionary with prompt_key -> success status
         """
         results = {}
+        engine = self._get_engine()
+        if not engine:
+            return {key: False for key in DEFAULT_PROMPTS}
 
-        for prompt_key, prompt_data in DEFAULT_PROMPTS.items():
-            if prompt_data["content"] is None:
-                logger.warning(f"Skipping prompt '{prompt_key}' - no content available")
-                results[prompt_key] = False
-                continue
+        try:
+            with engine.connect() as conn:
+                for prompt_key, prompt_data in DEFAULT_PROMPTS.items():
+                    if prompt_data["content"] is None:
+                        logger.warning(f"Skipping prompt '{prompt_key}' - no content available")
+                        results[prompt_key] = False
+                        continue
 
-            try:
-                engine = self._get_engine()
-                if not engine:
-                    results[prompt_key] = False
-                    continue
-
-                with engine.connect() as conn:
-                    # Check if exists
-                    result = conn.execute(
+                    exists = conn.execute(
                         text(PromptQueries.CHECK_PROMPT_EXISTS),
                         {"key": prompt_key},
-                    )
-                    exists = result.fetchone() is not None
+                    ).fetchone() is not None
 
                     if not exists:
-                        # Insert new prompt
                         conn.execute(
                             text(PromptQueries.INSERT_PROMPT),
-                            {
-                                "key": prompt_key,
-                                "name": prompt_data["name"],
-                                "content": prompt_data["content"],
-                            },
+                            {"key": prompt_key, "name": prompt_data["name"], "content": prompt_data["content"]},
                         )
-                        conn.commit()
                         logger.info(f"Seeded prompt: {prompt_key}")
                         results[prompt_key] = True
                     elif force_update:
-                        # Update existing
                         conn.execute(
                             text(PromptQueries.UPDATE_PROMPT_CONTENT),
-                            {
-                                "content": prompt_data["content"],
-                                "key": prompt_key,
-                            },
+                            {"content": prompt_data["content"], "key": prompt_key},
                         )
-                        conn.commit()
-                        logger.info(f"Updated existing prompt: {prompt_key}")
+                        logger.info(f"Updated prompt: {prompt_key}")
                         results[prompt_key] = True
                     else:
                         logger.info(f"Prompt '{prompt_key}' already exists, skipping")
                         results[prompt_key] = True
 
-                engine.dispose()
-
-            except Exception as e:
-                logger.error(f"Error seeding prompt '{prompt_key}': {e}")
-                results[prompt_key] = False
+                conn.commit()  # single commit for all prompts
+        except Exception as e:
+            logger.error(f"Error in seed_default_prompts: {e}")
+        finally:
+            engine.dispose()
 
         return results
 
@@ -341,4 +333,11 @@ def get_todo_list_middleware_prompt() -> str:
     if not prompt:
         logger.warning("TodoListMiddleware prompt not found, using empty string")
         return ""
+    return prompt
+
+
+def get_standards_guidelines_prompt() -> str:
+    """Get the Standards & Guidelines agent prompt"""
+    manager = get_prompt_manager()
+    prompt = manager.get_prompt("standards_guidelines_prompt")
     return prompt

@@ -3,20 +3,33 @@ import { useSearchParams } from "react-router-dom";
 import "./ChatPage.css";
 import Sidebar from "./Sidebar";
 import ChatArea from "./ChatArea";
+import PdfViewerModal from "./PdfViewerModal";
 import { conversationService } from "../services/api";
 
 function ChatPage() {
   const [searchParams] = useSearchParams();
   const feature = searchParams.get("feature");
 
+  // Map landing-page feature key → backend agent_type
+  const getAgentType = (feat) => {
+    if (feat === "guideline") return "standards_guidelines";
+    return "analyst";
+  };
+
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [messages, setMessages] = useState([]);
   const [recentChats, setRecentChats] = useState([]);
   const [currentConversationId, setCurrentConversationId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [agentType, setAgentType] = useState("analyst");
+  const [agentType, setAgentType] = useState(() => getAgentType(feature));
   const [thinkingSteps, setThinkingSteps] = useState([]);
   const [currentThinkingStep, setCurrentThinkingStep] = useState("");
+  
+  // PDF Viewer State
+  const [isPdfOpen, setIsPdfOpen] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [pdfScrollTo, setPdfScrollTo] = useState(null);
+
   const websocketRef = useRef(null);
 
   // Message ref to track without causing re-renders (like Agentic-AI-Framework)
@@ -40,7 +53,12 @@ function ChatPage() {
     return featureNames[feature] || "Quality Assistant Bot";
   };
 
-  // Load conversation history on mount
+  // Sync agentType when the URL feature param changes
+  useEffect(() => {
+    setAgentType(getAgentType(feature));
+  }, [feature]);
+
+  // Load conversation history on mount / when agentType changes
   useEffect(() => {
     loadConversationHistory();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -115,6 +133,22 @@ function ChatPage() {
     setIsSidebarCollapsed(!isSidebarCollapsed);
   };
 
+  const handleOpenPdf = (url, scrollTo) => {
+      setPdfUrl(url);
+      setPdfScrollTo(scrollTo);
+      setIsPdfOpen(true);
+      // Auto-collapse left sidebar to give room
+      setIsSidebarCollapsed(true);
+  };
+
+  const handleClosePdf = () => {
+      setIsPdfOpen(false);
+      setPdfUrl(null);
+      setPdfScrollTo(null);
+      // Restore left sidebar
+      setIsSidebarCollapsed(false);
+  };
+
   const handleNewChat = async () => {
     try {
       // Close existing WebSocket if any
@@ -132,6 +166,8 @@ function ChatPage() {
       setIsLoading(false);
       isNearBottomRef.current = true;
       setIsUserScrolling(false);
+      // Close PDF if open
+      handleClosePdf();
 
       console.log("Ready for new conversation");
     } catch (error) {
@@ -144,6 +180,8 @@ function ChatPage() {
 
     try {
       setIsLoading(true);
+      // Close PDF if open
+      handleClosePdf();
 
       // Close existing WebSocket if any
       if (websocketRef.current) {
@@ -236,7 +274,9 @@ function ChatPage() {
               minute: "2-digit",
             }),
             cypher_query: response?.cypher_query,
-            similar_docs: response?.similar_docs,
+            similar_docs: response?.similar_docs || response?.citations,
+            // Include chart_data if present in historical message
+            ...(response?.chart_data && { chart_data: response.chart_data }),
           });
         });
       } else {
@@ -461,6 +501,46 @@ function ChatPage() {
         messagesRef.current = out;
         return out;
       });
+    } else if (data.type === "chart") {
+      // Handle chart data event
+      console.log("Chart data received:", data.chart_data);
+
+      // Store chart data in the last bot message
+      setMessages((prev) => {
+        if (!prev.length) return prev;
+        const out = [...prev];
+        const idx = out.length - 1;
+
+        if (out[idx].sender === "bot" && !out[idx].messageId) {
+          out[idx] = {
+            ...out[idx],
+            chart_data: data.chart_data,
+          };
+        }
+
+        messagesRef.current = out;
+        return out;
+      });
+    } else if (data.type === "citations") {
+      // Handle citations data event
+      console.log("Citations received:", data.citations);
+
+      // Store citations in the last bot message
+      setMessages((prev) => {
+        if (!prev.length) return prev;
+        const out = [...prev];
+        const idx = out.length - 1;
+
+        if (out[idx].sender === "bot" && !out[idx].messageId) {
+          out[idx] = {
+            ...out[idx],
+            citations: data.citations,
+          };
+        }
+
+        messagesRef.current = out;
+        return out;
+      });
     } else if (data.type === "complete" || data.type === "final") {
       setIsLoading(false);
       setThinkingSteps([]);
@@ -477,6 +557,10 @@ function ChatPage() {
             ...out[idx],
             messageId: data.messageId || data.message_id,
             text: data.content || data.response || out[idx].text,
+            // Include chart_data if present in final event
+            ...(data.chart_data && { chart_data: data.chart_data }),
+            // Include citations if present
+            ...(data.citations && { citations: data.citations }),
           };
         } else {
           // Fallback: create new message
@@ -489,6 +573,10 @@ function ChatPage() {
               hour: "2-digit",
               minute: "2-digit",
             }),
+            // Include chart_data if present
+            ...(data.chart_data && { chart_data: data.chart_data }),
+            // Include citations if present
+            ...(data.citations && { citations: data.citations }),
           });
         }
 
@@ -593,15 +681,32 @@ function ChatPage() {
           </svg>
         )}
       </button>
-      <ChatArea
-        messages={messages}
-        onSendMessage={handleSendMessage}
-        userName={userName}
-        isLoading={isLoading}
-        currentConversationId={currentConversationId}
-        thinkingSteps={thinkingSteps}
-        currentThinkingStep={currentThinkingStep}
-      />
+      
+      {/* Main Content Layout - Flex container for ChatArea and PdfViewer */}
+      <div className="main-content-layout" style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+          <ChatArea
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            userName={userName}
+            isLoading={isLoading}
+            currentConversationId={currentConversationId}
+            thinkingSteps={thinkingSteps}
+            currentThinkingStep={currentThinkingStep}
+            onOpenPdf={handleOpenPdf}
+          />
+          
+          {/* Render PDF Viewer as a sidebar if open */}
+          {isPdfOpen && (
+              <div className="pdf-sidebar-wrapper" style={{ width: '45%', borderLeft: '1px solid #ddd' }}>
+                  <PdfViewerModal 
+                    pdfUrl={pdfUrl} 
+                    initialScrollTo={pdfScrollTo}
+                    onClose={handleClosePdf}
+                    isSidebar={true}
+                  />
+              </div>
+          )}
+      </div>
     </div>
   );
 }

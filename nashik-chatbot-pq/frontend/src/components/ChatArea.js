@@ -13,6 +13,7 @@ const ChatArea = ({
   currentConversationId,
   thinkingSteps = [],
   currentThinkingStep = "",
+  onOpenPdf,
 }) => {
   const [inputMessage, setInputMessage] = useState("");
   const [isScrolled, setIsScrolled] = useState(false);
@@ -55,94 +56,17 @@ const ChatArea = ({
     const height = chatContent.scrollHeight;
     const result = height - position < threshold;
 
-    // #region agent log
-    fetch("http://127.0.0.1:7242/ingest/1d1b34bf-6548-420b-837c-4d0ab5515e52", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "ChatArea.js:57",
-        message: "isAtBottom check",
-        data: {
-          scrollTop: chatContent.scrollTop,
-          clientHeight: chatContent.clientHeight,
-          scrollHeight: height,
-          position,
-          threshold,
-          result,
-        },
-        timestamp: Date.now(),
-        sessionId: "debug-session",
-        runId: "run1",
-        hypothesisId: "B",
-      }),
-    }).catch(() => {});
-    // #endregion
 
     return result;
   };
 
   const scrollToBottom = () => {
-    const chatContent = chatContentRef.current;
-    const beforeScroll = chatContent
-      ? {
-          scrollTop: chatContent.scrollTop,
-          scrollHeight: chatContent.scrollHeight,
-          clientHeight: chatContent.clientHeight,
-        }
-      : null;
-
-    // #region agent log
-    fetch("http://127.0.0.1:7242/ingest/1d1b34bf-6548-420b-837c-4d0ab5515e52", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        location: "ChatArea.js:61",
-        message: "scrollToBottom called",
-        data: {
-          beforeScroll,
-          hasMessagesEndRef: !!messagesEndRef.current,
-          behavior: "smooth",
-        },
-        timestamp: Date.now(),
-        sessionId: "debug-session",
-        runId: "run1",
-        hypothesisId: "A",
-      }),
-    }).catch(() => {});
-    // #endregion
-
     isAutoScrollingRef.current = true;
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     setUserScrolledUp(false);
     userHasScrolledRef.current = false;
-
     // Reset auto-scrolling flag after animation completes
     setTimeout(() => {
-      const afterScroll = chatContent
-        ? {
-            scrollTop: chatContent.scrollTop,
-            scrollHeight: chatContent.scrollHeight,
-            clientHeight: chatContent.clientHeight,
-          }
-        : null;
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7242/ingest/1d1b34bf-6548-420b-837c-4d0ab5515e52",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            location: "ChatArea.js:69",
-            message: "scrollToBottom timeout after",
-            data: { afterScroll },
-            timestamp: Date.now(),
-            sessionId: "debug-session",
-            runId: "run1",
-            hypothesisId: "D",
-          }),
-        }
-      ).catch(() => {});
-      // #endregion
       isAutoScrollingRef.current = false;
     }, 500);
   };
@@ -187,53 +111,8 @@ const ChatArea = ({
 
     const handleScroll = () => {
       const scrollTop = chatContent.scrollTop;
-      const scrollHeight = chatContent.scrollHeight;
-      const clientHeight = chatContent.clientHeight;
-
-      // #region agent log
-      fetch(
-        "http://127.0.0.1:7242/ingest/1d1b34bf-6548-420b-837c-4d0ab5515e52",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            location: "ChatArea.js:108",
-            message: "handleScroll event",
-            data: {
-              scrollTop,
-              scrollHeight,
-              clientHeight,
-              isAutoScrolling: isAutoScrollingRef.current,
-            },
-            timestamp: Date.now(),
-            sessionId: "debug-session",
-            runId: "run1",
-            hypothesisId: "C",
-          }),
-        }
-      ).catch(() => {});
-      // #endregion
-
       // Ignore scroll events triggered by auto-scroll
       if (isAutoScrollingRef.current) {
-        // #region agent log
-        fetch(
-          "http://127.0.0.1:7242/ingest/1d1b34bf-6548-420b-837c-4d0ab5515e52",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              location: "ChatArea.js:112",
-              message: "Ignoring scroll - auto scrolling",
-              data: {},
-              timestamp: Date.now(),
-              sessionId: "debug-session",
-              runId: "run1",
-              hypothesisId: "C",
-            }),
-          }
-        ).catch(() => {});
-        // #endregion
         return;
       }
 
@@ -248,24 +127,6 @@ const ChatArea = ({
       scrollTimeout = setTimeout(() => {
         const atBottom = isAtBottom();
 
-        // #region agent log
-        fetch(
-          "http://127.0.0.1:7242/ingest/1d1b34bf-6548-420b-837c-4d0ab5515e52",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              location: "ChatArea.js:127",
-              message: "Scroll debounce - setting user scroll state",
-              data: { atBottom },
-              timestamp: Date.now(),
-              sessionId: "debug-session",
-              runId: "run1",
-              hypothesisId: "C",
-            }),
-          }
-        ).catch(() => {});
-        // #endregion
 
         // If user scrolled and not at bottom, mark as user scroll
         if (!atBottom) {
@@ -427,6 +288,7 @@ const ChatArea = ({
                 key={message.id}
                 message={message}
                 conversationId={currentConversationId}
+                onOpenPdf={onOpenPdf}
               />
             ))}
 

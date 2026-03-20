@@ -1,12 +1,13 @@
 .thinking-steps-container {
-  background: linear-gradient(135deg, rgba(255, 0, 0, 0.08) 0%, rgba(255, 0, 0, 0.03) 100%);
-  border-left: 3px solid #ff0000;
+  background: #FFFFFF;
+  border-left: 3px solid #DC143C;
   padding: 16px 18px;
   margin: 12px 0 12px 44px;
   border-radius: 8px;
   animation: slideIn 0.5s ease;
   backdrop-filter: blur(10px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: 1px solid #E5E5E5;
 }
 
 /* Section Styles */
@@ -25,11 +26,13 @@
   gap: 8px;
   margin-bottom: 10px;
   padding-bottom: 8px;
-  border-bottom: 1px solid rgba(255, 0, 0, 0.2);
+  border-bottom: 1px solid rgba(220, 20, 60, 0.2);
 }
 
 .section-icon {
   font-size: 16px;
+  color: #DC143C;
+  filter: hue-rotate(310deg) saturate(2);
   animation: pulse 2s infinite;
 }
 
@@ -38,7 +41,7 @@
   text-transform: uppercase;
   letter-spacing: 0.4px;
   font-weight: 600;
-  color: #ff0000;
+  color: #DC143C;
 }
 
 .section-content {
@@ -49,10 +52,8 @@
 
 /* Reasoning Section - Fixed size container */
 .reasoning-section {
-  background: rgba(255, 255, 255, 0.02);
   padding: 10px 12px;
   border-radius: 6px;
-  border: 1px solid rgba(255, 0, 0, 0.1);
   margin-bottom: 8px;
 }
 
@@ -67,12 +68,12 @@
 }
 
 .reasoning-content-fixed::-webkit-scrollbar-track {
-  background: rgba(255, 0, 0, 0.1);
+  background: rgba(220, 20, 60, 0.1);
   border-radius: 2px;
 }
 
 .reasoning-content-fixed::-webkit-scrollbar-thumb {
-  background: rgba(255, 0, 0, 0.3);
+  background: rgba(220, 20, 60, 0.3);
   border-radius: 2px;
 }
 
@@ -80,7 +81,7 @@
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  color: rgba(255, 255, 255, 0.85);
+  color: #2c2c2c;
   font-size: 12px;
   line-height: 1.5;
   animation: fadeIn 0.4s ease;
@@ -92,7 +93,7 @@
 }
 
 .reasoning-item.current {
-  color: rgba(255, 255, 255, 0.95);
+  color: #1a1a1a;
 }
 
 .reasoning-text {
@@ -108,7 +109,7 @@
   background: rgba(255, 255, 255, 0.02);
   padding: 0;
   border-radius: 6px;
-  border: 1px solid rgba(255, 0, 0, 0.1);
+  border: 1px solid rgba(220, 20, 60, 0.1);
   overflow: hidden;
   margin-bottom: 8px;
   margin-top: 0;
@@ -181,13 +182,13 @@
 
 .progress-circle-bg {
   fill: none;
-  stroke: rgba(255, 0, 0, 0.15);
+  stroke: rgba(220, 20, 60, 0.15);
   stroke-width: 3;
 }
 
 .progress-circle-fg {
   fill: none;
-  stroke: #ff0000;
+  stroke: #DC143C;
   stroke-width: 3;
   stroke-linecap: round;
   transition: stroke-dasharray 0.5s ease;
@@ -208,7 +209,7 @@
 .progress-count {
   font-size: 11px;
   font-weight: 700;
-  color: #ff0000;
+  color: #DC143C;
   text-align: center;
 }
 
@@ -249,12 +250,12 @@
 }
 
 .todo-list-expanded::-webkit-scrollbar-track {
-  background: rgba(255, 0, 0, 0.1);
+  background: rgba(220, 20, 60, 0.1);
   border-radius: 2px;
 }
 
 .todo-list-expanded::-webkit-scrollbar-thumb {
-  background: rgba(255, 0, 0, 0.3);
+  background: rgba(220, 20, 60, 0.3);
   border-radius: 2px;
 }
 
@@ -304,7 +305,7 @@
 }
 
 .todo-item.pending {
-  border-left-color: rgba(255, 0, 0, 0.4);
+  border-left-color: rgba(220, 20, 60, 0.4);
 }
 
 .todo-item.completed {
@@ -333,9 +334,9 @@
 .checkbox-empty {
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(255, 0, 0, 0.4);
+  border: 2px solid rgba(220, 20, 60, 0.4);
   border-radius: 3px;
-  background: rgba(255, 0, 0, 0.08);
+  background: rgba(220, 20, 60, 0.08);
   animation: pulseBorder 2s infinite;
 }
 
@@ -363,7 +364,7 @@
 .step-loading span {
   width: 6px;
   height: 6px;
-  background-color: #ff0000;
+  background-color: #DC143C;
   border-radius: 50%;
   animation: bounce 1.5s infinite;
 }
@@ -383,7 +384,7 @@
   gap: 6px;
   margin-bottom: 10px;
   font-weight: 500;
-  color: #ff0000;
+  color: #DC143C;
 }
 
 .thinking-title {
@@ -439,11 +440,11 @@
 
   0%,
   100% {
-    border-color: rgba(255, 0, 0, 0.5);
+    border-color: rgba(220, 20, 60, 0.5);
   }
 
   50% {
-    border-color: rgba(255, 0, 0, 0.8);
+    border-color: rgba(220, 20, 60, 0.8);
   }
 }
 

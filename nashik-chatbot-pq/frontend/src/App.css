@@ -20,7 +20,7 @@ button:focus {
 }
 
 button:focus-visible {
-  outline: 2px solid rgba(255, 0, 0, 0.5);
+  outline: 2px solid rgba(220, 20, 60, 0.5);
   outline-offset: 2px;
 }
 
@@ -31,11 +31,11 @@ html {
 
 /* Improve text selection */
 ::selection {
-  background-color: rgba(255, 0, 0, 0.2);
+  background-color: rgba(220, 20, 60, 0.2);
   color: inherit;
 }
 
 ::-moz-selection {
-  background-color: rgba(255, 0, 0, 0.2);
+  background-color: rgba(220, 20, 60, 0.2);
   color: inherit;
 }

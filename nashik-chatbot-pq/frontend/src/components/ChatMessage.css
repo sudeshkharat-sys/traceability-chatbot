@@ -88,7 +88,7 @@
 }
 
 .message-avatar.user-avatar {
-  background-color: #ff0000;
+  background-color: #DC143C;
   padding: 0;
 }
 
@@ -140,13 +140,14 @@
 }
 
 .bot-message .message-bubble {
-  background-color: rgba(255, 255, 255, 0.92);
+  background: linear-gradient(135deg, #FFFFFF 0%, #F8F8F8 100%);
   color: #1f1f1f;
   border-bottom-left-radius: 4px;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   contain: layout style;
   overflow-anchor: auto;
+  border: 1px solid #E5E5E5;
   /* Prevent flickering during streaming */
   transform: translateZ(0);
   -webkit-transform: translateZ(0);
@@ -167,13 +168,13 @@
 }
 
 .user-message .message-bubble {
-  background-color: #ff0000;
+  background-color: #DC143C;
   color: #ffffff;
   border-bottom-left-radius: 4px;
   align-self: flex-start;
   max-width: 100%;
   font-weight: 400;
-  box-shadow: 0 1px 3px rgba(255, 0, 0, 0.2);
+  box-shadow: 0 1px 3px rgba(220, 20, 60, 0.2);
 }
 
 .user-message .message-avatar {
@@ -304,14 +305,14 @@
 }
 
 .feedback-btn.active {
-  background-color: #ff0000;
-  border-color: #ff0000;
+  background-color: #DC143C;
+  border-color: #DC143C;
   color: white;
 }
 
 .feedback-btn.active:hover {
-  background-color: #e60000;
-  border-color: #e60000;
+  background-color: #B8102E;
+  border-color: #B8102E;
 }
 
 .feedback-btn:disabled {
@@ -372,8 +373,8 @@
 
 .feedback-modal textarea:focus {
   outline: none;
-  border-color: #ff0000;
-  box-shadow: 0 0 0 3px rgba(255, 0, 0, 0.1);
+  border-color: #DC143C;
+  box-shadow: 0 0 0 3px rgba(220, 20, 60, 0.1);
 }
 
 .feedback-modal-actions {
@@ -393,12 +394,12 @@
 }
 
 .feedback-modal-actions button:first-child {
-  background-color: #ff0000;
+  background-color: #DC143C;
   color: white;
 }
 
 .feedback-modal-actions button:first-child:hover {
-  background-color: #e60000;
+  background-color: #B8102E;
 }
 
 .feedback-modal-actions button:last-child {
@@ -602,7 +603,7 @@
 }
 
 .bot-message-markdown thead {
-  background-color: #ff0000;
+  background-color: #DC143C;
 }
 
 .bot-message-markdown th {
@@ -612,8 +613,8 @@
   color: white;
   font-size: 13.5px;
   letter-spacing: 0.02em;
-  border-bottom: 2px solid #cc0000;
-  background-color: #ff0000;
+  border-bottom: 2px solid #B8102E;
+  background-color: #DC143C;
 }
 
 .bot-message-markdown tbody {

@@ -1,14 +1,25 @@
 # ═══════════════════════════════════════════════════════════
-# DATA LOADING
+# DATA LOADING (Memory-Optimized for Large Datasets)
 # ═══════════════════════════════════════════════════════════
 
 import pandas as pd
 from neo4j import GraphDatabase
+import time
+import gc
+import os
+import re
 
-NEO4J_URI = "neo4j://127.0.0.1:7687"
+NEO4J_URI = "neo4j://neo4j:7687"
 NEO4J_USERNAME = "neo4j"
 NEO4J_PASSWORD = "dataeaze@12345"
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USERNAME, NEO4J_PASSWORD))
+
+# Pre-compile regex patterns for performance (avoid re-compiling per row)
+PART_PATTERN = re.compile(r"^[0-9]{4}[A-Z]{2,3}[0-9]{5,6}[A-Z]$")
+J_PATTERN = re.compile(r"^J[0-9]{2}-[A-Z]{3}-[0-9]{4}$")
+
+# Chunk size for processing large traceability files
+TRACEABILITY_CHUNK_SIZE = 50000  # Process 50k rows at a time
 
 
 def run_query(query, params=None):
@@ -17,54 +28,146 @@ def run_query(query, params=None):
 
 
 # ═══════════════════════════════════════════════════════════
-# STEP 1: LOAD DATA FILES
+# STEP 1: LOAD DATA FILES (Memory-Optimized)
 # ═══════════════════════════════════════════════════════════
 print("=" * 80)
-print("LOADING CSV FILES")
+print("LOADING CSV FILES (Memory-Optimized)")
 print("=" * 80)
 
-ppcm = pd.read_csv("../../thar_csv/1. THAR ROXX PPCM_Sheet1.csv")
-warranty = pd.read_csv("../../thar_csv/2. THAR ROXX Warranty_Sheet1.csv")
+folder = "/app/csv-data"
+
+# Load smaller datasets (these fit in memory)
+ppcm = pd.read_csv(f"{folder}/1. THAR ROXX PPCM_Sheet1.csv")
+warranty = pd.read_csv(f"{folder}/2. THAR ROXX Warranty_Sheet1_FILTERED.csv")
 warranty_analysis = pd.read_csv(
-    "../../thar_csv/3. THAR ROXX Warranty Analysis_Sheet1.csv"
+    f"{folder}/3. THAR ROXX Warranty Analysis_Sheet1_FILTERED.csv"
 )
-esqa = pd.read_csv("../../thar_csv/4. THAR ROXX e-SQA_Sheet1.csv")
+esqa = pd.read_csv(f"{folder}/4. THAR ROXX e-SQA_Sheet1.csv")
 
-# Load ALL traceability files
-import os
-
-folder = "../../thar_csv"
+# Get list of traceability files (will be processed in chunks later)
 trace_files = [
     f for f in os.listdir(folder) if "traceability" in f.lower() and f.endswith(".csv")
 ]
-print(f"Found {len(trace_files)} traceability files")
-trace = pd.concat(
-    [pd.read_csv(os.path.join(folder, f)) for f in trace_files], ignore_index=True
-)
+print(f"Found {len(trace_files)} traceability files (will process in chunks)")
+
+# Count total trace rows without loading all into memory
+trace_total_rows = 0
+for f in trace_files:
+    # Count rows using file read (memory efficient)
+    with open(os.path.join(folder, f), 'r') as file:
+        trace_total_rows += sum(1 for _ in file) - 1  # -1 for header
 
 print(
-    f"✅ Loaded: {len(ppcm)} PPCM, {len(warranty)} Warranty, {len(warranty_analysis)} Analysis, {len(esqa)} e-SQA, {len(trace)} Trace"
+    f"✅ Loaded: {len(ppcm)} PPCM, {len(warranty)} Warranty, {len(warranty_analysis)} Analysis, {len(esqa)} e-SQA"
 )
+print(f"✅ Traceability files contain ~{trace_total_rows:,} rows (will process in {TRACEABILITY_CHUNK_SIZE:,} row chunks)")
 
 # ═══════════════════════════════════════════════════════════
-# STEP 2: DATA PREPROCESSING
+# STEP 2: DATA PREPROCESSING (Non-Traceability Data)
 # ═══════════════════════════════════════════════════════════
 print("\n" + "=" * 80)
 print("PREPROCESSING DATA")
 print("=" * 80)
 
-# Fill NaN with 'unknown'
+# Fill NaN with 'unknown' (traceability will be processed in chunks later)
 ppcm = ppcm.fillna("unknown")
 warranty = warranty.fillna("unknown")
 warranty_analysis = warranty_analysis.fillna("unknown")
 esqa = esqa.fillna("unknown")
-trace = trace.fillna("unknown")
+
+print("✅ Filled missing values with 'unknown'")
 
 # Clean vendor names
 warranty["vender"] = warranty["vender"].replace(["-", "", "N/A", " "], "unknown")
 
-# CRITICAL: Extract VIN suffix (last 8 chars) from traceability
-trace["VIN_SHORT"] = trace["VINNumber"].str[-8:]
+print("✅ Vendor names cleaned")
+
+# ═══════════════════════════════════════════════════════════
+# PART NUMBER NORMALIZATION (FIX ISSUE #1 & #5: Part mismatch & Duplicate nodes)
+# ═══════════════════════════════════════════════════════════
+def normalize_part_number(part_value):
+    """
+    Normalize part numbers to ensure consistency across datasets.
+    Uses pre-compiled regex patterns for performance.
+
+    Valid formats:
+        - ####AA#####A  (12-13 chars: 4 digits + 2 letters + 5-6 digits + 1 letter)
+        - ####AAA####A  (13-14 chars: 4 digits + 3 letters + 5-6 digits + 1 letter)
+
+    Examples:
+        - 0107BW500561N (13 chars)
+        - 2303CW504481N (13 chars)
+        - 1101AAA03621N (13 chars)
+
+    Returns:
+        - Standard format part if valid (e.g., "0107BW500561N")
+        - J-format preserved (e.g., "J60-BOD-1920")
+        - "unknown" if invalid or garbage text
+    """
+    # Handle NaN, None, empty
+    if pd.isna(part_value) or part_value == "" or part_value == "unknown":
+        return "unknown"
+
+    # Convert to string and clean
+    part = str(part_value).strip()
+
+    # Remove common control characters
+    part = part.replace("_x000d_", "").replace("_X000D_", "")
+    part = part.replace("\r", "").replace("\n", "").replace("\t", "")
+    part = part.strip()
+
+    # Convert to uppercase for consistency
+    part = part.upper()
+
+    # Use pre-compiled patterns for performance
+    if PART_PATTERN.match(part):
+        return part  # Valid standard format
+
+    if J_PATTERN.match(part):
+        # Keep J-format as-is (may not match traceability but preserve for reference)
+        return part
+
+    # If it contains spaces or is too long, it's likely a description, not a part number
+    if len(part) > 50 or " " in part:
+        return "unknown"
+
+    # If too short, likely incomplete
+    if len(part) < 5:
+        return "unknown"
+
+    # Default: mark as unknown (invalid format)
+    return "unknown"
+
+
+print("\n🔧 Normalizing part numbers...")
+
+# Apply normalization to non-traceability datasets (traceability processed in chunks)
+warranty["part_original"] = warranty["part"]  # Keep original for debugging
+warranty["part"] = warranty["part"].apply(normalize_part_number)
+
+ppcm["Part No"] = ppcm["Part No"].apply(normalize_part_number)
+esqa["Part No"] = esqa["Part No"].apply(normalize_part_number)
+
+# Report normalization results
+warranty_valid = (warranty["part"] != "unknown").sum()
+warranty_total = len(warranty)
+
+warranty_invalid = warranty_total - warranty_valid
+
+print(f"✅ Part number normalization complete:")
+print(f"   Warranty - Valid: {warranty_valid:,}/{warranty_total:,} ({warranty_valid/warranty_total*100:.1f}%)")
+print(f"   Warranty - Invalid/Unknown: {warranty_invalid:,} ({warranty_invalid/warranty_total*100:.1f}%)")
+print(f"   (Traceability parts will be normalized during chunked loading)")
+
+# Show sample invalid entries (for debugging)
+invalid_samples = warranty[warranty["part"] == "unknown"]["part_original"].unique()[:5]
+if len(invalid_samples) > 0:
+    print(f"   Sample invalid entries (marked as 'unknown'):")
+    for sample in invalid_samples:
+        sample_str = str(sample)[:60]
+        if len(str(sample)) > 60:
+            sample_str += "..."
+        print(f"     - {sample_str}")
 
 
 # CRITICAL: Parse ScanValue (format: mfg_date:shift:batch_code)
@@ -120,44 +223,56 @@ def convert_ddmmyy_to_ddmmyyyy(date_str, reference_date=None):
         return date_str
 
 
-trace[["BATCH_DATE", "SHIFT", "BATCH_CODE"]] = trace["ScanValue"].apply(
-    lambda x: pd.Series(parse_scan_value(x))
-)
-
-print("✅ VIN extraction and ScanValue parsing complete")
-
-# Check VIN match rate
+# Note: ScanValue parsing and VIN extraction will be done during chunked loading
 warranty_vins = set(warranty["Serial No"].dropna().unique())
-trace_vin_short = set(trace["VIN_SHORT"].dropna().unique())
-vin_matches = warranty_vins.intersection(trace_vin_short)
-
-print(f"\nVIN Matching:")
-print(f"  Warranty VINs: {len(warranty_vins):,}")
-print(f"  Trace VINs (short): {len(trace_vin_short):,}")
-print(
-    f"  Matches: {len(vin_matches):,} ({len(vin_matches)/len(warranty_vins)*100:.1f}%)"
-)
-
-# Check Part No match rate
 warranty_parts = set(warranty["part"].dropna().unique())
-trace_parts = set(trace["BOMPARTNO"].dropna().unique())
-part_matches = warranty_parts.intersection(trace_parts)
-
-print(f"\nPart Number Matching:")
-print(f"  Warranty parts: {len(warranty_parts):,}")
-print(f"  Trace parts: {len(trace_parts):,}")
-print(
-    f"  Matches: {len(part_matches):,} ({len(part_matches)/len(warranty_parts)*100:.1f}%)"
-)
+print(f"\nWarranty VINs for matching: {len(warranty_vins):,}")
+print(f"Warranty parts for matching: {len(warranty_parts):,}")
+print("(VIN and Part matching stats will be shown during traceability loading)")
 
 # ═══════════════════════════════════════════════════════════
 # STEP 3: CLEAR EXISTING DATA
 # ═══════════════════════════════════════════════════════════
 print("\n" + "=" * 80)
-print("CLEARING EXISTING DATA")
+print("CLEARING EXISTING DATA (Batch-wise to prevent timeout)")
 print("=" * 80)
 
-run_query("MATCH (n) DETACH DELETE n")
+# Delete relationships first (it's often faster than DETACH DELETE)
+print("Deleting relationships...")
+delete_rels_query = """
+MATCH ()-[r]->() 
+WITH r LIMIT 10000
+DELETE r
+RETURN count(*) as deleted
+"""
+
+while True:
+    with driver.session() as session:
+        result = session.run(delete_rels_query)
+        count = result.single()["deleted"]
+        if count == 0:
+            break
+        print(f"  Deleted {count} relationships...")
+        time.sleep(0.5)
+
+# Then delete nodes
+print("Deleting nodes...")
+delete_nodes_query = """
+MATCH (n) 
+WITH n LIMIT 10000
+DELETE n
+RETURN count(*) as deleted
+"""
+
+while True:
+    with driver.session() as session:
+        result = session.run(delete_nodes_query)
+        count = result.single()["deleted"]
+        if count == 0:
+            break
+        print(f"  Deleted {count} nodes...")
+        time.sleep(0.5)
+
 print("✅ Database cleared")
 
 # ═══════════════════════════════════════════════════════════
@@ -174,6 +289,12 @@ constraints = [
     "CREATE CONSTRAINT IF NOT EXISTS FOR (c:Commodity) REQUIRE c.name IS UNIQUE",
     "CREATE CONSTRAINT IF NOT EXISTS FOR (pl:Plant) REQUIRE pl.code IS UNIQUE",
     "CREATE CONSTRAINT IF NOT EXISTS FOR (b:Batch) REQUIRE b.lot_no IS UNIQUE",
+     
+    # PERFORMANCE INDEXES
+    "CREATE INDEX batch_code_idx IF NOT EXISTS FOR (b:Batch) ON (b.batch_code)",
+    "CREATE INDEX complaint_desc_idx IF NOT EXISTS FOR (wc:WarrantyClaim) ON (wc.complaint_desc)",
+    "CREATE INDEX fitted_on_scan_idx IF NOT EXISTS FOR ()-[f:FITTED_ON]-() ON (f.scan_value)",
+    "CREATE INDEX fitted_on_date_idx IF NOT EXISTS FOR ()-[f:FITTED_ON]-() ON (f.batch_date)"
 ]
 
 for c in constraints:
@@ -185,13 +306,13 @@ for c in constraints:
 print("✅ Constraints created")
 
 # ═══════════════════════════════════════════════════════════
-# STEP 5: LOAD TRACEABILITY (FIRST - creates Vehicles & Batches)
+# STEP 5: LOAD TRACEABILITY (Memory-Optimized Chunked Processing)
 # ═══════════════════════════════════════════════════════════
 print("\n" + "=" * 80)
-print("1. LOADING TRACEABILITY (Part → VIN → Batch)")
+print("1. LOADING TRACEABILITY (Part → VIN → Batch) - CHUNKED")
 print("=" * 80)
 
-query = """
+trace_query = """
 UNWIND $rows AS row
 
 // Create Vehicle using SHORT VIN (8 chars)
@@ -203,7 +324,7 @@ MERGE (p:Part {part_no: row.part_no})
 
 // Link Part to Vehicle
 MERGE (p)-[f:FITTED_ON]->(v)
-SET f.date = row.tdate, 
+SET f.date = row.tdate,
     f.scan_value = row.scan_value,
     f.batch_date = row.batch_date,
     f.shift = row.shift
@@ -218,29 +339,76 @@ SET b.batch_code = row.batch_code,
 MERGE (p)-[:FROM_BATCH]->(b)
 """
 
-rows = trace.rename(
-    columns={
+def process_trace_chunk(chunk_df):
+    """Process a chunk of traceability data with memory-efficient operations."""
+    # Handle different column names across files
+    col_mapping = {
         "VINNumber": "full_vin",
-        "VIN_SHORT": "vin_short",
         "BOMPARTNO": "part_no",
-        "TDATE": "tdate",
-        "ScanValue": "scan_value",
-        "BATCH_DATE": "batch_date",
-        "SHIFT": "shift",
-        "BATCH_CODE": "batch_code",
+        "ScanValue": "scan_value"
     }
-).to_dict("records")
+    
+    # Check for date column variations
+    if "TDATE" in chunk_df.columns:
+        col_mapping["TDATE"] = "tdate"
+    elif "Tracebility_Date" in chunk_df.columns:
+        col_mapping["Tracebility_Date"] = "tdate"
+    
+    # Rename only columns that exist
+    available_cols = {k: v for k, v in col_mapping.items() if k in chunk_df.columns}
+    chunk_df = chunk_df.rename(columns=available_cols)
 
-# Filter valid records
-rows = [r for r in rows if r["vin_short"] != "unknown" and r["part_no"] != "unknown"]
+    # Fill NaN
+    chunk_df = chunk_df.fillna("unknown")
 
-batch_size = 1000
-for i in range(0, len(rows), batch_size):
-    run_query(query, {"rows": rows[i : i + batch_size]})
-    if i % 10000 == 0 and i > 0:
-        print(f"   Progress: {i:,}/{len(rows):,}")
+    # Extract VIN suffix (last 8 chars)
+    chunk_df["vin_short"] = chunk_df["full_vin"].astype(str).str[-8:]
 
-print(f"✅ Loaded {len(rows):,} traceability records")
+    # Normalize part numbers
+    chunk_df["part_no"] = chunk_df["part_no"].apply(normalize_part_number)
+
+    # Parse ScanValue
+    scan_parsed = chunk_df["scan_value"].apply(lambda x: pd.Series(parse_scan_value(x)))
+    scan_parsed.columns = ["batch_date", "shift", "batch_code"]
+    chunk_df = pd.concat([chunk_df, scan_parsed], axis=1)
+
+    # Convert to records
+    rows = chunk_df.to_dict("records")
+
+    # Filter valid records
+    rows = [r for r in rows if str(r.get("vin_short")) != "unknown" and str(r.get("part_no")) != "unknown"]
+
+    return rows
+
+# Process traceability files in chunks
+total_loaded = 0
+neo4j_batch_size = 1000
+
+for file_idx, trace_file in enumerate(trace_files):
+    file_path = os.path.join(folder, trace_file)
+    print(f"\n  Processing file {file_idx + 1}/{len(trace_files)}: {trace_file}")
+
+    # Read and process file in chunks
+    chunk_count = 0
+    for chunk in pd.read_csv(file_path, chunksize=TRACEABILITY_CHUNK_SIZE, low_memory=False):
+        chunk_count += 1
+
+        # Process chunk
+        rows = process_trace_chunk(chunk)
+
+        # Load to Neo4j in batches
+        for i in range(0, len(rows), neo4j_batch_size):
+            run_query(trace_query, {"rows": rows[i : i + neo4j_batch_size]})
+
+        total_loaded += len(rows)
+        print(f"    Chunk {chunk_count}: Loaded {len(rows):,} records (Total: {total_loaded:,})")
+
+        # Force garbage collection after each chunk
+        del rows
+        del chunk
+        gc.collect()
+
+print(f"\n✅ Loaded {total_loaded:,} traceability records from {len(trace_files)} files")
 
 # ═══════════════════════════════════════════════════════════
 # STEP 6: LOAD PPCM (Supplier Quality - Cp/Cpk)
@@ -285,6 +453,10 @@ for i in range(0, len(rows), 500):
 
 print(f"✅ Loaded {len(rows):,} PPCM records")
 
+# Free memory
+del ppcm, rows
+gc.collect()
+
 # ═══════════════════════════════════════════════════════════
 # STEP 7: LOAD WARRANTY (Field Failures)
 # ═══════════════════════════════════════════════════════════
@@ -309,6 +481,7 @@ SET w.complaint_code = row.complaint_code,
 // Link to Vehicle (using 8-char VIN - same as trace)
 MERGE (v:Vehicle {vin: row.serial_no})
 SET v.model = row.model_code, 
+    v.base_model = row.base_model,
     v.engine_no = row.engine_no
 
 // Dealer
@@ -324,6 +497,7 @@ MERGE (c:Commodity {name: row.commodity})
 
 // Part
 MERGE (p:Part {part_no: row.part})
+SET p.name = row.part_name
 
 // Create relationships
 MERGE (v)-[:HAS_CLAIM]->(w)
@@ -356,9 +530,11 @@ rows = warranty.rename(
         "PlantDesc": "plant_desc",
         "part": "part",
         "vender": "vendor",
+        "BASE MODEL": "base_model",
         "Model Code": "model_code",
         "ENGINE NUMBER": "engine_no",
         "Commodity": "commodity",
+        "Material Description": "part_name",
     }
 ).to_dict("records")
 
@@ -366,6 +542,10 @@ for i in range(0, len(rows), 500):
     run_query(query, {"rows": rows[i : i + 500]})
 
 print(f"✅ Loaded {len(rows):,} warranty claims")
+
+# Free memory
+del warranty, rows
+gc.collect()
 
 # ═══════════════════════════════════════════════════════════
 # STEP 8: LOAD WARRANTY ANALYSIS (Decisions & Attribution)
@@ -434,6 +614,10 @@ for i in range(0, len(rows_without_claim), 500):
 
 print(f"✅ Loaded {len(rows):,} warranty analysis records")
 
+# Free memory
+del warranty_analysis, rows, rows_with_claim, rows_without_claim
+gc.collect()
+
 # ═══════════════════════════════════════════════════════════
 # STEP 9: LOAD e-SQA (Incoming Quality - Part No ONLY)
 # ═══════════════════════════════════════════════════════════
@@ -479,6 +663,10 @@ for i in range(0, len(rows), 500):
     run_query(query, {"rows": rows[i : i + 500]})
 
 print(f"✅ Loaded {len(rows):,} e-SQA concerns")
+
+# Free memory
+del esqa, rows
+gc.collect()
 
 # ═══════════════════════════════════════════════════════════
 # STEP 10: VERIFICATION

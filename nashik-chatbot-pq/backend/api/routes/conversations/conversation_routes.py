@@ -21,8 +21,6 @@ from backend.models.schemas.conversation_schemas import (
     InitiateConversationResponseDto,
     FeedbackDto,
 )
-from backend.services.conversations.conversation_service import ConversationService
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["conversations"])
@@ -31,13 +29,16 @@ router = APIRouter(tags=["conversations"])
 _conversation_service = None
 
 
-def get_conversation_service() -> ConversationService:
+def get_conversation_service():
     """
     Get the conversation service instance (lazy initialization).
-    This ensures the service is only created after the database is ready.
+    Import is deferred here so that langchain/langgraph are not loaded
+    at module import time — keeps reload instant.
     """
     global _conversation_service
     if _conversation_service is None:
+        from backend.services.conversations.conversation_service import ConversationService
+
         _conversation_service = ConversationService()
     return _conversation_service
 
@@ -180,11 +181,11 @@ async def websocket_endpoint(
             agent_type = payload_data.get("agent_type", "analyst")
 
             # Validate agent type
-            if agent_type not in ["analyst", "cypher"]:
+            if agent_type not in ["analyst", "cypher", "standards_guidelines"]:
                 await websocket.send_json(
                     {
                         "type": "error",
-                        "content": f"Invalid agent type: {agent_type}. Must be 'analyst' or 'cypher'.",
+                        "content": f"Invalid agent type: {agent_type}. Must be 'analyst', 'cypher', or 'standards_guidelines'.",
                     }
                 )
                 return

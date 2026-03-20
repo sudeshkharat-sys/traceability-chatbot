@@ -3,10 +3,7 @@
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background-image: url('../assests/background.png');
-  background-size: 180%;
-  background-position: center 75%;
-  background-repeat: no-repeat;
+  background: #FFFFFF;
   position: relative;
 }
 
@@ -17,7 +14,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: transparent;
   z-index: 1;
 }
 
@@ -31,7 +28,7 @@
 }
 
 .mahindra-logo {
-  height: 20px;
+  height: 30px;
   width: auto;
   object-fit: contain;
 }
@@ -59,9 +56,9 @@
   left: -60px;
   right: -60px;
   height: 60px;
-  background: linear-gradient(to bottom, 
-    rgba(0, 0, 0, 0.8) 0%,
-    rgba(0, 0, 0, 0.5) 50%,
+  background: linear-gradient(to bottom,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.7) 50%,
     transparent 100%);
   z-index: 10;
   pointer-events: none;
@@ -138,19 +135,20 @@
 
 .welcome-greeting {
   font-size: 22px;
-  color: #ffffff;
+  color: #1a1a1a;
   margin: 0;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  text-shadow: 0 2px 4px rgba(220, 20, 60, 0.1);
 }
 
 /* Welcome Message Box */
 .welcome-message-wrapper {
-  background-color: rgba(200, 200, 200, 0.95);
+  background-color: #FFFFFF;
+  border: 1px solid #E5E5E5;
   border-radius: 18px;
   padding: 10px 15px;
   max-width: 580px;
   width: 100%;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(10px);
   animation: slideUp 0.5s ease;
 }
@@ -197,20 +195,20 @@
   height: 29px;
   border-radius: 50%;
   border: none;
-  background-color: #ff0000;
+  background-color: #DC143C;
   color: #ffffff;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.25s ease;
-  box-shadow: 0 2px 10px rgba(255, 0, 0, 0.25);
+  box-shadow: 0 2px 10px rgba(220, 20, 60, 0.25);
 }
 
 .action-circle-btn:hover {
-  background-color: #e60000;
+  background-color: #B8102E;
   transform: scale(1.05);
-  box-shadow: 0 4px 14px rgba(255, 0, 0, 0.4);
+  box-shadow: 0 4px 14px rgba(220, 20, 60, 0.4);
 }
 
 .action-circle-btn:disabled {
@@ -255,23 +253,23 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: #ff0000;
+  background: #DC143C;
   border: none;
   color: white;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 12px rgba(255, 0, 0, 0.4);
+  box-shadow: 0 4px 12px rgba(220, 20, 60, 0.4);
   z-index: 10;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   animation: slideInFromRight 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .scroll-to-bottom-btn:hover {
-  background: #e60000;
+  background: #B8102E;
   transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(255, 0, 0, 0.5);
+  box-shadow: 0 6px 16px rgba(220, 20, 60, 0.5);
 }
 
 .scroll-to-bottom-btn:active {
@@ -299,10 +297,10 @@
   position: relative;
   z-index: 11;
   padding: 15px 60px 20px;
-  background: linear-gradient(to top, 
-    rgba(0, 0, 0, 0.9) 0%,
-    rgba(0, 0, 0, 0.85) 50%,
-    rgba(0, 0, 0, 0.6) 85%,
+  background: linear-gradient(to top,
+    rgba(255, 255, 255, 0.98) 0%,
+    rgba(255, 255, 255, 0.9) 50%,
+    rgba(255, 255, 255, 0.7) 85%,
     transparent 100%);
   animation: fadeInSmooth 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   backdrop-filter: blur(10px);
@@ -333,15 +331,15 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  background-color: rgba(255, 255, 255, 0.98);
+  background-color: #FFFFFF;
   border-radius: 28px;
   padding: 12px 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   backdrop-filter: blur(10px);
   max-width: 900px;
   margin: 0 auto;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid #E5E5E5;
   animation: fadeInInput 0.5s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -357,9 +355,9 @@
 }
 
 .chat-input-wrapper:focus-within {
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2), 0 2px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
   transform: translateY(-2px);
-  border-color: rgba(255, 0, 0, 0.3);
+  border-color: #DC143C;
 }
 
 .chat-input {
@@ -403,15 +401,15 @@
 }
 
 .input-action-btn.send {
-  background-color: #ff0000;
+  background-color: #DC143C;
   color: #ffffff;
-  box-shadow: 0 2px 4px rgba(255, 0, 0, 0.2);
+  box-shadow: 0 2px 4px rgba(220, 20, 60, 0.2);
 }
 
 .input-action-btn.send:hover {
-  background-color: #e60000;
+  background-color: #B8102E;
   transform: scale(1.1);
-  box-shadow: 0 3px 8px rgba(255, 0, 0, 0.3);
+  box-shadow: 0 3px 8px rgba(220, 20, 60, 0.3);
 }
 
 .input-action-btn.send:active {
@@ -445,7 +443,7 @@
 }
 
 .chat-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(220, 20, 60, 0.2);
   border-radius: 10px;
   border: 2px solid transparent;
   background-clip: padding-box;
@@ -453,7 +451,7 @@
 }
 
 .chat-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(220, 20, 60, 0.35);
   border-radius: 10px;
   border: 2px solid transparent;
   background-clip: padding-box;
