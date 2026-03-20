@@ -50,6 +50,32 @@ def safe_str(val) -> str:
     s = str(val).strip()
     return '' if s.lower() in ('nan', 'none', 'nat') else s
 
+def normalize_month_label(label: str) -> str:
+    """Normalize any month label to 'Mon-YY' (e.g. 'Jan-2024' -> 'Jan-24')."""
+    if not label:
+        return label
+    for fmt in ('%b-%Y', '%b-%y'):
+        try:
+            return datetime.strptime(label, fmt).strftime('%b-%y')
+        except ValueError:
+            pass
+    return label
+
+def generate_month_sequence(min_date, max_date) -> list:
+    """Build complete list of 'Mon-YY' labels from min_date to max_date (inclusive)."""
+    sequence = []
+    curr = datetime(min_date.year, min_date.month, 1)
+    end = datetime(max_date.year, max_date.month, 1)
+    while curr <= end:
+        sequence.append(curr.strftime('%b-%y'))
+        m = curr.month + 1
+        y = curr.year
+        if m > 12:
+            m = 1
+            y += 1
+        curr = datetime(y, m, 1)
+    return sequence
+
 class PartLabelerService:
     """Manages CAD labeling data and warranty information"""
 
@@ -440,7 +466,14 @@ class PartLabelerService:
             "search_terms": search_terms,
         }
         try:
-            result["mfgMonth"] = [{"label": r[0], "value": r[1]} for r in self.db.execute_query(PartLabelerQueries.RPT_GET_DASHBOARD_MFG_MONTH, params)]
+            range_row = self.db.execute_query(PartLabelerQueries.RPT_GET_MFG_DATE_RANGE, {"user_id": user_id})
+            if range_row and range_row[0][0] and range_row[0][1]:
+                min_date, max_date = range_row[0]
+                sequence = generate_month_sequence(min_date, max_date)
+                db_data = {}
+                if search_terms:
+                    db_data = {r[0]: r[1] for r in self.db.execute_query(PartLabelerQueries.RPT_GET_DASHBOARD_MFG_MONTH, params)}
+                result["mfgMonth"] = [{"label": m, "value": db_data.get(m, 0)} for m in sequence]
         except Exception as e:
             logger.error(f"RPT mfgMonth error: {e}")
         try:
@@ -538,7 +571,14 @@ class PartLabelerService:
             "search_terms": search_terms,
         }
         try:
-            result["mfgMonth"] = [{"label": r[0], "value": r[1]} for r in self.db.execute_query(PartLabelerQueries.GNOVAC_GET_DASHBOARD_MFG_MONTH, params)]
+            range_row = self.db.execute_query(PartLabelerQueries.GNOVAC_GET_MFG_DATE_RANGE, {"user_id": user_id})
+            if range_row and range_row[0][0] and range_row[0][1]:
+                min_date, max_date = range_row[0]
+                sequence = generate_month_sequence(min_date, max_date)
+                db_data = {}
+                if search_terms:
+                    db_data = {r[0]: r[1] for r in self.db.execute_query(PartLabelerQueries.GNOVAC_GET_DASHBOARD_MFG_MONTH, params)}
+                result["mfgMonth"] = [{"label": m, "value": db_data.get(m, 0)} for m in sequence]
         except Exception as e:
             logger.error(f"GNOVAC mfgMonth error: {e}")
         try:
@@ -637,7 +677,14 @@ class PartLabelerService:
             "search_terms": search_terms,
         }
         try:
-            result["mfgMonth"] = [{"label": r[0], "value": r[1]} for r in self.db.execute_query(PartLabelerQueries.RFI_GET_DASHBOARD_MFG_MONTH, params)]
+            range_row = self.db.execute_query(PartLabelerQueries.RFI_GET_MFG_DATE_RANGE, {"user_id": user_id})
+            if range_row and range_row[0][0] and range_row[0][1]:
+                min_date, max_date = range_row[0]
+                sequence = generate_month_sequence(min_date, max_date)
+                db_data = {}
+                if search_terms:
+                    db_data = {r[0]: r[1] for r in self.db.execute_query(PartLabelerQueries.RFI_GET_DASHBOARD_MFG_MONTH, params)}
+                result["mfgMonth"] = [{"label": m, "value": db_data.get(m, 0)} for m in sequence]
         except Exception as e:
             logger.error(f"RFI mfgMonth error: {e}")
         try:
@@ -739,7 +786,14 @@ class PartLabelerService:
             "search_terms": search_terms,
         }
         try:
-            result["mfgMonth"] = [{"label": r[0], "value": r[1]} for r in self.db.execute_query(PartLabelerQueries.ESQA_GET_DASHBOARD_MFG_MONTH, params)]
+            range_row = self.db.execute_query(PartLabelerQueries.ESQA_GET_MFG_DATE_RANGE, {"user_id": user_id})
+            if range_row and range_row[0][0] and range_row[0][1]:
+                min_date, max_date = range_row[0]
+                sequence = generate_month_sequence(min_date, max_date)
+                db_data = {}
+                if search_terms:
+                    db_data = {r[0]: r[1] for r in self.db.execute_query(PartLabelerQueries.ESQA_GET_DASHBOARD_MFG_MONTH, params)}
+                result["mfgMonth"] = [{"label": m, "value": db_data.get(m, 0)} for m in sequence]
         except Exception as e:
             logger.error(f"e-SQA mfgMonth error: {e}")
         try:
@@ -780,22 +834,11 @@ class PartLabelerService:
                 range_row = self.db.execute_query(PartLabelerQueries.GET_MFG_DATE_RANGE, {"user_id": user_id})
                 if range_row and range_row[0][0] and range_row[0][1]:
                     min_date, max_date = range_row[0]
-                    from datetime import datetime
-                    sequence = []
-                    curr = datetime(min_date.year, min_date.month, 1)
-                    end = datetime(max_date.year, max_date.month, 1)
-                    while curr <= end:
-                        sequence.append(curr.strftime("%b-%Y"))
-                        m = curr.month + 1
-                        y = curr.year
-                        if m > 12:
-                            m = 1
-                            y += 1
-                        curr = datetime(y, m, 1)
-                    
+                    sequence = generate_month_sequence(min_date, max_date)
                     db_data = {}
                     if search_terms:
-                        db_data = {r[0]: r[1] for r in self.db.execute_query(PartLabelerQueries.GET_DASHBOARD_MFG_MONTH, params)}
+                        raw = self.db.execute_query(PartLabelerQueries.GET_DASHBOARD_MFG_MONTH, params)
+                        db_data = {normalize_month_label(r[0]): r[1] for r in raw}
                     result["mfgMonth"] = [{"label": m, "value": db_data.get(m, 0)} for m in sequence]
                 else:
                     result["mfgMonth"] = []
@@ -807,22 +850,11 @@ class PartLabelerService:
                 range_row_rep = self.db.execute_query(PartLabelerQueries.GET_REPORTING_DATE_RANGE, {"user_id": user_id})
                 if range_row_rep and range_row_rep[0][0] and range_row_rep[0][1]:
                     min_date, max_date = range_row_rep[0]
-                    from datetime import datetime
-                    sequence = []
-                    curr = datetime(min_date.year, min_date.month, 1)
-                    end = datetime(max_date.year, max_date.month, 1)
-                    while curr <= end:
-                        sequence.append(curr.strftime("%b-%Y"))
-                        m = curr.month + 1
-                        y = curr.year
-                        if m > 12:
-                            m = 1
-                            y += 1
-                        curr = datetime(y, m, 1)
-                    
+                    sequence = generate_month_sequence(min_date, max_date)
                     db_data = {}
                     if search_terms:
-                        db_data = {r[0]: r[1] for r in self.db.execute_query(PartLabelerQueries.GET_DASHBOARD_REPORTING_MONTH, params)}
+                        raw = self.db.execute_query(PartLabelerQueries.GET_DASHBOARD_REPORTING_MONTH, params)
+                        db_data = {normalize_month_label(r[0]): r[1] for r in raw}
                     result["reportingMonth"] = [{"label": m, "value": db_data.get(m, 0)} for m in sequence]
                 else:
                     result["reportingMonth"] = []

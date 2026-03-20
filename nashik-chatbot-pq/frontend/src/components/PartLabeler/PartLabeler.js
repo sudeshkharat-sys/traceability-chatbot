@@ -1311,7 +1311,7 @@ function PartLabeler() {
               )}
             </div>
 
-            {selectedImage && (
+            {selectedImage && activePopup && (
               <div className="dashboard-analysis-section">
                 <div className="dashboard-grid">
                   <CustomBarChart title={sourceConfig.chartTitles.mfgMonth} data={dashboardData.mfgMonth} color="#f6ad55" icon={History} />
@@ -1325,6 +1325,14 @@ function PartLabeler() {
                   ) : (
                     <LocationBarChart title={sourceConfig.chartTitles.region} data={dashboardData.region} />
                   )}
+                </div>
+              </div>
+            )}
+            {selectedImage && !activePopup && (
+              <div className="dashboard-analysis-section dashboard-placeholder">
+                <div className="dashboard-placeholder-hint">
+                  <BarChart2 size={32} />
+                  <p>Click a component marker on the image to view its analytics</p>
                 </div>
               </div>
             )}

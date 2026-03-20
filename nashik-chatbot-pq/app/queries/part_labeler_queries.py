@@ -167,7 +167,7 @@ class PartLabelerQueries:
     """
 
     GET_DASHBOARD_REPORTING_MONTH = """
-        SELECT TO_CHAR(TO_DATE(claim_date, 'YYYY-MM-DD'), 'Mon-YYYY') as label, COUNT(*) as value
+        SELECT TO_CHAR(TO_DATE(claim_date, 'YYYY-MM-DD'), 'Mon-YY') as label, COUNT(*) as value
         FROM raw_warranty_data
         WHERE user_id = :user_id AND claim_date IS NOT NULL AND claim_date != ''
           AND (:search_terms IS NULL OR LOWER(REPLACE(material_description, ' ', '')) LIKE ANY(:search_terms) OR LOWER(REPLACE(complaint_code_desc, ' ', '')) LIKE ANY(:search_terms))
@@ -284,8 +284,34 @@ class PartLabelerQueries:
     """
 
     RPT_GET_MFG_DATE_RANGE = """
-        SELECT MIN(mfg_month) as min_m, MAX(mfg_month) as max_m
+        SELECT
+            MIN(TO_DATE(mfg_month, 'Mon-YY')) as min_date,
+            MAX(TO_DATE(mfg_month, 'Mon-YY')) as max_date
         FROM raw_rpt_data
+        WHERE user_id = :user_id AND mfg_month IS NOT NULL AND mfg_month != ''
+    """
+
+    GNOVAC_GET_MFG_DATE_RANGE = """
+        SELECT
+            MIN(TO_DATE(mfg_month, 'Mon-YY')) as min_date,
+            MAX(TO_DATE(mfg_month, 'Mon-YY')) as max_date
+        FROM raw_gnovac_data
+        WHERE user_id = :user_id AND mfg_month IS NOT NULL AND mfg_month != ''
+    """
+
+    RFI_GET_MFG_DATE_RANGE = """
+        SELECT
+            MIN(TO_DATE(mfg_month, 'Mon-YY')) as min_date,
+            MAX(TO_DATE(mfg_month, 'Mon-YY')) as max_date
+        FROM raw_rfi_data
+        WHERE user_id = :user_id AND mfg_month IS NOT NULL AND mfg_month != ''
+    """
+
+    ESQA_GET_MFG_DATE_RANGE = """
+        SELECT
+            MIN(TO_DATE(mfg_month, 'Mon-YY')) as min_date,
+            MAX(TO_DATE(mfg_month, 'Mon-YY')) as max_date
+        FROM raw_esqa_data
         WHERE user_id = :user_id AND mfg_month IS NOT NULL AND mfg_month != ''
     """
 
