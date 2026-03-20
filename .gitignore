@@ -70,5 +70,8 @@ Thumbs.db
 *.spec
 *.xls
 *.xlsx
-*.csv
+csv_output/
+excel_part_labeler_csv/
+thar_csv/
+warranty/
 PartLabelerDashBoard/
