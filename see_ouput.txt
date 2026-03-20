@@ -1,6 +1,0 @@
-CONTAINER ID   NAME                      CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O        PIDS 
-3961a03907bc   traceability-app          100.36%   4.289GiB / 12GiB      35.74%    1.85MB / 105kB    250MB / 1.68MB   69 
-f2ae15ea69e8   traceability-nginx        0.02%     3.059MiB / 31.34GiB   0.01%     9.37kB / 4.57kB   868kB / 12.3kB   2 
-2cd04ed97c43   traceability-postgres     0.00%     24.47MiB / 2GiB       1.19%     256kB / 397kB     7.25MB / 467kB   7 
-d4c92723c1e9   traceability-opensearch   1.25%     2.623GiB / 6GiB       43.72%    4.74kB / 3.16kB   127MB / 18MB     103 
-fa537031bd35   traceability-neo4j        0.51%     4.076GiB / 10GiB      40.76%    28.5kB / 33.5kB   909MB / 232MB    79 
