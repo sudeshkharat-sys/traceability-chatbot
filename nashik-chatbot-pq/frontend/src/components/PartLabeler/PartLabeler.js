@@ -337,7 +337,8 @@ const LocationBarChart = ({ data, title }) => (
           <YAxis fontSize={10} tick={{ fill: '#7f8c8d' }} axisLine={false} tickLine={false} />
           <RechartsTooltip cursor={{ fill: '#fff5f5' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
           <Bar dataKey="value" fill="#667eea" radius={[4, 4, 0, 0]} barSize={10}>
-            <LabelList dataKey="value" position="top" fontSize={8} fill="#7f8c8d" offset={5} />
+            <LabelList dataKey="value" position="top" fontSize={8} fill="#7f8c8d" offset={5}
+              formatter={(v) => v > 0 ? v : ''} />
           </Bar>
         </BarChart>
       </ResponsiveContainer>
@@ -369,7 +370,8 @@ const CustomBarChart = ({ title, data, color, icon: Icon }) => (
           <YAxis fontSize={10} tick={{ fill: '#7f8c8d' }} axisLine={false} tickLine={false} />
           <RechartsTooltip cursor={{ fill: '#fff5f5' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }} />
           <Bar dataKey="value" fill={color} radius={[4, 4, 0, 0]} barSize={10}>
-            <LabelList dataKey="value" position="top" fontSize={8} fill="#7f8c8d" offset={5} />
+            <LabelList dataKey="value" position="top" fontSize={8} fill="#7f8c8d" offset={5}
+              formatter={(v) => v > 0 ? v : ''} />
           </Bar>
         </BarChart>
       </ResponsiveContainer>

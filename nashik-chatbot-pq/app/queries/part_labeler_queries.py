@@ -64,9 +64,9 @@ class PartLabelerQueries:
     """
 
     GET_UNIQUE_MFG_MONTHS = """
-        SELECT DISTINCT manufac_yr_mon FROM raw_warranty_data 
+        SELECT DISTINCT manufac_yr_mon FROM raw_warranty_data
         WHERE manufac_yr_mon IS NOT NULL AND manufac_yr_mon != '' AND user_id = :user_id
-        ORDER BY manufac_yr_mon DESC
+        ORDER BY TO_DATE(manufac_yr_mon, 'Mon-YYYY') DESC
     """
 
     GET_MFG_DATE_RANGE = """
@@ -263,7 +263,7 @@ class PartLabelerQueries:
     RPT_GET_UNIQUE_MFG_MONTHS = """
         SELECT DISTINCT mfg_month FROM raw_rpt_data
         WHERE mfg_month IS NOT NULL AND mfg_month != '' AND user_id = :user_id
-        ORDER BY mfg_month DESC
+        ORDER BY TO_DATE(mfg_month, 'Mon-YY') DESC
     """
 
     RPT_SEARCH_DATA = """
@@ -410,7 +410,7 @@ class PartLabelerQueries:
     GNOVAC_GET_UNIQUE_MFG_MONTHS = """
         SELECT DISTINCT mfg_month FROM raw_gnovac_data
         WHERE mfg_month IS NOT NULL AND mfg_month != '' AND user_id = :user_id
-        ORDER BY mfg_month DESC
+        ORDER BY TO_DATE(mfg_month, 'Mon-YY') DESC
     """
 
     GNOVAC_SEARCH_DATA = """
@@ -529,7 +529,7 @@ class PartLabelerQueries:
     RFI_GET_UNIQUE_MFG_MONTHS = """
         SELECT DISTINCT mfg_month FROM raw_rfi_data
         WHERE mfg_month IS NOT NULL AND mfg_month != '' AND user_id = :user_id
-        ORDER BY mfg_month DESC
+        ORDER BY TO_DATE(mfg_month, 'Mon-YY') DESC
     """
 
     RFI_SEARCH_DATA = """
@@ -654,7 +654,7 @@ class PartLabelerQueries:
     ESQA_GET_UNIQUE_MFG_MONTHS = """
         SELECT DISTINCT mfg_month FROM raw_esqa_data
         WHERE mfg_month IS NOT NULL AND mfg_month != '' AND user_id = :user_id
-        ORDER BY mfg_month DESC
+        ORDER BY TO_DATE(mfg_month, 'Mon-YY') DESC
     """
 
     ESQA_SEARCH_DATA = """
