@@ -358,10 +358,10 @@ class PartLabelerService:
         else:
             return self.get_filter_options(user_id)
 
-    def get_source_data(self, user_id: int, part_name: Optional[str], month, base_model, mis_bucket, mfg_qtr, data_source: str) -> Any:
+    def get_source_data(self, user_id: int, part_name: Optional[str], month, base_model, mis_bucket, mfg_qtr, data_source: str, buyoff_stage=None, online_offline=None) -> Any:
         """Dispatch data lookup to the correct method based on data_source."""
         if data_source == 'rpt':
-            return self.get_rpt_data(user_id, part_name, month, base_model, mis_bucket, mfg_qtr)
+            return self.get_rpt_data(user_id, part_name, month, base_model, mis_bucket, mfg_qtr, buyoff_stage, online_offline)
         elif data_source == 'gnovac':
             return self.get_gnovac_data(user_id, part_name, month, base_model, mis_bucket, mfg_qtr)
         elif data_source == 'rfi':
@@ -371,10 +371,10 @@ class PartLabelerService:
         else:
             return self.get_warranty_data(user_id, part_name, month, base_model, mis_bucket, mfg_qtr)
 
-    def get_dashboard_data_for_source(self, user_id: int, part_name, month, base_model, mis_bucket, mfg_qtr, data_source: str) -> Dict[str, Any]:
+    def get_dashboard_data_for_source(self, user_id: int, part_name, month, base_model, mis_bucket, mfg_qtr, data_source: str, buyoff_stage=None, online_offline=None) -> Dict[str, Any]:
         """Dispatch dashboard data to the correct method based on data_source."""
         if data_source == 'rpt':
-            return self.get_rpt_dashboard_data(user_id, part_name, month, base_model, mis_bucket, mfg_qtr)
+            return self.get_rpt_dashboard_data(user_id, part_name, month, base_model, mis_bucket, mfg_qtr, buyoff_stage, online_offline)
         elif data_source == 'gnovac':
             return self.get_gnovac_dashboard_data(user_id, part_name, month, base_model, mis_bucket, mfg_qtr)
         elif data_source == 'rfi':
@@ -431,14 +431,18 @@ class PartLabelerService:
             "mis_buckets": [r[0] for r in self.db.execute_query(PartLabelerQueries.RPT_GET_UNIQUE_MIS, params)],
             "mfg_quarters": [r[0] for r in self.db.execute_query(PartLabelerQueries.RPT_GET_UNIQUE_MFG_QUARTERS, params)],
             "mfg_months": [r[0] for r in self.db.execute_query(PartLabelerQueries.RPT_GET_UNIQUE_MFG_MONTHS, params)],
+            "buyoff_stages": [r[0] for r in self.db.execute_query(PartLabelerQueries.RPT_GET_UNIQUE_BUYOFF_STAGES, params)],
+            "online_offline_options": ["Online", "Offline"],
         }
 
-    def get_rpt_data(self, user_id: int, part_name=None, month=None, base_model=None, mis_bucket=None, mfg_qtr=None) -> Any:
+    def get_rpt_data(self, user_id: int, part_name=None, month=None, base_model=None, mis_bucket=None, mfg_qtr=None, buyoff_stage=None, online_offline=None) -> Any:
         try:
             params = {
                 "base_model": base_model if base_model and "All" not in base_model else None,
                 "mis_bucket": mis_bucket if mis_bucket and "All" not in mis_bucket else None,
                 "mfg_qtr": mfg_qtr if mfg_qtr and "All" not in mfg_qtr else None,
+                "buyoff_stage": buyoff_stage if buyoff_stage and "All" not in buyoff_stage else None,
+                "online_offline": online_offline if online_offline and "All" not in online_offline else None,
                 "user_id": user_id,
             }
             if part_name:
@@ -454,7 +458,7 @@ class PartLabelerService:
             logger.error(f"RPT data lookup error: {e}")
             return {"error": str(e)}
 
-    def get_rpt_dashboard_data(self, user_id: int, part_name=None, month=None, base_model=None, mis_bucket=None, mfg_qtr=None) -> Dict[str, Any]:
+    def get_rpt_dashboard_data(self, user_id: int, part_name=None, month=None, base_model=None, mis_bucket=None, mfg_qtr=None, buyoff_stage=None, online_offline=None) -> Dict[str, Any]:
         result = {"mfgMonth": [], "reportingMonth": [], "kms": [], "region": []}
         search_terms = [f"%{p.lower().replace(' ', '')}%" for p in part_name if p] if part_name else None
         params = {
@@ -463,6 +467,8 @@ class PartLabelerService:
             "base_model": base_model if base_model and "All" not in base_model else None,
             "mis_bucket": mis_bucket if mis_bucket and "All" not in mis_bucket else None,
             "mfg_qtr": mfg_qtr if mfg_qtr and "All" not in mfg_qtr else None,
+            "buyoff_stage": buyoff_stage if buyoff_stage and "All" not in buyoff_stage else None,
+            "online_offline": online_offline if online_offline and "All" not in online_offline else None,
             "search_terms": search_terms,
         }
         try:

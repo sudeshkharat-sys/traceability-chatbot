@@ -271,6 +271,12 @@ class PartLabelerQueries:
         ) sub ORDER BY sort_key DESC
     """
 
+    RPT_GET_UNIQUE_BUYOFF_STAGES = """
+        SELECT DISTINCT buyoff_stage FROM raw_rpt_data
+        WHERE buyoff_stage IS NOT NULL AND buyoff_stage != '' AND user_id = :user_id
+        ORDER BY buyoff_stage ASC
+    """
+
     RPT_SEARCH_DATA = """
         SELECT
             mode() WITHIN GROUP (ORDER BY part_defect) as "partName",
@@ -283,6 +289,10 @@ class PartLabelerQueries:
           AND (:base_model IS NULL OR model = ANY(:base_model))
           AND (:mis_bucket IS NULL OR defect_category = ANY(:mis_bucket))
           AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (:buyoff_stage IS NULL OR buyoff_stage = ANY(:buyoff_stage))
+          AND (:online_offline IS NULL
+               OR ('Online' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(online_val), '')) = 'true')
+               OR ('Offline' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(offline_val), '')) = 'true'))
           AND user_id = :user_id
         GROUP BY mfg_month
         ORDER BY mfg_month DESC
@@ -329,6 +339,10 @@ class PartLabelerQueries:
           AND (:base_model IS NULL OR model = ANY(:base_model))
           AND (:mis_bucket IS NULL OR defect_category = ANY(:mis_bucket))
           AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (:buyoff_stage IS NULL OR buyoff_stage = ANY(:buyoff_stage))
+          AND (:online_offline IS NULL
+               OR ('Online' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(online_val), '')) = 'true')
+               OR ('Offline' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(offline_val), '')) = 'true'))
         GROUP BY mfg_month
         ORDER BY mfg_month ASC
     """
@@ -342,6 +356,10 @@ class PartLabelerQueries:
           AND (:base_model IS NULL OR model = ANY(:base_model))
           AND (:mis_bucket IS NULL OR defect_category = ANY(:mis_bucket))
           AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (:buyoff_stage IS NULL OR buyoff_stage = ANY(:buyoff_stage))
+          AND (:online_offline IS NULL
+               OR ('Online' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(online_val), '')) = 'true')
+               OR ('Offline' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(offline_val), '')) = 'true'))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 15
@@ -356,6 +374,10 @@ class PartLabelerQueries:
           AND (:base_model IS NULL OR model = ANY(:base_model))
           AND (:mis_bucket IS NULL OR defect_category = ANY(:mis_bucket))
           AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (:buyoff_stage IS NULL OR buyoff_stage = ANY(:buyoff_stage))
+          AND (:online_offline IS NULL
+               OR ('Online' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(online_val), '')) = 'true')
+               OR ('Offline' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(offline_val), '')) = 'true'))
         GROUP BY 1
         ORDER BY value DESC
     """
@@ -369,6 +391,10 @@ class PartLabelerQueries:
           AND (:base_model IS NULL OR model = ANY(:base_model))
           AND (:mis_bucket IS NULL OR defect_category = ANY(:mis_bucket))
           AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (:buyoff_stage IS NULL OR buyoff_stage = ANY(:buyoff_stage))
+          AND (:online_offline IS NULL
+               OR ('Online' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(online_val), '')) = 'true')
+               OR ('Offline' = ANY(:online_offline) AND LOWER(COALESCE(TRIM(offline_val), '')) = 'true'))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 15

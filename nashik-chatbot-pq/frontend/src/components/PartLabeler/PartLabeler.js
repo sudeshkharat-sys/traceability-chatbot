@@ -446,7 +446,9 @@ function PartLabeler() {
   const [filterModel, setFilterModel] = useState(['All']);
   const [filterMIS, setFilterMIS] = useState(['All']);
   const [filterMfgQtr, setFilterMfgQtr] = useState(['All']);
-  const [filterOptions, setFilterOptions] = useState({ models: [], mis_buckets: [], mfg_quarters: [], mfg_months: [] });
+  const [filterBuyoffStage, setFilterBuyoffStage] = useState(['All']);
+  const [filterOnlineOffline, setFilterOnlineOffline] = useState(['All']);
+  const [filterOptions, setFilterOptions] = useState({ models: [], mis_buckets: [], mfg_quarters: [], mfg_months: [], buyoff_stages: [], online_offline_options: [] });
   const [openFilter, setOpenFilter] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSummaryActive, setIsSummaryActive] = useState(false);
@@ -483,6 +485,10 @@ function PartLabeler() {
       filterModel.forEach(m => params.append('baseModel', m));
       filterMIS.forEach(m => params.append('misBucket', m));
       filterMfgQtr.forEach(m => params.append('mfgQtr', m));
+      if ((src || dataSource) === 'rpt') {
+        filterBuyoffStage.forEach(m => params.append('buyoffStage', m));
+        filterOnlineOffline.forEach(m => params.append('onlineOffline', m));
+      }
 
       const res = await fetch(`${API_BASE}/dashboard-data?${params.toString()}`);
       const data = await res.json();
@@ -503,6 +509,10 @@ function PartLabeler() {
       filterModel.forEach(m => params.append('baseModel', m));
       filterMIS.forEach(m => params.append('misBucket', m));
       filterMfgQtr.forEach(m => params.append('mfgQtr', m));
+      if (dataSource === 'rpt') {
+        filterBuyoffStage.forEach(m => params.append('buyoffStage', m));
+        filterOnlineOffline.forEach(m => params.append('onlineOffline', m));
+      }
 
       const res = await fetch(`${API_BASE}/warranty-lookup?${params.toString()}`);
       const data = await res.json();
@@ -526,6 +536,10 @@ function PartLabeler() {
         model.forEach(m => params.append('baseModel', m));
         mis.forEach(m => params.append('misBucket', m));
         qtr.forEach(m => params.append('mfgQtr', m));
+        if (src_ === 'rpt') {
+          filterBuyoffStage.forEach(m => params.append('buyoffStage', m));
+          filterOnlineOffline.forEach(m => params.append('onlineOffline', m));
+        }
 
         const res = await fetch(`${API_BASE}/warranty-lookup?${params.toString()}`);
         const data = await res.json();
@@ -565,7 +579,7 @@ function PartLabeler() {
       fetchActivePartHistory(activePopup);
     }
     fetchDashboardData(activePopup?.partName);
-  }, [filterMonth, filterModel, filterMIS, filterMfgQtr, activePopup, labels, isSummaryActive]);
+  }, [filterMonth, filterModel, filterMIS, filterMfgQtr, filterBuyoffStage, filterOnlineOffline, activePopup, labels, isSummaryActive]);
 
   const imgRef = useRef(null);
   const cadInputRef = useRef(null);
@@ -590,6 +604,8 @@ function PartLabeler() {
     setFilterModel(['All']);
     setFilterMIS(['All']);
     setFilterMfgQtr(['All']);
+    setFilterBuyoffStage(['All']);
+    setFilterOnlineOffline(['All']);
     setFilterOptions({ models: [], mis_buckets: [], mfg_quarters: [], mfg_months: [] });
     setDashboardData({ mfgMonth: [], reportingMonth: [], kms: [], region: [] });
     setActivePopup(null);
@@ -1188,6 +1204,60 @@ function PartLabeler() {
                 </div>
               );
             })}
+            {dataSource === 'rpt' && (() => {
+              const rptFilters = [
+                {
+                  key: 'buyoff',
+                  label: 'Buyoff Stage',
+                  options: filterOptions.buyoff_stages || [],
+                  currentArr: filterBuyoffStage,
+                  setter: setFilterBuyoffStage,
+                  allLabel: 'All Stages',
+                },
+                {
+                  key: 'onlineOffline',
+                  label: 'Online/Offline',
+                  options: filterOptions.online_offline_options || [],
+                  currentArr: filterOnlineOffline,
+                  setter: setFilterOnlineOffline,
+                  allLabel: 'All',
+                },
+              ];
+              return rptFilters.map(({ key, label, options, currentArr, setter, allLabel }) => {
+                const displayValue = currentArr.includes('All')
+                  ? allLabel
+                  : currentArr.length === 1 ? currentArr[0] : `${currentArr.length} selected`;
+                const handleToggle = (opt) => {
+                  if (opt === 'All') { setter(['All']); return; }
+                  let newArr = currentArr.filter(v => v !== 'All');
+                  if (newArr.includes(opt)) {
+                    newArr = newArr.filter(v => v !== opt);
+                    if (newArr.length === 0) newArr = ['All'];
+                  } else {
+                    newArr.push(opt);
+                  }
+                  setter(newArr);
+                };
+                return (
+                  <div key={key} className={`month-filter-compact ${openFilter === key ? 'open' : ''}`} onClick={() => setOpenFilter(openFilter === key ? null : key)}>
+                    <Layout size={16} /><span>{label}:</span><div className="selected-value">{displayValue}</div>
+                    <ChevronDown size={14} className={`chevron ${openFilter === key ? 'rotate' : ''}`} />
+                    {openFilter === key && (
+                      <div className="filter-dropdown-list" onClick={(e) => e.stopPropagation()}>
+                        <div className={`filter-option ${currentArr.includes('All') ? 'selected' : ''}`} onClick={() => handleToggle('All')}>
+                          {allLabel}
+                        </div>
+                        {options.map(opt => (
+                          <div key={opt} className={`filter-option ${currentArr.includes(opt) ? 'selected' : ''}`} onClick={() => handleToggle(opt)}>
+                            {opt}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              });
+            })()}
           </div>
 
           <div className={`workspace-scroll-container ${!selectedImage ? 'empty-state' : ''}`}>
