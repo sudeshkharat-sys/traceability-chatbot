@@ -567,6 +567,12 @@ class PartLabelerQueries:
         ) sub ORDER BY sort_key DESC
     """
 
+    RFI_GET_UNIQUE_DEFECT_TYPES = """
+        SELECT DISTINCT defect_type_name FROM raw_rfi_data
+        WHERE defect_type_name IS NOT NULL AND defect_type_name != '' AND user_id = :user_id
+        ORDER BY defect_type_name ASC
+    """
+
     RFI_SEARCH_DATA = """
         SELECT
             mode() WITHIN GROUP (ORDER BY part_name) as "partName",
@@ -580,6 +586,7 @@ class PartLabelerQueries:
           AND (:base_model IS NULL OR model_name = ANY(:base_model))
           AND (:mis_bucket IS NULL OR severity_name = ANY(:mis_bucket))
           AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (:defect_type IS NULL OR defect_type_name = ANY(:defect_type))
           AND user_id = :user_id
         GROUP BY mfg_month
         ORDER BY mfg_month DESC
@@ -594,6 +601,7 @@ class PartLabelerQueries:
           AND (:base_model IS NULL OR model_name = ANY(:base_model))
           AND (:mis_bucket IS NULL OR severity_name = ANY(:mis_bucket))
           AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (:defect_type IS NULL OR defect_type_name = ANY(:defect_type))
         GROUP BY mfg_month
         ORDER BY mfg_month ASC
     """
@@ -607,6 +615,7 @@ class PartLabelerQueries:
           AND (:base_model IS NULL OR model_name = ANY(:base_model))
           AND (:mis_bucket IS NULL OR severity_name = ANY(:mis_bucket))
           AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (:defect_type IS NULL OR defect_type_name = ANY(:defect_type))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 15
@@ -621,6 +630,7 @@ class PartLabelerQueries:
           AND (:base_model IS NULL OR model_name = ANY(:base_model))
           AND (:mis_bucket IS NULL OR severity_name = ANY(:mis_bucket))
           AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (:defect_type IS NULL OR defect_type_name = ANY(:defect_type))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 15
@@ -635,6 +645,7 @@ class PartLabelerQueries:
           AND (:base_model IS NULL OR model_name = ANY(:base_model))
           AND (:mis_bucket IS NULL OR severity_name = ANY(:mis_bucket))
           AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (:defect_type IS NULL OR defect_type_name = ANY(:defect_type))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 15

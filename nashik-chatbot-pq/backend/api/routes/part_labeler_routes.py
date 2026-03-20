@@ -56,9 +56,10 @@ async def warranty_lookup(
     dataSource: Optional[str] = Query("warranty"),
     buyoffStage: Optional[list[str]] = Query(None),
     onlineOffline: Optional[list[str]] = Query(None),
+    defectType: Optional[list[str]] = Query(None),
 ):
     try:
-        result = get_service().get_source_data(userId, partName, month, baseModel, misBucket, mfgQtr, dataSource, buyoffStage, onlineOffline)
+        result = get_service().get_source_data(userId, partName, month, baseModel, misBucket, mfgQtr, dataSource, buyoffStage, onlineOffline, defectType)
         return result
     except Exception as e:
         logger.error(f"Data lookup error: {e}")
@@ -215,9 +216,10 @@ async def get_dashboard_data(
     dataSource: Optional[str] = Query("warranty"),
     buyoffStage: Optional[list[str]] = Query(None),
     onlineOffline: Optional[list[str]] = Query(None),
+    defectType: Optional[list[str]] = Query(None),
 ):
     try:
-        return get_service().get_dashboard_data_for_source(userId, partName, month, baseModel, misBucket, mfgQtr, dataSource, buyoffStage, onlineOffline)
+        return get_service().get_dashboard_data_for_source(userId, partName, month, baseModel, misBucket, mfgQtr, dataSource, buyoffStage, onlineOffline, defectType)
     except Exception as e:
         logger.error(f"Dashboard data error: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch dashboard data")
