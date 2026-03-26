@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Upload,
@@ -428,6 +428,9 @@ const IndiaMap = ({ data }) => {
 
 function PartLabeler() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isPlantMode = searchParams.get('mode') === 'plant';
+
   const [userId] = useState(() => {
     const id = sessionStorage.getItem('user_id');
     return id ? parseInt(id, 10) : null;
@@ -1105,7 +1108,7 @@ function PartLabeler() {
 
       <div className="part-labeler-header">
         <div className="header-title">
-          <h1>Part Sense Visualizer</h1>
+          <h1>{isPlantMode ? 'Part Sense Visualizer Plant' : 'Part Sense Visualizer'}</h1>
           <p>Interactive failure trend analysis</p>
         </div>
         <div className="header-stats">
@@ -1168,8 +1171,9 @@ function PartLabeler() {
 
         <main className="part-labeler-workspace">
           <div className="workspace-header-bar">
-            <DataSourceSelector current={dataSource} onChange={handleDataSourceChange} />
-            {dataSource === 'warranty' && (
+            {isPlantMode ? (
+              <DataSourceSelector current={dataSource} onChange={handleDataSourceChange} />
+            ) : (
               <div className="prefix-filter-field">
                 <span className="prefix-label">Prefix:</span>
                 <input
