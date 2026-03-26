@@ -43,6 +43,12 @@
   color: var(--text-gray);
 }
 
+.header-stats {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
 .header-stats .stat-card {
   background: #fff5f5;
   padding: 0.4rem 1rem;
@@ -1507,4 +1513,13 @@
 .prefix-filter-field:focus-within {
   border-color: var(--mahindra-red);
   box-shadow: 0 4px 15px rgba(220, 20, 60, 0.15);
+}
+
+/* Header corner logo */
+.header-corner-logo {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
+  margin-left: auto;
+  flex-shrink: 0;
 }

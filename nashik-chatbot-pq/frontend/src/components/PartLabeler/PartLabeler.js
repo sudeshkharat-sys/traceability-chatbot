@@ -40,6 +40,7 @@ import {
 import { ComposableMap, Geographies, Geography } from "react-simple-maps";
 import { scaleLinear } from "d3-scale";
 import { backend_url } from '../../services/api/config';
+import logoImg from '../../assests/logo.png';
 import './PartLabeler.css';
 
 const API_BASE = `${backend_url}/part-labeler`;
@@ -1116,6 +1117,7 @@ function PartLabeler() {
             <span className="stat-value">{labels.length}</span>
             <span className="stat-label">Mapped Components</span>
           </div>
+          <img src={logoImg} alt="Logo" className="header-corner-logo" />
         </div>
       </div>
 
