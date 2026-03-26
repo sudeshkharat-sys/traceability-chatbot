@@ -434,6 +434,7 @@ function PartLabeler() {
   });
 
   const [dataSource, setDataSource] = useState('warranty');
+  const [prefix, setPrefix] = useState('');
   const [selectedImage, setSelectedImage] = useState(null);
   const [images, setImages] = useState([]);
   const [labels, setLabels] = useState([]);
@@ -475,6 +476,7 @@ function PartLabeler() {
       const params = new URLSearchParams();
       params.append('userId', userId);
       params.append('dataSource', src);
+      if (prefix) params.append('prefix', prefix);
 
       if (partNameArg) {
         params.append('partName', partNameArg);
@@ -509,6 +511,7 @@ function PartLabeler() {
       params.append('userId', userId);
       params.append('partName', label.partName);
       params.append('dataSource', dataSource);
+      if (prefix) params.append('prefix', prefix);
       filterMonth.forEach(m => params.append('month', m));
       filterModel.forEach(m => params.append('baseModel', m));
       filterMIS.forEach(m => params.append('misBucket', m));
@@ -1166,6 +1169,18 @@ function PartLabeler() {
         <main className="part-labeler-workspace">
           <div className="workspace-header-bar">
             <DataSourceSelector current={dataSource} onChange={handleDataSourceChange} />
+            {dataSource === 'warranty' && (
+              <div className="prefix-filter-field">
+                <span className="prefix-label">Prefix:</span>
+                <input
+                  type="text"
+                  className="prefix-input"
+                  value={prefix}
+                  onChange={(e) => setPrefix(e.target.value)}
+                  placeholder="e.g. MA1"
+                />
+              </div>
+            )}
             {['month', 'qtr', 'model', 'mis'].map(type => {
               const label = type === 'month' ? 'Mfg Month' : type === 'qtr' ? 'Mfg Qtr' : type === 'model' ? 'Model' : 'MIS';
               const options = type === 'month' ? filterOptions.mfg_months : 

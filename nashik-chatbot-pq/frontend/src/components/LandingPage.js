@@ -28,7 +28,7 @@ function LandingPage() {
     setIsLoggedIn(authService.isLoggedIn());
   }, []);
 
-  const enabledFeatures = ["traceability", "guideline", "part-labeler"];
+  const enabledFeatures = ["traceability", "guideline", "part-labeler", "add-prefix"];
   const features = [
     {
       id: "traceability",
@@ -50,6 +50,13 @@ function LandingPage() {
       icon: dashboardIcon,
       description: "Interactive failure trend analysis",
       route: "/part-labeler",
+    },
+    {
+      id: "add-prefix",
+      title: "Add Prefix",
+      icon: dashboardIcon,
+      description: "Manage plant prefix configurations across data sources",
+      route: "/add-prefix",
     },
     {
       id: "quality-assistant",

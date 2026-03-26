@@ -1469,3 +1469,42 @@
   font-weight: 400;
   font-style: italic;
 }
+
+/* Prefix filter field */
+.prefix-filter-field {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: white;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.35rem 0.7rem;
+  flex-shrink: 0;
+}
+
+.prefix-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--text-gray);
+}
+
+.prefix-input {
+  border: none;
+  outline: none;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-dark);
+  width: 80px;
+  background: transparent;
+}
+
+.prefix-input::placeholder {
+  font-weight: 400;
+  color: #b0b0b0;
+}
+
+.prefix-filter-field:focus-within {
+  border-color: var(--mahindra-red);
+  box-shadow: 0 4px 15px rgba(220, 20, 60, 0.15);
+}

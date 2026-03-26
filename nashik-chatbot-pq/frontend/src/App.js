@@ -4,6 +4,7 @@ import "./App.css";
 import LandingPage from "./components/LandingPage";
 import ChatPage from "./components/ChatPage";
 import PartLabeler from "./components/PartLabeler/PartLabeler";
+import AddPrefix from "./components/AddPrefix/AddPrefix";
 
 function App() {
   return (
@@ -12,6 +13,7 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/part-labeler" element={<PartLabeler />} />
+        <Route path="/add-prefix" element={<AddPrefix />} />
       </Routes>
     </Router>
   );
