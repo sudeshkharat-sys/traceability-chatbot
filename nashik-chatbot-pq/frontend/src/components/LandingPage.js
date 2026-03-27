@@ -15,7 +15,6 @@ function LandingPage() {
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [justLoggedIn, setJustLoggedIn] = useState(false);
-  const [partSensePrefix, setPartSensePrefix] = useState("");
   const [isSignup, setIsSignup] = useState(false);
   const [username, setUsername] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -47,7 +46,7 @@ function LandingPage() {
     },
   {
       id: "part-labeler",
-      title: "Part Sense Visualizer",
+      title: "Part Sense Visualizer Field",
       icon: dashboardIcon,
       description: "Interactive failure trend analysis",
       route: "/part-labeler",
@@ -277,10 +276,6 @@ function LandingPage() {
           >
             {features.map((feature, index) => {
               const isEnabled = enabledFeatures.includes(feature.id);
-              const route =
-                feature.id === "part-labeler" && partSensePrefix.trim()
-                  ? `${feature.route}?prefix=${encodeURIComponent(partSensePrefix.trim())}`
-                  : feature.route;
               return (
                 <div
                   key={feature.id}
@@ -297,7 +292,7 @@ function LandingPage() {
                       ? { cursor: "not-allowed", opacity: 0.6 }
                       : { cursor: "pointer" }
                   }
-                  onClick={() => isEnabled && handleGetStarted(route)}
+                  onClick={() => isEnabled && handleGetStarted(feature.route)}
                 >
                   <div className="feature-content">
                     <img
@@ -306,23 +301,7 @@ function LandingPage() {
                       className="feature-icon"
                     />
                     <div className="feature-info">
-                      <h3 className="feature-title">
-                        {feature.id === "part-labeler" && isEnabled ? (
-                          <span className="inline-title-wrap">
-                            Part Sense Visualizer&nbsp;
-                            <input
-                              type="text"
-                              className="inline-title-input"
-                              value={partSensePrefix}
-                              onChange={(e) => setPartSensePrefix(e.target.value)}
-                              onClick={(e) => e.stopPropagation()}
-                              placeholder="Field"
-                            />
-                          </span>
-                        ) : (
-                          feature.title
-                        )}
-                      </h3>
+                      <h3 className="feature-title">{feature.title}</h3>
                       <p className="feature-description">
                         {feature.description}
                       </p>
@@ -333,7 +312,7 @@ function LandingPage() {
                     onClick={(e) => {
                       e.stopPropagation();
                       if (isEnabled) {
-                        handleGetStarted(route);
+                        handleGetStarted(feature.route);
                       }
                     }}
                     disabled={!isEnabled}
