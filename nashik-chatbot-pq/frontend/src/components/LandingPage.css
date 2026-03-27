@@ -633,3 +633,29 @@
 .card-prefix-input::placeholder {
   color: #b0b0b0;
 }
+
+/* Inline title input for Part Sense Visualizer */
+.inline-title-wrap {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0;
+}
+
+.inline-title-input {
+  border: none;
+  border-bottom: 2px solid #dc143c;
+  background: transparent;
+  font-size: inherit;
+  font-weight: inherit;
+  color: #dc143c;
+  outline: none;
+  width: 90px;
+  padding: 0 2px;
+  line-height: inherit;
+}
+
+.inline-title-input::placeholder {
+  color: #e07b8c;
+  font-weight: 500;
+}

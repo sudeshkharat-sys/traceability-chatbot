@@ -306,20 +306,26 @@ function LandingPage() {
                       className="feature-icon"
                     />
                     <div className="feature-info">
-                      <h3 className="feature-title">{feature.title}</h3>
+                      <h3 className="feature-title">
+                        {feature.id === "part-labeler" && isEnabled ? (
+                          <span className="inline-title-wrap">
+                            Part Sense Visualizer&nbsp;
+                            <input
+                              type="text"
+                              className="inline-title-input"
+                              value={partSensePrefix}
+                              onChange={(e) => setPartSensePrefix(e.target.value)}
+                              onClick={(e) => e.stopPropagation()}
+                              placeholder="Field"
+                            />
+                          </span>
+                        ) : (
+                          feature.title
+                        )}
+                      </h3>
                       <p className="feature-description">
                         {feature.description}
                       </p>
-                      {feature.id === "part-labeler" && isEnabled && (
-                        <input
-                          type="text"
-                          className="card-prefix-input"
-                          value={partSensePrefix}
-                          onChange={(e) => setPartSensePrefix(e.target.value)}
-                          onClick={(e) => e.stopPropagation()}
-                          placeholder="Enter Prefix (e.g. MA1)"
-                        />
-                      )}
                     </div>
                   </div>
                   <button
