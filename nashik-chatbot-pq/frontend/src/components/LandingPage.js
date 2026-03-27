@@ -15,6 +15,7 @@ function LandingPage() {
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [justLoggedIn, setJustLoggedIn] = useState(false);
+  const [partSensePrefix, setPartSensePrefix] = useState("");
   const [isSignup, setIsSignup] = useState(false);
   const [username, setUsername] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -276,6 +277,10 @@ function LandingPage() {
           >
             {features.map((feature, index) => {
               const isEnabled = enabledFeatures.includes(feature.id);
+              const route =
+                feature.id === "part-labeler" && partSensePrefix.trim()
+                  ? `${feature.route}?prefix=${encodeURIComponent(partSensePrefix.trim())}`
+                  : feature.route;
               return (
                 <div
                   key={feature.id}
@@ -292,7 +297,7 @@ function LandingPage() {
                       ? { cursor: "not-allowed", opacity: 0.6 }
                       : { cursor: "pointer" }
                   }
-                  onClick={() => isEnabled && handleGetStarted(feature.route)}
+                  onClick={() => isEnabled && handleGetStarted(route)}
                 >
                   <div className="feature-content">
                     <img
@@ -305,6 +310,16 @@ function LandingPage() {
                       <p className="feature-description">
                         {feature.description}
                       </p>
+                      {feature.id === "part-labeler" && isEnabled && (
+                        <input
+                          type="text"
+                          className="card-prefix-input"
+                          value={partSensePrefix}
+                          onChange={(e) => setPartSensePrefix(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
+                          placeholder="Enter Prefix (e.g. MA1)"
+                        />
+                      )}
                     </div>
                   </div>
                   <button
@@ -312,7 +327,7 @@ function LandingPage() {
                     onClick={(e) => {
                       e.stopPropagation();
                       if (isEnabled) {
-                        handleGetStarted(feature.route);
+                        handleGetStarted(route);
                       }
                     }}
                     disabled={!isEnabled}

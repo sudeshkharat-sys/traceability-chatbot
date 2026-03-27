@@ -610,3 +610,26 @@
     font-size: 1rem;
   }
 }
+
+/* Prefix input inside feature card */
+.card-prefix-input {
+  margin-top: 0.5rem;
+  width: 100%;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+  color: #2d3748;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  background: #fff;
+}
+
+.card-prefix-input:focus {
+  border-color: #dc143c;
+  box-shadow: 0 0 0 3px rgba(220, 20, 60, 0.08);
+}
+
+.card-prefix-input::placeholder {
+  color: #b0b0b0;
+}

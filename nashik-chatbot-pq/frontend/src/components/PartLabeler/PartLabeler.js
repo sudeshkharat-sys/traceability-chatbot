@@ -438,7 +438,7 @@ function PartLabeler() {
   });
 
   const [dataSource, setDataSource] = useState('warranty');
-  const [prefix, setPrefix] = useState('');
+  const [prefix] = useState(() => searchParams.get('prefix') || '');
   const [selectedImage, setSelectedImage] = useState(null);
   const [images, setImages] = useState([]);
   const [labels, setLabels] = useState([]);
@@ -1176,16 +1176,12 @@ function PartLabeler() {
             {isPlantMode ? (
               <DataSourceSelector current={dataSource} onChange={handleDataSourceChange} />
             ) : (
-              <div className="prefix-filter-field">
-                <span className="prefix-label">Prefix:</span>
-                <input
-                  type="text"
-                  className="prefix-input"
-                  value={prefix}
-                  onChange={(e) => setPrefix(e.target.value)}
-                  placeholder="e.g. MA1"
-                />
-              </div>
+              prefix && (
+                <div className="prefix-filter-field">
+                  <span className="prefix-label">Prefix:</span>
+                  <span className="prefix-value">{prefix}</span>
+                </div>
+              )
             )}
             {['month', 'qtr', 'model', 'mis'].map(type => {
               const label = type === 'month' ? 'Mfg Month' : type === 'qtr' ? 'Mfg Qtr' : type === 'model' ? 'Model' : 'MIS';
