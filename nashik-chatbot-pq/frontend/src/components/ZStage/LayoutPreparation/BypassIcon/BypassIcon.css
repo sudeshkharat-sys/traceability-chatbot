@@ -1,0 +1,167 @@
+.bypass-icon-wrapper {
+  position: absolute;
+  z-index: 10;
+  user-select: none;
+  width: 62px;
+  height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bypass-diamond {
+  width: 44px;
+  height: 44px;
+  background-color: #f6c90e;
+  transform: rotate(45deg);
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  border: 2px solid #c9a000;
+  transition: box-shadow 0.15s;
+}
+
+.bypass-diamond:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+.bypass-diamond:active {
+  cursor: grabbing;
+}
+
+.bypass-diamond-inner {
+  transform: rotate(-45deg);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--mahindra-red-dark);
+  pointer-events: none;
+}
+
+/* ── Connection ports ─────────────────────────────────────────────────────── */
+.bypass-port {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--mahindra-red);
+  border: 2px solid #fff;
+  cursor: crosshair;
+  padding: 0;
+  box-shadow: 0 0 0 1px var(--mahindra-red);
+  opacity: 0;
+  transition: opacity 0.15s, transform 0.1s;
+  z-index: 20;
+}
+
+.bypass-icon-wrapper:hover .bypass-port {
+  opacity: 1;
+}
+
+.bypass-port:hover {
+  background: var(--mahindra-red-dark);
+  transform: scale(1.4) !important;
+}
+
+.bypass-port--right  { right: -5px;  top: 50%;    transform: translateY(-50%); }
+.bypass-port--left   { left: -5px;   top: 50%;    transform: translateY(-50%); }
+.bypass-port--top    { top: -5px;    left: 50%;   transform: translateX(-50%); }
+.bypass-port--bottom { bottom: -5px; left: 50%;   transform: translateX(-50%); }
+
+/* Accordion panel */
+.bypass-accordion {
+  position: absolute;
+  left: 68px;
+  top: 0;
+  background-color: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: var(--card-shadow);
+  min-width: 180px;
+  z-index: 20;
+}
+
+.bypass-accordion-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background-color: var(--mahindra-red);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 5px 5px 0 0;
+}
+
+.bypass-close-btn {
+  background: none;
+  border: none;
+  color: #ffffff;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+.bypass-accordion-body {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bypass-connection-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bypass-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.bypass-dot--in {
+  background-color: #38a169;
+}
+
+.bypass-dot--out {
+  background-color: #e53e3e;
+}
+
+.bypass-dot--bypass {
+  background-color: #d69e2e;
+}
+
+.bypass-connection-label {
+  font-size: 12px;
+  color: var(--text-dark);
+  font-weight: 500;
+}
+
+.bypass-delete-btn {
+  width: 100%;
+  padding: 6px 12px;
+  background-color: #fff5f5;
+  color: #e53e3e;
+  border: none;
+  border-top: 1px solid #fed7d7;
+  border-radius: 0 0 5px 5px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: background-color 0.15s;
+}
+
+.bypass-delete-btn:hover {
+  background-color: #fed7d7;
+}

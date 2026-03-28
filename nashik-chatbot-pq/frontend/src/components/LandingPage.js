@@ -28,7 +28,7 @@ function LandingPage() {
     setIsLoggedIn(authService.isLoggedIn());
   }, []);
 
-  const enabledFeatures = ["traceability", "guideline", "part-labeler", "part-labeler-plant"];
+  const enabledFeatures = ["traceability", "guideline", "part-labeler", "part-labeler-plant", "z-stage"];
   const features = [
     {
       id: "traceability",
@@ -57,6 +57,13 @@ function LandingPage() {
       icon: dashboardIcon,
       description: "Interactive failure trend analysis across all data sources",
       route: "/part-labeler?mode=plant",
+    },
+    {
+      id: "z-stage",
+      title: "Z-Stage Layout Preparation",
+      icon: dashboardIcon,
+      description: "Design and visualize production layouts with Z-Stage",
+      route: "/z-stage",
     },
     {
       id: "quality-assistant",
