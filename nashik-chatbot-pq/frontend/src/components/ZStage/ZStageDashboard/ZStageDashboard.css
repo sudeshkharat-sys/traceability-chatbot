@@ -143,10 +143,10 @@
   flex: 1;
   position: relative;
   overflow: hidden;
-  background-color: #ececec;
+  background-color: #ffffff;
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.5) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.5) 1px, transparent 1px);
+    linear-gradient(rgba(0, 0, 0, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.07) 1px, transparent 1px);
   background-size: 40px 40px;
 }
 
@@ -197,10 +197,10 @@
 
 /* ── Station box (read-only, matches layout StationBox dimensions) ────────── */
 .dash-box {
-  background-color: #ffffff;
-  border: 2px solid var(--border-color);
+  background-color: #ececec;
+  border: none;
   border-radius: 4px;
-  box-shadow: var(--card-shadow);
+  box-shadow: none;
   height: 160px;
   box-sizing: border-box;
   display: flex;
@@ -307,6 +307,27 @@
   background-color: var(--bg-light);
   border-right: 1px solid var(--border-color);
   border-bottom: 1px solid var(--border-color);
+}
+
+/* MPDU label color coding */
+.dash-grid-label--m {
+  background-color: #ffc0cb;
+  color: #7b1a2e;
+}
+
+.dash-grid-label--p {
+  background-color: #bee3f8;
+  color: #1a3a5c;
+}
+
+.dash-grid-label--d {
+  background-color: #fbd38d;
+  color: #7b4200;
+}
+
+.dash-grid-label--u {
+  background-color: #fefcbf;
+  color: #744210;
 }
 
 /* Value sub-column */

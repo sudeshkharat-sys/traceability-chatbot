@@ -259,12 +259,15 @@ function LayoutPreparation({
   const handleAddBox = useCallback((boxData) => {
     const id = uid();
     setBoxes((prev) => {
+      const baseStationData = boxData.stationData || {};
       const newBox = {
         id,
         dbId: null,
         name: boxData.name,
         stationIds: boxData.stationIds,
-        stationData: boxData.stationData || {},
+        stationData: boxData.description
+          ? { ...baseStationData, __box_desc__: boxData.description }
+          : baseStationData,
         orderIndex: prev.length,
         position: { x: 0, y: 0 },
       };
@@ -508,6 +511,7 @@ function LayoutPreparation({
                         name={box.name}
                         stationIds={box.stationIds}
                         stationData={box.stationData}
+                        description={box.stationData?.__box_desc__ || ''}
                         position={box.position}
                         onPositionChange={handleBoxPositionChange}
                         onDelete={handleDeleteBox}

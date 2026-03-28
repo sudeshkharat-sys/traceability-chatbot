@@ -7,7 +7,7 @@ function buildAutoIds(prefix, count) {
   return Array.from({ length: count }, (_, i) => `${p}-${String(i + 1).padStart(2, '0')}`);
 }
 
-const DEFAULT_FORM = { name: '', prefix: '', stationCount: 5 };
+const DEFAULT_FORM = { name: '', prefix: '', stationCount: 5, description: '' };
 
 function AddBoxModal({ onAdd, onClose }) {
   const [form, setForm] = useState(DEFAULT_FORM);
@@ -68,7 +68,7 @@ function AddBoxModal({ onAdd, onClose }) {
     if (Object.keys(errs).length > 0) { setErrors(errs); return; }
 
     const stationIds = mode === 'auto' ? autoIds : parsedCustomIds;
-    onAdd({ name: form.name.trim(), stationIds });
+    onAdd({ name: form.name.trim(), stationIds, description: form.description.trim() });
     onClose();
   };
 
@@ -168,6 +168,23 @@ function AddBoxModal({ onAdd, onClose }) {
               {errors.customIds && <span className="modal-error">{errors.customIds}</span>}
             </div>
           )}
+
+          {/* Description — shown below station IDs */}
+          <div className="modal-field">
+            <label className="modal-label">
+              Description
+              <span className="modal-label-hint"> — optional, shown below station ID row</span>
+            </label>
+            <input
+              className="modal-input"
+              type="text"
+              name="description"
+              value={form.description}
+              onChange={handleFormChange}
+              placeholder="e.g. Trim Line A"
+              maxLength={60}
+            />
+          </div>
 
           {/* ID preview chips */}
           {previewIds.length > 0 && (

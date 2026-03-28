@@ -376,9 +376,12 @@ function computeStationData(records, stationId) {
     zeStatus = zRecs.some((r) => (r.total_incidences || 0) > 0) ? 'red' : 'green';
   }
 
+  // Only count records where status_3m is 'R' for MPDU values
+  const srFiltered = sr.filter((r) => r.status_3m === 'R');
+
   const attrs = {};
   for (const attr of ['P', 'M', 'D', 'U']) {
-    const attrRecs = sr.filter((r) => r.attribution === attr);
+    const attrRecs = srFiltered.filter((r) => r.attribution === attr);
     // Y = sum of total_incidences across all records for this attribution
     const Y = attrRecs.reduce((sum, r) => sum + (r.total_incidences || 0), 0);
     if (Y === 0) continue; // don't show if no incidences at all
@@ -673,7 +676,7 @@ function ZStageDashboard() {
                                         const val = stationData[sid].attrs[label];
                                         return (
                                           <React.Fragment key={sid}>
-                                            <td className="dash-grid-label">{val ? label : ''}</td>
+                                            <td className={`dash-grid-label dash-grid-label--${label.toLowerCase()}`}>{val ? label : ''}</td>
                                             <td className={`dash-grid-value${val ? ' dash-grid-value--active' : ''}`}>
                                               {val || ''}
                                             </td>

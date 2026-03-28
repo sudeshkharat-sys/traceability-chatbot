@@ -9,6 +9,7 @@ function StationBox({
   name,
   stationIds,
   stationData = {},
+  description = '',
   position: parentPosition,
   onPositionChange,
   onDelete,
@@ -105,6 +106,13 @@ function StationBox({
                     <th key={sid} colSpan={2} className="station-grid-header-cell">{sid}</th>
                   ))}
                 </tr>
+                {description && (
+                  <tr>
+                    <td colSpan={stationIds.length * 2} className="station-grid-desc-cell">
+                      {description}
+                    </td>
+                  </tr>
+                )}
               </thead>
               <tbody>
                 {/* Z row — one cell per station (spans both label+value cols), invisible text */}
