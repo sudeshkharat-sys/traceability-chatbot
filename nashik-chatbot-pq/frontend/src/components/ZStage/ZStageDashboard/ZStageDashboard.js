@@ -649,12 +649,12 @@ function ZStageDashboard() {
                                 <thead>
                                   <tr>
                                     {box.stationIds.map((sid) => {
-                                      const { zeStatus } = stationData[sid];
+                                      const { ze } = stationData[sid];
                                       return (
                                         <th
                                           key={sid}
                                           colSpan={2}
-                                          className={`dash-grid-th dash-grid-th--clickable${zeStatus ? ` dash-grid-th--${zeStatus}` : ''}`}
+                                          className={`dash-grid-th dash-grid-th--clickable${ze ? ' dash-grid-th--red' : ''}`}
                                           title={`Click to view records for ${sid}`}
                                           onClick={() => setPopupStation(sid)}
                                         >
