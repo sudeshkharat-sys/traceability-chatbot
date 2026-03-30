@@ -550,9 +550,7 @@ function ZStageDashboard() {
           <div className="dash-toolbar-right">
             <div className="dash-legend">
               <span className="dash-legend-chip dash-legend-chip--red">Z</span>
-              <span className="dash-legend-text">Active issues</span>
-              <span className="dash-legend-chip dash-legend-chip--green">Z</span>
-              <span className="dash-legend-text">No issues (clean)</span>
+              <span className="dash-legend-text">Z/E stage present</span>
               <span className="dash-legend-sep" />
               <span className="dash-legend-text dash-legend-hint">X/Y = active / total incidences · Click station header to view records</span>
             </div>
@@ -668,12 +666,12 @@ function ZStageDashboard() {
                                   {/* Z / E row */}
                                   <tr>
                                     {box.stationIds.map((sid) => {
-                                      const { ze, zeStatus } = stationData[sid];
+                                      const { ze } = stationData[sid];
                                       return (
                                         <td
                                           key={sid}
                                           colSpan={2}
-                                          className={`dash-grid-ze${zeStatus ? ` dash-ze--${zeStatus}` : ''}`}
+                                          className={`dash-grid-ze${ze ? ' dash-ze--red' : ''}`}
                                         >
                                           {ze || ''}
                                         </td>
