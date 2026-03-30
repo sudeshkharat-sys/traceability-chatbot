@@ -75,7 +75,7 @@ function stateFromApi(apiLayout) {
   const buildIds = (prefix, count) =>
     Array.from({ length: count }, (_, i) => `${prefix}-${String(i + 1).padStart(2, '0')}`);
 
-  const boxes = apiLayout.station_boxes.map((b) => {
+  const boxes = (apiLayout.station_boxes || []).map((b) => {
     let parsedStationData = {};
     if (b.station_data) {
       try { parsedStationData = JSON.parse(b.station_data); } catch (_) { parsedStationData = {}; }
@@ -101,13 +101,13 @@ function stateFromApi(apiLayout) {
     };
   });
 
-  const bypassIcons = apiLayout.bypass_icons.map((ic) => ({
+  const bypassIcons = (apiLayout.bypass_icons || []).map((ic) => ({
     id: `db-bypass-${ic.id}`,
     dbId: ic.id,
     position: { x: ic.position_x, y: ic.position_y },
   }));
 
-  const connections = apiLayout.connections.map((c) => ({
+  const connections = (apiLayout.connections || []).map((c) => ({
     id: `db-conn-${c.id}`,
     fromId: c.from_box_id != null ? `db-box-${c.from_box_id}` : `db-bypass-${c.from_bypass_id}`,
     toId:   c.to_box_id   != null ? `db-box-${c.to_box_id}`   : `db-bypass-${c.to_bypass_id}`,

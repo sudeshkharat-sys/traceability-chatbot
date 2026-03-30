@@ -320,7 +320,10 @@ function StationDetailModal({ stationId, records, allMonths, onSaved, onClose })
 
 // ── Parse API layout into flat state ─────────────────────────────────────────
 function parseLayout(apiLayout) {
-  const boxes = apiLayout.station_boxes.map((b) => ({
+  if (!apiLayout || typeof apiLayout !== 'object') {
+    return { boxes: [], bypassIcons: [], connections: [] };
+  }
+  const boxes = (apiLayout.station_boxes || []).map((b) => ({
     id: `db-box-${b.id}`,
     name: b.name,
     stationIds: b.station_ids
@@ -329,12 +332,12 @@ function parseLayout(apiLayout) {
     position: { x: b.position_x, y: b.position_y },
   }));
 
-  const bypassIcons = apiLayout.bypass_icons.map((ic) => ({
+  const bypassIcons = (apiLayout.bypass_icons || []).map((ic) => ({
     id: `db-bypass-${ic.id}`,
     position: { x: ic.position_x, y: ic.position_y },
   }));
 
-  const connections = apiLayout.connections.map((c) => ({
+  const connections = (apiLayout.connections || []).map((c) => ({
     id: `db-conn-${c.id}`,
     fromId: c.from_box_id != null ? `db-box-${c.from_box_id}` : `db-bypass-${c.from_bypass_id}`,
     toId:   c.to_box_id   != null ? `db-box-${c.to_box_id}`   : `db-bypass-${c.to_bypass_id}`,
@@ -467,11 +470,16 @@ function ZStageDashboard() {
   useEffect(() => {
     layoutApi.getLayouts()
       .then((r) => {
+        console.log('[ZStageDashboard] /layouts response:', r.data);
         const list = Array.isArray(r.data) ? r.data : [];
         setLayouts(list);
         if (list.length > 0) setSelectedId(list[0].id);
+        else setError('No layouts found. Create and save a layout first.');
       })
-      .catch(() => setError('Failed to load layouts'));
+      .catch((err) => {
+        console.error('[ZStageDashboard] /layouts error:', err);
+        setError('Failed to load layouts — check backend is running on port 5000');
+      });
 
     inputApi.getRecords()
       .then((r) => setRecords(Array.isArray(r.data) ? r.data : []))
