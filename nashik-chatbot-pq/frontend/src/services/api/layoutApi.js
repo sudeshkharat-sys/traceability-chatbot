@@ -1,6 +1,7 @@
 import axios from 'axios';
+import { backend_url } from "./config";
 
-const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+const BASE_URL = `${backend_url}/z-stage`;
 
 const api = axios.create({
   baseURL: BASE_URL,
