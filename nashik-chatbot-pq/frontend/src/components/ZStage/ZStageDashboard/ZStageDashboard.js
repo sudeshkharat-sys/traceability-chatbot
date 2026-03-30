@@ -323,14 +323,24 @@ function parseLayout(apiLayout) {
   if (!apiLayout || typeof apiLayout !== 'object') {
     return { boxes: [], bypassIcons: [], connections: [] };
   }
-  const boxes = (apiLayout.station_boxes || []).map((b) => ({
-    id: `db-box-${b.id}`,
-    name: b.name,
-    stationIds: b.station_ids
-      ? (typeof b.station_ids === 'string' ? b.station_ids.split(',') : b.station_ids)
-      : [],
-    position: { x: b.position_x, y: b.position_y },
-  }));
+  const boxes = (apiLayout.station_boxes || []).map((b) => {
+    let description = '';
+    if (b.station_data) {
+      try {
+        const sd = typeof b.station_data === 'string' ? JSON.parse(b.station_data) : b.station_data;
+        description = sd.__box_desc__ || '';
+      } catch {}
+    }
+    return {
+      id: `db-box-${b.id}`,
+      name: b.name,
+      description,
+      stationIds: b.station_ids
+        ? (typeof b.station_ids === 'string' ? b.station_ids.split(',') : b.station_ids)
+        : [],
+      position: { x: b.position_x, y: b.position_y },
+    };
+  });
 
   const bypassIcons = (apiLayout.bypass_icons || []).map((ic) => ({
     id: `db-bypass-${ic.id}`,
@@ -643,6 +653,9 @@ function ZStageDashboard() {
                             {/* Header */}
                             <div className="dash-box-header">
                               <span className="dash-box-title">{box.name}</span>
+                              {box.description && (
+                                <span className="dash-box-desc">{box.description}</span>
+                              )}
                             </div>
 
                             {/* Data grid */}

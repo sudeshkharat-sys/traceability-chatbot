@@ -226,6 +226,16 @@
   text-overflow: ellipsis;
 }
 
+.dash-box-desc {
+  font-size: 9px;
+  font-weight: 400;
+  color: var(--text-gray);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: 6px;
+}
+
 .dash-box-body {
   overflow: hidden;
   flex: 1;
