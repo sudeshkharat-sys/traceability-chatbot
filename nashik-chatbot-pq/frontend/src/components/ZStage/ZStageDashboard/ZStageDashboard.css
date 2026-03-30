@@ -303,15 +303,15 @@
 
 /* Z/E with active incidences — red */
 .dash-ze--red {
-  background-color: #fff0f0;
-  color: #c53030;
+  background-color: #c53030;
+  color: #ffffff;
   font-weight: 900;
 }
 
 /* Z/E stage exists but no active incidences — green (all clear) */
 .dash-ze--green {
-  background-color: #f0fff4;
-  color: #276749;
+  background-color: #45b480;
+  color: #ffffff;
   font-weight: 900;
 }
 
