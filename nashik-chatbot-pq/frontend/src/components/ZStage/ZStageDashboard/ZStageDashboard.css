@@ -301,16 +301,16 @@
   border-right: none;
 }
 
-/* Z/E with active incidences — solid red bg, white text */
+/* Z/E with active incidences — light red bg, dark red text */
 .dash-ze--red {
-  background-color: #c53030;
-  color: #ffffff;
+  background-color: #ffd5d5;
+  color: #c53030;
   font-weight: 900;
 }
 
-/* Z/E stage exists but no active incidences — light red bg, green text */
+/* Z/E stage exists but no active incidences — light green bg, dark green text */
 .dash-ze--green {
-  background-color: #ffe4e4;
+  background-color: #d4f5e2;
   color: #276749;
   font-weight: 900;
 }
