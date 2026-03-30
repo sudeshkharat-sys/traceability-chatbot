@@ -467,13 +467,14 @@ function ZStageDashboard() {
   useEffect(() => {
     layoutApi.getLayouts()
       .then((r) => {
-        setLayouts(r.data);
-        if (r.data.length > 0) setSelectedId(r.data[0].id);
+        const list = Array.isArray(r.data) ? r.data : [];
+        setLayouts(list);
+        if (list.length > 0) setSelectedId(list[0].id);
       })
       .catch(() => setError('Failed to load layouts'));
 
     inputApi.getRecords()
-      .then((r) => setRecords(r.data))
+      .then((r) => setRecords(Array.isArray(r.data) ? r.data : []))
       .catch(() => {});
   }, []);
 
@@ -496,7 +497,7 @@ function ZStageDashboard() {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    const calls = [inputApi.getRecords().then((r) => setRecords(r.data))];
+    const calls = [inputApi.getRecords().then((r) => setRecords(Array.isArray(r.data) ? r.data : []))];
     if (selectedId) {
       calls.push(
         layoutApi.getLayout(selectedId).then((r) => {

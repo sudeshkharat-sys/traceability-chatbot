@@ -271,7 +271,7 @@ export default function InputData() {
     setLoadError(null);
     try {
       const res = await inputApi.getRecords();
-      setRecords(res.data);
+      setRecords(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       setLoadError('Failed to load records. Is the backend running?');
     } finally {
