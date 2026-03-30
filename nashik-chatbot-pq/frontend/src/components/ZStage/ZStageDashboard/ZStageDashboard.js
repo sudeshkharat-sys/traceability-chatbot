@@ -653,10 +653,10 @@ function ZStageDashboard() {
                             {/* Header */}
                             <div className="dash-box-header">
                               <span className="dash-box-title">{box.name}</span>
-                              {box.description && (
-                                <span className="dash-box-desc">{box.description}</span>
-                              )}
                             </div>
+                            {box.description && (
+                              <div className="dash-box-desc">{box.description}</div>
+                            )}
 
                             {/* Data grid */}
                             <div className="dash-box-body">
