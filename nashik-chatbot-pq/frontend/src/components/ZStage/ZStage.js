@@ -20,7 +20,7 @@ function ZStage() {
 
   useEffect(() => {
     layoutApi.getLayouts()
-      .then((res) => setSavedLayouts(res.data))
+      .then((res) => setSavedLayouts(Array.isArray(res.data) ? res.data : []))
       .catch(() => {});
   }, []);
 
@@ -31,7 +31,7 @@ function ZStage() {
     setIsSaving(false);
     if (ok) {
       layoutApi.getLayouts()
-        .then((res) => setSavedLayouts(res.data))
+        .then((res) => setSavedLayouts(Array.isArray(res.data) ? res.data : []))
         .catch(() => {});
     }
   };
