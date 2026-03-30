@@ -251,8 +251,8 @@
   font-size: 10px;
   font-weight: 700;
   color: #ffffff;
-  background-color: #45b480;
-  border-right: 1px solid #1c4532;
+  background-color: #a0aec0;
+  border-right: 1px solid #718096;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -260,6 +260,27 @@
 
 .dash-grid-th:last-child {
   border-right: none;
+}
+
+/* Station header turns red when Z/E has active issues */
+.dash-grid-th--red {
+  background-color: #c53030;
+  border-right-color: #9b2c2c;
+}
+
+/* Station header turns green when Z/E is clean */
+.dash-grid-th--green {
+  background-color: #276749;
+  border-right-color: #1c4532;
+}
+
+.dash-grid-th--clickable {
+  cursor: pointer;
+  transition: filter 0.12s;
+}
+
+.dash-grid-th--clickable:hover {
+  filter: brightness(1.15);
 }
 
 /* Z / E row — spans both sub-cols per station */
@@ -385,15 +406,6 @@
   color: var(--mahindra-red-dark, #8b0000);
 }
 
-/* ── Clickable station header ────────────────────────────────────────────── */
-.dash-grid-th--clickable {
-  cursor: pointer;
-  transition: background-color 0.12s;
-}
-
-.dash-grid-th--clickable:hover {
-  background-color: #2d9c6a;
-}
 
 /* ── Station Detail Modal (SDM) ──────────────────────────────────────────────
    Rendered via ReactDOM.createPortal to document.body — position:fixed is
