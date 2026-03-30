@@ -197,9 +197,9 @@
 
 /* ── Station box (read-only, matches layout StationBox dimensions) ────────── */
 .dash-box {
-  background-color: #ececec;
+  background-color: transparent;
   border: none;
-  border-radius: 4px;
+  border-radius: 0;
   box-shadow: none;
   height: 160px;
   box-sizing: border-box;
@@ -214,8 +214,8 @@
   display: flex;
   align-items: center;
   padding: 5px 10px;
-  background-color: var(--bg-light);
-  border-bottom: 1px solid var(--border-color);
+  background-color: transparent;
+  border-bottom: none;
   flex-shrink: 0;
   height: 40px;
 }
@@ -291,14 +291,9 @@
   vertical-align: middle;
   font-size: 10px;
   font-weight: 800;
-  background-color: var(--bg-light);
-  border-right: 1px solid var(--border-color);
-  border-bottom: 1px solid var(--border-color);
+  background-color: transparent;
+  border: none;
   color: transparent;  /* empty = invisible */
-}
-
-.dash-grid-ze:last-child {
-  border-right: none;
 }
 
 /* Z/E with active incidences — light red bg, dark red text */
@@ -324,10 +319,9 @@
   vertical-align: middle;
   font-size: 9px;
   font-weight: 700;
-  color: var(--text-gray);
-  background-color: var(--bg-light);
-  border-right: 1px solid var(--border-color);
-  border-bottom: 1px solid var(--border-color);
+  color: transparent;
+  background-color: transparent;
+  border: none;
 }
 
 /* MPDU label color coding */
@@ -360,24 +354,19 @@
   vertical-align: middle;
   font-size: 9px;
   font-weight: 500;
-  color: var(--text-gray);
-  background-color: #ffffff;
-  border-right: 1px solid var(--border-color);
-  border-bottom: 1px solid var(--border-color);
+  color: transparent;
+  background-color: transparent;
+  border: none;
 }
 
 /* Active value (X > 0) — highlighted */
 .dash-grid-value--active {
-  background-color: #fffaf0;
+  background-color: transparent;
   color: #c05621;
   font-weight: 700;
 }
 
-/* Remove trailing borders on last station column */
-.dash-grid tr td:last-child,
-.dash-grid tr th:last-child {
-  border-right: none;
-}
+/* No trailing borders needed — all cell borders removed */
 
 /* ── Bypass icon (read-only diamond — matches LayoutPreparation orange style) */
 .dash-bypass {
