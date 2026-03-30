@@ -373,10 +373,12 @@ function computeStationData(records, stationId) {
 
   if (eRecs.length > 0) {
     ze = 'E';
-    zeStatus = eRecs.some((r) => (r.total_incidences || 0) > 0) ? 'red' : 'green';
+    const eRecsR = eRecs.filter((r) => r.status_3m === 'R');
+    zeStatus = eRecsR.some((r) => (r.total_incidences || 0) > 0) ? 'red' : 'green';
   } else if (zRecs.length > 0) {
     ze = 'Z';
-    zeStatus = zRecs.some((r) => (r.total_incidences || 0) > 0) ? 'red' : 'green';
+    const zRecsR = zRecs.filter((r) => r.status_3m === 'R');
+    zeStatus = zRecsR.some((r) => (r.total_incidences || 0) > 0) ? 'red' : 'green';
   }
 
   // Only count records where status_3m is 'R' for MPDU values
