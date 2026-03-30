@@ -688,7 +688,7 @@ function ZStageDashboard() {
                                         const val = stationData[sid].attrs[label];
                                         return (
                                           <React.Fragment key={sid}>
-                                            <td className={`dash-grid-label dash-grid-label--${label.toLowerCase()}`}>{val ? label : ''}</td>
+                                            <td className={`dash-grid-label${val ? ` dash-grid-label--${label.toLowerCase()}` : ''}`}>{val ? label : ''}</td>
                                             <td className={`dash-grid-value${val ? ' dash-grid-value--active' : ''}`}>
                                               {val || ''}
                                             </td>
