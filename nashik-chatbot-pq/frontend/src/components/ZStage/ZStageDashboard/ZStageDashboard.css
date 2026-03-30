@@ -198,8 +198,8 @@
 /* ── Station box (read-only, matches layout StationBox dimensions) ────────── */
 .dash-box {
   background-color: transparent;
-  border: none;
-  border-radius: 0;
+  border: 1.5px solid #b0b0b0;
+  border-radius: 4px;
   box-shadow: none;
   height: 160px;
   box-sizing: border-box;
