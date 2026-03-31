@@ -16,7 +16,7 @@
 .zstage-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: 8px 20px;
   background: #ffffff;
   border-bottom: 1px solid #E5E5E5;
