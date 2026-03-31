@@ -60,8 +60,7 @@ function ZStage() {
       />
       <main className="zstage-app-main">
         <div className="zstage-header">
-          <img src={utilityLogo} alt="Mahindra Utility Logo" className="zstage-header-logo-left" />
-          <img src={mahindraRiseLogo} alt="Mahindra Rise Logo" className="zstage-header-logo-right" />
+          <img src={utilityLogo} alt="Mahindra Utility Logo" className="zstage-header-logo-right" />
         </div>
         {activeSection === 'layout' && (
           <LayoutPreparation

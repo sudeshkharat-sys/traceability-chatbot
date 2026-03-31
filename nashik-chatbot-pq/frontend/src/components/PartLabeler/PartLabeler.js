@@ -1125,7 +1125,6 @@ function PartLabeler() {
 
       <div className="part-labeler-header">
         <div className="header-title">
-          <img src={utilityLogo} alt="Mahindra Utility Logo" className="header-logo-utility" />
           <div>
             <h1>{isPlantMode ? 'Part Sense Visualizer Plant' : 'Part Sense Visualizer'}</h1>
             <p>Interactive failure trend analysis</p>
@@ -1136,7 +1135,7 @@ function PartLabeler() {
             <span className="stat-value">{labels.length}</span>
             <span className="stat-label">Mapped Components</span>
           </div>
-          <img src={mahindraRiseLogo} alt="Mahindra Rise Logo" className="header-corner-logo" />
+          <img src={utilityLogo} alt="Mahindra Utility Logo" className="header-corner-logo" />
         </div>
       </div>
 
