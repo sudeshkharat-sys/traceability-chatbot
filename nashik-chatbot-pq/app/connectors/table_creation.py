@@ -697,6 +697,8 @@ create_dynamic_table(
             server_default=layout_id_seq.next_value(),
         ),
         Column("name", String(255), nullable=False),
+        Column("legend_position_x", Float, nullable=True),
+        Column("legend_position_y", Float, nullable=True),
         Column(
             "created_at",
             DateTime,

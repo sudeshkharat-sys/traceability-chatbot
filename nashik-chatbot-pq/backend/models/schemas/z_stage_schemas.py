@@ -89,10 +89,14 @@ class LayoutCreate(LayoutBase):
 
 class LayoutUpdate(BaseModel):
     name: Optional[str] = None
+    legend_position_x: Optional[float] = None
+    legend_position_y: Optional[float] = None
 
 
 class LayoutOut(LayoutBase):
     id: int
+    legend_position_x: Optional[float] = None
+    legend_position_y: Optional[float] = None
     created_at: datetime
     updated_at: datetime
     station_boxes: List[StationBoxOut] = []
@@ -138,6 +142,8 @@ class SnapshotConnection(BaseModel):
 
 class LayoutSnapshotCreate(BaseModel):
     name: str
+    legend_position_x: Optional[float] = None
+    legend_position_y: Optional[float] = None
     boxes: List[SnapshotBox] = []
     bypass_icons: List[SnapshotBypassIcon] = []
     connections: List[SnapshotConnection] = []

@@ -63,7 +63,12 @@ def update_layout(layout_id: int, payload: schemas.LayoutUpdate, connector: Stat
     exists = connector.execute_query(LayoutQueries.CHECK_EXISTS, {"layout_id": layout_id})
     if not exists:
         raise HTTPException(status_code=404, detail="Layout not found")
-    rows = connector.execute_query(LayoutQueries.UPDATE_LAYOUT, {"layout_id": layout_id, "name": payload.name})
+    rows = connector.execute_query(LayoutQueries.UPDATE_LAYOUT, {
+        "layout_id": layout_id,
+        "name": payload.name,
+        "legend_position_x": payload.legend_position_x,
+        "legend_position_y": payload.legend_position_y,
+    })
     if not rows:
         raise HTTPException(status_code=500, detail="Failed to update layout")
     return _build_layout_out(rows[0], connector)
@@ -98,10 +103,15 @@ def _execute_snapshot(layout_id: int, payload: schemas.LayoutSnapshotCreate, con
         session.execute(text(SnapshotQueries.DELETE_BYPASS_ICONS), {"layout_id": layout_id})
         session.execute(text(SnapshotQueries.DELETE_STATION_BOXES), {"layout_id": layout_id})
 
-        # 2. Update layout name
+        # 2. Update layout name + legend position
         session.execute(
             text(LayoutQueries.UPDATE_LAYOUT),
-            {"layout_id": layout_id, "name": payload.name},
+            {
+                "layout_id": layout_id,
+                "name": payload.name,
+                "legend_position_x": payload.legend_position_x,
+                "legend_position_y": payload.legend_position_y,
+            },
         )
 
         # 3. Insert boxes

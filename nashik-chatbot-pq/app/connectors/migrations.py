@@ -39,6 +39,32 @@ PART_LABELER_INDEXES = [
 ]
 
 
+# Add new columns to existing tables (idempotent via IF NOT EXISTS)
+COLUMN_MIGRATIONS = [
+    "ALTER TABLE layouts ADD COLUMN IF NOT EXISTS legend_position_x FLOAT",
+    "ALTER TABLE layouts ADD COLUMN IF NOT EXISTS legend_position_y FLOAT",
+]
+
+
+def run_column_migrations(session_factory) -> None:
+    """
+    Add new columns to existing tables using ALTER TABLE … ADD COLUMN IF NOT EXISTS.
+    Safe to run on every startup — no-op if columns already exist.
+    """
+    applied = 0
+    failed = 0
+    for sql in COLUMN_MIGRATIONS:
+        try:
+            with session_factory() as session:
+                session.execute(text(sql))
+                session.commit()
+            applied += 1
+        except Exception as e:
+            logger.warning(f"Column migration skipped [{sql[:60]}]: {e}")
+            failed += 1
+    logger.info(f"Column migrations complete: {applied} applied, {failed} skipped/failed")
+
+
 def run_index_migrations(session_factory) -> None:
     """
     Create all missing indexes using CREATE INDEX IF NOT EXISTS.

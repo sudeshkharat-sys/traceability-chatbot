@@ -408,6 +408,157 @@ function computeStationData(records, stationId) {
   return { ze, zeStatus, attrs };
 }
 
+// ── Legend data computation ───────────────────────────────────────────────────
+// TYPE table:   rows = TOTAL + one per unique type value
+//   columns: Phenomenons (record count), Incidences (sum total_incidences),
+//            Stages (unique stage_no count), Red (unique stage_no with ryg='R'),
+//            Effectiveness = (Stages - Red) / Stages * 100%
+// ATTRIBUTION table: rows ordered P→D→M→U
+//   columns: Label, Phenomenons (count), Incidences (sum)
+const ATTR_ORDER  = ['P', 'D', 'M', 'U'];
+const ATTR_LABELS = { P: 'Parts', D: 'Design', M: 'Process', U: 'U/A' };
+
+function computeLegendData(records) {
+  const makeTypeRow = (label, recs) => {
+    const phenomenons = recs.length;
+    const incidences  = recs.reduce((s, r) => s + (r.total_incidences || 0), 0);
+    const stages      = new Set(recs.map((r) => r.stage_no).filter(Boolean)).size;
+    const red         = new Set(
+      recs.filter((r) => r.ryg === 'R').map((r) => r.stage_no).filter(Boolean)
+    ).size;
+    const effectiveness = stages > 0 ? Math.round(((stages - red) / stages) * 100) : 0;
+    return { label, phenomenons, incidences, stages, red, effectiveness };
+  };
+
+  const typeMap = {};
+  records.forEach((r) => {
+    const t = r.type || 'Unknown';
+    (typeMap[t] = typeMap[t] || []).push(r);
+  });
+
+  const totalRow = makeTypeRow('TOTAL', records);
+  const typeRows = Object.keys(typeMap).sort().map((t) => makeTypeRow(t, typeMap[t]));
+
+  const attrMap = {};
+  records.forEach((r) => {
+    if (r.attribution) (attrMap[r.attribution] = attrMap[r.attribution] || []).push(r);
+  });
+  const attrRows = ATTR_ORDER.filter((a) => attrMap[a]).map((a) => ({
+    label:        ATTR_LABELS[a] || a,
+    phenomenons:  attrMap[a].length,
+    incidences:   attrMap[a].reduce((s, r) => s + (r.total_incidences || 0), 0),
+  }));
+
+  return { totalRow, typeRows, attrRows };
+}
+
+// ── Draggable Legend Box (lives inside the canvas, scales with zoom) ──────────
+function LegendBox({ legendData, position, transformScale, onDragEnd }) {
+  const posRef = useRef(position);
+  posRef.current = position;
+
+  const onMouseDown = useCallback((e) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    e.preventDefault();
+
+    const startX     = e.clientX;
+    const startY     = e.clientY;
+    const origX      = posRef.current.x;
+    const origY      = posRef.current.y;
+    const scale      = transformScale;
+
+    const onMove = (ev) => {
+      const dx = (ev.clientX - startX) / scale;
+      const dy = (ev.clientY - startY) / scale;
+      onDragEnd({ x: origX + dx, y: origY + dy }, false /* not committed yet */);
+    };
+
+    const onUp = (ev) => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup',   onUp);
+      const dx = (ev.clientX - startX) / scale;
+      const dy = (ev.clientY - startY) / scale;
+      onDragEnd({ x: origX + dx, y: origY + dy }, true /* commit to DB */);
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup',   onUp);
+  }, [transformScale, onDragEnd]);
+
+  const { totalRow, typeRows, attrRows } = legendData;
+
+  return (
+    <div
+      className="dash-legend-box"
+      style={{ position: 'absolute', left: position.x, top: position.y }}
+      onMouseDown={onMouseDown}
+    >
+      {/* TYPE section */}
+      <div className="dlb-section-title">TYPE</div>
+      <table className="dlb-table dlb-table--type">
+        <thead>
+          <tr>
+            <th className="dlb-th dlb-th--label"></th>
+            <th className="dlb-th">Phenom.</th>
+            <th className="dlb-th">Incid.</th>
+            <th className="dlb-th">Stages</th>
+            <th className="dlb-th dlb-th--red">Red</th>
+            <th className="dlb-th">Eff.%</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr className="dlb-row dlb-row--total">
+            <td className="dlb-td dlb-td--label">TOTAL</td>
+            <td className="dlb-td">{totalRow.phenomenons}</td>
+            <td className="dlb-td">{totalRow.incidences}</td>
+            <td className="dlb-td">{totalRow.stages}</td>
+            <td className="dlb-td dlb-td--red">{totalRow.red}</td>
+            <td className="dlb-td">{totalRow.effectiveness}%</td>
+          </tr>
+          {typeRows.map((row) => (
+            <tr key={row.label} className="dlb-row">
+              <td className="dlb-td dlb-td--label">{row.label}</td>
+              <td className="dlb-td">{row.phenomenons}</td>
+              <td className="dlb-td">{row.incidences}</td>
+              <td className="dlb-td">{row.stages}</td>
+              <td className="dlb-td dlb-td--red">{row.red}</td>
+              <td className="dlb-td">{row.effectiveness}%</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* ATTRIBUTION section */}
+      {attrRows.length > 0 && (
+        <>
+          <div className="dlb-section-title dlb-section-title--attr">ATTRIBUTION</div>
+          <table className="dlb-table dlb-table--attr">
+            <thead>
+              <tr>
+                <th className="dlb-th dlb-th--label"></th>
+                <th className="dlb-th">Phenom.</th>
+                <th className="dlb-th">Incid.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {attrRows.map((row) => (
+                <tr key={row.label} className="dlb-row">
+                  <td className="dlb-td dlb-td--label">{row.label}</td>
+                  <td className="dlb-td">{row.phenomenons}</td>
+                  <td className="dlb-td">{row.incidences}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+
+      <div className="dlb-drag-hint">drag to reposition</div>
+    </div>
+  );
+}
+
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 function ZStageDashboard() {
   const [layouts, setLayouts]         = useState([]);
@@ -420,6 +571,9 @@ function ZStageDashboard() {
   const [refreshing, setRefreshing]   = useState(false);
   const [error, setError]             = useState(null);
   const [transformState, setTransformState] = useState({ scale: 1, positionX: 0, positionY: 0 });
+
+  // Legend position (canvas coordinates) – null until layout is loaded
+  const [legendPos, setLegendPos] = useState(null);
 
   // Station detail popup
   const [popupStation, setPopupStation] = useState(null); // stationId string | null
@@ -509,6 +663,22 @@ function ZStageDashboard() {
         setBoxes(state.boxes);
         setBypassIcons(state.bypassIcons);
         setConnections(state.connections);
+
+        // Restore saved legend position or compute a default to the right of content
+        if (r.data.legend_position_x != null && r.data.legend_position_y != null) {
+          setLegendPos({ x: r.data.legend_position_x, y: r.data.legend_position_y });
+        } else {
+          // Place legend to the right of all boxes, aligned to their top
+          const allBoxes = state.boxes;
+          if (allBoxes.length > 0) {
+            const maxX = Math.max(...allBoxes.map((b) => b.position.x + boxWidth(b.stationIds.length)));
+            const minY = Math.min(...allBoxes.map((b) => b.position.y));
+            setLegendPos({ x: maxX + 80, y: minY });
+          } else {
+            setLegendPos({ x: 500, y: 100 });
+          }
+        }
+
         setTimeout(() => fitView(state.boxes, state.bypassIcons), 80);
       })
       .catch(() => setError('Failed to load layout'))
@@ -535,6 +705,20 @@ function ZStageDashboard() {
   const handleRecordSaved = useCallback((recordId, updatedRecord) => {
     setRecords((prev) => prev.map((r) => (r.id === recordId ? updatedRecord : r)));
   }, []);
+
+  // Legend data derived from all records
+  const legendData = React.useMemo(() => computeLegendData(records), [records]);
+
+  // Drag callback: update position live; auto-save to DB on commit
+  const handleLegendDrag = useCallback((newPos, commit) => {
+    setLegendPos(newPos);
+    if (commit && selectedId) {
+      layoutApi.updateLayout(selectedId, {
+        legend_position_x: newPos.x,
+        legend_position_y: newPos.y,
+      }).catch(() => {/* non-critical */});
+    }
+  }, [selectedId]);
 
   return (
     // Xwrapper must wrap everything so Xarrow SVGs render in screen space
@@ -628,6 +812,16 @@ function ZStageDashboard() {
                           </div>
                         </div>
                       ))}
+
+                      {/* Legend box – draggable, scales with canvas zoom */}
+                      {legendPos && (
+                        <LegendBox
+                          legendData={legendData}
+                          position={legendPos}
+                          transformScale={transformState.scale}
+                          onDragEnd={handleLegendDrag}
+                        />
+                      )}
 
                       {/* Station boxes */}
                       {boxes.map((box) => {

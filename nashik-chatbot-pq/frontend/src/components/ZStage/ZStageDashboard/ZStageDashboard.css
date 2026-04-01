@@ -762,3 +762,106 @@
 .dash-zoom-btn:hover {
   background-color: var(--bg-light);
 }
+
+/* ── Dashboard Legend Box (draggable, lives inside canvas) ───────────────── */
+.dash-legend-box {
+  background: #ffffff;
+  border: 1.5px solid #b0b8c9;
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  padding: 10px 12px 6px 12px;
+  cursor: grab;
+  user-select: none;
+  min-width: 260px;
+  font-family: inherit;
+  z-index: 50;
+}
+
+.dash-legend-box:active {
+  cursor: grabbing;
+}
+
+.dlb-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #1a2744;
+  background: #ffe066;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-bottom: 4px;
+  display: inline-block;
+}
+
+.dlb-section-title--attr {
+  background: #ffd6a5;
+  margin-top: 8px;
+}
+
+/* Tables */
+.dlb-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.dlb-th {
+  background: #ffe066;
+  color: #1a2744;
+  font-weight: 700;
+  padding: 3px 6px;
+  text-align: center;
+  border: 1px solid #d4b800;
+  white-space: nowrap;
+}
+
+.dlb-th--label {
+  text-align: left;
+  min-width: 54px;
+}
+
+.dlb-th--red {
+  background: #fed7d7;
+  color: #c53030;
+}
+
+.dlb-table--attr .dlb-th {
+  background: #ffd6a5;
+  border-color: #e8a44a;
+}
+
+.dlb-td {
+  padding: 3px 6px;
+  text-align: center;
+  border: 1px solid #e2e8f0;
+  color: #2d3748;
+  font-size: 11px;
+}
+
+.dlb-td--label {
+  text-align: left;
+  font-weight: 600;
+  color: #1a2744;
+}
+
+.dlb-td--red {
+  color: #c53030;
+  font-weight: 700;
+}
+
+.dlb-row--total .dlb-td {
+  background: #fffde6;
+  font-weight: 700;
+}
+
+.dlb-row:nth-child(even) .dlb-td {
+  background: #fafafa;
+}
+
+.dlb-drag-hint {
+  font-size: 9px;
+  color: #a0aec0;
+  text-align: center;
+  margin-top: 5px;
+  font-style: italic;
+}

@@ -38,13 +38,13 @@ class QueryValidator:
 
 class LayoutQueries:
     LIST_LAYOUTS = """
-        SELECT id, name, created_at, updated_at
+        SELECT id, name, legend_position_x, legend_position_y, created_at, updated_at
         FROM layouts
         ORDER BY created_at DESC
     """
 
     GET_LAYOUT = """
-        SELECT id, name, created_at, updated_at
+        SELECT id, name, legend_position_x, legend_position_y, created_at, updated_at
         FROM layouts
         WHERE id = :layout_id
     """
@@ -52,14 +52,17 @@ class LayoutQueries:
     CREATE_LAYOUT = """
         INSERT INTO layouts (name, created_at, updated_at)
         VALUES (:name, NOW(), NOW())
-        RETURNING id, name, created_at, updated_at
+        RETURNING id, name, legend_position_x, legend_position_y, created_at, updated_at
     """
 
     UPDATE_LAYOUT = """
         UPDATE layouts
-        SET name = :name, updated_at = NOW()
+        SET name               = COALESCE(:name, name),
+            legend_position_x  = COALESCE(:legend_position_x, legend_position_x),
+            legend_position_y  = COALESCE(:legend_position_y, legend_position_y),
+            updated_at         = NOW()
         WHERE id = :layout_id
-        RETURNING id, name, created_at, updated_at
+        RETURNING id, name, legend_position_x, legend_position_y, created_at, updated_at
     """
 
     DELETE_LAYOUT = "DELETE FROM layouts WHERE id = :layout_id"
