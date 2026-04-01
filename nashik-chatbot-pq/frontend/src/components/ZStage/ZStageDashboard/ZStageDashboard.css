@@ -327,6 +327,7 @@
   font-weight: 800;
   background-color: transparent;
   border: none;
+  border-right: 1px solid #b0c4de;
   color: transparent;  /* empty = invisible */
 }
 
@@ -391,6 +392,7 @@
   color: transparent;
   background-color: transparent;
   border: none;
+  border-right: 1px solid #b0c4de;
 }
 
 /* Active value (X > 0) — highlighted */
@@ -790,8 +792,8 @@
 
 /* ── Dashboard Legend Box (draggable, lives inside canvas) ───────────────── */
 .dash-legend-box {
-  background: #ffffff;
-  border: 1.5px solid #b0b8c9;
+  background: #f0f8ff;
+  border: 1.5px solid #b0c4de;
   border-radius: 6px;
   box-shadow: 0 4px 16px rgba(0,0,0,0.18);
   padding: 10px 12px 6px 12px;
@@ -880,7 +882,7 @@
 }
 
 .dlb-row:nth-child(even) .dlb-td {
-  background: #fafafa;
+  background: #e8f4ff;
 }
 
 .dlb-drag-hint {
