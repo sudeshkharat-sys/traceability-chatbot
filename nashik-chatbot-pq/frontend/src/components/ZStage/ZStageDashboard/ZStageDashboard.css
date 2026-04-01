@@ -298,10 +298,9 @@
 
 /* Station header turns red when Z/E has active issues */
 .dash-grid-th--red {
-  background-color: #c53030;
-  border-right-color: #9b2c2c;
+    background-color: #f70707;
+    border-right-color: #9b2c2c;
 }
-
 /* Station header turns green when Z/E is clean */
 .dash-grid-th--green {
   background-color: #276749;
@@ -323,7 +322,7 @@
   height: 20px;
   text-align: center;
   vertical-align: middle;
-  font-size: 10px;
+  font-size: 18px;
   font-weight: 800;
   background-color: transparent;
   border: none;
@@ -333,16 +332,16 @@
 
 /* Z/E with active incidences — light red bg, dark red text */
 .dash-ze--red {
-  background-color: #ffd5d5;
-  color: #c53030;
-  font-weight: 900;
+    background-color: transparent;
+    color: red;
+    font-weight: 800;
 }
 
 /* Z/E stage exists but no active incidences — light green bg, dark green text */
 .dash-ze--green {
-  background-color: #d4f5e2;
-  color: #276749;
-  font-weight: 900;
+    background-color: transparent;
+    color: lightseagreen;
+    font-weight: 900;
 }
 
 /* Label sub-column (M / P / D / U) */
@@ -361,23 +360,23 @@
 
 /* MPDU label color coding */
 .dash-grid-label--m {
-  background-color: #ffc0cb;
-  color: #7b1a2e;
+    background-color: #f9b4c1;
+    color: white;
 }
 
 .dash-grid-label--p {
-  background-color: #bee3f8;
-  color: #1a3a5c;
+    background-color: #5611f0;
+    color: white;
 }
 
 .dash-grid-label--d {
-  background-color: #fbd38d;
-  color: #7b4200;
+    background-color: orange;
+    color: white;
 }
 
 .dash-grid-label--u {
-  background-color: #fefcbf;
-  color: #744210;
+    background-color: yellow;
+    color: black;
 }
 
 /* Value sub-column */
@@ -397,9 +396,9 @@
 
 /* Active value (X > 0) — highlighted */
 .dash-grid-value--active {
-  background-color: transparent;
-  color: #c05621;
-  font-weight: 700;
+    background-color: transparent;
+    color: black;
+    font-weight: 500;
 }
 
 /* No trailing borders needed — all cell borders removed */
