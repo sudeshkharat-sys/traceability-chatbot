@@ -750,6 +750,15 @@ function ZStageDashboard() {
               <span className="dash-legend-chip dash-legend-chip--green">Z</span>
               <span className="dash-legend-text">No issues (clean)</span>
               <span className="dash-legend-sep" />
+              <span className="dash-legend-chip dash-legend-chip--m">M</span>
+              <span className="dash-legend-text">Manufacturing</span>
+              <span className="dash-legend-chip dash-legend-chip--p">P</span>
+              <span className="dash-legend-text">Part Quality</span>
+              <span className="dash-legend-chip dash-legend-chip--d">D</span>
+              <span className="dash-legend-text">Design</span>
+              <span className="dash-legend-chip dash-legend-chip--u">U</span>
+              <span className="dash-legend-text">Under Analysis</span>
+              <span className="dash-legend-sep" />
               <span className="dash-legend-text dash-legend-hint">X/Y = active / total incidences · Click station header to view records</span>
             </div>
             <button className="dash-refresh-btn" onClick={handleRefresh} disabled={refreshing} title="Refresh data">

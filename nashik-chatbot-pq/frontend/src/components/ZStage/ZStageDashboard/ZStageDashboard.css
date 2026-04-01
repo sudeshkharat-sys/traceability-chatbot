@@ -88,6 +88,31 @@
   font-weight: 800;
 }
 
+/* Attribution chips */
+.dash-legend-chip--m {
+  background-color: #bee3f8;
+  color: #2b6cb0;
+  font-weight: 800;
+}
+
+.dash-legend-chip--p {
+  background-color: #fefcbf;
+  color: #744210;
+  font-weight: 800;
+}
+
+.dash-legend-chip--d {
+  background-color: #e9d8fd;
+  color: #553c9a;
+  font-weight: 800;
+}
+
+.dash-legend-chip--u {
+  background-color: #fed7e2;
+  color: #97266d;
+  font-weight: 800;
+}
+
 .dash-legend-text {
   font-size: 12px;
   color: var(--text-gray);
