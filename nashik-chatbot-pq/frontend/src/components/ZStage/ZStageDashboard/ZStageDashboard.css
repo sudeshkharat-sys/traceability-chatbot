@@ -90,26 +90,26 @@
 
 /* Attribution chips */
 .dash-legend-chip--m {
-  background-color: #bee3f8;
-  color: #2b6cb0;
+  background-color: #f9b4c1;
+  color: white;
   font-weight: 800;
 }
 
 .dash-legend-chip--p {
-  background-color: #fefcbf;
-  color: #744210;
+    background-color: #5611f0;
+    color: white;
   font-weight: 800;
 }
 
 .dash-legend-chip--d {
-  background-color: #e9d8fd;
-  color: #553c9a;
+    background-color: orange;
+    color: white;
   font-weight: 800;
 }
 
 .dash-legend-chip--u {
-  background-color: #fed7e2;
-  color: #97266d;
+    background-color: yellow;
+    color: black;;
   font-weight: 800;
 }
 
