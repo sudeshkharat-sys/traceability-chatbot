@@ -163,12 +163,12 @@
   display: inline-block;
 }
 
-/* ── Canvas — plain white, no grid lines ─────────────────────────────────── */
+/* ── Canvas — beige background ───────────────────────────────────────────── */
 .dash-canvas {
   flex: 1;
   position: relative;
   overflow: hidden;
-  background-color: #ffffff;
+  background-color: #f5f0e8;
 }
 
 .dash-virtual-canvas {
@@ -218,8 +218,8 @@
 
 /* ── Station box (read-only, matches layout StationBox dimensions) ────────── */
 .dash-box {
-  background-color: #f5f5f5;
-  border: 1.5px solid #b0b0b0;
+  background-color: #f0f8ff;
+  border: 1.5px solid #b0c4de;
   border-radius: 4px;
   box-shadow: none;
   height: 160px;
@@ -244,7 +244,7 @@
 .dash-box-title {
   font-size: 13px;
   font-weight: 700;
-  color: var(--text-dark);
+  color: #001f5b;
   letter-spacing: 0.5px;
   white-space: nowrap;
   overflow: hidden;
