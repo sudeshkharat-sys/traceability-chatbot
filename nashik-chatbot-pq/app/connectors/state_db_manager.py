@@ -125,14 +125,31 @@ class StateDBManager:
             from sqlalchemy import create_engine as _ce
             engine = _ce(url)
             with engine.connect() as conn:
-                # ── Rename bypass_icons → buyoff_icons ──────────────────────
+                # ── Migrate bypass_icons → buyoff_icons ─────────────────────
+                # create_all() may have already created an empty buyoff_icons,
+                # so we copy any existing data then drop the old table.
                 conn.execute(text("""
                     DO $$ BEGIN
                         IF EXISTS (
                             SELECT FROM pg_tables
                             WHERE schemaname = 'public' AND tablename = 'bypass_icons'
                         ) THEN
-                            ALTER TABLE bypass_icons RENAME TO buyoff_icons;
+                            IF EXISTS (
+                                SELECT FROM pg_tables
+                                WHERE schemaname = 'public' AND tablename = 'buyoff_icons'
+                            ) THEN
+                                -- Both tables exist: copy old data (preserve IDs) then drop old
+                                INSERT INTO buyoff_icons
+                                    (id, layout_id, position_x, position_y, created_at)
+                                OVERRIDING SYSTEM VALUE
+                                SELECT id, layout_id, position_x, position_y, created_at
+                                FROM bypass_icons
+                                ON CONFLICT (id) DO NOTHING;
+                                DROP TABLE bypass_icons CASCADE;
+                            ELSE
+                                -- Only old table exists: simple rename
+                                ALTER TABLE bypass_icons RENAME TO buyoff_icons;
+                            END IF;
                         END IF;
                     END $$;
                 """))
