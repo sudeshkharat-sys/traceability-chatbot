@@ -71,6 +71,77 @@ To extend the chatbot's capabilities with a new specialized agent:
 
 ---
 
+## Roles & Access
+
+| Role | Access |
+|------|--------|
+| `admin` | All features + Admin Panel (manage users, assign roles, delete accounts) |
+| `user` | All features — default role given on public signup |
+| `part_labeler` | Part Sense Visualizer Field & Plant only |
+
+> **Note:** `admin` and `part_labeler` accounts are **not** created through public signup.  
+> Use the seed script below or the **Admin Panel → Add User** button to create them.
+
+---
+
+## Creating Admin Users
+
+The script `scripts/create_users.py` creates a single user with a chosen role.  
+It is idempotent — running it twice with the same username skips the duplicate silently.
+
+### Arguments
+
+| Flag | Required | Default | Description |
+|------|----------|---------|-------------|
+| `--username` | Yes | — | Login username |
+| `--email` | Yes | — | Email address |
+| `--first-name` | No | `Admin` | First name |
+| `--last-name` | No | `User` | Last name |
+| `--password` | No | *(prompted)* | Omit for secure interactive prompt |
+| `--role` | No | `admin` | `admin` \| `user` \| `part_labeler` |
+
+### Local development
+
+```bash
+cd nashik-chatbot-pq
+
+# Minimal — password prompted interactively
+python scripts/create_users.py \
+    --username admin \
+    --email admin@company.com
+
+# Fully specified
+python scripts/create_users.py \
+    --username admin \
+    --first-name John \
+    --last-name Doe \
+    --email john@company.com \
+    --password "Admin@1234" \
+    --role admin
+```
+
+### Docker
+
+```bash
+# Interactive password prompt
+docker exec -it traceability-app \
+    python scripts/create_users.py \
+    --username admin \
+    --email admin@company.com
+
+# Non-interactive (all flags)
+docker exec -it traceability-app \
+    python scripts/create_users.py \
+    --username admin \
+    --first-name Admin \
+    --last-name User \
+    --email admin@company.com \
+    --password "Admin@1234" \
+    --role admin
+```
+
+---
+
 ## Setup Guide (VM / Production)
 
 ### 1. Prerequisites
