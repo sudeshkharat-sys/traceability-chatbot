@@ -175,6 +175,13 @@
   width: 675px;
 }
 
+.features-container.features-single-col .get-started-btn {
+  align-self: flex-end;
+  width: auto;
+  padding: 0.25rem 1.1rem;
+  font-size: 0.72rem;
+}
+
 /* Feature Grid Cards */
 .feature-card {
   background: #FFFFFF;
