@@ -67,7 +67,17 @@
   margin: 0 0 16px 0;
 }
 
-/* ── Layout select row ────────────────────────────────────────────────────── */
+/* ── Layout select in tabs bar ────────────────────────────────────────────── */
+
+.tabs-layout-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 0 4px;
+}
+
+/* ── Layout select row (legacy, kept for safety) ──────────────────────────── */
 
 .layout-select-row {
   display: flex;

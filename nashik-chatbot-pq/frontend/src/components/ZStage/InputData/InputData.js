@@ -352,6 +352,22 @@ export default function InputData({ userId, layouts = [] }) {
           <Database size={15} />
           Master Data
         </button>
+
+        {layouts.length > 0 && (
+          <div className="tabs-layout-select">
+            <label className="layout-select-label">Layout:</label>
+            <select
+              className="layout-select-dropdown"
+              value={selectedLayoutId ?? ''}
+              onChange={(e) => setSelectedLayoutId(e.target.value ? Number(e.target.value) : null)}
+            >
+              <option value="">All layouts</option>
+              {layouts.map((l) => (
+                <option key={l.id} value={l.id}>{l.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {activeTab === 'upload' && (
@@ -360,22 +376,6 @@ export default function InputData({ userId, layouts = [] }) {
           <p className="panel-subtitle">
             Upload the Z-Stage input Excel file (.xlsx). The data will replace existing records for the selected layout.
           </p>
-
-          {layouts.length > 0 && (
-            <div className="layout-select-row">
-              <label className="layout-select-label">Layout:</label>
-              <select
-                className="layout-select-dropdown"
-                value={selectedLayoutId ?? ''}
-                onChange={(e) => setSelectedLayoutId(e.target.value ? Number(e.target.value) : null)}
-              >
-                <option value="">All layouts (no filter)</option>
-                {layouts.map((l) => (
-                  <option key={l.id} value={l.id}>{l.name}</option>
-                ))}
-              </select>
-            </div>
-          )}
 
           <div
             className={`drop-zone ${dragging ? 'drag-over' : ''} ${selectedFile ? 'has-file' : ''}`}
@@ -436,23 +436,6 @@ export default function InputData({ userId, layouts = [] }) {
         <div className="master-panel">
           <div className="master-header">
             <h2 className="panel-title">Master Data</h2>
-            {layouts.length > 0 && (
-              <div className="layout-select-row">
-                <label className="layout-select-label">Layout:</label>
-                <select
-                  className="layout-select-dropdown"
-                  value={selectedLayoutId ?? ''}
-                  onChange={(e) => {
-                    setSelectedLayoutId(e.target.value ? Number(e.target.value) : null);
-                  }}
-                >
-                  <option value="">All layouts</option>
-                  {layouts.map((l) => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
-                  ))}
-                </select>
-              </div>
-            )}
             <div className="master-actions">
               <span className="record-count">{records.length} record{records.length !== 1 ? 's' : ''}</span>
               <button className="add-month-btn" onClick={() => setShowAddMonth(true)}>
