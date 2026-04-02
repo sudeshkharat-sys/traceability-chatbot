@@ -75,7 +75,7 @@ async def delete_user(
         raise HTTPException(status_code=400, detail="Admin cannot delete their own account")
     from app.queries.auth_queries import AuthQueries
     db = get_db()
-    db.execute_query(AuthQueries.DELETE_USER, {"user_id": user_id})
+    db.execute_update(AuthQueries.DELETE_USER, {"user_id": user_id})
     logger.info(f"User {user_id} deleted by admin {requester_id}")
     return JSONResponse(content={"message": "User deleted successfully"})
 
@@ -97,6 +97,6 @@ async def update_user_role(
         raise HTTPException(status_code=400, detail="Admin cannot demote their own account")
     from app.queries.auth_queries import AuthQueries
     db = get_db()
-    db.execute_query(AuthQueries.UPDATE_USER_ROLE, {"user_id": user_id, "role": payload.role})
+    db.execute_update(AuthQueries.UPDATE_USER_ROLE, {"user_id": user_id, "role": payload.role})
     logger.info(f"User {user_id} role updated to '{payload.role}' by admin {requester_id}")
     return JSONResponse(content={"message": f"Role updated to '{payload.role}'"})
