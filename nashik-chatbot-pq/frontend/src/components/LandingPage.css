@@ -6,30 +6,66 @@
   background-position: center;
   background-repeat: no-repeat;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  position: relative;
+  flex-direction: column;
+  align-items: stretch;
   overflow: hidden;
 }
 
-/* Corner Logos */
-.corner-logo {
-  position: absolute;
-  top: 1.5rem;
-  height: 45px;
+/* ── Top Navbar ── */
+.landing-navbar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 2rem;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+  z-index: 20;
+  animation: fadeIn 0.8s ease;
+}
+
+.navbar-left,
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 160px;
+}
+
+.navbar-right {
+  justify-content: flex-end;
+}
+
+.navbar-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.navbar-logo {
+  height: 40px;
   width: auto;
   object-fit: contain;
-  z-index: 10;
   animation: fadeIn 1s ease;
 }
 
-.corner-logo-left {
-  left: 2rem;
+.navbar-welcome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.35);
 }
 
-.corner-logo-right {
-  right: 2rem;
+/* Legacy corner-logo kept for any other usage */
+.corner-logo {
+  height: 40px;
+  width: auto;
+  object-fit: contain;
 }
 
 @keyframes fadeIn {
@@ -42,8 +78,11 @@
 }
 
 .landing-content {
+  flex: 1;
   width: 100%;
   max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.5rem 2rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -490,21 +529,16 @@
 }
 
 @media (max-width: 768px) {
-  .landing-page {
-    padding: 2rem 1.5rem;
+  .landing-navbar {
+    padding: 0.6rem 1rem;
   }
 
-  .corner-logo {
-    height: 50px;
-    top: 1rem;
+  .navbar-logo {
+    height: 32px;
   }
 
-  .corner-logo-left {
-    left: 1rem;
-  }
-
-  .corner-logo-right {
-    right: 1rem;
+  .landing-content {
+    padding: 1rem;
   }
 
   .left-section {
@@ -545,21 +579,21 @@
 }
 
 @media (max-width: 480px) {
-  .landing-page {
-    padding: 1.5rem 1rem;
+  .landing-navbar {
+    padding: 0.5rem 0.75rem;
+    gap: 6px;
   }
 
-  .corner-logo {
-    height: 40px;
-    top: 0.75rem;
+  .navbar-logo {
+    height: 28px;
   }
 
-  .corner-logo-left {
-    left: 0.75rem;
+  .navbar-welcome {
+    font-size: 0.75rem;
   }
 
-  .corner-logo-right {
-    right: 0.75rem;
+  .landing-content {
+    padding: 0.75rem;
   }
 
   .left-section {
@@ -660,47 +694,29 @@
   font-weight: 500;
 }
 
-/* ── Logged-in user: welcome bar (absolute, top-center) ── */
-.user-welcome-bar {
-  position: absolute;
-  top: 1.8rem;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.85rem;
-  color: #fff;
-  white-space: nowrap;
-  z-index: 10;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
-}
-
+/* ── Role badge (in navbar) ── */
 .user-role-badge {
-  background: rgba(220, 20, 60, 0.85);
+  background: #DC143C;
   color: #fff;
   border-radius: 10px;
   padding: 2px 9px;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-/* ── Logout button (absolute, top-right below logo) ── */
+/* ── Logout button (in navbar) ── */
 .user-logout-btn {
-  position: absolute;
-  top: 5rem;
-  right: 2rem;
   background: transparent;
-  border: 1px solid rgba(220, 20, 60, 0.6);
+  border: 1px solid rgba(220, 20, 60, 0.7);
   color: #DC143C;
   border-radius: 6px;
   padding: 4px 14px;
   font-size: 0.82rem;
   cursor: pointer;
-  z-index: 10;
   transition: background 0.2s, color 0.2s;
+  white-space: nowrap;
 }
 
 .user-logout-btn:hover {
@@ -708,7 +724,7 @@
   color: #fff;
 }
 
-/* ── Admin Panel card — same white card style, red left border ── */
+/* ── Admin Panel card — white card style with red tint ── */
 .feature-card-admin {
   border-left: 4px solid #DC143C !important;
   background: #fff5f7 !important;

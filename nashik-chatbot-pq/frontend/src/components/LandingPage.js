@@ -10,10 +10,7 @@ import utilityLogo from "../assests/image.png";
 import mahindraRiseLogo from "../assests/mahindra_rise_logo.png";
 import { authService } from "../services/api";
 
-// Features that are interactive (not grayed-out) for admin/user roles
 const BASE_ENABLED = ["traceability", "guideline", "part-labeler", "part-labeler-plant", "z-stage"];
-
-// Features visible to part_labeler role
 const PART_LABELER_ALLOWED = ["part-labeler", "part-labeler-plant"];
 
 function LandingPage() {
@@ -88,9 +85,7 @@ function LandingPage() {
     },
   ];
 
-  const handleGetStarted = (route) => {
-    navigate(route);
-  };
+  const handleGetStarted = (route) => navigate(route);
 
   const handleLogout = async () => {
     await authService.logout();
@@ -149,33 +144,39 @@ function LandingPage() {
 
   return (
     <div className="landing-page">
-      {/* Top Corner Logos */}
-      <img
-        src={utilityLogo}
-        alt="Mahindra Utility Logo"
-        className="corner-logo corner-logo-left"
-      />
-      <img
-        src={mahindraRiseLogo}
-        alt="Mahindra Rise Logo"
-        className="corner-logo corner-logo-right"
-      />
 
-      {/* Welcome greeting + Logout — only when logged in, absolutely positioned */}
-      {isLoggedIn && (
-        <>
-          <div className="user-welcome-bar">
-            Welcome,&nbsp;<strong>{authService.getFullName()}</strong>
-            <span className="user-role-badge">{currentRole}</span>
-          </div>
-          <button className="user-logout-btn" onClick={handleLogout}>
-            Logout
-          </button>
-        </>
-      )}
+      {/* ── TOP NAVBAR ── */}
+      <nav className="landing-navbar">
+        {/* Left: app logo */}
+        <div className="navbar-left">
+          <img src={utilityLogo} alt="Mahindra Utility Logo" className="navbar-logo" />
+        </div>
 
+        {/* Center: welcome + role badge (only when logged in) */}
+        <div className="navbar-center">
+          {isLoggedIn && (
+            <span className="navbar-welcome">
+              Welcome,&nbsp;<strong>{authService.getFullName()}</strong>
+              <span className="user-role-badge">{currentRole}</span>
+            </span>
+          )}
+        </div>
+
+        {/* Right: Mahindra Rise logo + Logout */}
+        <div className="navbar-right">
+          <img src={mahindraRiseLogo} alt="Mahindra Rise Logo" className="navbar-logo" />
+          {isLoggedIn && (
+            <button className="user-logout-btn" onClick={handleLogout}>
+              Logout
+            </button>
+          )}
+        </div>
+      </nav>
+
+      {/* ── MAIN CONTENT ── */}
       <div className="landing-content">
-        {/* Left Section */}
+
+        {/* Left: AI text + cars */}
         <div className="left-section">
           <div className="ai-solution-text">
             <h1 className="main-heading">
@@ -190,7 +191,7 @@ function LandingPage() {
           </div>
         </div>
 
-        {/* Right Section — Auth form or Feature cards */}
+        {/* Right: Auth form OR Feature cards */}
         {!isLoggedIn ? (
           <div className="auth-container">
             <div className="auth-card">
@@ -198,9 +199,7 @@ function LandingPage() {
                 {isSignup ? "Create Account" : "Welcome Back"}
               </h2>
               <p className="auth-subtitle">
-                {isSignup
-                  ? "Sign up to get started"
-                  : "Login to access your dashboard"}
+                {isSignup ? "Sign up to get started" : "Login to access your dashboard"}
               </p>
 
               {error && <div className="auth-error">{error}</div>}
@@ -266,11 +265,7 @@ function LandingPage() {
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  className="auth-submit-btn"
-                  disabled={loading}
-                >
+                <button type="submit" className="auth-submit-btn" disabled={loading}>
                   {loading ? "Please wait..." : isSignup ? "Sign Up" : "Login"}
                 </button>
               </form>
@@ -279,55 +274,31 @@ function LandingPage() {
                 {isSignup ? (
                   <span>
                     Already have an account?{" "}
-                    <button className="auth-toggle-btn" onClick={toggleMode}>
-                      Login
-                    </button>
+                    <button className="auth-toggle-btn" onClick={toggleMode}>Login</button>
                   </span>
                 ) : (
                   <span>
                     Don't have an account?{" "}
-                    <button className="auth-toggle-btn" onClick={toggleMode}>
-                      Sign Up
-                    </button>
+                    <button className="auth-toggle-btn" onClick={toggleMode}>Sign Up</button>
                   </span>
                 )}
               </div>
             </div>
           </div>
         ) : (
-          /* ── FEATURE CARDS — exactly original structure ── */
-          <div
-            className={`features-container ${
-              justLoggedIn ? "features-enter" : ""
-            }`}
-          >
+          <div className={`features-container ${justLoggedIn ? "features-enter" : ""}`}>
             {features.map((feature, index) => {
-              // part_labeler: completely hide features outside their list
-              if (
-                currentRole === "part_labeler" &&
-                !PART_LABELER_ALLOWED.includes(feature.id)
-              ) {
+              if (currentRole === "part_labeler" && !PART_LABELER_ALLOWED.includes(feature.id)) {
                 return null;
               }
-
-              // admin / user: disable (gray out) features not in BASE_ENABLED
               const isEnabled = BASE_ENABLED.includes(feature.id);
-
               return (
                 <div
                   key={feature.id}
-                  className={`feature-card ${
-                    justLoggedIn ? "feature-card-enter" : ""
-                  }`}
+                  className={`feature-card ${justLoggedIn ? "feature-card-enter" : ""}`}
                   style={
                     justLoggedIn
-                      ? {
-                          animationDelay: `${index * 0.12}s`,
-                          ...(!isEnabled && {
-                            cursor: "not-allowed",
-                            opacity: 0.6,
-                          }),
-                        }
+                      ? { animationDelay: `${index * 0.12}s`, ...(!isEnabled && { cursor: "not-allowed", opacity: 0.6 }) }
                       : !isEnabled
                       ? { cursor: "not-allowed", opacity: 0.6 }
                       : { cursor: "pointer" }
@@ -335,24 +306,15 @@ function LandingPage() {
                   onClick={() => isEnabled && handleGetStarted(feature.route)}
                 >
                   <div className="feature-content">
-                    <img
-                      src={feature.icon}
-                      alt={feature.title}
-                      className="feature-icon"
-                    />
+                    <img src={feature.icon} alt={feature.title} className="feature-icon" />
                     <div className="feature-info">
                       <h3 className="feature-title">{feature.title}</h3>
-                      <p className="feature-description">
-                        {feature.description}
-                      </p>
+                      <p className="feature-description">{feature.description}</p>
                     </div>
                   </div>
                   <button
                     className="get-started-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (isEnabled) handleGetStarted(feature.route);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); if (isEnabled) handleGetStarted(feature.route); }}
                     disabled={!isEnabled}
                     style={!isEnabled ? { cursor: "not-allowed" } : {}}
                   >
@@ -363,34 +325,23 @@ function LandingPage() {
               );
             })}
 
-            {/* Admin Panel card — ONLY visible to admin role */}
+            {/* Admin Panel — only for admin role */}
             {currentRole === "admin" && (
               <div
-                className={`feature-card feature-card-admin ${
-                  justLoggedIn ? "feature-card-enter" : ""
-                }`}
+                className={`feature-card feature-card-admin ${justLoggedIn ? "feature-card-enter" : ""}`}
                 style={{ cursor: "pointer" }}
                 onClick={() => handleGetStarted("/admin")}
               >
                 <div className="feature-content">
-                  <img
-                    src={dashboardIcon}
-                    alt="Admin Panel"
-                    className="feature-icon"
-                  />
+                  <img src={dashboardIcon} alt="Admin Panel" className="feature-icon" />
                   <div className="feature-info">
                     <h3 className="feature-title">Admin Panel</h3>
-                    <p className="feature-description">
-                      Manage users, assign roles, and control access
-                    </p>
+                    <p className="feature-description">Manage users, assign roles, and control access</p>
                   </div>
                 </div>
                 <button
                   className="get-started-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleGetStarted("/admin");
-                  }}
+                  onClick={(e) => { e.stopPropagation(); handleGetStarted("/admin"); }}
                 >
                   Open
                   <span className="arrow-icon">&rarr;</span>
