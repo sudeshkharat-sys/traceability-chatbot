@@ -27,6 +27,7 @@ function LandingPage() {
   const [isSignup, setIsSignup] = useState(false);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [resetUsername, setResetUsername] = useState("");
+  const [resetCurrentPassword, setResetCurrentPassword] = useState("");
   const [resetNewPassword, setResetNewPassword] = useState("");
   const [resetConfirmPassword, setResetConfirmPassword] = useState("");
   const [resetSuccess, setResetSuccess] = useState("");
@@ -157,6 +158,7 @@ function LandingPage() {
     setIsForgotPassword(true);
     setError("");
     setResetUsername("");
+    setResetCurrentPassword("");
     setResetNewPassword("");
     setResetConfirmPassword("");
     setResetSuccess("");
@@ -173,18 +175,19 @@ function LandingPage() {
     setError("");
     setResetSuccess("");
     if (resetNewPassword !== resetConfirmPassword) {
-      setError("Passwords do not match");
+      setError("New password and confirm password do not match.");
       return;
     }
     if (resetNewPassword.length < 6) {
-      setError("Password must be at least 6 characters");
+      setError("New password must be at least 6 characters.");
       return;
     }
     setLoading(true);
     try {
-      await authService.resetPassword(resetUsername, resetNewPassword);
+      await authService.resetPassword(resetUsername, resetCurrentPassword, resetNewPassword);
       setResetSuccess("Password reset successfully! You can now log in.");
       setResetUsername("");
+      setResetCurrentPassword("");
       setResetNewPassword("");
       setResetConfirmPassword("");
     } catch (err) {
@@ -249,22 +252,34 @@ function LandingPage() {
             {isForgotPassword ? (
               <div className="auth-card">
                 <h2 className="auth-title">Reset Password</h2>
-                <p className="auth-subtitle">Enter your username and choose a new password</p>
+                <p className="auth-subtitle">Verify your current password, then set a new one</p>
 
                 {error && <div className="auth-error">{error}</div>}
                 {resetSuccess && <div className="auth-success">{resetSuccess}</div>}
 
                 {!resetSuccess && (
                   <form onSubmit={handleResetPassword}>
-                    <div className="auth-field">
-                      <label>Username</label>
-                      <input
-                        type="text"
-                        value={resetUsername}
-                        onChange={(e) => setResetUsername(e.target.value)}
-                        placeholder="Enter your username"
-                        required
-                      />
+                    <div className="auth-name-row">
+                      <div className="auth-field">
+                        <label>Username</label>
+                        <input
+                          type="text"
+                          value={resetUsername}
+                          onChange={(e) => setResetUsername(e.target.value)}
+                          placeholder="Enter your username"
+                          required
+                        />
+                      </div>
+                      <div className="auth-field">
+                        <label>Current Password</label>
+                        <input
+                          type="password"
+                          value={resetCurrentPassword}
+                          onChange={(e) => setResetCurrentPassword(e.target.value)}
+                          placeholder="Your current password"
+                          required
+                        />
+                      </div>
                     </div>
                     <div className="auth-name-row">
                       <div className="auth-field">
@@ -278,12 +293,12 @@ function LandingPage() {
                         />
                       </div>
                       <div className="auth-field">
-                        <label>Confirm Password</label>
+                        <label>Confirm New Password</label>
                         <input
                           type="password"
                           value={resetConfirmPassword}
                           onChange={(e) => setResetConfirmPassword(e.target.value)}
-                          placeholder="Confirm password"
+                          placeholder="Confirm new password"
                           required
                         />
                       </div>
@@ -406,7 +421,7 @@ function LandingPage() {
               {!isSignup && (
                 <div className="auth-forgot">
                   <button className="auth-forgot-btn" onClick={openForgotPassword}>
-                    Forgot password?
+                    Reset Password
                   </button>
                 </div>
               )}

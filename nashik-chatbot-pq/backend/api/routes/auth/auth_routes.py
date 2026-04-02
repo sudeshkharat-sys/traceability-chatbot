@@ -84,8 +84,14 @@ async def reset_password(payload: ResetPasswordDto):
     existing = db.execute_query(AuthQueries.CHECK_USERNAME_EXISTS, {"username": payload.username})
     if not existing:
         raise HTTPException(status_code=404, detail="Username not found")
-    password_hash = hashlib.sha256(payload.new_password.encode()).hexdigest()
-    db.execute_update(AuthQueries.RESET_PASSWORD, {"username": payload.username, "password_hash": password_hash})
+    # Verify current password
+    rows = db.execute_query(AuthQueries.GET_PASSWORD_HASH, {"username": payload.username})
+    stored_hash = rows[0][0] if rows else None
+    current_hash = hashlib.sha256(payload.current_password.encode()).hexdigest()
+    if stored_hash != current_hash:
+        raise HTTPException(status_code=401, detail="Current password is incorrect. Please contact your admin.")
+    new_hash = hashlib.sha256(payload.new_password.encode()).hexdigest()
+    db.execute_update(AuthQueries.RESET_PASSWORD, {"username": payload.username, "password_hash": new_hash})
     logger.info(f"Password reset for user '{payload.username}'")
     return JSONResponse(content={"message": "Password reset successful"})
 

@@ -54,6 +54,10 @@ class AuthQueries:
         UPDATE users SET role = :role WHERE user_id = :user_id
     """
 
+    GET_PASSWORD_HASH = """
+        SELECT password_hash FROM users WHERE username = :username
+    """
+
     RESET_PASSWORD = """
         UPDATE users SET password_hash = :password_hash WHERE username = :username
     """

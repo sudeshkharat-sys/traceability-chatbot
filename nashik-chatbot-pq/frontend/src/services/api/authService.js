@@ -149,11 +149,11 @@ class AuthService {
    * @param {string} path
    * @returns {boolean}
    */
-  async resetPassword(username, newPassword) {
+  async resetPassword(username, currentPassword, newPassword) {
     const response = await fetch(`${backend_url}/auth/reset-password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, new_password: newPassword }),
+      body: JSON.stringify({ username, current_password: currentPassword, new_password: newPassword }),
     });
     if (!response.ok) {
       const error = await response.json();
