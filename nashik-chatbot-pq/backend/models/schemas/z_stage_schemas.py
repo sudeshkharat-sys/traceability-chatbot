@@ -39,28 +39,35 @@ class StationBoxOut(StationBoxBase):
     model_config = {"from_attributes": True}
 
 
-# ── BypassIcon ───────────────────────────────────────────────────────────────
+# ── BuyoffIcon ───────────────────────────────────────────────────────────────
 
-class BypassIconBase(BaseModel):
+class BuyoffIconBase(BaseModel):
     position_x: float = 0.0
     position_y: float = 0.0
 
 
-class BypassIconCreate(BypassIconBase):
+class BuyoffIconCreate(BuyoffIconBase):
     pass
 
 
-class BypassIconUpdate(BaseModel):
+class BuyoffIconUpdate(BaseModel):
     position_x: Optional[float] = None
     position_y: Optional[float] = None
 
 
-class BypassIconOut(BypassIconBase):
+class BuyoffIconOut(BuyoffIconBase):
     id: int
     layout_id: int
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# Backward-compat aliases (keep old names working during transition)
+BypassIconBase   = BuyoffIconBase
+BypassIconCreate = BuyoffIconCreate
+BypassIconUpdate = BuyoffIconUpdate
+BypassIconOut    = BuyoffIconOut
 
 
 # ── Connection ────────────────────────────────────────────────────────────────
@@ -70,8 +77,8 @@ class ConnectionOut(BaseModel):
     layout_id: int
     from_box_id: Optional[int] = None
     to_box_id: Optional[int] = None
-    from_bypass_id: Optional[int] = None
-    to_bypass_id: Optional[int] = None
+    from_buyoff_id: Optional[int] = None
+    to_buyoff_id: Optional[int] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -95,12 +102,13 @@ class LayoutUpdate(BaseModel):
 
 class LayoutOut(LayoutBase):
     id: int
+    user_id: Optional[int] = None
     legend_position_x: Optional[float] = None
     legend_position_y: Optional[float] = None
     created_at: datetime
     updated_at: datetime
     station_boxes: List[StationBoxOut] = []
-    bypass_icons: List[BypassIconOut] = []
+    buyoff_icons: List[BuyoffIconOut] = []
     connections: List[ConnectionOut] = []
 
     model_config = {"from_attributes": True}
@@ -108,6 +116,7 @@ class LayoutOut(LayoutBase):
 
 class LayoutSummary(LayoutBase):
     id: int
+    user_id: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
@@ -129,10 +138,14 @@ class SnapshotBox(BaseModel):
     order_index: int = 0
 
 
-class SnapshotBypassIcon(BaseModel):
+class SnapshotBuyoffIcon(BaseModel):
     local_id: str
     position_x: float = 0.0
     position_y: float = 0.0
+
+
+# Backward-compat alias
+SnapshotBypassIcon = SnapshotBuyoffIcon
 
 
 class SnapshotConnection(BaseModel):
@@ -145,7 +158,7 @@ class LayoutSnapshotCreate(BaseModel):
     legend_position_x: Optional[float] = None
     legend_position_y: Optional[float] = None
     boxes: List[SnapshotBox] = []
-    bypass_icons: List[SnapshotBypassIcon] = []
+    buyoff_icons: List[SnapshotBuyoffIcon] = []
     connections: List[SnapshotConnection] = []
 
 
@@ -153,6 +166,8 @@ class LayoutSnapshotCreate(BaseModel):
 
 class InputRecordOut(BaseModel):
     id: int
+    user_id: Optional[int] = None
+    layout_id: Optional[int] = None
     sr_no: Optional[int] = None
     concern_id: Optional[str] = None
     concern: Optional[str] = None
@@ -181,6 +196,7 @@ class InputRecordOut(BaseModel):
 
 
 class InputRecordUpdate(BaseModel):
+    layout_id: Optional[int] = None
     sr_no: Optional[int] = None
     concern_id: Optional[str] = None
     concern: Optional[str] = None

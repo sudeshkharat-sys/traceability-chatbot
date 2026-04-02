@@ -38,21 +38,22 @@ class QueryValidator:
 
 class LayoutQueries:
     LIST_LAYOUTS = """
-        SELECT id, name, legend_position_x, legend_position_y, created_at, updated_at
+        SELECT id, name, user_id, legend_position_x, legend_position_y, created_at, updated_at
         FROM layouts
+        WHERE (:user_id IS NULL OR user_id = :user_id)
         ORDER BY created_at DESC
     """
 
     GET_LAYOUT = """
-        SELECT id, name, legend_position_x, legend_position_y, created_at, updated_at
+        SELECT id, name, user_id, legend_position_x, legend_position_y, created_at, updated_at
         FROM layouts
         WHERE id = :layout_id
     """
 
     CREATE_LAYOUT = """
-        INSERT INTO layouts (name, created_at, updated_at)
-        VALUES (:name, NOW(), NOW())
-        RETURNING id, name, legend_position_x, legend_position_y, created_at, updated_at
+        INSERT INTO layouts (name, user_id, created_at, updated_at)
+        VALUES (:name, :user_id, NOW(), NOW())
+        RETURNING id, name, user_id, legend_position_x, legend_position_y, created_at, updated_at
     """
 
     UPDATE_LAYOUT = """
@@ -62,7 +63,7 @@ class LayoutQueries:
             legend_position_y  = COALESCE(:legend_position_y, legend_position_y),
             updated_at         = NOW()
         WHERE id = :layout_id
-        RETURNING id, name, legend_position_x, legend_position_y, created_at, updated_at
+        RETURNING id, name, user_id, legend_position_x, legend_position_y, created_at, updated_at
     """
 
     DELETE_LAYOUT = "DELETE FROM layouts WHERE id = :layout_id"
@@ -121,55 +122,59 @@ class StationBoxQueries:
     CHECK_EXISTS = "SELECT id FROM station_boxes WHERE id = :box_id"
 
 
-# ── Bypass icon queries ───────────────────────────────────────────────────────
+# ── Buyoff icon queries ───────────────────────────────────────────────────────
 
-class BypassIconQueries:
+class BuyoffIconQueries:
     LIST_BY_LAYOUT = """
         SELECT id, layout_id, position_x, position_y, created_at
-        FROM bypass_icons
+        FROM buyoff_icons
         WHERE layout_id = :layout_id
         ORDER BY id
     """
 
     GET_ICON = """
         SELECT id, layout_id, position_x, position_y, created_at
-        FROM bypass_icons
+        FROM buyoff_icons
         WHERE id = :icon_id
     """
 
     CREATE_ICON = """
-        INSERT INTO bypass_icons (layout_id, position_x, position_y, created_at)
+        INSERT INTO buyoff_icons (layout_id, position_x, position_y, created_at)
         VALUES (:layout_id, :position_x, :position_y, NOW())
         RETURNING id, layout_id, position_x, position_y, created_at
     """
 
     UPDATE_ICON = """
-        UPDATE bypass_icons
+        UPDATE buyoff_icons
         SET position_x = COALESCE(:position_x, position_x),
             position_y = COALESCE(:position_y, position_y)
         WHERE id = :icon_id
         RETURNING id, layout_id, position_x, position_y, created_at
     """
 
-    DELETE_ICON = "DELETE FROM bypass_icons WHERE id = :icon_id"
+    DELETE_ICON = "DELETE FROM buyoff_icons WHERE id = :icon_id"
 
-    CHECK_EXISTS = "SELECT id FROM bypass_icons WHERE id = :icon_id"
+    CHECK_EXISTS = "SELECT id FROM buyoff_icons WHERE id = :icon_id"
+
+
+# Keep alias for any code that still uses the old name during transition
+BypassIconQueries = BuyoffIconQueries
 
 
 # ── Connection queries ────────────────────────────────────────────────────────
 
 class ConnectionQueries:
     LIST_BY_LAYOUT = """
-        SELECT id, layout_id, from_box_id, to_box_id, from_bypass_id, to_bypass_id, created_at
+        SELECT id, layout_id, from_box_id, to_box_id, from_buyoff_id, to_buyoff_id, created_at
         FROM box_connections
         WHERE layout_id = :layout_id
         ORDER BY id
     """
 
     CREATE_CONNECTION = """
-        INSERT INTO box_connections (layout_id, from_box_id, to_box_id, from_bypass_id, to_bypass_id, created_at)
-        VALUES (:layout_id, :from_box_id, :to_box_id, :from_bypass_id, :to_bypass_id, NOW())
-        RETURNING id, layout_id, from_box_id, to_box_id, from_bypass_id, to_bypass_id, created_at
+        INSERT INTO box_connections (layout_id, from_box_id, to_box_id, from_buyoff_id, to_buyoff_id, created_at)
+        VALUES (:layout_id, :from_box_id, :to_box_id, :from_buyoff_id, :to_buyoff_id, NOW())
+        RETURNING id, layout_id, from_box_id, to_box_id, from_buyoff_id, to_buyoff_id, created_at
     """
 
     DELETE_CONNECTION = "DELETE FROM box_connections WHERE id = :conn_id"
@@ -181,25 +186,30 @@ class ConnectionQueries:
 
 class SnapshotQueries:
     DELETE_CONNECTIONS = "DELETE FROM box_connections WHERE layout_id = :layout_id"
-    DELETE_BYPASS_ICONS = "DELETE FROM bypass_icons WHERE layout_id = :layout_id"
+    DELETE_BUYOFF_ICONS = "DELETE FROM buyoff_icons WHERE layout_id = :layout_id"
     DELETE_STATION_BOXES = "DELETE FROM station_boxes WHERE layout_id = :layout_id"
+
+    # Keep old name as alias
+    DELETE_BYPASS_ICONS = DELETE_BUYOFF_ICONS
 
 
 # ── Input record queries ───────────────────────────────────────────────────────
 
 class InputRecordQueries:
     LIST_ALL = """
-        SELECT id, sr_no, concern_id, concern, type, root_cause, action_plan,
+        SELECT id, user_id, layout_id, sr_no, concern_id, concern, type, root_cause, action_plan,
                target_date, closure_date, ryg, attri, comm, line, stage_no,
                z_e, attribution, part, phenomena, total_incidences,
                monthly_data, field_defect_after_cutoff, status_3m,
                created_at, updated_at
         FROM input_records
+        WHERE (:user_id IS NULL OR user_id = :user_id)
+          AND (:layout_id IS NULL OR layout_id = :layout_id)
         ORDER BY sr_no, id
     """
 
     GET_BY_ID = """
-        SELECT id, sr_no, concern_id, concern, type, root_cause, action_plan,
+        SELECT id, user_id, layout_id, sr_no, concern_id, concern, type, root_cause, action_plan,
                target_date, closure_date, ryg, attri, comm, line, stage_no,
                z_e, attribution, part, phenomena, total_incidences,
                monthly_data, field_defect_after_cutoff, status_3m,
@@ -210,19 +220,21 @@ class InputRecordQueries:
 
     CREATE = """
         INSERT INTO input_records (
+            user_id, layout_id,
             sr_no, concern_id, concern, type, root_cause, action_plan,
             target_date, closure_date, ryg, attri, comm, line, stage_no,
             z_e, attribution, part, phenomena, total_incidences,
             monthly_data, field_defect_after_cutoff, status_3m,
             created_at, updated_at
         ) VALUES (
+            :user_id, :layout_id,
             :sr_no, :concern_id, :concern, :type, :root_cause, :action_plan,
             :target_date, :closure_date, :ryg, :attri, :comm, :line, :stage_no,
             :z_e, :attribution, :part, :phenomena, :total_incidences,
             :monthly_data, :field_defect_after_cutoff, :status_3m,
             NOW(), NOW()
         )
-        RETURNING id, sr_no, concern_id, concern, type, root_cause, action_plan,
+        RETURNING id, user_id, layout_id, sr_no, concern_id, concern, type, root_cause, action_plan,
                   target_date, closure_date, ryg, attri, comm, line, stage_no,
                   z_e, attribution, part, phenomena, total_incidences,
                   monthly_data, field_defect_after_cutoff, status_3m,
@@ -254,13 +266,13 @@ class InputRecordQueries:
             status_3m                = COALESCE(:status_3m, status_3m),
             updated_at               = NOW()
         WHERE id = :record_id
-        RETURNING id, sr_no, concern_id, concern, type, root_cause, action_plan,
+        RETURNING id, user_id, layout_id, sr_no, concern_id, concern, type, root_cause, action_plan,
                   target_date, closure_date, ryg, attri, comm, line, stage_no,
                   z_e, attribution, part, phenomena, total_incidences,
                   monthly_data, field_defect_after_cutoff, status_3m,
                   created_at, updated_at
     """
 
-    DELETE_ALL = "DELETE FROM input_records"
+    DELETE_ALL = "DELETE FROM input_records WHERE (:user_id IS NULL OR user_id = :user_id) AND (:layout_id IS NULL OR layout_id = :layout_id)"
 
     CHECK_EXISTS = "SELECT id FROM input_records WHERE id = :record_id"

@@ -30,7 +30,7 @@ router.include_router(part_labeler_router, prefix="/part-labeler", tags=["part_l
 
 router.include_router(layout_router, prefix="/z-stage", tags=["z_stage_layouts"])
 router.include_router(
-    bypass_icon_router, prefix="/z-stage", tags=["z_stage_bypass_icons"]
+    bypass_icon_router, prefix="/z-stage", tags=["z_stage_buyoff_icons"]
 )
 router.include_router(
     station_box_router, prefix="/z-stage", tags=["z_stage_station_boxes"]

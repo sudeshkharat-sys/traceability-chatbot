@@ -321,7 +321,7 @@ function StationDetailModal({ stationId, records, allMonths, onSaved, onClose })
 // ── Parse API layout into flat state ─────────────────────────────────────────
 function parseLayout(apiLayout) {
   if (!apiLayout || typeof apiLayout !== 'object') {
-    return { boxes: [], bypassIcons: [], connections: [] };
+    return { boxes: [], buyoffIcons: [], connections: [] };
   }
   const boxes = (apiLayout.station_boxes || []).map((b) => {
     let description = '';
@@ -342,30 +342,30 @@ function parseLayout(apiLayout) {
     };
   });
 
-  const bypassIcons = (apiLayout.bypass_icons || []).map((ic) => ({
-    id: `db-bypass-${ic.id}`,
+  const buyoffIcons = (apiLayout.buyoff_icons || []).map((ic) => ({
+    id: `db-buyoff-${ic.id}`,
     position: { x: ic.position_x, y: ic.position_y },
   }));
 
   const connections = (apiLayout.connections || []).map((c) => ({
     id: `db-conn-${c.id}`,
-    fromId: c.from_box_id != null ? `db-box-${c.from_box_id}` : `db-bypass-${c.from_bypass_id}`,
-    toId:   c.to_box_id   != null ? `db-box-${c.to_box_id}`   : `db-bypass-${c.to_bypass_id}`,
+    fromId: c.from_box_id != null ? `db-box-${c.from_box_id}` : `db-buyoff-${c.from_buyoff_id}`,
+    toId:   c.to_box_id   != null ? `db-box-${c.to_box_id}`   : `db-buyoff-${c.to_buyoff_id}`,
   }));
 
   // Normalize negative coordinates — shift everything so min x/y ≥ GRID (40px)
-  const allX = [...boxes.map((b) => b.position.x), ...bypassIcons.map((ic) => ic.position.x)];
-  const allY = [...boxes.map((b) => b.position.y), ...bypassIcons.map((ic) => ic.position.y)];
+  const allX = [...boxes.map((b) => b.position.x), ...buyoffIcons.map((ic) => ic.position.x)];
+  const allY = [...boxes.map((b) => b.position.y), ...buyoffIcons.map((ic) => ic.position.y)];
   const shiftX = allX.length ? Math.max(0, GRID - Math.min(...allX)) : 0;
   const shiftY = allY.length ? Math.max(0, GRID - Math.min(...allY)) : 0;
   const shiftedBoxes = shiftX || shiftY
     ? boxes.map((b) => ({ ...b, position: { x: b.position.x + shiftX, y: b.position.y + shiftY } }))
     : boxes;
-  const shiftedBypass = shiftX || shiftY
-    ? bypassIcons.map((ic) => ({ ...ic, position: { x: ic.position.x + shiftX, y: ic.position.y + shiftY } }))
-    : bypassIcons;
+  const shiftedBuyoff = shiftX || shiftY
+    ? buyoffIcons.map((ic) => ({ ...ic, position: { x: ic.position.x + shiftX, y: ic.position.y + shiftY } }))
+    : buyoffIcons;
 
-  return { boxes: shiftedBoxes, bypassIcons: shiftedBypass, connections };
+  return { boxes: shiftedBoxes, buyoffIcons: shiftedBuyoff, connections };
 }
 
 // ── Compute display data for one station ──────────────────────────────────────
@@ -560,11 +560,11 @@ function LegendBox({ legendData, position, transformScale, onDragEnd }) {
 }
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
-function ZStageDashboard() {
+function ZStageDashboard({ userId }) {
   const [layouts, setLayouts]         = useState([]);
   const [selectedId, setSelectedId]   = useState(null);
   const [boxes, setBoxes]             = useState([]);
-  const [bypassIcons, setBypassIcons] = useState([]);
+  const [buyoffIcons, setBuyoffIcons] = useState([]);
   const [connections, setConnections] = useState([]);
   const [records, setRecords]         = useState([]);
   const [loading, setLoading]         = useState(false);
@@ -581,9 +581,9 @@ function ZStageDashboard() {
   const canvasRef   = useRef(null);
   const transformRef = useRef(null);
 
-  const fitView = useCallback((loadedBoxes, loadedBypassIcons) => {
+  const fitView = useCallback((loadedBoxes, loadedBuyoffIcons) => {
     if (!transformRef.current) return;
-    if (loadedBoxes.length === 0 && loadedBypassIcons.length === 0) return;
+    if (loadedBoxes.length === 0 && loadedBuyoffIcons.length === 0) return;
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     const BOX_H = 4 * GRID; // 160px — mirrors LayoutPreparation boxSize height
@@ -596,7 +596,7 @@ function ZStageDashboard() {
       maxY = Math.max(maxY, box.position.y + BOX_H);
     });
 
-    loadedBypassIcons.forEach((icon) => {
+    loadedBuyoffIcons.forEach((icon) => {
       minX = Math.min(minX, icon.position.x);
       minY = Math.min(minY, icon.position.y);
       maxX = Math.max(maxX, icon.position.x + 62);
@@ -634,41 +634,39 @@ function ZStageDashboard() {
 
   // Load layout list + input records on mount
   useEffect(() => {
-    layoutApi.getLayouts()
+    layoutApi.getLayouts(userId)
       .then((r) => {
-        console.log('[ZStageDashboard] /layouts response:', r.data);
         const list = Array.isArray(r.data) ? r.data : [];
         setLayouts(list);
         if (list.length > 0) setSelectedId(list[0].id);
         else setError('No layouts found. Create and save a layout first.');
       })
-      .catch((err) => {
-        console.error('[ZStageDashboard] /layouts error:', err);
+      .catch(() => {
         setError('Failed to load layouts — check backend is running on port 5000');
       });
+  }, [userId]);
 
-    inputApi.getRecords()
-      .then((r) => setRecords(Array.isArray(r.data) ? r.data : []))
-      .catch(() => {});
-  }, []);
-
-  // Load layout when selection changes
+  // Load layout + records when selection changes
   useEffect(() => {
     if (!selectedId) return;
     setLoading(true);
     setError(null);
-    layoutApi.getLayout(selectedId)
-      .then((r) => {
-        const state = parseLayout(r.data);
+
+    Promise.all([
+      layoutApi.getLayout(selectedId),
+      inputApi.getRecords(userId, selectedId),
+    ])
+      .then(([layoutRes, recordsRes]) => {
+        const state = parseLayout(layoutRes.data);
         setBoxes(state.boxes);
-        setBypassIcons(state.bypassIcons);
+        setBuyoffIcons(state.buyoffIcons);
         setConnections(state.connections);
+        setRecords(Array.isArray(recordsRes.data) ? recordsRes.data : []);
 
         // Restore saved legend position or compute a default to the right of content
-        if (r.data.legend_position_x != null && r.data.legend_position_y != null) {
-          setLegendPos({ x: r.data.legend_position_x, y: r.data.legend_position_y });
+        if (layoutRes.data.legend_position_x != null && layoutRes.data.legend_position_y != null) {
+          setLegendPos({ x: layoutRes.data.legend_position_x, y: layoutRes.data.legend_position_y });
         } else {
-          // Place legend to the right of all boxes, aligned to their top
           const allBoxes = state.boxes;
           if (allBoxes.length > 0) {
             const maxX = Math.max(...allBoxes.map((b) => b.position.x + boxWidth(b.stationIds.length)));
@@ -679,21 +677,23 @@ function ZStageDashboard() {
           }
         }
 
-        setTimeout(() => fitView(state.boxes, state.bypassIcons), 80);
+        setTimeout(() => fitView(state.boxes, state.buyoffIcons), 80);
       })
       .catch(() => setError('Failed to load layout'))
       .finally(() => setLoading(false));
-  }, [selectedId, fitView]);
+  }, [selectedId, userId, fitView]);
 
   const handleRefresh = () => {
     setRefreshing(true);
-    const calls = [inputApi.getRecords().then((r) => setRecords(Array.isArray(r.data) ? r.data : []))];
+    const calls = [
+      inputApi.getRecords(userId, selectedId).then((r) => setRecords(Array.isArray(r.data) ? r.data : [])),
+    ];
     if (selectedId) {
       calls.push(
         layoutApi.getLayout(selectedId).then((r) => {
           const state = parseLayout(r.data);
           setBoxes(state.boxes);
-          setBypassIcons(state.bypassIcons);
+          setBuyoffIcons(state.buyoffIcons);
           setConnections(state.connections);
         })
       );
@@ -801,22 +801,22 @@ function ZStageDashboard() {
                     <div className="dash-virtual-canvas" style={{ width: CANVAS_SIZE, height: CANVAS_SIZE }}>
 
                       {/* Empty state */}
-                      {boxes.length === 0 && bypassIcons.length === 0 && (
+                      {boxes.length === 0 && buyoffIcons.length === 0 && (
                         <div className="dash-empty">
                           <p>No layout data to display.</p>
                           <p>Design a layout in the <strong>Layout</strong> section and upload data in the <strong>Input</strong> section.</p>
                         </div>
                       )}
 
-                      {/* Bypass icons */}
-                      {bypassIcons.map((icon) => (
+                      {/* Buyoff icons */}
+                      {buyoffIcons.map((icon) => (
                         <div
                           key={icon.id}
                           id={icon.id}
-                          className="dash-bypass"
+                          className="dash-buyoff"
                           style={{ position: 'absolute', left: icon.position.x, top: icon.position.y }}
                         >
-                          <div className="dash-bypass-diamond">
+                          <div className="dash-buyoff-diamond">
                             <GitBranch size={14} />
                           </div>
                         </div>

@@ -137,14 +137,14 @@
   background-color: rgba(255, 255, 255, 0.14);
 }
 
-/* Bypass */
-.sidebar-sub-btn--bypass {
+/* Buyoff */
+.sidebar-sub-btn--buyoff {
   background-color: rgba(246, 201, 14, 0.1);
   color: #f6e05e;
   border-color: rgba(246, 201, 14, 0.25);
 }
 
-.sidebar-sub-btn--bypass:hover {
+.sidebar-sub-btn--buyoff:hover {
   background-color: rgba(246, 201, 14, 0.2);
 }
 

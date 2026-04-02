@@ -403,8 +403,8 @@
 
 /* No trailing borders needed — all cell borders removed */
 
-/* ── Bypass icon (read-only diamond — matches LayoutPreparation orange style) */
-.dash-bypass {
+/* ── Buyoff icon (read-only diamond — matches LayoutPreparation orange style) */
+.dash-buyoff {
   width: 62px;
   height: 62px;
   display: flex;
@@ -413,7 +413,7 @@
   z-index: 5;
 }
 
-.dash-bypass-diamond {
+.dash-buyoff-diamond {
   width: 44px;
   height: 44px;
   background-color: #f6c90e;
@@ -425,7 +425,7 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
 }
 
-.dash-bypass-diamond svg {
+.dash-buyoff-diamond svg {
   transform: rotate(-45deg);
   color: var(--mahindra-red-dark, #8b0000);
 }

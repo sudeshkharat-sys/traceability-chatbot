@@ -4,16 +4,17 @@ import LayoutPreparation from './LayoutPreparation/LayoutPreparation';
 import InputData from './InputData/InputData';
 import ZStageDashboard from './ZStageDashboard/ZStageDashboard';
 import { layoutApi } from '../../services/api/layoutApi';
+import authService from '../../services/api/authService';
 import utilityLogo from '../../assests/image.png';
-import mahindraRiseLogo from '../../assests/mahindra_rise_logo.png';
 import './ZStage.css';
 
 function ZStage() {
   const [activeSection, setActiveSection] = useState('layout');
+  const userId = authService.getUserId();
 
   // ── Layout Preparation state lifted to App so Sidebar can trigger it ────────
   const [showAddBoxModal, setShowAddBoxModal] = useState(false);
-  const [addBypassSignal, setAddBypassSignal] = useState(0);
+  const [addBuyoffSignal, setAddBuyoffSignal] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [savedLayouts, setSavedLayouts] = useState([]);
 
@@ -21,10 +22,10 @@ function ZStage() {
   const loadHandlerRef = useRef(null);
 
   useEffect(() => {
-    layoutApi.getLayouts()
+    layoutApi.getLayouts(userId)
       .then((res) => setSavedLayouts(Array.isArray(res.data) ? res.data : []))
       .catch(() => {});
-  }, []);
+  }, [userId]);
 
   const handleSaveLayout = async () => {
     if (!saveHandlerRef.current) return;
@@ -32,7 +33,7 @@ function ZStage() {
     const ok = await saveHandlerRef.current();
     setIsSaving(false);
     if (ok) {
-      layoutApi.getLayouts()
+      layoutApi.getLayouts(userId)
         .then((res) => setSavedLayouts(Array.isArray(res.data) ? res.data : []))
         .catch(() => {});
     }
@@ -44,7 +45,7 @@ function ZStage() {
 
   const layoutActions = {
     onAddBox: () => setShowAddBoxModal(true),
-    onAddBypass: () => setAddBypassSignal((s) => s + 1),
+    onAddBuyoff: () => setAddBuyoffSignal((s) => s + 1),
     onSaveLayout: handleSaveLayout,
     onLoadLayout: handleLoadLayout,
     savedLayouts,
@@ -66,13 +67,18 @@ function ZStage() {
           <LayoutPreparation
             showAddBoxModal={showAddBoxModal}
             onCloseAddBoxModal={() => setShowAddBoxModal(false)}
-            addBypassSignal={addBypassSignal}
+            addBuyoffSignal={addBuyoffSignal}
             onSaveLayout={(fn) => { saveHandlerRef.current = fn; }}
             onLoadLayout={(fn) => { loadHandlerRef.current = fn; }}
+            userId={userId}
           />
         )}
-        {activeSection === 'input' && <InputData />}
-        {activeSection === 'dashboard' && <ZStageDashboard />}
+        {activeSection === 'input' && (
+          <InputData userId={userId} layouts={savedLayouts} />
+        )}
+        {activeSection === 'dashboard' && (
+          <ZStageDashboard userId={userId} />
+        )}
       </main>
     </div>
   );

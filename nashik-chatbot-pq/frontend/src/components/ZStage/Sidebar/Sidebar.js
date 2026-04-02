@@ -26,7 +26,7 @@ function Sidebar({ activeSection, onSectionChange, layoutActions }) {
 
   const {
     onAddBox,
-    onAddBypass,
+    onAddBuyoff,
     onSaveLayout,
     onLoadLayout,
     savedLayouts = [],
@@ -84,9 +84,9 @@ function Sidebar({ activeSection, onSectionChange, layoutActions }) {
                   Add Box
                 </button>
 
-                <button className="sidebar-sub-btn sidebar-sub-btn--bypass" onClick={onAddBypass}>
+                <button className="sidebar-sub-btn sidebar-sub-btn--buyoff" onClick={onAddBuyoff}>
                   <Diamond size={14} className="sidebar-diamond-icon" />
-                  Add Bypass
+                  Add Buyoff
                 </button>
 
                 <div className="sidebar-sub-divider" />

@@ -3,7 +3,7 @@ import Xarrow, { Xwrapper } from 'react-xarrows';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Pencil, LayoutGrid, Trash2, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import StationBox from './StationBox/StationBox';
-import BypassIcon from './BypassIcon/BypassIcon';
+import BuyoffIcon from './BypassIcon/BypassIcon';
 import AddBoxModal from './AddBoxModal/AddBoxModal';
 import { layoutApi } from '../../../services/api/layoutApi';
 import './LayoutPreparation.css';
@@ -101,44 +101,45 @@ function stateFromApi(apiLayout) {
     };
   });
 
-  const bypassIcons = (apiLayout.bypass_icons || []).map((ic) => ({
-    id: `db-bypass-${ic.id}`,
+  const buyoffIcons = (apiLayout.buyoff_icons || []).map((ic) => ({
+    id: `db-buyoff-${ic.id}`,
     dbId: ic.id,
     position: { x: ic.position_x, y: ic.position_y },
   }));
 
   const connections = (apiLayout.connections || []).map((c) => ({
     id: `db-conn-${c.id}`,
-    fromId: c.from_box_id != null ? `db-box-${c.from_box_id}` : `db-bypass-${c.from_bypass_id}`,
-    toId:   c.to_box_id   != null ? `db-box-${c.to_box_id}`   : `db-bypass-${c.to_bypass_id}`,
+    fromId: c.from_box_id != null ? `db-box-${c.from_box_id}` : `db-buyoff-${c.from_buyoff_id}`,
+    toId:   c.to_box_id   != null ? `db-box-${c.to_box_id}`   : `db-buyoff-${c.to_buyoff_id}`,
   }));
 
   // Normalize: if any element has a negative x/y, shift everything so the
   // minimum coordinate is at (GRID, GRID). This fixes layouts where elements
   // were accidentally dragged into negative canvas space.
-  const allX = [...boxes.map((b) => b.position.x), ...bypassIcons.map((ic) => ic.position.x)];
-  const allY = [...boxes.map((b) => b.position.y), ...bypassIcons.map((ic) => ic.position.y)];
+  const allX = [...boxes.map((b) => b.position.x), ...buyoffIcons.map((ic) => ic.position.x)];
+  const allY = [...boxes.map((b) => b.position.y), ...buyoffIcons.map((ic) => ic.position.y)];
   const shiftX = allX.length ? Math.max(0, GRID - Math.min(...allX)) : 0;
   const shiftY = allY.length ? Math.max(0, GRID - Math.min(...allY)) : 0;
   const shiftedBoxes = shiftX || shiftY
     ? boxes.map((b) => ({ ...b, position: { x: b.position.x + shiftX, y: b.position.y + shiftY } }))
     : boxes;
-  const shiftedBypass = shiftX || shiftY
-    ? bypassIcons.map((ic) => ({ ...ic, position: { x: ic.position.x + shiftX, y: ic.position.y + shiftY } }))
-    : bypassIcons;
+  const shiftedBuyoff = shiftX || shiftY
+    ? buyoffIcons.map((ic) => ({ ...ic, position: { x: ic.position.x + shiftX, y: ic.position.y + shiftY } }))
+    : buyoffIcons;
 
-  return { boxes: shiftedBoxes, bypassIcons: shiftedBypass, connections };
+  return { boxes: shiftedBoxes, buyoffIcons: shiftedBuyoff, connections };
 }
 
 function LayoutPreparation({
   showAddBoxModal,
   onCloseAddBoxModal,
-  addBypassSignal,
+  addBuyoffSignal,
   onSaveLayout,
   onLoadLayout,
+  userId,
 }) {
   const [boxes, setBoxes] = useState([]);
-  const [bypassIcons, setBypassIcons] = useState([]);
+  const [buyoffIcons, setBuyoffIcons] = useState([]);
   const [connections, setConnections] = useState([]);
   const [layoutName, setLayoutName] = useState('New Layout');
   const [editingName, setEditingName] = useState(false);
@@ -153,9 +154,9 @@ function LayoutPreparation({
   const transformRef = useRef(null);
 
   // Fit the view so all loaded elements are visible with padding
-  const fitView = useCallback((loadedBoxes, loadedBypassIcons) => {
+  const fitView = useCallback((loadedBoxes, loadedBuyoffIcons) => {
     if (!transformRef.current) return;
-    if (loadedBoxes.length === 0 && loadedBypassIcons.length === 0) return;
+    if (loadedBoxes.length === 0 && loadedBuyoffIcons.length === 0) return;
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
@@ -168,7 +169,7 @@ function LayoutPreparation({
       maxY = Math.max(maxY, box.position.y + h);
     });
 
-    loadedBypassIcons.forEach((icon) => {
+    loadedBuyoffIcons.forEach((icon) => {
       minX = Math.min(minX, icon.position.x);
       minY = Math.min(minY, icon.position.y);
       maxX = Math.max(maxX, icon.position.x + BYPASS_SIZE);
@@ -207,7 +208,7 @@ function LayoutPreparation({
     const onUp = (e) => {
       // Use bounding-rect hit-test so the connection always lands on the box
       // the cursor is actually inside — not on a nearby/overlapping box.
-      const candidates = document.querySelectorAll('.station-box, .bypass-icon-wrapper');
+      const candidates = document.querySelectorAll('.station-box, .buyoff-icon-wrapper');
       let targetId = null;
       for (const el of candidates) {
         if (el.id === dragging.fromId) continue;
@@ -239,7 +240,7 @@ function LayoutPreparation({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragging?.fromId]);
 
-  // Called by StationBox / BypassIcon when user mousedowns on a connection port
+  // Called by StationBox / BuyoffIcon when user mousedowns on a connection port
   const handlePortMouseDown = useCallback((fromId, clientX, clientY) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -249,11 +250,11 @@ function LayoutPreparation({
     setDragPos({ x2: x, y2: y });
   }, []);
 
-  // Add bypass icon when parent signals it
+  // Add buyoff icon when parent signals it
   useEffect(() => {
-    if (addBypassSignal > 0) handleAddBypass();
+    if (addBuyoffSignal > 0) handleAddBuyoff();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addBypassSignal]);
+  }, [addBuyoffSignal]);
 
   // ── Box actions ─────────────────────────────────────────────────────────────
   const handleAddBox = useCallback((boxData) => {
@@ -298,22 +299,22 @@ function LayoutPreparation({
     setConnections((prev) => prev.filter((c) => c.fromId !== id && c.toId !== id));
   }, []);
 
-  // ── Bypass icon actions ─────────────────────────────────────────────────────
-  const handleAddBypass = useCallback(() => {
+  // ── Buyoff icon actions ─────────────────────────────────────────────────────
+  const handleAddBuyoff = useCallback(() => {
     const id = uid();
-    setBypassIcons((prev) => [
+    setBuyoffIcons((prev) => [
       ...prev,
       { id, dbId: null, position: { x: snapBypass(GRID + prev.length * GRID * 2), y: snapBypass(GRID) } },
     ]);
   }, []);
 
-  const handleBypassPositionChange = useCallback((id, rawPos) => {
+  const handleBuyoffPositionChange = useCallback((id, rawPos) => {
     const snapped = { x: snapBypass(rawPos.x), y: snapBypass(rawPos.y) };
-    setBypassIcons((prev) => prev.map((b) => (b.id === id ? { ...b, position: snapped } : b)));
+    setBuyoffIcons((prev) => prev.map((b) => (b.id === id ? { ...b, position: snapped } : b)));
   }, []);
 
-  const handleDeleteBypass = useCallback((id) => {
-    setBypassIcons((prev) => prev.filter((b) => b.id !== id));
+  const handleDeleteBuyoff = useCallback((id) => {
+    setBuyoffIcons((prev) => prev.filter((b) => b.id !== id));
     setConnections((prev) => prev.filter((c) => c.fromId !== id && c.toId !== id));
   }, []);
 
@@ -337,7 +338,7 @@ function LayoutPreparation({
         position_y: b.position.y,
         order_index: b.orderIndex,
       })),
-      bypass_icons: bypassIcons.map((ic) => ({
+      buyoff_icons: buyoffIcons.map((ic) => ({
         local_id: ic.id,
         position_x: ic.position.x,
         position_y: ic.position.y,
@@ -353,13 +354,13 @@ function LayoutPreparation({
       if (currentLayoutId) {
         response = await layoutApi.updateSnapshot(currentLayoutId, payload);
       } else {
-        response = await layoutApi.createSnapshot(payload);
+        response = await layoutApi.createSnapshot(payload, userId);
       }
       const saved = response.data;
       setCurrentLayoutId(saved.id);
       const rebuilt = stateFromApi(saved);
       setBoxes(rebuilt.boxes);
-      setBypassIcons(rebuilt.bypassIcons);
+      setBuyoffIcons(rebuilt.buyoffIcons);
       setConnections(rebuilt.connections);
       setLayoutName(saved.name);
       return true;
@@ -367,7 +368,7 @@ function LayoutPreparation({
       console.error('Save failed:', err);
       return false;
     }
-  }, [layoutName, boxes, bypassIcons, connections, currentLayoutId]);
+  }, [layoutName, boxes, buyoffIcons, connections, currentLayoutId, userId]);
 
   // ── Load layout ─────────────────────────────────────────────────────────────
   const handleLoad = useCallback(async (layoutId) => {
@@ -376,12 +377,12 @@ function LayoutPreparation({
       const data = response.data;
       const rebuilt = stateFromApi(data);
       setBoxes(rebuilt.boxes);
-      setBypassIcons(rebuilt.bypassIcons);
+      setBuyoffIcons(rebuilt.buyoffIcons);
       setConnections(rebuilt.connections);
       setLayoutName(data.name);
       setCurrentLayoutId(data.id);
       // Auto-fit: wait one tick for React to render new positions, then zoom to fit
-      setTimeout(() => fitView(rebuilt.boxes, rebuilt.bypassIcons), 80);
+      setTimeout(() => fitView(rebuilt.boxes, rebuilt.buyoffIcons), 80);
     } catch (err) {
       console.error('Load failed:', err);
     }
@@ -391,7 +392,7 @@ function LayoutPreparation({
   const handleClearAll = () => {
     if (window.confirm('Clear the canvas? (Saved layouts are not deleted.)')) {
       setBoxes([]);
-      setBypassIcons([]);
+      setBuyoffIcons([]);
       setConnections([]);
       setCurrentLayoutId(null);
       setLayoutName('New Layout');
@@ -446,7 +447,7 @@ function LayoutPreparation({
         {/* Stats bar */}
         <div className="layout-stats">
           <span className="layout-stat"><strong>{boxes.length}</strong> Boxes</span>
-          <span className="layout-stat"><strong>{bypassIcons.length}</strong> Bypass Icons</span>
+          <span className="layout-stat"><strong>{buyoffIcons.length}</strong> Buyoff Icons</span>
           <span className="layout-stat"><strong>{connections.length}</strong> Connections</span>
           <span className="layout-stat layout-stat--hint">Scroll to zoom · Drag canvas to pan</span>
         </div>
@@ -466,7 +467,7 @@ function LayoutPreparation({
             minScale={0.15}
             maxScale={3}
             wheel={{ step: 0.08 }}
-            panning={{ excluded: ['station-box-header', 'bypass-drag-handle', 'station-port', 'bypass-port'] }}
+            panning={{ excluded: ['station-box-header', 'buyoff-drag-handle', 'station-port', 'buyoff-port'] }}
             onTransformed={(_, state) => {
                 setCanvasScale(state.scale);
                 setTransformState({ scale: state.scale, positionX: state.positionX, positionY: state.positionY });
@@ -482,7 +483,7 @@ function LayoutPreparation({
                     className="layout-virtual-canvas"
                     style={{ width: CANVAS_SIZE, height: CANVAS_SIZE }}
                   >
-                    {boxes.length === 0 && bypassIcons.length === 0 && (
+                    {boxes.length === 0 && buyoffIcons.length === 0 && (
                       <div className="layout-canvas-empty">
                         <div className="layout-canvas-empty-icon">
                           <LayoutGrid size={52} strokeWidth={1} />
@@ -492,13 +493,13 @@ function LayoutPreparation({
                       </div>
                     )}
 
-                    {bypassIcons.map((icon) => (
-                      <BypassIcon
+                    {buyoffIcons.map((icon) => (
+                      <BuyoffIcon
                         key={icon.id}
                         id={icon.id}
                         position={icon.position}
-                        onPositionChange={handleBypassPositionChange}
-                        onDelete={handleDeleteBypass}
+                        onPositionChange={handleBuyoffPositionChange}
+                        onDelete={handleDeleteBuyoff}
                         onPortMouseDown={handlePortMouseDown}
                         canvasScale={canvasScale}
                       />

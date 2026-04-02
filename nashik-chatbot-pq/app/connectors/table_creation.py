@@ -697,6 +697,7 @@ create_dynamic_table(
             server_default=layout_id_seq.next_value(),
         ),
         Column("name", String(255), nullable=False),
+        Column("user_id", Integer, nullable=True),
         Column("legend_position_x", Float, nullable=True),
         Column("legend_position_y", Float, nullable=True),
         Column(
@@ -767,10 +768,10 @@ create_dynamic_table(
 )
 
 
-# ── bypass_icons ──────────────────────────────────────────────────────────────
+# ── buyoff_icons ──────────────────────────────────────────────────────────────
 
 create_dynamic_table(
-    "bypass_icons",
+    "buyoff_icons",
     [
         Column(
             "id",
@@ -795,7 +796,7 @@ create_dynamic_table(
         ),
     ],
     indexes=[
-        Index("idx_bypass_icons_layout_id", "layout_id"),
+        Index("idx_buyoff_icons_layout_id", "layout_id"),
     ],
 )
 
@@ -831,15 +832,15 @@ create_dynamic_table(
             nullable=True,
         ),
         Column(
-            "from_bypass_id",
+            "from_buyoff_id",
             Integer,
-            ForeignKey("bypass_icons.id", ondelete="CASCADE"),
+            ForeignKey("buyoff_icons.id", ondelete="CASCADE"),
             nullable=True,
         ),
         Column(
-            "to_bypass_id",
+            "to_buyoff_id",
             Integer,
-            ForeignKey("bypass_icons.id", ondelete="CASCADE"),
+            ForeignKey("buyoff_icons.id", ondelete="CASCADE"),
             nullable=True,
         ),
         Column(
@@ -853,6 +854,8 @@ create_dynamic_table(
         Index("idx_box_connections_layout_id", "layout_id"),
         Index("idx_box_connections_from", "from_box_id"),
         Index("idx_box_connections_to", "to_box_id"),
+        Index("idx_box_connections_from_buyoff", "from_buyoff_id"),
+        Index("idx_box_connections_to_buyoff", "to_buyoff_id"),
     ],
 )
 
@@ -868,6 +871,13 @@ create_dynamic_table(
             input_record_id_seq,
             primary_key=True,
             server_default=input_record_id_seq.next_value(),
+        ),
+        Column("user_id", Integer, nullable=True),
+        Column(
+            "layout_id",
+            Integer,
+            ForeignKey("layouts.id", ondelete="SET NULL"),
+            nullable=True,
         ),
         Column("sr_no", Integer, nullable=True),
         Column("concern_id", String(255), nullable=True),

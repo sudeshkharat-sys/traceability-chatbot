@@ -4,7 +4,7 @@ import { useXarrow } from 'react-xarrows';
 import { GitBranch, X, Trash2 } from 'lucide-react';
 import './BypassIcon.css';
 
-function BypassIcon({ id, position: parentPosition, onPositionChange, onDelete, onPortMouseDown, canvasScale }) {
+function BuyoffIcon({ id, position: parentPosition, onPositionChange, onDelete, onPortMouseDown, canvasScale }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [pos, setPos] = useState(parentPosition || { x: 0, y: 0 });
   const nodeRef = useRef(null);
@@ -44,43 +44,43 @@ function BypassIcon({ id, position: parentPosition, onPositionChange, onDelete, 
       position={pos}
       onDrag={handleDrag}
       onStop={handleDragStop}
-      handle=".bypass-drag-handle"
+      handle=".buyoff-drag-handle"
       scale={canvasScale || 1}
       grid={[40, 40]}
     >
-      <div ref={nodeRef} id={id} className="bypass-icon-wrapper">
-        <div className="bypass-drag-handle bypass-diamond" onClick={toggleExpand} title="Bypass / Connect">
-          <span className="bypass-diamond-inner"><GitBranch size={14} /></span>
+      <div ref={nodeRef} id={id} className="buyoff-icon-wrapper">
+        <div className="buyoff-drag-handle buyoff-diamond" onClick={toggleExpand} title="Buyoff / Connect">
+          <span className="buyoff-diamond-inner"><GitBranch size={14} /></span>
         </div>
 
         {/* Connection ports — visible on hover */}
-        <button className="bypass-port bypass-port--right" onMouseDown={handlePortDown} title="Drag to connect" />
-        <button className="bypass-port bypass-port--left"  onMouseDown={handlePortDown} title="Drag to connect" />
-        <button className="bypass-port bypass-port--top"   onMouseDown={handlePortDown} title="Drag to connect" />
-        <button className="bypass-port bypass-port--bottom" onMouseDown={handlePortDown} title="Drag to connect" />
+        <button className="buyoff-port buyoff-port--right" onMouseDown={handlePortDown} title="Drag to connect" />
+        <button className="buyoff-port buyoff-port--left"  onMouseDown={handlePortDown} title="Drag to connect" />
+        <button className="buyoff-port buyoff-port--top"   onMouseDown={handlePortDown} title="Drag to connect" />
+        <button className="buyoff-port buyoff-port--bottom" onMouseDown={handlePortDown} title="Drag to connect" />
 
         {isExpanded && (
-          <div className="bypass-accordion">
-            <div className="bypass-accordion-header">
-              <span>Bypass Connection</span>
-              <button className="bypass-close-btn" onClick={toggleExpand}><X size={12} /></button>
+          <div className="buyoff-accordion">
+            <div className="buyoff-accordion-header">
+              <span>Buyoff Connection</span>
+              <button className="buyoff-close-btn" onClick={toggleExpand}><X size={12} /></button>
             </div>
-            <div className="bypass-accordion-body">
-              <div className="bypass-connection-row">
-                <span className="bypass-dot bypass-dot--in"></span>
-                <span className="bypass-connection-label">In</span>
+            <div className="buyoff-accordion-body">
+              <div className="buyoff-connection-row">
+                <span className="buyoff-dot buyoff-dot--in"></span>
+                <span className="buyoff-connection-label">In</span>
               </div>
-              <div className="bypass-connection-row">
-                <span className="bypass-dot bypass-dot--out"></span>
-                <span className="bypass-connection-label">Out</span>
+              <div className="buyoff-connection-row">
+                <span className="buyoff-dot buyoff-dot--out"></span>
+                <span className="buyoff-connection-label">Out</span>
               </div>
-              <div className="bypass-connection-row">
-                <span className="bypass-dot bypass-dot--bypass"></span>
-                <span className="bypass-connection-label">Bypass</span>
+              <div className="buyoff-connection-row">
+                <span className="buyoff-dot buyoff-dot--buyoff"></span>
+                <span className="buyoff-connection-label">Buyoff</span>
               </div>
             </div>
             {onDelete && (
-              <button className="bypass-delete-btn" onClick={() => onDelete(id)}>
+              <button className="buyoff-delete-btn" onClick={() => onDelete(id)}>
                 <Trash2 size={12} />
                 Remove
               </button>
@@ -92,4 +92,4 @@ function BypassIcon({ id, position: parentPosition, onPositionChange, onDelete, 
   );
 }
 
-export default BypassIcon;
+export default BuyoffIcon;

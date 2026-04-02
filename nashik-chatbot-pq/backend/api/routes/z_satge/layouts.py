@@ -1,12 +1,12 @@
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
-from typing import List
+from typing import List, Optional
 
 from app.connectors.state_db_connector import StateDBConnector
 from app.connectors.database import get_connector
 from app.queries import (
-    LayoutQueries, StationBoxQueries, BypassIconQueries,
+    LayoutQueries, StationBoxQueries, BuyoffIconQueries,
     ConnectionQueries, SnapshotQueries,
 )
 import backend.models.schemas.z_stage_schemas as schemas
@@ -25,11 +25,11 @@ def _build_layout_out(layout_row, connector: StateDBConnector) -> dict:
     lid = layout["id"]
 
     boxes = connector.execute_query(StationBoxQueries.LIST_BY_LAYOUT, {"layout_id": lid})
-    icons = connector.execute_query(BypassIconQueries.LIST_BY_LAYOUT, {"layout_id": lid})
+    icons = connector.execute_query(BuyoffIconQueries.LIST_BY_LAYOUT, {"layout_id": lid})
     conns = connector.execute_query(ConnectionQueries.LIST_BY_LAYOUT, {"layout_id": lid})
 
     layout["station_boxes"] = [_row_to_dict(b) for b in boxes]
-    layout["bypass_icons"] = [_row_to_dict(i) for i in icons]
+    layout["buyoff_icons"] = [_row_to_dict(i) for i in icons]
     layout["connections"] = [_row_to_dict(c) for c in conns]
     return layout
 
@@ -37,21 +37,28 @@ def _build_layout_out(layout_row, connector: StateDBConnector) -> dict:
 # ── Standard CRUD ─────────────────────────────────────────────────────────────
 
 @router.get("/", response_model=List[schemas.LayoutSummary])
-def list_layouts(connector: StateDBConnector = Depends(get_connector)):
-    rows = connector.execute_query(LayoutQueries.LIST_LAYOUTS)
+def list_layouts(
+    user_id: Optional[int] = Query(None),
+    connector: StateDBConnector = Depends(get_connector),
+):
+    rows = connector.execute_query(LayoutQueries.LIST_LAYOUTS, {"user_id": user_id})
     return [_row_to_dict(r) for r in rows]
 
 
 @router.post("/", response_model=schemas.LayoutOut, status_code=201)
-def create_layout(payload: schemas.LayoutCreate, connector: StateDBConnector = Depends(get_connector)):
-    rows = connector.execute_query(LayoutQueries.CREATE_LAYOUT, {"name": payload.name})
+def create_layout(
+    payload: schemas.LayoutCreate,
+    user_id: Optional[int] = Query(None),
+    connector: StateDBConnector = Depends(get_connector),
+):
+    rows = connector.execute_query(LayoutQueries.CREATE_LAYOUT, {"name": payload.name, "user_id": user_id})
     if not rows:
         raise HTTPException(status_code=500, detail="Failed to create layout")
     return _build_layout_out(rows[0], connector)
 
 
 @router.get("/{layout_id}", response_model=schemas.LayoutOut)
-def get_layout(layout_id: int, connector: StateDBConnector = Depends(get_connector) ):
+def get_layout(layout_id: int, connector: StateDBConnector = Depends(get_connector)):
     rows = connector.execute_query(LayoutQueries.GET_LAYOUT, {"layout_id": layout_id})
     if not rows:
         raise HTTPException(status_code=404, detail="Layout not found")
@@ -59,7 +66,7 @@ def get_layout(layout_id: int, connector: StateDBConnector = Depends(get_connect
 
 
 @router.put("/{layout_id}", response_model=schemas.LayoutOut)
-def update_layout(layout_id: int, payload: schemas.LayoutUpdate, connector: StateDBConnector = Depends(get_connector) ):
+def update_layout(layout_id: int, payload: schemas.LayoutUpdate, connector: StateDBConnector = Depends(get_connector)):
     exists = connector.execute_query(LayoutQueries.CHECK_EXISTS, {"layout_id": layout_id})
     if not exists:
         raise HTTPException(status_code=404, detail="Layout not found")
@@ -90,17 +97,17 @@ def _execute_snapshot(layout_id: int, payload: schemas.LayoutSnapshotCreate, con
     Runs in a single session/transaction:
       1. Wipe existing children
       2. Re-insert boxes  → build local_id → db_id map
-      3. Re-insert bypass icons
+      3. Re-insert buyoff icons
       4. Re-insert connections (resolved via map)
     Returns the assembled LayoutOut dict.
     """
-    box_map: dict = {}       # local_id → db box id
-    bypass_map: dict = {}    # local_id → db bypass icon id
+    box_map: dict = {}      # local_id → db box id
+    buyoff_map: dict = {}   # local_id → db buyoff icon id
 
     with connector.get_session() as session:
         # 1. Clear existing children
         session.execute(text(SnapshotQueries.DELETE_CONNECTIONS), {"layout_id": layout_id})
-        session.execute(text(SnapshotQueries.DELETE_BYPASS_ICONS), {"layout_id": layout_id})
+        session.execute(text(SnapshotQueries.DELETE_BUYOFF_ICONS), {"layout_id": layout_id})
         session.execute(text(SnapshotQueries.DELETE_STATION_BOXES), {"layout_id": layout_id})
 
         # 2. Update layout name + legend position
@@ -135,10 +142,10 @@ def _execute_snapshot(layout_id: int, payload: schemas.LayoutSnapshotCreate, con
             if row:
                 box_map[box.local_id] = row[0]  # db id (first RETURNING column)
 
-        # 4. Insert bypass icons
-        for icon in payload.bypass_icons:
+        # 4. Insert buyoff icons
+        for icon in payload.buyoff_icons:
             result = session.execute(
-                text(BypassIconQueries.CREATE_ICON),
+                text(BuyoffIconQueries.CREATE_ICON),
                 {
                     "layout_id": layout_id,
                     "position_x": icon.position_x,
@@ -147,25 +154,25 @@ def _execute_snapshot(layout_id: int, payload: schemas.LayoutSnapshotCreate, con
             )
             row = result.fetchone()
             if row:
-                bypass_map[icon.local_id] = row[0]
+                buyoff_map[icon.local_id] = row[0]
 
-        # 5. Insert connections — resolve each endpoint from box_map or bypass_map
+        # 5. Insert connections — resolve each endpoint from box_map or buyoff_map
         for conn in payload.connections:
             from_box    = box_map.get(conn.from_local_id)
-            from_bypass = None if from_box else bypass_map.get(conn.from_local_id)
+            from_buyoff = None if from_box else buyoff_map.get(conn.from_local_id)
             to_box      = box_map.get(conn.to_local_id)
-            to_bypass   = None if to_box else bypass_map.get(conn.to_local_id)
+            to_buyoff   = None if to_box else buyoff_map.get(conn.to_local_id)
 
             # Both endpoints must resolve to something
-            if (from_box or from_bypass) and (to_box or to_bypass):
+            if (from_box or from_buyoff) and (to_box or to_buyoff):
                 session.execute(
                     text(ConnectionQueries.CREATE_CONNECTION),
                     {
-                        "layout_id":    layout_id,
-                        "from_box_id":    from_box,
-                        "to_box_id":      to_box,
-                        "from_bypass_id": from_bypass,
-                        "to_bypass_id":   to_bypass,
+                        "layout_id":     layout_id,
+                        "from_box_id":   from_box,
+                        "to_box_id":     to_box,
+                        "from_buyoff_id": from_buyoff,
+                        "to_buyoff_id":  to_buyoff,
                     },
                 )
 
@@ -175,9 +182,13 @@ def _execute_snapshot(layout_id: int, payload: schemas.LayoutSnapshotCreate, con
 
 
 @router.post("/snapshot", response_model=schemas.LayoutOut, status_code=201)
-def create_snapshot(payload: schemas.LayoutSnapshotCreate, connector: StateDBConnector = Depends(get_connector) ):
+def create_snapshot(
+    payload: schemas.LayoutSnapshotCreate,
+    user_id: Optional[int] = Query(None),
+    connector: StateDBConnector = Depends(get_connector),
+):
     """Create a new layout from a full canvas snapshot"""
-    layout_rows = connector.execute_query(LayoutQueries.CREATE_LAYOUT, {"name": payload.name})
+    layout_rows = connector.execute_query(LayoutQueries.CREATE_LAYOUT, {"name": payload.name, "user_id": user_id})
     if not layout_rows:
         raise HTTPException(status_code=500, detail="Failed to create layout")
     layout_id = _row_to_dict(layout_rows[0])["id"]
@@ -185,7 +196,7 @@ def create_snapshot(payload: schemas.LayoutSnapshotCreate, connector: StateDBCon
 
 
 @router.put("/{layout_id}/snapshot", response_model=schemas.LayoutOut)
-def update_snapshot(layout_id: int, payload: schemas.LayoutSnapshotCreate, connector: StateDBConnector = Depends(get_connector) ):
+def update_snapshot(layout_id: int, payload: schemas.LayoutSnapshotCreate, connector: StateDBConnector = Depends(get_connector)):
     """Replace an existing layout's full canvas state atomically"""
     exists = connector.execute_query(LayoutQueries.CHECK_EXISTS, {"layout_id": layout_id})
     if not exists:

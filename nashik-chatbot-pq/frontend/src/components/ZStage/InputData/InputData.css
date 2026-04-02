@@ -64,7 +64,39 @@
 .panel-subtitle {
   font-size: 13px;
   color: #718096;
-  margin: 0 0 24px 0;
+  margin: 0 0 16px 0;
+}
+
+/* ── Layout select row ────────────────────────────────────────────────────── */
+
+.layout-select-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.layout-select-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a5568;
+  white-space: nowrap;
+}
+
+.layout-select-dropdown {
+  padding: 6px 10px;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #2d3748;
+  background: #fff;
+  cursor: pointer;
+  min-width: 180px;
+}
+
+.layout-select-dropdown:focus {
+  outline: none;
+  border-color: #3182ce;
 }
 
 /* ── Upload panel ─────────────────────────────────────────────────────────── */

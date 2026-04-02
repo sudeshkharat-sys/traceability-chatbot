@@ -108,6 +108,77 @@ class StateDBManager:
             logger.error(f"Error creating tables: {e}")
             raise
 
+    def run_migrations(self):
+        """
+        Apply incremental schema migrations (idempotent).
+        Run after create_tables_if_not_exists.
+        """
+        try:
+            engine = self._get_engine(self.settings.POSTGRES_DB)
+            with engine.connect() as conn:
+                # ── Rename bypass_icons → buyoff_icons ──────────────────────
+                conn.execute(text("""
+                    DO $$ BEGIN
+                        IF EXISTS (
+                            SELECT FROM pg_tables
+                            WHERE schemaname = 'public' AND tablename = 'bypass_icons'
+                        ) THEN
+                            ALTER TABLE bypass_icons RENAME TO buyoff_icons;
+                        END IF;
+                    END $$;
+                """))
+
+                # ── Rename FK columns in box_connections ────────────────────
+                conn.execute(text("""
+                    DO $$ BEGIN
+                        IF EXISTS (
+                            SELECT FROM information_schema.columns
+                            WHERE table_name = 'box_connections'
+                              AND column_name = 'from_bypass_id'
+                        ) THEN
+                            ALTER TABLE box_connections
+                                RENAME COLUMN from_bypass_id TO from_buyoff_id;
+                        END IF;
+                    END $$;
+                """))
+                conn.execute(text("""
+                    DO $$ BEGIN
+                        IF EXISTS (
+                            SELECT FROM information_schema.columns
+                            WHERE table_name = 'box_connections'
+                              AND column_name = 'to_bypass_id'
+                        ) THEN
+                            ALTER TABLE box_connections
+                                RENAME COLUMN to_bypass_id TO to_buyoff_id;
+                        END IF;
+                    END $$;
+                """))
+
+                # ── Add user_id to layouts ───────────────────────────────────
+                conn.execute(text(
+                    "ALTER TABLE layouts "
+                    "ADD COLUMN IF NOT EXISTS user_id INTEGER;"
+                ))
+
+                # ── Add user_id and layout_id to input_records ───────────────
+                conn.execute(text(
+                    "ALTER TABLE input_records "
+                    "ADD COLUMN IF NOT EXISTS user_id INTEGER;"
+                ))
+                conn.execute(text(
+                    "ALTER TABLE input_records "
+                    "ADD COLUMN IF NOT EXISTS layout_id INTEGER "
+                    "REFERENCES layouts(id) ON DELETE SET NULL;"
+                ))
+
+                conn.commit()
+
+            engine.dispose()
+            logger.info("Migrations completed successfully")
+        except Exception as e:
+            logger.error(f"Error running migrations: {e}")
+            raise
+
     def drop_all_tables(self):
         """
         Drop all tables (USE WITH CAUTION)

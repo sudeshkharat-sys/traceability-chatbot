@@ -2,10 +2,10 @@ import io
 import json
 import logging
 import re
-from typing import List
+from typing import List, Optional
 
 import openpyxl
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 
 from app.connectors.state_db_connector import StateDBConnector
 from app.connectors.database import get_connector
@@ -32,9 +32,7 @@ def _row_to_dict(row) -> dict:
 
 def _clean_text(s: str) -> str:
     """Remove characters that cannot be stored in WIN1252 (e.g. zero-width spaces)."""
-    # Strip zero-width and other invisible unicode characters
     s = re.sub(r'[\u200b\u200c\u200d\u200e\u200f\ufeff\u00ad]', '', s)
-    # Replace any remaining character not representable in WIN1252 with a space
     s = s.encode('cp1252', errors='replace').decode('cp1252')
     return s
 
@@ -43,7 +41,6 @@ def _safe_str(value) -> str | None:
     if value is None:
         return None
     s = str(value).strip()
-    # Ignore Excel formula strings
     if s.startswith("="):
         return None
     s = _clean_text(s)
@@ -132,6 +129,8 @@ def _parse_excel(file_bytes: bytes) -> list[dict]:
 @router.post("/upload", response_model=schemas.UploadResponse, status_code=201)
 async def upload_excel(
     file: UploadFile = File(...),
+    user_id: Optional[int] = Form(None),
+    layout_id: Optional[int] = Form(None),
     connector: StateDBConnector = Depends(get_connector),
 ):
     if not file.filename.endswith((".xlsx", ".xls")):
@@ -147,18 +146,30 @@ async def upload_excel(
     if not records:
         raise HTTPException(status_code=422, detail="No data rows found in the uploaded file")
 
-    # Full replace: wipe existing records then insert fresh ones
-    connector.execute_update(InputRecordQueries.DELETE_ALL)
+    # Full replace for this user+layout scope, then insert fresh ones
+    connector.execute_update(
+        InputRecordQueries.DELETE_ALL,
+        {"user_id": user_id, "layout_id": layout_id},
+    )
 
     for rec in records:
+        rec["user_id"] = user_id
+        rec["layout_id"] = layout_id
         connector.execute_query(InputRecordQueries.CREATE, rec)
 
     return {"message": "Upload successful", "rows_imported": len(records)}
 
 
 @router.get("/records", response_model=List[schemas.InputRecordOut])
-def list_records(connector: StateDBConnector = Depends(get_connector)):
-    rows = connector.execute_query(InputRecordQueries.LIST_ALL)
+def list_records(
+    user_id: Optional[int] = Query(None),
+    layout_id: Optional[int] = Query(None),
+    connector: StateDBConnector = Depends(get_connector),
+):
+    rows = connector.execute_query(
+        InputRecordQueries.LIST_ALL,
+        {"user_id": user_id, "layout_id": layout_id},
+    )
     return [_row_to_dict(r) for r in rows]
 
 

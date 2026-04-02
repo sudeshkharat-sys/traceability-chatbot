@@ -251,10 +251,11 @@ function AddMonthModal({ existingMonths, onAdd, onClose }) {
   );
 }
 
-export default function InputData() {
+export default function InputData({ userId, layouts = [] }) {
   const [activeTab, setActiveTab] = useState('upload');
   const [dragging, setDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedLayoutId, setSelectedLayoutId] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
   const [records, setRecords] = useState([]);
@@ -270,18 +271,18 @@ export default function InputData() {
     setLoadingRecords(true);
     setLoadError(null);
     try {
-      const res = await inputApi.getRecords();
+      const res = await inputApi.getRecords(userId, selectedLayoutId);
       setRecords(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       setLoadError('Failed to load records. Is the backend running?');
     } finally {
       setLoadingRecords(false);
     }
-  }, []);
+  }, [userId, selectedLayoutId]);
 
   useEffect(() => {
     if (activeTab === 'master') loadRecords();
-  }, [activeTab, loadRecords]);
+  }, [activeTab, loadRecords, selectedLayoutId]);
 
   const handleRecordSaved = useCallback((recordId, updatedRecord) => {
     setRecords((prev) => prev.map((r) => (r.id === recordId ? updatedRecord : r)));
@@ -322,7 +323,7 @@ export default function InputData() {
     setUploading(true);
     setUploadResult(null);
     try {
-      const res = await inputApi.uploadExcel(selectedFile);
+      const res = await inputApi.uploadExcel(selectedFile, userId, selectedLayoutId);
       setUploadResult({ success: true, message: res.data.message, rowsImported: res.data.rows_imported });
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -357,8 +358,24 @@ export default function InputData() {
         <div className="upload-panel">
           <h2 className="panel-title">Upload Input Excel</h2>
           <p className="panel-subtitle">
-            Upload the Z-Stage input Excel file (.xlsx). The data will replace any existing records.
+            Upload the Z-Stage input Excel file (.xlsx). The data will replace existing records for the selected layout.
           </p>
+
+          {layouts.length > 0 && (
+            <div className="layout-select-row">
+              <label className="layout-select-label">Layout:</label>
+              <select
+                className="layout-select-dropdown"
+                value={selectedLayoutId ?? ''}
+                onChange={(e) => setSelectedLayoutId(e.target.value ? Number(e.target.value) : null)}
+              >
+                <option value="">All layouts (no filter)</option>
+                {layouts.map((l) => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div
             className={`drop-zone ${dragging ? 'drag-over' : ''} ${selectedFile ? 'has-file' : ''}`}
@@ -419,6 +436,23 @@ export default function InputData() {
         <div className="master-panel">
           <div className="master-header">
             <h2 className="panel-title">Master Data</h2>
+            {layouts.length > 0 && (
+              <div className="layout-select-row">
+                <label className="layout-select-label">Layout:</label>
+                <select
+                  className="layout-select-dropdown"
+                  value={selectedLayoutId ?? ''}
+                  onChange={(e) => {
+                    setSelectedLayoutId(e.target.value ? Number(e.target.value) : null);
+                  }}
+                >
+                  <option value="">All layouts</option>
+                  {layouts.map((l) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="master-actions">
               <span className="record-count">{records.length} record{records.length !== 1 ? 's' : ''}</span>
               <button className="add-month-btn" onClick={() => setShowAddMonth(true)}>

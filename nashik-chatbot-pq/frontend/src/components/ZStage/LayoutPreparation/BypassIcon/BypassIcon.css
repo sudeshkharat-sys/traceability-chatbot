@@ -1,4 +1,4 @@
-.bypass-icon-wrapper {
+.buyoff-icon-wrapper {
   position: absolute;
   z-index: 10;
   user-select: none;
@@ -9,7 +9,7 @@
   justify-content: center;
 }
 
-.bypass-diamond {
+.buyoff-diamond {
   width: 44px;
   height: 44px;
   background-color: #f6c90e;
@@ -23,15 +23,15 @@
   transition: box-shadow 0.15s;
 }
 
-.bypass-diamond:hover {
+.buyoff-diamond:hover {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 
-.bypass-diamond:active {
+.buyoff-diamond:active {
   cursor: grabbing;
 }
 
-.bypass-diamond-inner {
+.buyoff-diamond-inner {
   transform: rotate(-45deg);
   font-size: 13px;
   font-weight: 800;
@@ -40,7 +40,7 @@
 }
 
 /* ── Connection ports ─────────────────────────────────────────────────────── */
-.bypass-port {
+.buyoff-port {
   position: absolute;
   width: 10px;
   height: 10px;
@@ -55,22 +55,22 @@
   z-index: 20;
 }
 
-.bypass-icon-wrapper:hover .bypass-port {
+.buyoff-icon-wrapper:hover .buyoff-port {
   opacity: 1;
 }
 
-.bypass-port:hover {
+.buyoff-port:hover {
   background: var(--mahindra-red-dark);
   transform: scale(1.4) !important;
 }
 
-.bypass-port--right  { right: -5px;  top: 50%;    transform: translateY(-50%); }
-.bypass-port--left   { left: -5px;   top: 50%;    transform: translateY(-50%); }
-.bypass-port--top    { top: -5px;    left: 50%;   transform: translateX(-50%); }
-.bypass-port--bottom { bottom: -5px; left: 50%;   transform: translateX(-50%); }
+.buyoff-port--right  { right: -5px;  top: 50%;    transform: translateY(-50%); }
+.buyoff-port--left   { left: -5px;   top: 50%;    transform: translateY(-50%); }
+.buyoff-port--top    { top: -5px;    left: 50%;   transform: translateX(-50%); }
+.buyoff-port--bottom { bottom: -5px; left: 50%;   transform: translateX(-50%); }
 
 /* Accordion panel */
-.bypass-accordion {
+.buyoff-accordion {
   position: absolute;
   left: 68px;
   top: 0;
@@ -82,7 +82,7 @@
   z-index: 20;
 }
 
-.bypass-accordion-header {
+.buyoff-accordion-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -94,7 +94,7 @@
   border-radius: 5px 5px 0 0;
 }
 
-.bypass-close-btn {
+.buyoff-close-btn {
   background: none;
   border: none;
   color: #ffffff;
@@ -106,45 +106,45 @@
   align-items: center;
 }
 
-.bypass-accordion-body {
+.buyoff-accordion-body {
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.bypass-connection-row {
+.buyoff-connection-row {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.bypass-dot {
+.buyoff-dot {
   width: 12px;
   height: 12px;
   border-radius: 50%;
   flex-shrink: 0;
 }
 
-.bypass-dot--in {
+.buyoff-dot--in {
   background-color: #38a169;
 }
 
-.bypass-dot--out {
+.buyoff-dot--out {
   background-color: #e53e3e;
 }
 
-.bypass-dot--bypass {
+.buyoff-dot--buyoff {
   background-color: #d69e2e;
 }
 
-.bypass-connection-label {
+.buyoff-connection-label {
   font-size: 12px;
   color: var(--text-dark);
   font-weight: 500;
 }
 
-.bypass-delete-btn {
+.buyoff-delete-btn {
   width: 100%;
   padding: 6px 12px;
   background-color: #fff5f5;
@@ -162,6 +162,6 @@
   transition: background-color 0.15s;
 }
 
-.bypass-delete-btn:hover {
+.buyoff-delete-btn:hover {
   background-color: #fed7d7;
 }
