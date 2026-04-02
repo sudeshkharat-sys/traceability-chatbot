@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import adminService from "../../services/api/adminService";
 import authService from "../../services/api/authService";
 import utilityLogo from "../../assests/image.png";
-import mahindraRiseLogo from "../../assests/mahindra_rise_logo.png";
 import "./AdminPanel.css";
 
 const ROLES = ["admin", "user", "part_labeler"];
@@ -98,20 +97,19 @@ function AdminPanel() {
       {/* Header */}
       <div className="admin-header">
         <div className="admin-header-left">
-          <img src={utilityLogo} alt="Utility Logo" className="admin-nav-logo" />
           <button className="back-btn" onClick={() => navigate("/")}>
             ← Back
           </button>
           <h1 className="admin-title">Admin Panel</h1>
         </div>
         <div className="admin-header-right">
+          <img src={utilityLogo} alt="Utility Logo" className="admin-nav-logo" />
           <span className="admin-subtitle">
             Logged in as <strong>{authService.getFullName()}</strong>
           </span>
           <button className="add-user-btn" onClick={() => { setShowAddUser(true); setError(""); }}>
             + Add User
           </button>
-          <img src={mahindraRiseLogo} alt="Mahindra Rise Logo" className="admin-nav-logo" />
         </div>
       </div>
 
