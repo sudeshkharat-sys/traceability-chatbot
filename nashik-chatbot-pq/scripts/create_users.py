@@ -8,8 +8,8 @@ bootstrap the first admin (or any additional admins).
 Usage:
     cd nashik-chatbot-pq
 
-    # Create a single admin (interactive password prompt)
-    python scripts/create_users.py --username admin --email admin@company.com
+    # Fully interactive (all prompts)
+    python scripts/create_users.py
 
     # Pass all values as flags (non-interactive)
     python scripts/create_users.py \\
@@ -61,11 +61,11 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    parser.add_argument("--username",   required=True,  help="Login username")
-    parser.add_argument("--email",      required=True,  help="User e-mail address")
-    parser.add_argument("--first-name", default="Admin", dest="first_name", help="First name (default: Admin)")
-    parser.add_argument("--last-name",  default="User",  dest="last_name",  help="Last name  (default: User)")
-    parser.add_argument("--password",   default=None,   help="Password (omit to be prompted securely)")
+    parser.add_argument("--username",   default=None,   help="Login username (prompted if omitted)")
+    parser.add_argument("--email",      default=None,   help="User e-mail address (prompted if omitted)")
+    parser.add_argument("--first-name", default=None,   dest="first_name", help="First name (prompted if omitted)")
+    parser.add_argument("--last-name",  default=None,   dest="last_name",  help="Last name  (prompted if omitted)")
+    parser.add_argument("--password",   default=None,   help="Password (prompted securely if omitted)")
     parser.add_argument(
         "--role",
         default="admin",
@@ -74,10 +74,23 @@ def main():
     )
     args = parser.parse_args()
 
-    # Prompt for password if not supplied on the command line
+    # Prompt for any missing fields interactively
+    username = args.username or input("Username: ").strip()
+    if not username:
+        print("Error: username cannot be empty.", file=sys.stderr)
+        sys.exit(1)
+
+    email = args.email or input("Email: ").strip()
+    if not email:
+        print("Error: email cannot be empty.", file=sys.stderr)
+        sys.exit(1)
+
+    first_name = args.first_name or input("First name [Admin]: ").strip() or "Admin"
+    last_name  = args.last_name  or input("Last name  [User]:  ").strip() or "User"
+
     password = args.password
     if not password:
-        password = getpass.getpass(f"Password for '{args.username}': ")
+        password = getpass.getpass(f"Password for '{username}': ")
         confirm  = getpass.getpass("Confirm password: ")
         if password != confirm:
             print("Error: passwords do not match.", file=sys.stderr)
@@ -90,15 +103,15 @@ def main():
     db = StateDBConnector()
 
     # Check email uniqueness
-    if db.execute_query(CHECK_EMAIL_SQL, {"email": args.email}):
-        print(f"Error: e-mail '{args.email}' is already registered.", file=sys.stderr)
+    if db.execute_query(CHECK_EMAIL_SQL, {"email": email}):
+        print(f"Error: e-mail '{email}' is already registered.", file=sys.stderr)
         sys.exit(1)
 
     params = {
-        "username":      args.username,
-        "first_name":    args.first_name,
-        "last_name":     args.last_name,
-        "email":         args.email,
+        "username":      username,
+        "first_name":    first_name,
+        "last_name":     last_name,
+        "email":         email,
         "password_hash": hash_password(password),
         "role":          args.role,
         "created_at":    datetime.datetime.utcnow(),
@@ -106,9 +119,9 @@ def main():
 
     result = db.execute_insert(INSERT_SQL, params)
     if result:
-        print(f"[CREATED] '{args.username}'  role={args.role}  id={result}")
+        print(f"[CREATED] '{username}'  role={args.role}  id={result}")
     else:
-        print(f"[SKIPPED] Username '{args.username}' already exists in the database.")
+        print(f"[SKIPPED] Username '{username}' already exists in the database.")
 
 
 if __name__ == "__main__":

@@ -91,31 +91,29 @@ It is idempotent — running it twice with the same username skips the duplicate
 
 ### Arguments
 
-| Flag | Required | Default | Description |
-|------|----------|---------|-------------|
-| `--username` | Yes | — | Login username |
-| `--email` | Yes | — | Email address |
-| `--first-name` | No | `Admin` | First name |
-| `--last-name` | No | `User` | Last name |
-| `--password` | No | *(prompted)* | Omit for secure interactive prompt |
-| `--role` | No | `admin` | `admin` \| `user` \| `part_labeler` |
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--username` | *(prompted)* | Login username |
+| `--email` | *(prompted)* | Email address |
+| `--first-name` | *(prompted, default: `Admin`)* | First name |
+| `--last-name` | *(prompted, default: `User`)* | Last name |
+| `--password` | *(prompted securely)* | Omit for secure interactive prompt |
+| `--role` | `admin` | `admin` \| `user` \| `part_labeler` |
 
 ### Local development
 
 ```bash
 cd nashik-chatbot-pq
 
-# Minimal — password prompted interactively
-python scripts/create_users.py \
-    --username admin \
-    --email admin@company.com
+# Fully interactive — all fields prompted
+python scripts/create_users.py
 
-# Fully specified
+# Non-interactive — pass all flags
 python scripts/create_users.py \
     --username admin \
-    --first-name John \
-    --last-name Doe \
-    --email john@company.com \
+    --first-name Admin \
+    --last-name User \
+    --email admin@company.com \
     --password "Admin@1234" \
     --role admin
 ```
@@ -123,11 +121,9 @@ python scripts/create_users.py \
 ### Docker
 
 ```bash
-# Interactive password prompt
+# Fully interactive
 docker exec -it traceability-app \
-    python scripts/create_users.py \
-    --username admin \
-    --email admin@company.com
+    python scripts/create_users.py
 
 # Non-interactive (all flags)
 docker exec -it traceability-app \
