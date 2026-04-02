@@ -205,16 +205,41 @@ function LandingPage() {
               {error && <div className="auth-error">{error}</div>}
 
               <form onSubmit={isSignup ? handleSignup : handleLogin}>
-                <div className="auth-field">
-                  <label>Username</label>
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Enter your username"
-                    required
-                  />
-                </div>
+                {isSignup ? (
+                  <div className="auth-name-row">
+                    <div className="auth-field">
+                      <label>Username</label>
+                      <input
+                        type="text"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        placeholder="Enter your username"
+                        required
+                      />
+                    </div>
+                    <div className="auth-field">
+                      <label>Email</label>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="Enter your email"
+                        required
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="auth-field">
+                    <label>Username</label>
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Enter your username"
+                      required
+                    />
+                  </div>
+                )}
 
                 {isSignup && (
                   <div className="auth-name-row">
@@ -238,19 +263,6 @@ function LandingPage() {
                         required
                       />
                     </div>
-                  </div>
-                )}
-
-                {isSignup && (
-                  <div className="auth-field">
-                    <label>Email</label>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="Enter your email"
-                      required
-                    />
                   </div>
                 )}
 
