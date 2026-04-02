@@ -648,7 +648,12 @@ function PartLabeler() {
 
   useEffect(() => {
     if (dataSource === 'all') {
-      if (labels.length > 0) updateAllLabelFailuresAllSources(labels);
+      // In drill-down mode, re-fetch charts for the active source when filters change
+      if (allModeActiveSource) {
+        fetchDashboardData(allModeActiveSource.label.partName, allModeActiveSource.src);
+      } else {
+        if (labels.length > 0) updateAllLabelFailuresAllSources(labels);
+      }
       return;
     }
     if (labels.length > 0) {
@@ -659,6 +664,13 @@ function PartLabeler() {
     }
     fetchDashboardData(activePopup?.partName);
   }, [filterMonth, filterModel, filterMIS, filterMfgQtr, filterBuyoffStage, filterOnlineOffline, filterDefectType, activePopup, labels, isSummaryActive]);
+
+  // Fetch filter options when drilling into a source from All Sources mode
+  useEffect(() => {
+    if (allModeActiveSource) {
+      fetchFilterOptions(allModeActiveSource.src);
+    }
+  }, [allModeActiveSource?.src]);
 
   const imgRef = useRef(null);
   const cadInputRef = useRef(null);
@@ -1285,7 +1297,7 @@ function PartLabeler() {
                 </div>
               )
             )}
-            {dataSource !== 'all' && ['month', 'qtr', 'model', 'mis'].map(type => {
+            {(dataSource !== 'all' || allModeActiveSource) && ['month', 'qtr', 'model', 'mis'].map(type => {
               const label = type === 'month' ? 'Mfg Month' : type === 'qtr' ? 'Mfg Qtr' : type === 'model' ? 'Model' : 'MIS';
               const options = type === 'month' ? filterOptions.mfg_months : 
                               type === 'qtr' ? filterOptions.mfg_quarters :
@@ -1334,7 +1346,7 @@ function PartLabeler() {
                 </div>
               );
             })}
-            {dataSource !== 'all' && dataSource === 'rfi' && (() => {
+            {(dataSource !== 'all' || allModeActiveSource) && (allModeActiveSource?.src || dataSource) === 'rfi' && (() => {
               const rfiFilters = [
                 {
                   key: 'defectType',
@@ -1380,7 +1392,7 @@ function PartLabeler() {
                 );
               });
             })()}
-            {dataSource !== 'all' && dataSource === 'rpt' && (() => {
+            {(dataSource !== 'all' || allModeActiveSource) && (allModeActiveSource?.src || dataSource) === 'rpt' && (() => {
               const rptFilters = [
                 {
                   key: 'buyoff',
