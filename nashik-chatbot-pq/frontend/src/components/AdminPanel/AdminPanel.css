@@ -43,6 +43,12 @@
   gap: 16px;
 }
 
+.admin-nav-logo {
+  height: 38px;
+  width: auto;
+  object-fit: contain;
+}
+
 .back-btn {
   background: transparent;
   border: 1px solid var(--crimson);
