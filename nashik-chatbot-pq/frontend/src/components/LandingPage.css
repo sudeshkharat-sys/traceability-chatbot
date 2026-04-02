@@ -172,7 +172,7 @@
 /* Single-column override — for users with ≤ 4 visible features (e.g. part_labeler) */
 .features-container.features-single-col {
   grid-template-columns: 1fr;
-  width: 380px;
+  width: 675px;
 }
 
 /* Feature Grid Cards */
