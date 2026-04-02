@@ -286,69 +286,79 @@ function LandingPage() {
             </div>
           </div>
         ) : (
-          <div className={`features-container ${justLoggedIn ? "features-enter" : ""}`}>
-            {features.map((feature, index) => {
-              if (currentRole === "part_labeler" && !PART_LABELER_ALLOWED.includes(feature.id)) {
-                return null;
-              }
-              const isEnabled = BASE_ENABLED.includes(feature.id);
+          <>
+            {(() => {
+              const visibleFeatures = features.filter(f =>
+                !(currentRole === "part_labeler" && !PART_LABELER_ALLOWED.includes(f.id))
+              );
+              const adminCard = currentRole === "admin" ? 1 : 0;
+              const totalVisible = visibleFeatures.length + adminCard;
+              const isSingleCol = totalVisible <= 4;
+
               return (
-                <div
-                  key={feature.id}
-                  className={`feature-card ${justLoggedIn ? "feature-card-enter" : ""}`}
-                  style={
-                    justLoggedIn
-                      ? { animationDelay: `${index * 0.12}s`, ...(!isEnabled && { cursor: "not-allowed", opacity: 0.6 }) }
-                      : !isEnabled
-                      ? { cursor: "not-allowed", opacity: 0.6 }
-                      : { cursor: "pointer" }
-                  }
-                  onClick={() => isEnabled && handleGetStarted(feature.route)}
-                >
-                  <div className="feature-content">
-                    <img src={feature.icon} alt={feature.title} className="feature-icon" />
-                    <div className="feature-info">
-                      <h3 className="feature-title">{feature.title}</h3>
-                      <p className="feature-description">{feature.description}</p>
+                <div className={`features-container${isSingleCol ? " features-single-col" : ""}${justLoggedIn ? " features-enter" : ""}`}>
+                  {visibleFeatures.map((feature, index) => {
+                    const isEnabled = BASE_ENABLED.includes(feature.id);
+                    return (
+                      <div
+                        key={feature.id}
+                        className={`feature-card ${justLoggedIn ? "feature-card-enter" : ""}`}
+                        style={
+                          justLoggedIn
+                            ? { animationDelay: `${index * 0.12}s`, ...(!isEnabled && { cursor: "not-allowed", opacity: 0.6 }) }
+                            : !isEnabled
+                            ? { cursor: "not-allowed", opacity: 0.6 }
+                            : { cursor: "pointer" }
+                        }
+                        onClick={() => isEnabled && handleGetStarted(feature.route)}
+                      >
+                        <div className="feature-content">
+                          <img src={feature.icon} alt={feature.title} className="feature-icon" />
+                          <div className="feature-info">
+                            <h3 className="feature-title">{feature.title}</h3>
+                            <p className="feature-description">{feature.description}</p>
+                          </div>
+                        </div>
+                        <button
+                          className="get-started-btn"
+                          onClick={(e) => { e.stopPropagation(); if (isEnabled) handleGetStarted(feature.route); }}
+                          disabled={!isEnabled}
+                          style={!isEnabled ? { cursor: "not-allowed" } : {}}
+                        >
+                          Get started
+                          <span className="arrow-icon">&rarr;</span>
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                  {/* Admin Panel — only for admin role */}
+                  {currentRole === "admin" && (
+                    <div
+                      className={`feature-card feature-card-admin ${justLoggedIn ? "feature-card-enter" : ""}`}
+                      style={{ cursor: "pointer" }}
+                      onClick={() => handleGetStarted("/admin")}
+                    >
+                      <div className="feature-content">
+                        <img src={dashboardIcon} alt="Admin Panel" className="feature-icon" />
+                        <div className="feature-info">
+                          <h3 className="feature-title">Admin Panel</h3>
+                          <p className="feature-description">Manage users, assign roles, and control access</p>
+                        </div>
+                      </div>
+                      <button
+                        className="get-started-btn"
+                        onClick={(e) => { e.stopPropagation(); handleGetStarted("/admin"); }}
+                      >
+                        Open
+                        <span className="arrow-icon">&rarr;</span>
+                      </button>
                     </div>
-                  </div>
-                  <button
-                    className="get-started-btn"
-                    onClick={(e) => { e.stopPropagation(); if (isEnabled) handleGetStarted(feature.route); }}
-                    disabled={!isEnabled}
-                    style={!isEnabled ? { cursor: "not-allowed" } : {}}
-                  >
-                    Get started
-                    <span className="arrow-icon">&rarr;</span>
-                  </button>
+                  )}
                 </div>
               );
-            })}
-
-            {/* Admin Panel — only for admin role */}
-            {currentRole === "admin" && (
-              <div
-                className={`feature-card feature-card-admin ${justLoggedIn ? "feature-card-enter" : ""}`}
-                style={{ cursor: "pointer" }}
-                onClick={() => handleGetStarted("/admin")}
-              >
-                <div className="feature-content">
-                  <img src={dashboardIcon} alt="Admin Panel" className="feature-icon" />
-                  <div className="feature-info">
-                    <h3 className="feature-title">Admin Panel</h3>
-                    <p className="feature-description">Manage users, assign roles, and control access</p>
-                  </div>
-                </div>
-                <button
-                  className="get-started-btn"
-                  onClick={(e) => { e.stopPropagation(); handleGetStarted("/admin"); }}
-                >
-                  Open
-                  <span className="arrow-icon">&rarr;</span>
-                </button>
-              </div>
-            )}
-          </div>
+            })()}
+          </>
         )}
       </div>
     </div>
