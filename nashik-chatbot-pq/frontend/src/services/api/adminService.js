@@ -46,6 +46,26 @@ class AdminService {
   }
 
   /**
+   * Create a new user (admin only)
+   * @param {{ username, first_name, last_name, email, password, role }} userData
+   */
+  async createUser(userData) {
+    const res = await fetch(
+      `${backend_url}/admin/users?requester_id=${this._adminId()}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(userData),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Failed to create user");
+    }
+    return res.json();
+  }
+
+  /**
    * Update a user's role
    * @param {number} userId
    * @param {"admin"|"user"|"part_labeler"} role

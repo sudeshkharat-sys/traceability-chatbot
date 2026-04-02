@@ -357,3 +357,80 @@
 .modal-confirm:hover {
   background: var(--crimson-dark);
 }
+
+/* ── Header right group ───────────────────────────── */
+.admin-header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+/* ── Add User button ──────────────────────────────── */
+.add-user-btn {
+  background: var(--crimson);
+  border: none;
+  color: #fff;
+  border-radius: 7px;
+  padding: 8px 18px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+.add-user-btn:hover {
+  background: var(--crimson-dark);
+}
+
+/* ── Add User modal form ──────────────────────────── */
+.modal-box-form {
+  max-width: 520px;
+}
+
+.add-user-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.form-row {
+  display: flex;
+  gap: 14px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 5px;
+}
+
+.form-field label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.form-field input,
+.form-field select {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 0.88rem;
+  color: var(--text-main);
+  background: #fff;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.form-field input:focus,
+.form-field select:focus {
+  border-color: var(--crimson);
+  box-shadow: 0 0 0 2px rgba(220,20,60,0.1);
+}
+
+.form-field input::placeholder {
+  color: var(--text-light);
+}

@@ -45,3 +45,13 @@ class UserDto(BaseModel):
 class UpdateRoleDto(BaseModel):
     """Request model for updating a user's role"""
     role: str
+
+
+class CreateUserDto(BaseModel):
+    """Request model for admin creating a new user"""
+    username: str
+    first_name: str
+    last_name: str
+    email: str
+    password: str
+    role: str = "user"

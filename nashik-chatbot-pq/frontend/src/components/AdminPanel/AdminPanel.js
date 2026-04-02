@@ -6,6 +6,8 @@ import "./AdminPanel.css";
 
 const ROLES = ["admin", "user", "part_labeler"];
 
+const EMPTY_FORM = { username: "", first_name: "", last_name: "", email: "", password: "", role: "user" };
+
 function AdminPanel() {
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
@@ -14,6 +16,9 @@ function AdminPanel() {
   const [actionMsg, setActionMsg] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(null); // user_id pending delete
   const [roleChanging, setRoleChanging] = useState({}); // { user_id: true }
+  const [showAddUser, setShowAddUser] = useState(false);
+  const [addForm, setAddForm] = useState(EMPTY_FORM);
+  const [addLoading, setAddLoading] = useState(false);
 
   const currentUserId = authService.getUserId();
 
@@ -44,6 +49,23 @@ function AdminPanel() {
       setError(e.message);
     } finally {
       setConfirmDelete(null);
+    }
+  };
+
+  const handleAddUser = async (e) => {
+    e.preventDefault();
+    setAddLoading(true);
+    setError("");
+    try {
+      await adminService.createUser(addForm);
+      setActionMsg(`User "${addForm.username}" created with role "${addForm.role}".`);
+      setShowAddUser(false);
+      setAddForm(EMPTY_FORM);
+      await loadUsers();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setAddLoading(false);
     }
   };
 
@@ -79,9 +101,14 @@ function AdminPanel() {
           </button>
           <h1 className="admin-title">Admin Panel</h1>
         </div>
-        <span className="admin-subtitle">
-          Logged in as <strong>{authService.getFullName()}</strong>
-        </span>
+        <div className="admin-header-right">
+          <span className="admin-subtitle">
+            Logged in as <strong>{authService.getFullName()}</strong>
+          </span>
+          <button className="add-user-btn" onClick={() => { setShowAddUser(true); setError(""); }}>
+            + Add User
+          </button>
+        </div>
       </div>
 
       {/* Body */}
@@ -201,6 +228,89 @@ function AdminPanel() {
       )}
 
       </div>{/* end admin-body */}
+
+      {/* Add User Modal */}
+      {showAddUser && (
+        <div className="modal-overlay" onClick={() => setShowAddUser(false)}>
+          <div className="modal-box modal-box-form" onClick={(e) => e.stopPropagation()}>
+            <h2>Add New User</h2>
+            <form onSubmit={handleAddUser} className="add-user-form">
+              <div className="form-row">
+                <div className="form-field">
+                  <label>Username</label>
+                  <input
+                    type="text"
+                    value={addForm.username}
+                    onChange={(e) => setAddForm((f) => ({ ...f, username: e.target.value }))}
+                    placeholder="e.g. john_doe"
+                    required
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Role</label>
+                  <select
+                    value={addForm.role}
+                    onChange={(e) => setAddForm((f) => ({ ...f, role: e.target.value }))}
+                  >
+                    {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-field">
+                  <label>First Name</label>
+                  <input
+                    type="text"
+                    value={addForm.first_name}
+                    onChange={(e) => setAddForm((f) => ({ ...f, first_name: e.target.value }))}
+                    placeholder="First name"
+                    required
+                  />
+                </div>
+                <div className="form-field">
+                  <label>Last Name</label>
+                  <input
+                    type="text"
+                    value={addForm.last_name}
+                    onChange={(e) => setAddForm((f) => ({ ...f, last_name: e.target.value }))}
+                    placeholder="Last name"
+                    required
+                  />
+                </div>
+              </div>
+              <div className="form-field">
+                <label>Email</label>
+                <input
+                  type="email"
+                  value={addForm.email}
+                  onChange={(e) => setAddForm((f) => ({ ...f, email: e.target.value }))}
+                  placeholder="user@example.com"
+                  required
+                />
+              </div>
+              <div className="form-field">
+                <label>Password</label>
+                <input
+                  type="password"
+                  value={addForm.password}
+                  onChange={(e) => setAddForm((f) => ({ ...f, password: e.target.value }))}
+                  placeholder="Set a password"
+                  required
+                />
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="modal-cancel" onClick={() => { setShowAddUser(false); setAddForm(EMPTY_FORM); }}>
+                  Cancel
+                </button>
+                <button type="submit" className="modal-confirm" disabled={addLoading}>
+                  {addLoading ? "Creating…" : "Create User"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -7,7 +7,7 @@ Authorization: caller must pass their user_id as query param; backend verifies a
 import logging
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
-from backend.models.schemas.auth_schemas import UpdateRoleDto
+from backend.models.schemas.auth_schemas import UpdateRoleDto, CreateUserDto
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +78,51 @@ async def delete_user(
     db.execute_update(AuthQueries.DELETE_USER, {"user_id": user_id})
     logger.info(f"User {user_id} deleted by admin {requester_id}")
     return JSONResponse(content={"message": "User deleted successfully"})
+
+
+@router.post("/users")
+async def create_user(
+    payload: CreateUserDto,
+    requester_id: int = Query(..., description="user_id of the admin making the request"),
+):
+    """Create a new user with a specified role — admin only."""
+    import hashlib
+    from datetime import datetime, timezone
+    require_admin(requester_id)
+    if payload.role not in ALLOWED_ROLES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid role '{payload.role}'. Allowed: {', '.join(ALLOWED_ROLES)}",
+        )
+    from app.queries.auth_queries import AuthQueries
+    db = get_db()
+    # Check username uniqueness
+    existing = db.execute_query(AuthQueries.CHECK_USERNAME_EXISTS, {"username": payload.username})
+    if existing:
+        raise HTTPException(status_code=409, detail="Username already taken")
+    # Check email uniqueness
+    existing_email = db.execute_query(AuthQueries.CHECK_EMAIL_EXISTS, {"email": payload.email})
+    if existing_email:
+        raise HTTPException(status_code=409, detail="Email already registered")
+    password_hash = hashlib.sha256(payload.password.encode()).hexdigest()
+    rows = db.execute_query(
+        AuthQueries.REGISTER_USER,
+        {
+            "username": payload.username,
+            "first_name": payload.first_name,
+            "last_name": payload.last_name,
+            "email": payload.email,
+            "password_hash": password_hash,
+            "role": payload.role,
+            "created_at": datetime.now(timezone.utc),
+        },
+    )
+    new_user_id = rows[0][0] if rows else None
+    logger.info(f"User '{payload.username}' (role={payload.role}) created by admin {requester_id}")
+    return JSONResponse(
+        status_code=201,
+        content={"message": "User created successfully", "user_id": new_user_id},
+    )
 
 
 @router.put("/users/{user_id}/role")
