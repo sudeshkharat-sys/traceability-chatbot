@@ -457,6 +457,7 @@ function PartLabeler() {
   const [labels, setLabels] = useState([]);
   const [labelFailures, setLabelFailures] = useState({});
   const [labelFailuresBySource, setLabelFailuresBySource] = useState({});
+  const [allModeActiveSource, setAllModeActiveSource] = useState(null); // { label, src } when drilling into a source in All mode
   const [showInput, setShowInput] = useState(null);
   const [activePopup, setActivePopup] = useState(null);
   const [warrantyHistory, setWarrantyHistory] = useState([]);
@@ -690,6 +691,14 @@ function PartLabeler() {
     setActivePopup(null);
     setWarrantyHistory([]);
     setLabelFailuresBySource({});
+    setAllModeActiveSource(null);
+  };
+
+  // In "All Sources" mode: clicking a source cell drills into that source's charts
+  const handleAllModeSourceClick = (label, src) => {
+    setActivePopup(label);
+    setAllModeActiveSource({ label, src });
+    fetchDashboardData(label.partName, src);
   };
 
   const handleDataIngestionStart = () => {
@@ -1489,17 +1498,24 @@ function PartLabeler() {
                             </thead>
                             <tbody>
                               {labels.map((label, idx) => {
-                                const src = labelFailuresBySource[label.id] || {};
-                                const total = (src.warranty || 0) + (src.rpt || 0) + (src.gnovac || 0) + (src.rfi || 0) + (src.esqa || 0);
+                                const srcCounts = labelFailuresBySource[label.id] || {};
+                                const total = (srcCounts.warranty || 0) + (srcCounts.rpt || 0) + (srcCounts.gnovac || 0) + (srcCounts.rfi || 0) + (srcCounts.esqa || 0);
+                                const isActive = allModeActiveSource?.label?.id === label.id;
                                 return (
-                                  <tr key={label.id}>
+                                  <tr key={label.id} className={isActive ? 'active-row-all' : ''}>
                                     <td>{idx + 1}</td>
                                     <td className="part-name-cell">{label.partName}</td>
-                                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{src.warranty || 0}</td>
-                                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{src.rpt || 0}</td>
-                                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{src.gnovac || 0}</td>
-                                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{src.rfi || 0}</td>
-                                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{src.esqa || 0}</td>
+                                    {['warranty', 'rpt', 'gnovac', 'rfi', 'esqa'].map(s => (
+                                      <td
+                                        key={s}
+                                        className={`source-count-cell ${isActive && allModeActiveSource?.src === s ? 'active-source-cell' : ''}`}
+                                        style={{ textAlign: 'right', fontWeight: 700, cursor: 'pointer' }}
+                                        onClick={() => handleAllModeSourceClick(label, s)}
+                                        title={`View ${DATA_SOURCES[s].label} charts for ${label.partName}`}
+                                      >
+                                        {srcCounts[s] || 0}
+                                      </td>
+                                    ))}
                                     <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--mahindra-red)' }}>{total}</td>
                                   </tr>
                                 );
@@ -1585,28 +1601,50 @@ function PartLabeler() {
               )}
             </div>
 
-            {selectedImage && activePopup && dataSource !== 'all' && (
-              <div className="dashboard-analysis-section">
-                <div className="dashboard-grid">
-                  <CustomBarChart title={sourceConfig.chartTitles.mfgMonth} data={dashboardData.mfgMonth} color="#f6ad55" icon={History} />
-                  <CustomBarChart title={sourceConfig.chartTitles.reportingMonth} data={dashboardData.reportingMonth} color="#68d391" icon={FileSpreadsheet} />
-                  <CustomBarChart title={sourceConfig.chartTitles.kms} data={dashboardData.kms} color="#76e4f7" icon={Activity} />
-                  {sourceConfig.useMapForRegion ? (
-                    <div className="dashboard-chart-card">
-                      <div className="chart-header"><MapIcon size={16} /><span>{sourceConfig.chartTitles.region}</span></div>
-                      <div className="chart-container-inner india-map-container"><IndiaMap data={dashboardData.region} /></div>
+            {selectedImage && activePopup && (dataSource !== 'all' || allModeActiveSource) && (() => {
+              const viewConfig = allModeActiveSource ? DATA_SOURCES[allModeActiveSource.src] : sourceConfig;
+              return (
+                <div className="dashboard-analysis-section">
+                  {allModeActiveSource && (
+                    <div className="all-mode-view-badge">
+                      <Database size={13} />
+                      <span>{viewConfig.label}</span>
+                      <span className="badge-separator">—</span>
+                      <span>{allModeActiveSource.label.partName}</span>
+                      <button className="badge-close" onClick={() => { setAllModeActiveSource(null); setActivePopup(null); }} title="Close">
+                        <X size={12} />
+                      </button>
                     </div>
-                  ) : (
-                    <LocationBarChart title={sourceConfig.chartTitles.region} data={dashboardData.region} />
                   )}
+                  <div className="dashboard-grid">
+                    <CustomBarChart title={viewConfig.chartTitles.mfgMonth} data={dashboardData.mfgMonth} color="#f6ad55" icon={History} />
+                    <CustomBarChart title={viewConfig.chartTitles.reportingMonth} data={dashboardData.reportingMonth} color="#68d391" icon={FileSpreadsheet} />
+                    <CustomBarChart title={viewConfig.chartTitles.kms} data={dashboardData.kms} color="#76e4f7" icon={Activity} />
+                    {viewConfig.useMapForRegion ? (
+                      <div className="dashboard-chart-card">
+                        <div className="chart-header"><MapIcon size={16} /><span>{viewConfig.chartTitles.region}</span></div>
+                        <div className="chart-container-inner india-map-container"><IndiaMap data={dashboardData.region} /></div>
+                      </div>
+                    ) : (
+                      <LocationBarChart title={viewConfig.chartTitles.region} data={dashboardData.region} />
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
             {selectedImage && !activePopup && dataSource !== 'all' && (
               <div className="dashboard-analysis-section dashboard-placeholder">
                 <div className="dashboard-placeholder-hint">
                   <BarChart2 size={32} />
                   <p>Click a component marker on the image to view its analytics</p>
+                </div>
+              </div>
+            )}
+            {selectedImage && dataSource === 'all' && !allModeActiveSource && (
+              <div className="dashboard-analysis-section dashboard-placeholder">
+                <div className="dashboard-placeholder-hint">
+                  <BarChart2 size={32} />
+                  <p>Click a count cell in the table to view source-specific analytics</p>
                 </div>
               </div>
             )}

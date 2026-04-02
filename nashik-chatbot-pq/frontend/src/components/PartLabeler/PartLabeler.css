@@ -548,6 +548,58 @@
   cursor: default;
 }
 
+.source-count-cell:hover {
+  background: #fff0f0 !important;
+  color: var(--mahindra-red);
+  border-radius: 4px;
+}
+
+.active-source-cell {
+  background: var(--mahindra-red) !important;
+  color: white !important;
+  border-radius: 4px;
+}
+
+.active-row-all td {
+  background: #fff5f5;
+}
+
+/* Badge shown above charts when drilling from All Sources mode */
+.all-mode-view-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: #fff5f5;
+  border: 1px solid var(--mahindra-red);
+  border-radius: 20px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--mahindra-red);
+  align-self: flex-start;
+  margin-bottom: 6px;
+}
+
+.badge-separator {
+  color: #ccc;
+  font-weight: 300;
+}
+
+.badge-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--mahindra-red);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  margin-left: 2px;
+}
+
+.badge-close:hover {
+  opacity: 0.7;
+}
+
 .active-part-details {
   background: white;
   border: 1.5px solid var(--mahindra-red);
