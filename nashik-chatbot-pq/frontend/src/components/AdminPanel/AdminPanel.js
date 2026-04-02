@@ -84,6 +84,9 @@ function AdminPanel() {
         </span>
       </div>
 
+      {/* Body */}
+      <div className="admin-body">
+
       {/* Status messages */}
       {error && (
         <div className="admin-alert admin-alert-error" onClick={() => setError("")}>
@@ -196,6 +199,8 @@ function AdminPanel() {
           </div>
         </div>
       )}
+
+      </div>{/* end admin-body */}
     </div>
   );
 }
