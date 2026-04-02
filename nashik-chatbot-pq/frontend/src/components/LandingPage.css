@@ -182,6 +182,19 @@
   font-size: 0.72rem;
 }
 
+.features-container.features-single-col .feature-icon {
+  width: 40px;
+  height: 40px;
+}
+
+.features-container.features-single-col .feature-title {
+  font-size: 1rem;
+}
+
+.features-container.features-single-col .feature-description {
+  font-size: 0.82rem;
+}
+
 /* Feature Grid Cards */
 .feature-card {
   background: #FFFFFF;
