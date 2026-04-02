@@ -98,6 +98,7 @@ create_dynamic_table(
         Column("last_name", String(100), nullable=False),
         Column("email", String(255), nullable=False, unique=True),
         Column("password_hash", String(255), nullable=False),
+        Column("role", String(20), nullable=False, server_default="user"),
         Column(
             "created_at", DateTime, default=datetime.datetime.utcnow, nullable=False
         ),

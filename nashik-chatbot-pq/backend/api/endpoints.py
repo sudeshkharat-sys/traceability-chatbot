@@ -7,6 +7,7 @@ from fastapi import APIRouter
 from backend.api.routes.conversations import conversation_routes
 from backend.api.routes.health import health_routes
 from backend.api.routes.auth import auth_routes
+from backend.api.routes.admin.admin_routes import router as admin_router
 from backend.api.routes.part_labeler_routes import router as part_labeler_router
 from backend.api.routes.z_satge.layouts import router as layout_router
 from backend.api.routes.z_satge.bypass_icons import router as bypass_icon_router
@@ -25,6 +26,8 @@ router.include_router(
 router.include_router(health_routes.router, prefix="", tags=["health"])
 
 router.include_router(auth_routes.router, prefix="/auth", tags=["auth"])
+
+router.include_router(admin_router, prefix="/admin", tags=["admin"])
 
 router.include_router(part_labeler_router, prefix="/part-labeler", tags=["part_labeler"])
 

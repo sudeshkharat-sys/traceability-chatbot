@@ -659,3 +659,61 @@
   color: #e07b8c;
   font-weight: 500;
 }
+
+/* ── Role-based feature wrapper ───────────────────────── */
+.features-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 900px;
+}
+
+.features-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 4px;
+}
+
+.features-greeting {
+  font-size: 0.95rem;
+  color: #e0e0e0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.features-role-badge {
+  background: rgba(220, 20, 60, 0.2);
+  color: #ff6b8a;
+  border: 1px solid rgba(220, 20, 60, 0.4);
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.logout-btn {
+  background: transparent;
+  border: 1px solid rgba(220, 20, 60, 0.5);
+  color: #ff6b8a;
+  border-radius: 6px;
+  padding: 5px 14px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+
+.logout-btn:hover {
+  background: rgba(220, 20, 60, 0.15);
+  color: #fff;
+}
+
+/* Admin Panel card highlight */
+.feature-card-admin {
+  border-color: rgba(220, 20, 60, 0.5) !important;
+  background: rgba(220, 20, 60, 0.05) !important;
+}

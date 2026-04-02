@@ -62,6 +62,7 @@ class AuthService {
     sessionStorage.setItem("username", data.username);
     sessionStorage.setItem("first_name", data.first_name || "");
     sessionStorage.setItem("last_name", data.last_name || "");
+    sessionStorage.setItem("role", data.role || "user");
     sessionStorage.setItem("isLoggedIn", "true");
 
     return data;
@@ -85,6 +86,7 @@ class AuthService {
     sessionStorage.removeItem("username");
     sessionStorage.removeItem("first_name");
     sessionStorage.removeItem("last_name");
+    sessionStorage.removeItem("role");
     sessionStorage.removeItem("isLoggedIn");
   }
 
@@ -122,6 +124,38 @@ class AuthService {
     const last = sessionStorage.getItem("last_name") || "";
     const full = `${first} ${last}`.trim();
     return full || this.getUsername() || "User";
+  }
+
+  /**
+   * Get current user role from session
+   * @returns {"admin"|"user"|"part_labeler"}
+   */
+  getUserRole() {
+    return sessionStorage.getItem("role") || "user";
+  }
+
+  /**
+   * Check if current user is an admin
+   * @returns {boolean}
+   */
+  isAdmin() {
+    return this.getUserRole() === "admin";
+  }
+
+  /**
+   * Check if current user has access to a given route
+   * part_labeler → only /part-labeler
+   * user / admin  → all routes
+   * @param {string} path
+   * @returns {boolean}
+   */
+  canAccess(path) {
+    const role = this.getUserRole();
+    if (role === "admin" || role === "user") return true;
+    if (role === "part_labeler") {
+      return path.startsWith("/part-labeler");
+    }
+    return false;
   }
 }
 

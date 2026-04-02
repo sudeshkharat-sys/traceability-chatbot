@@ -38,6 +38,7 @@ async def signup(payload: SignupDto):
                 "username": result["username"],
                 "first_name": result["first_name"],
                 "last_name": result["last_name"],
+                "role": result["role"],
                 "message": "Signup successful",
             },
             status_code=201,
@@ -60,6 +61,7 @@ async def login(payload: LoginDto):
                 "username": result["username"],
                 "first_name": result["first_name"],
                 "last_name": result["last_name"],
+                "role": result["role"],
                 "message": "Login successful",
             }
         )

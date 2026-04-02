@@ -27,4 +27,21 @@ class AuthResponseDto(BaseModel):
     username: str
     first_name: str = ""
     last_name: str = ""
+    role: str = "user"
     message: str = ""
+
+
+class UserDto(BaseModel):
+    """User record for admin panel"""
+    user_id: int
+    username: str
+    first_name: str
+    last_name: str
+    email: str
+    role: str
+    created_at: str
+
+
+class UpdateRoleDto(BaseModel):
+    """Request model for updating a user's role"""
+    role: str
