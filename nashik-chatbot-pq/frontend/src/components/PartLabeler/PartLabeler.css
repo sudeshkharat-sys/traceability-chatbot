@@ -522,6 +522,32 @@
   font-weight: 600;
 }
 
+/* All-sources columnar table */
+.all-sources-table th,
+.all-sources-table td {
+  font-size: 0.6rem;
+  padding: 6px 4px;
+}
+
+.all-sources-table th:nth-child(n+3),
+.all-sources-table td:nth-child(n+3) {
+  width: 44px;
+  min-width: 44px;
+}
+
+.all-sources-table td:last-child {
+  color: var(--mahindra-red);
+  font-weight: 700;
+}
+
+.all-sources-table tr:hover td {
+  background: #f8fafc;
+}
+
+.all-sources-table tr td {
+  cursor: default;
+}
+
 .active-part-details {
   background: white;
   border: 1.5px solid var(--mahindra-red);

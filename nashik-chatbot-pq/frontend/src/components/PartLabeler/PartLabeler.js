@@ -266,6 +266,13 @@ const DATA_SOURCES = {
       { key: 'esqa_posting_date', label: 'ESQA Posting Date', group: 'ESQA' },
     ],
   },
+  all: {
+    key: 'all',
+    label: 'All Sources',
+    chartTitles: { mfgMonth: '', reportingMonth: '', kms: '', region: '' },
+    useMapForRegion: false,
+    targetColumns: [],
+  },
 };
 
 // Use the local TopoJSON file from the public folder
@@ -449,6 +456,7 @@ function PartLabeler() {
   const [images, setImages] = useState([]);
   const [labels, setLabels] = useState([]);
   const [labelFailures, setLabelFailures] = useState({});
+  const [labelFailuresBySource, setLabelFailuresBySource] = useState({});
   const [showInput, setShowInput] = useState(null);
   const [activePopup, setActivePopup] = useState(null);
   const [warrantyHistory, setWarrantyHistory] = useState([]);
@@ -586,6 +594,35 @@ function PartLabeler() {
     setLabelFailures(counts);
   };
 
+  const REAL_SOURCES = ['warranty', 'rpt', 'gnovac', 'rfi', 'esqa'];
+
+  const updateAllLabelFailuresAllSources = async (currentLabels) => {
+    if (!userId) return;
+    const bySource = {};
+    await Promise.all(currentLabels.map(async (label) => {
+      bySource[label.id] = {};
+      await Promise.all(REAL_SOURCES.map(async (src) => {
+        try {
+          const params = new URLSearchParams();
+          params.append('userId', userId);
+          params.append('partName', label.partName);
+          params.append('dataSource', src);
+          params.append('month', 'All');
+          params.append('baseModel', 'All');
+          params.append('misBucket', 'All');
+          params.append('mfgQtr', 'All');
+          const res = await fetch(`${API_BASE}/warranty-lookup?${params.toString()}`);
+          const data = await res.json();
+          const records = Array.isArray(data) ? data : [data];
+          bySource[label.id][src] = records.reduce((sum, r) => sum + (r.failureCount || 0), 0);
+        } catch {
+          bySource[label.id][src] = 0;
+        }
+      }));
+    }));
+    setLabelFailuresBySource(bySource);
+  };
+
   useEffect(() => {
     if (!userId) {
       navigate('/');
@@ -599,12 +636,20 @@ function PartLabeler() {
   // Reload filters and dashboard when data source changes
   useEffect(() => {
     if (!userId) return;
+    if (dataSource === 'all') {
+      if (labels.length > 0) updateAllLabelFailuresAllSources(labels);
+      return;
+    }
     fetchFilterOptions(dataSource);
     fetchDashboardData(null, dataSource);
     if (labels.length > 0) updateAllLabelFailures(labels, filterMonth, filterModel, filterMIS, filterMfgQtr, dataSource);
   }, [dataSource]);
 
   useEffect(() => {
+    if (dataSource === 'all') {
+      if (labels.length > 0) updateAllLabelFailuresAllSources(labels);
+      return;
+    }
     if (labels.length > 0) {
       updateAllLabelFailures(labels, filterMonth, filterModel, filterMIS, filterMfgQtr);
     }
@@ -644,6 +689,7 @@ function PartLabeler() {
     setDashboardData({ mfgMonth: [], reportingMonth: [], kms: [], region: [] });
     setActivePopup(null);
     setWarrantyHistory([]);
+    setLabelFailuresBySource({});
   };
 
   const handleDataIngestionStart = () => {
@@ -1230,7 +1276,7 @@ function PartLabeler() {
                 </div>
               )
             )}
-            {['month', 'qtr', 'model', 'mis'].map(type => {
+            {dataSource !== 'all' && ['month', 'qtr', 'model', 'mis'].map(type => {
               const label = type === 'month' ? 'Mfg Month' : type === 'qtr' ? 'Mfg Qtr' : type === 'model' ? 'Model' : 'MIS';
               const options = type === 'month' ? filterOptions.mfg_months : 
                               type === 'qtr' ? filterOptions.mfg_quarters :
@@ -1279,7 +1325,7 @@ function PartLabeler() {
                 </div>
               );
             })}
-            {dataSource === 'rfi' && (() => {
+            {dataSource !== 'all' && dataSource === 'rfi' && (() => {
               const rfiFilters = [
                 {
                   key: 'defectType',
@@ -1325,7 +1371,7 @@ function PartLabeler() {
                 );
               });
             })()}
-            {dataSource === 'rpt' && (() => {
+            {dataSource !== 'all' && dataSource === 'rpt' && (() => {
               const rptFilters = [
                 {
                   key: 'buyoff',
@@ -1427,16 +1473,51 @@ function PartLabeler() {
                     <div className="mapped-parts-integrated">
                       <div className="panel-header"><Layers size={16} /><span>Mapped Components</span></div>
                       <div className="panel-table-scroll">
-                        <table className="integrated-table">
-                          <thead><tr><th>#</th><th>Component Name</th><th style={{ textAlign: 'right' }}>Failures</th></tr></thead>
-                          <tbody>
-                            {labels.map((label, idx) => (
-                              <tr key={label.id} className={activePopup?.id === label.id ? 'active-row' : ''} onClick={() => handleMarkerClick(label)}>
-                                <td>{idx + 1}</td><td className="part-name-cell">{label.partName}</td><td style={{ textAlign: 'right', fontWeight: 700 }}>{labelFailures[label.id] || 0}</td>
+                        {dataSource === 'all' ? (
+                          <table className="integrated-table all-sources-table">
+                            <thead>
+                              <tr>
+                                <th>#</th>
+                                <th>Component Name</th>
+                                <th style={{ textAlign: 'right' }}>Warranty</th>
+                                <th style={{ textAlign: 'right' }}>RPT</th>
+                                <th style={{ textAlign: 'right' }}>GNOVAC</th>
+                                <th style={{ textAlign: 'right' }}>RFI</th>
+                                <th style={{ textAlign: 'right' }}>e-SQA</th>
+                                <th style={{ textAlign: 'right' }}>Total</th>
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                            </thead>
+                            <tbody>
+                              {labels.map((label, idx) => {
+                                const src = labelFailuresBySource[label.id] || {};
+                                const total = (src.warranty || 0) + (src.rpt || 0) + (src.gnovac || 0) + (src.rfi || 0) + (src.esqa || 0);
+                                return (
+                                  <tr key={label.id}>
+                                    <td>{idx + 1}</td>
+                                    <td className="part-name-cell">{label.partName}</td>
+                                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{src.warranty || 0}</td>
+                                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{src.rpt || 0}</td>
+                                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{src.gnovac || 0}</td>
+                                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{src.rfi || 0}</td>
+                                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{src.esqa || 0}</td>
+                                    <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--mahindra-red)' }}>{total}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        ) : (
+                          <table className="integrated-table">
+                            <thead><tr><th>#</th><th>Component Name</th><th style={{ textAlign: 'right' }}>Failures</th></tr></thead>
+                            <tbody>
+                              {labels.map((label, idx) => (
+                                <tr key={label.id} className={activePopup?.id === label.id ? 'active-row' : ''} onClick={() => handleMarkerClick(label)}>
+                                  <td>{idx + 1}</td><td className="part-name-cell">{label.partName}</td><td style={{ textAlign: 'right', fontWeight: 700 }}>{labelFailures[label.id] || 0}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
                       </div>
                     </div>
                                         <AnimatePresence>
@@ -1504,7 +1585,7 @@ function PartLabeler() {
               )}
             </div>
 
-            {selectedImage && activePopup && (
+            {selectedImage && activePopup && dataSource !== 'all' && (
               <div className="dashboard-analysis-section">
                 <div className="dashboard-grid">
                   <CustomBarChart title={sourceConfig.chartTitles.mfgMonth} data={dashboardData.mfgMonth} color="#f6ad55" icon={History} />
@@ -1521,7 +1602,7 @@ function PartLabeler() {
                 </div>
               </div>
             )}
-            {selectedImage && !activePopup && (
+            {selectedImage && !activePopup && dataSource !== 'all' && (
               <div className="dashboard-analysis-section dashboard-placeholder">
                 <div className="dashboard-placeholder-hint">
                   <BarChart2 size={32} />
