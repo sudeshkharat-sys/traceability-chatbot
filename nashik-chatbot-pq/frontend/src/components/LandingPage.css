@@ -660,60 +660,56 @@
   font-weight: 500;
 }
 
-/* ── Role-based feature wrapper ───────────────────────── */
-.features-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 100%;
-  max-width: 900px;
-}
-
-.features-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 4px;
-}
-
-.features-greeting {
-  font-size: 0.95rem;
-  color: #e0e0e0;
+/* ── Logged-in user: welcome bar (absolute, top-center) ── */
+.user-welcome-bar {
+  position: absolute;
+  top: 1.8rem;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 8px;
+  font-size: 0.85rem;
+  color: #fff;
+  white-space: nowrap;
+  z-index: 10;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4);
 }
 
-.features-role-badge {
-  background: rgba(220, 20, 60, 0.2);
-  color: #ff6b8a;
-  border: 1px solid rgba(220, 20, 60, 0.4);
-  border-radius: 12px;
-  padding: 2px 10px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+.user-role-badge {
+  background: rgba(220, 20, 60, 0.85);
+  color: #fff;
+  border-radius: 10px;
+  padding: 2px 9px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
-.logout-btn {
+/* ── Logout button (absolute, top-right below logo) ── */
+.user-logout-btn {
+  position: absolute;
+  top: 5rem;
+  right: 2rem;
   background: transparent;
-  border: 1px solid rgba(220, 20, 60, 0.5);
-  color: #ff6b8a;
+  border: 1px solid rgba(220, 20, 60, 0.6);
+  color: #DC143C;
   border-radius: 6px;
-  padding: 5px 14px;
-  font-size: 0.85rem;
+  padding: 4px 14px;
+  font-size: 0.82rem;
   cursor: pointer;
+  z-index: 10;
   transition: background 0.2s, color 0.2s;
 }
 
-.logout-btn:hover {
-  background: rgba(220, 20, 60, 0.15);
+.user-logout-btn:hover {
+  background: #DC143C;
   color: #fff;
 }
 
-/* Admin Panel card highlight */
+/* ── Admin Panel card — same white card style, red left border ── */
 .feature-card-admin {
-  border-color: rgba(220, 20, 60, 0.5) !important;
-  background: rgba(220, 20, 60, 0.05) !important;
+  border-left: 4px solid #DC143C !important;
+  background: #fff5f7 !important;
 }

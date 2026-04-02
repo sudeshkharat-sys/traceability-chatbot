@@ -10,6 +10,12 @@ import utilityLogo from "../assests/image.png";
 import mahindraRiseLogo from "../assests/mahindra_rise_logo.png";
 import { authService } from "../services/api";
 
+// Features that are interactive (not grayed-out) for admin/user roles
+const BASE_ENABLED = ["traceability", "guideline", "part-labeler", "part-labeler-plant", "z-stage"];
+
+// Features visible to part_labeler role
+const PART_LABELER_ALLOWED = ["part-labeler", "part-labeler-plant"];
+
 function LandingPage() {
   const navigate = useNavigate();
 
@@ -28,15 +34,8 @@ function LandingPage() {
     setIsLoggedIn(authService.isLoggedIn());
   }, []);
 
-  // Features visible per role
-  const ROLE_FEATURES = {
-    admin:        ["traceability", "guideline", "part-labeler", "part-labeler-plant", "z-stage"],
-    user:         ["traceability", "guideline", "part-labeler", "part-labeler-plant", "z-stage"],
-    part_labeler: ["part-labeler", "part-labeler-plant"],
-  };
-
   const currentRole = authService.getUserRole();
-  const enabledFeatures = ROLE_FEATURES[currentRole] || ROLE_FEATURES["user"];
+
   const features = [
     {
       id: "traceability",
@@ -52,7 +51,7 @@ function LandingPage() {
       description: "Access quality guidelines and industry standards",
       route: "/chat?feature=guideline",
     },
-  {
+    {
       id: "part-labeler",
       title: "Part Sense Visualizer Field",
       icon: dashboardIcon,
@@ -93,11 +92,16 @@ function LandingPage() {
     navigate(route);
   };
 
+  const handleLogout = async () => {
+    await authService.logout();
+    setIsLoggedIn(false);
+    setJustLoggedIn(false);
+  };
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
       await authService.login(username, password);
       setJustLoggedIn(true);
@@ -115,10 +119,8 @@ function LandingPage() {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
       await authService.signup(username, firstName, lastName, email, password);
-      // After signup, auto-login
       await authService.login(username, password);
       setJustLoggedIn(true);
       setIsLoggedIn(true);
@@ -159,8 +161,21 @@ function LandingPage() {
         className="corner-logo corner-logo-right"
       />
 
+      {/* Welcome greeting + Logout — only when logged in, absolutely positioned */}
+      {isLoggedIn && (
+        <>
+          <div className="user-welcome-bar">
+            Welcome,&nbsp;<strong>{authService.getFullName()}</strong>
+            <span className="user-role-badge">{currentRole}</span>
+          </div>
+          <button className="user-logout-btn" onClick={handleLogout}>
+            Logout
+          </button>
+        </>
+      )}
+
       <div className="landing-content">
-        {/* Left Section - AI Solution Text */}
+        {/* Left Section */}
         <div className="left-section">
           <div className="ai-solution-text">
             <h1 className="main-heading">
@@ -175,7 +190,7 @@ function LandingPage() {
           </div>
         </div>
 
-        {/* Right Section - Auth Form or Features */}
+        {/* Right Section — Auth form or Feature cards */}
         {!isLoggedIn ? (
           <div className="auth-container">
             <div className="auth-card">
@@ -256,11 +271,7 @@ function LandingPage() {
                   className="auth-submit-btn"
                   disabled={loading}
                 >
-                  {loading
-                    ? "Please wait..."
-                    : isSignup
-                    ? "Sign Up"
-                    : "Login"}
+                  {loading ? "Please wait..." : isSignup ? "Sign Up" : "Login"}
                 </button>
               </form>
 
@@ -284,79 +295,108 @@ function LandingPage() {
             </div>
           </div>
         ) : (
-          <div className={`features-wrapper ${justLoggedIn ? "features-enter" : ""}`}>
-            {/* Top bar: greeting + logout */}
-            <div className="features-topbar">
-              <span className="features-greeting">
-                Welcome, <strong>{authService.getFullName()}</strong>
-                <span className="features-role-badge">{currentRole}</span>
-              </span>
-              <button
-                className="logout-btn"
-                onClick={async () => {
-                  await authService.logout();
-                  setIsLoggedIn(false);
-                  setJustLoggedIn(false);
-                }}
-              >
-                Logout
-              </button>
-            </div>
+          /* ── FEATURE CARDS — exactly original structure ── */
+          <div
+            className={`features-container ${
+              justLoggedIn ? "features-enter" : ""
+            }`}
+          >
+            {features.map((feature, index) => {
+              // part_labeler: completely hide features outside their list
+              if (
+                currentRole === "part_labeler" &&
+                !PART_LABELER_ALLOWED.includes(feature.id)
+              ) {
+                return null;
+              }
 
-            <div className={`features-container ${justLoggedIn ? "features-enter" : ""}`}>
-              {/* Regular feature cards — filtered by role */}
-              {features
-                .filter((f) => enabledFeatures.includes(f.id))
-                .map((feature, index) => (
-                  <div
-                    key={feature.id}
-                    className={`feature-card ${justLoggedIn ? "feature-card-enter" : ""}`}
-                    style={justLoggedIn ? { animationDelay: `${index * 0.12}s`, cursor: "pointer" } : { cursor: "pointer" }}
-                    onClick={() => handleGetStarted(feature.route)}
-                  >
-                    <div className="feature-content">
-                      <img src={feature.icon} alt={feature.title} className="feature-icon" />
-                      <div className="feature-info">
-                        <h3 className="feature-title">{feature.title}</h3>
-                        <p className="feature-description">{feature.description}</p>
-                      </div>
-                    </div>
-                    <button
-                      className="get-started-btn"
-                      onClick={(e) => { e.stopPropagation(); handleGetStarted(feature.route); }}
-                    >
-                      Get started
-                      <span className="arrow-icon">&rarr;</span>
-                    </button>
-                  </div>
-                ))}
+              // admin / user: disable (gray out) features not in BASE_ENABLED
+              const isEnabled = BASE_ENABLED.includes(feature.id);
 
-              {/* Admin Panel card — only for admin role */}
-              {currentRole === "admin" && (
+              return (
                 <div
-                  className={`feature-card feature-card-admin ${justLoggedIn ? "feature-card-enter" : ""}`}
-                  style={{ cursor: "pointer" }}
-                  onClick={() => handleGetStarted("/admin")}
+                  key={feature.id}
+                  className={`feature-card ${
+                    justLoggedIn ? "feature-card-enter" : ""
+                  }`}
+                  style={
+                    justLoggedIn
+                      ? {
+                          animationDelay: `${index * 0.12}s`,
+                          ...(!isEnabled && {
+                            cursor: "not-allowed",
+                            opacity: 0.6,
+                          }),
+                        }
+                      : !isEnabled
+                      ? { cursor: "not-allowed", opacity: 0.6 }
+                      : { cursor: "pointer" }
+                  }
+                  onClick={() => isEnabled && handleGetStarted(feature.route)}
                 >
                   <div className="feature-content">
-                    <img src={dashboardIcon} alt="Admin Panel" className="feature-icon" />
+                    <img
+                      src={feature.icon}
+                      alt={feature.title}
+                      className="feature-icon"
+                    />
                     <div className="feature-info">
-                      <h3 className="feature-title">Admin Panel</h3>
+                      <h3 className="feature-title">{feature.title}</h3>
                       <p className="feature-description">
-                        Manage users, assign roles, and control access
+                        {feature.description}
                       </p>
                     </div>
                   </div>
                   <button
                     className="get-started-btn"
-                    onClick={(e) => { e.stopPropagation(); handleGetStarted("/admin"); }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (isEnabled) handleGetStarted(feature.route);
+                    }}
+                    disabled={!isEnabled}
+                    style={!isEnabled ? { cursor: "not-allowed" } : {}}
                   >
-                    Open
+                    Get started
                     <span className="arrow-icon">&rarr;</span>
                   </button>
                 </div>
-              )}
-            </div>
+              );
+            })}
+
+            {/* Admin Panel card — ONLY visible to admin role */}
+            {currentRole === "admin" && (
+              <div
+                className={`feature-card feature-card-admin ${
+                  justLoggedIn ? "feature-card-enter" : ""
+                }`}
+                style={{ cursor: "pointer" }}
+                onClick={() => handleGetStarted("/admin")}
+              >
+                <div className="feature-content">
+                  <img
+                    src={dashboardIcon}
+                    alt="Admin Panel"
+                    className="feature-icon"
+                  />
+                  <div className="feature-info">
+                    <h3 className="feature-title">Admin Panel</h3>
+                    <p className="feature-description">
+                      Manage users, assign roles, and control access
+                    </p>
+                  </div>
+                </div>
+                <button
+                  className="get-started-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleGetStarted("/admin");
+                  }}
+                >
+                  Open
+                  <span className="arrow-icon">&rarr;</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
