@@ -149,6 +149,19 @@ class AuthService {
    * @param {string} path
    * @returns {boolean}
    */
+  async resetPassword(username, newPassword) {
+    const response = await fetch(`${backend_url}/auth/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, new_password: newPassword }),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || "Password reset failed");
+    }
+    return response.json();
+  }
+
   canAccess(path) {
     const role = this.getUserRole();
     if (role === "admin" || role === "user") return true;

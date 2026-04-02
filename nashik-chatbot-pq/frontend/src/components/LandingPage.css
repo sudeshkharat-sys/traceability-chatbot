@@ -468,6 +468,36 @@
   cursor: not-allowed;
 }
 
+.auth-success {
+  background: #f0fff4;
+  color: #1a7f3c;
+  border: 1px solid #b7ebc8;
+  border-radius: 6px;
+  padding: 0.6rem 0.85rem;
+  font-size: 0.82rem;
+  margin-bottom: 1rem;
+}
+
+.auth-forgot {
+  text-align: center;
+  margin-top: 0.6rem;
+}
+
+.auth-forgot-btn {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 0.78rem;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.auth-forgot-btn:hover {
+  color: #DC143C;
+  text-decoration: underline;
+}
+
 .auth-toggle {
   text-align: center;
   margin-top: 1rem;

@@ -55,3 +55,9 @@ class CreateUserDto(BaseModel):
     email: str
     password: str
     role: str = "user"
+
+
+class ResetPasswordDto(BaseModel):
+    """Request model for resetting a user's password"""
+    username: str
+    new_password: str

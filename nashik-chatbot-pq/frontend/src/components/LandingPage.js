@@ -25,6 +25,11 @@ function LandingPage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [justLoggedIn, setJustLoggedIn] = useState(false);
   const [isSignup, setIsSignup] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [resetUsername, setResetUsername] = useState("");
+  const [resetNewPassword, setResetNewPassword] = useState("");
+  const [resetConfirmPassword, setResetConfirmPassword] = useState("");
+  const [resetSuccess, setResetSuccess] = useState("");
   const [username, setUsername] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -148,6 +153,47 @@ function LandingPage() {
     setEmail("");
   };
 
+  const openForgotPassword = () => {
+    setIsForgotPassword(true);
+    setError("");
+    setResetUsername("");
+    setResetNewPassword("");
+    setResetConfirmPassword("");
+    setResetSuccess("");
+  };
+
+  const closeForgotPassword = () => {
+    setIsForgotPassword(false);
+    setError("");
+    setResetSuccess("");
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setError("");
+    setResetSuccess("");
+    if (resetNewPassword !== resetConfirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+    if (resetNewPassword.length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+    setLoading(true);
+    try {
+      await authService.resetPassword(resetUsername, resetNewPassword);
+      setResetSuccess("Password reset successfully! You can now log in.");
+      setResetUsername("");
+      setResetNewPassword("");
+      setResetConfirmPassword("");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="landing-page">
 
@@ -200,6 +246,61 @@ function LandingPage() {
         {/* Right: Auth form OR Feature cards */}
         {!isLoggedIn ? (
           <div className="auth-container">
+            {isForgotPassword ? (
+              <div className="auth-card">
+                <h2 className="auth-title">Reset Password</h2>
+                <p className="auth-subtitle">Enter your username and choose a new password</p>
+
+                {error && <div className="auth-error">{error}</div>}
+                {resetSuccess && <div className="auth-success">{resetSuccess}</div>}
+
+                {!resetSuccess && (
+                  <form onSubmit={handleResetPassword}>
+                    <div className="auth-field">
+                      <label>Username</label>
+                      <input
+                        type="text"
+                        value={resetUsername}
+                        onChange={(e) => setResetUsername(e.target.value)}
+                        placeholder="Enter your username"
+                        required
+                      />
+                    </div>
+                    <div className="auth-name-row">
+                      <div className="auth-field">
+                        <label>New Password</label>
+                        <input
+                          type="password"
+                          value={resetNewPassword}
+                          onChange={(e) => setResetNewPassword(e.target.value)}
+                          placeholder="New password"
+                          required
+                        />
+                      </div>
+                      <div className="auth-field">
+                        <label>Confirm Password</label>
+                        <input
+                          type="password"
+                          value={resetConfirmPassword}
+                          onChange={(e) => setResetConfirmPassword(e.target.value)}
+                          placeholder="Confirm password"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <button type="submit" className="auth-submit-btn" disabled={loading}>
+                      {loading ? "Resetting…" : "Reset Password"}
+                    </button>
+                  </form>
+                )}
+
+                <div className="auth-toggle">
+                  <button className="auth-toggle-btn" onClick={closeForgotPassword}>
+                    ← Back to Login
+                  </button>
+                </div>
+              </div>
+            ) : (
             <div className="auth-card">
               <h2 className="auth-title">
                 {isSignup ? "Create Account" : "Welcome Back"}
@@ -301,7 +402,16 @@ function LandingPage() {
                   </span>
                 )}
               </div>
+
+              {!isSignup && (
+                <div className="auth-forgot">
+                  <button className="auth-forgot-btn" onClick={openForgotPassword}>
+                    Forgot password?
+                  </button>
+                </div>
+              )}
             </div>
+            )}
           </div>
         ) : (
           <>
