@@ -114,7 +114,16 @@ class StateDBManager:
         Run after create_tables_if_not_exists.
         """
         try:
-            engine = self._get_engine(self.settings.POSTGRES_DB)
+            # Use a regular (non-AUTOCOMMIT) engine so we can commit explicitly.
+            # _get_engine() uses AUTOCOMMIT which does not allow conn.commit().
+            settings = self.settings
+            url = (
+                f"postgresql://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}"
+                f"@{settings.POSTGRES_HOST}:{settings.POSTGRES_PORT}"
+                f"/{settings.POSTGRES_DB}?client_encoding=utf8"
+            )
+            from sqlalchemy import create_engine as _ce
+            engine = _ce(url)
             with engine.connect() as conn:
                 # ── Rename bypass_icons → buyoff_icons ──────────────────────
                 conn.execute(text("""
