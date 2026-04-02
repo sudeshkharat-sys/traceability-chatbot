@@ -152,9 +152,9 @@ class AuthService {
   canAccess(path) {
     const role = this.getUserRole();
     if (role === "admin" || role === "user") return true;
-    if (role === "part_labeler") {
-      return path.startsWith("/part-labeler");
-    }
+    if (role === "part_labeler") return path.startsWith("/part-labeler");
+    if (role === "part_labeler_field") return path.startsWith("/part-labeler") && !path.includes("mode=plant");
+    if (role === "part_labeler_plant") return path.startsWith("/part-labeler") && path.includes("mode=plant");
     return false;
   }
 }

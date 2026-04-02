@@ -5,7 +5,7 @@ import authService from "../../services/api/authService";
 import utilityLogo from "../../assests/image.png";
 import "./AdminPanel.css";
 
-const ROLES = ["admin", "user", "part_labeler"];
+const ROLES = ["admin", "user", "part_labeler", "part_labeler_field", "part_labeler_plant"];
 
 const EMPTY_FORM = { username: "", first_name: "", last_name: "", email: "", password: "", role: "user" };
 
@@ -88,8 +88,8 @@ function AdminPanel() {
 
   const roleBadgeClass = (role) => {
     if (role === "admin") return "badge badge-admin";
-    if (role === "part_labeler") return "badge badge-pl";
-    return "badge badge-user";
+    if (role === "user")  return "badge badge-user";
+    return "badge badge-pl"; // all part_labeler variants
   };
 
   return (
@@ -141,7 +141,7 @@ function AdminPanel() {
             <span className="stat-num">{users.filter((u) => u.role === "user").length}</span> Users
           </div>
           <div className="stat-chip">
-            <span className="stat-num">{users.filter((u) => u.role === "part_labeler").length}</span> Part Labelers
+            <span className="stat-num">{users.filter((u) => u.role.startsWith("part_labeler")).length}</span> Part Labelers
           </div>
         </div>
       )}

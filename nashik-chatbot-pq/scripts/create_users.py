@@ -39,7 +39,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.connectors.state_db_connector import StateDBConnector
 
-ALLOWED_ROLES = {"admin", "user", "part_labeler"}
+ALLOWED_ROLES = {"admin", "user", "part_labeler", "part_labeler_field", "part_labeler_plant"}
 
 INSERT_SQL = """
     INSERT INTO users (username, first_name, last_name, email, password_hash, role, created_at)

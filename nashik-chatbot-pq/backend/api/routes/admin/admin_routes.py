@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["admin"])
 
-ALLOWED_ROLES = {"admin", "user", "part_labeler"}
+ALLOWED_ROLES = {"admin", "user", "part_labeler", "part_labeler_field", "part_labeler_plant"}
 
 _auth_service = None
 

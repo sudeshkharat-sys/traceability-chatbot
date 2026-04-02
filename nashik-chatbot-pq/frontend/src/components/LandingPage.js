@@ -13,6 +13,12 @@ import { authService } from "../services/api";
 const BASE_ENABLED = ["traceability", "guideline", "part-labeler", "part-labeler-plant", "z-stage"];
 const PART_LABELER_ALLOWED = ["part-labeler", "part-labeler-plant"];
 
+const ROLE_ALLOWED = {
+  part_labeler:       ["part-labeler", "part-labeler-plant"],
+  part_labeler_field: ["part-labeler"],
+  part_labeler_plant: ["part-labeler-plant"],
+};
+
 function LandingPage() {
   const navigate = useNavigate();
 
@@ -300,8 +306,9 @@ function LandingPage() {
         ) : (
           <>
             {(() => {
+              const allowedIds = ROLE_ALLOWED[currentRole];
               const visibleFeatures = features.filter(f =>
-                !(currentRole === "part_labeler" && !PART_LABELER_ALLOWED.includes(f.id))
+                allowedIds ? allowedIds.includes(f.id) : true
               );
               const adminCard = currentRole === "admin" ? 1 : 0;
               const totalVisible = visibleFeatures.length + adminCard;
