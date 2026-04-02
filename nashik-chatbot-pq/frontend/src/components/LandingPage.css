@@ -89,7 +89,7 @@
 /* Left Section - AI Text — floats over background, doesn't push cards */
 .left-section {
   position: absolute;
-  left: 3rem;
+  left: 7rem;
   top: 50%;
   transform: translateY(-50%);
   display: flex;
@@ -158,7 +158,7 @@
 /* Right Section - Features Grid — anchored to right edge */
 .features-container {
   flex: 0 0 auto;
-  width: 750px;
+  width: 675px;
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 0.65rem;
