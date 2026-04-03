@@ -217,12 +217,15 @@ export function routePath(start, end, obstacles) {
   // Convert grid path back to canvas coords
   const mid = gridPath.map(([gx, gy]) => [gx * GRID, gy * GRID]);
 
-  // Full path: exact start → forced exit → BFS mid-points → forced approach → exact end
-  // Drop duplicate forced waypoints (mid already starts at g1 / ends at g2)
+  // Full path: exact start → forced exit → BFS grid points → forced approach → exact end
+  // We include ALL BFS grid points (including mid[0] ≈ p1 and mid[-1] ≈ p2).
+  // Port x-positions have a 17 px offset from the 40 px grid, so mid[0].x may
+  // differ from p1x by up to ~20 px.  Including mid[0] turns that gap into a
+  // clean short horizontal segment rather than a diagonal.
   const full = [
     [sx, sy],
     [p1x, p1y],
-    ...mid.slice(1, -1),  // skip first & last grid points (== p1 & p2 snapped)
+    ...mid,          // all BFS grid points — no slice, keeps routing axis-aligned
     [p2x, p2y],
     [ex, ey],
   ];
