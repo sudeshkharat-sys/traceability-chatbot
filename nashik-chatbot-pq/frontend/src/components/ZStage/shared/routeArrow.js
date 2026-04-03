@@ -161,11 +161,36 @@ export function routePath(start, end, obstacles) {
   const p2x = ex + ED[0] * GRID;
   const p2y = ey + ED[1] * GRID;
 
-  // Convert to grid coordinates for BFS
-  const g1x = Math.round(p1x / GRID);
-  const g1y = Math.round(p1y / GRID);
-  const g2x = Math.round(p2x / GRID);
-  const g2y = Math.round(p2y / GRID);
+  // ── Direction-aware grid snapping ────────────────────────────────────────────
+  // Top/bottom port x-positions have a 17 px offset from the 40 px grid
+  // (formula: bx + 17 + i×40).  Naïve Math.round snaps to the nearest cell,
+  // which can be 17 px in the WRONG direction (backward relative to the
+  // destination), causing a backward staircase jog at the start/end of the path.
+  //
+  // Fix: for top/bottom exits, snap g1x TOWARD the destination (ceil when going
+  // right, floor when going left).  For the approach (g2x), snap from the
+  // direction we're coming FROM.  This ensures the small alignment segment
+  // always goes the same direction as the main path and merges away cleanly.
+  const goingRight = ex >= sx;
+
+  let g1x, g1y, g2x, g2y;
+  if (sDir === 'top' || sDir === 'bottom') {
+    // x has 17 px offset — snap toward goal
+    g1x = goingRight ? Math.ceil(p1x / GRID) : Math.floor(p1x / GRID);
+    g1y = Math.round(p1y / GRID); // y is always grid-aligned for top/bottom ports
+  } else {
+    g1x = Math.round(p1x / GRID);
+    g1y = Math.round(p1y / GRID);
+  }
+  if (eDir === 'top' || eDir === 'bottom') {
+    // Approach from the start side: if going right → last BFS step arrives from
+    // the left → g2x should be to the LEFT of p2x (floor)
+    g2x = goingRight ? Math.floor(p2x / GRID) : Math.ceil(p2x / GRID);
+    g2y = Math.round(p2y / GRID);
+  } else {
+    g2x = Math.round(p2x / GRID);
+    g2y = Math.round(p2y / GRID);
+  }
 
   // Trivial case: both forced waypoints on the same grid cell
   if (g1x === g2x && g1y === g2y) {
@@ -175,10 +200,23 @@ export function routePath(start, end, obstacles) {
   const startKey = `${g1x},${g1y}`;
   const goalKey  = `${g2x},${g2y}`;
 
+  // ── Goal-directed step ordering ───────────────────────────────────────────────
+  // BFS finds *a* shortest path, but which one depends on the expansion order.
+  // By trying directions TOWARD the goal first, BFS naturally finds paths that
+  // travel in the right direction without backtracking.  This prevents the small
+  // alignment jog at the start from becoming a backward staircase step.
+  const dxGoal = g2x - g1x;
+  const dyGoal = g2y - g1y;
+  const dxPref  = Math.sign(dxGoal) || 1;   // preferred horizontal direction
+  const dyPref  = Math.sign(dyGoal) || -1;  // preferred vertical direction
+  // Prefer whichever axis has more distance to cover; fall back to horizontal
+  const STEPS = Math.abs(dxGoal) >= Math.abs(dyGoal)
+    ? [[dxPref, 0], [0, dyPref], [-dxPref, 0], [0, -dyPref]]   // horizontal first
+    : [[0, dyPref], [dxPref, 0], [0, -dyPref], [-dxPref, 0]];  // vertical first
+
   // BFS with parent-pointer tracking for path reconstruction
   const parent = new Map([[startKey, null]]);
   const queue  = [[g1x, g1y]];
-  const STEPS  = [[0, -1], [0, 1], [-1, 0], [1, 0]];
   const LIMIT  = 30000; // cap iterations to avoid UI freeze on pathological layouts
 
   let found = false;
