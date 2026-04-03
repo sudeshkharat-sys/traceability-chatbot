@@ -11,6 +11,21 @@ import './LayoutPreparation.css';
 let nextId = 1;
 const uid = () => `loc-${nextId++}`;
 
+// Derive Xarrow anchor direction from the dot's id suffix so the path
+// exits/enters each dot on the correct side and never routes through a box.
+// id format: "${boxId}__${stationId}"           → top station dot   → "top"
+//            "${boxId}__${stationId}__b"         → bottom station dot → "bottom"
+//            "${boxId}__left"                    → box left port      → "left"
+//            "${boxId}__right"                   → box right port     → "right"
+//            no "__"  (buyoff id)                → auto
+const dotAnchor = (id) => {
+  if (!id.includes('__')) return 'auto';
+  if (id.endsWith('__left'))  return 'left';
+  if (id.endsWith('__right')) return 'right';
+  if (id.endsWith('__b'))     return 'bottom';
+  return 'top';
+};
+
 // ── Grid constants ────────────────────────────────────────────────────────────
 const GRID = 40;
 const MIN_GAP = GRID;
@@ -624,6 +639,8 @@ function LayoutPreparation({
           key={conn.id}
           start={conn.fromId}
           end={conn.toId}
+          startAnchor={dotAnchor(conn.fromId)}
+          endAnchor={dotAnchor(conn.toId)}
           color="#1a2744"
           strokeWidth={2}
           path="grid"

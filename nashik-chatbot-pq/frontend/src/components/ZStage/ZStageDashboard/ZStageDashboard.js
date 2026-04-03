@@ -55,6 +55,15 @@ function fmtMonth(key) {
     .toLocaleString('default', { month: 'short' }) + ' ' + year.slice(2);
 }
 
+// Mirror of LayoutPreparation's dotAnchor — keeps arrow routing consistent
+const dotAnchor = (id) => {
+  if (!id.includes('__')) return 'auto';
+  if (id.endsWith('__left'))  return 'left';
+  if (id.endsWith('__right')) return 'right';
+  if (id.endsWith('__b'))     return 'bottom';
+  return 'top';
+};
+
 // ── Inline editable cell ───────────────────────────────────────────────────────
 function EditableCell({ recordId, fieldKey, value, type, onSaved, stickyLeft }) {
   const stickyStyle = stickyLeft !== undefined
@@ -965,6 +974,8 @@ function ZStageDashboard({ userId }) {
           key={conn.id}
           start={conn.fromId}
           end={conn.toId}
+          startAnchor={dotAnchor(conn.fromId)}
+          endAnchor={dotAnchor(conn.toId)}
           color="#1a2744"
           strokeWidth={2}
           path="grid"
