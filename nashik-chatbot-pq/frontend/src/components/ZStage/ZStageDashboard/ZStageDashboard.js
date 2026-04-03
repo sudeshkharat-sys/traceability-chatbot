@@ -58,9 +58,11 @@ function fmtMonth(key) {
 // Mirror of LayoutPreparation's dotAnchor — keeps arrow routing consistent
 const dotAnchor = (id) => {
   if (!id.includes('__')) return 'auto';
-  if (id.endsWith('__left'))  return 'left';
-  if (id.endsWith('__right')) return 'right';
-  if (id.endsWith('__b'))     return 'bottom';
+  if (id.endsWith('__left'))   return 'left';
+  if (id.endsWith('__right'))  return 'right';
+  if (id.endsWith('__b'))      return 'bottom';
+  if (id.endsWith('__bottom')) return 'bottom';
+  if (id.endsWith('__top'))    return 'top';
   return 'top';
 };
 
@@ -362,13 +364,15 @@ function parseLayout(apiLayout) {
       const base = `db-box-${c.from_box_id}`;
       fromId = c.from_station_id ? `${base}__${c.from_station_id}` : base;
     } else {
-      fromId = `db-buyoff-${c.from_buyoff_id}`;
+      const base = `db-buyoff-${c.from_buyoff_id}`;
+      fromId = c.from_station_id ? `${base}__${c.from_station_id}` : base;
     }
     if (c.to_box_id != null) {
       const base = `db-box-${c.to_box_id}`;
       toId = c.to_station_id ? `${base}__${c.to_station_id}` : base;
     } else {
-      toId = `db-buyoff-${c.to_buyoff_id}`;
+      const base = `db-buyoff-${c.to_buyoff_id}`;
+      toId = c.to_station_id ? `${base}__${c.to_station_id}` : base;
     }
     return { id: `db-conn-${c.id}`, fromId, toId };
   });
@@ -835,6 +839,11 @@ function ZStageDashboard({ userId }) {
                           className="dash-buyoff"
                           style={{ position: 'absolute', left: icon.position.x, top: icon.position.y }}
                         >
+                          {/* Invisible Xarrow anchor points for each direction */}
+                          <div id={`${icon.id}__top`}    style={{ position:'absolute', top:0,    left:'50%', width:1, height:1, pointerEvents:'none' }} />
+                          <div id={`${icon.id}__bottom`} style={{ position:'absolute', bottom:0, left:'50%', width:1, height:1, pointerEvents:'none' }} />
+                          <div id={`${icon.id}__left`}   style={{ position:'absolute', top:'50%', left:0,   width:1, height:1, pointerEvents:'none' }} />
+                          <div id={`${icon.id}__right`}  style={{ position:'absolute', top:'50%', right:0,  width:1, height:1, pointerEvents:'none' }} />
                           <div className="dash-buyoff-diamond">
                             <GitBranch size={14} />
                           </div>

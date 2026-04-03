@@ -419,6 +419,7 @@
 
 /* ── Buyoff icon (read-only diamond — matches LayoutPreparation orange style) */
 .dash-buyoff {
+  position: relative;
   width: 62px;
   height: 62px;
   display: flex;

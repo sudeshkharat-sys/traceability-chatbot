@@ -32,10 +32,11 @@ function BuyoffIcon({ id, position: parentPosition, onPositionChange, onDelete, 
   const handlePortDown = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    const portId = e.currentTarget.id;  // e.g. "loc-3__top"
     const rect = e.currentTarget.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
-    if (onPortMouseDown) onPortMouseDown(id, cx, cy);
+    if (onPortMouseDown) onPortMouseDown(portId, cx, cy);
   };
 
   return (
@@ -53,11 +54,11 @@ function BuyoffIcon({ id, position: parentPosition, onPositionChange, onDelete, 
           <span className="buyoff-diamond-inner"><GitBranch size={14} /></span>
         </div>
 
-        {/* Connection ports — visible on hover */}
-        <button className="buyoff-port buyoff-port--right" onMouseDown={handlePortDown} title="Drag to connect" />
-        <button className="buyoff-port buyoff-port--left"  onMouseDown={handlePortDown} title="Drag to connect" />
-        <button className="buyoff-port buyoff-port--top"   onMouseDown={handlePortDown} title="Drag to connect" />
-        <button className="buyoff-port buyoff-port--bottom" onMouseDown={handlePortDown} title="Drag to connect" />
+        {/* Connection ports — visible on hover, each has a direction-encoded id */}
+        <button id={`${id}__right`}  className="buyoff-port buyoff-port--right"  onMouseDown={handlePortDown} title="Drag to connect" />
+        <button id={`${id}__left`}   className="buyoff-port buyoff-port--left"   onMouseDown={handlePortDown} title="Drag to connect" />
+        <button id={`${id}__top`}    className="buyoff-port buyoff-port--top"    onMouseDown={handlePortDown} title="Drag to connect" />
+        <button id={`${id}__bottom`} className="buyoff-port buyoff-port--bottom" onMouseDown={handlePortDown} title="Drag to connect" />
 
         {isExpanded && (
           <div className="buyoff-accordion">
