@@ -107,11 +107,22 @@ function stateFromApi(apiLayout) {
     position: { x: ic.position_x, y: ic.position_y },
   }));
 
-  const connections = (apiLayout.connections || []).map((c) => ({
-    id: `db-conn-${c.id}`,
-    fromId: c.from_box_id != null ? `db-box-${c.from_box_id}` : `db-buyoff-${c.from_buyoff_id}`,
-    toId:   c.to_box_id   != null ? `db-box-${c.to_box_id}`   : `db-buyoff-${c.to_buyoff_id}`,
-  }));
+  const connections = (apiLayout.connections || []).map((c) => {
+    let fromId, toId;
+    if (c.from_box_id != null) {
+      const base = `db-box-${c.from_box_id}`;
+      fromId = c.from_station_id ? `${base}__${c.from_station_id}` : base;
+    } else {
+      fromId = `db-buyoff-${c.from_buyoff_id}`;
+    }
+    if (c.to_box_id != null) {
+      const base = `db-box-${c.to_box_id}`;
+      toId = c.to_station_id ? `${base}__${c.to_station_id}` : base;
+    } else {
+      toId = `db-buyoff-${c.to_buyoff_id}`;
+    }
+    return { id: `db-conn-${c.id}`, fromId, toId };
+  });
 
   // Normalize: if any element has a negative x/y, shift everything so the
   // minimum coordinate is at (GRID, GRID). This fixes layouts where elements
@@ -206,19 +217,40 @@ function LayoutPreparation({
     };
 
     const onUp = (e) => {
-      // Use bounding-rect hit-test so the connection always lands on the box
-      // the cursor is actually inside — not on a nearby/overlapping box.
-      const candidates = document.querySelectorAll('.station-box, .buyoff-icon-wrapper');
+      // Determine the source box ID (strip station suffix if present)
+      const isFromStation = dragging.fromId.includes('__');
+      const fromBoxId = isFromStation ? dragging.fromId.split('__')[0] : dragging.fromId;
+
       let targetId = null;
-      for (const el of candidates) {
-        if (el.id === dragging.fromId) continue;
+
+      // 1. Check station-level port dots (primary targets for box connections)
+      const sidPorts = document.querySelectorAll('.station-sid-port');
+      for (const el of sidPorts) {
+        if (el.id === dragging.fromId) continue;           // same port
+        if (el.id.startsWith(fromBoxId + '__')) continue;  // same box, different station
         const r = el.getBoundingClientRect();
-        if (e.clientX >= r.left && e.clientX <= r.right &&
-            e.clientY >= r.top  && e.clientY <= r.bottom) {
+        const PAD = 10; // generous hit area for small dots
+        if (e.clientX >= r.left - PAD && e.clientX <= r.right + PAD &&
+            e.clientY >= r.top  - PAD && e.clientY <= r.bottom + PAD) {
           targetId = el.id;
           break;
         }
       }
+
+      // 2. Fall back to buyoff icons
+      if (!targetId) {
+        const buyoffs = document.querySelectorAll('.buyoff-icon-wrapper');
+        for (const el of buyoffs) {
+          if (el.id === dragging.fromId || el.id === fromBoxId) continue;
+          const r = el.getBoundingClientRect();
+          if (e.clientX >= r.left && e.clientX <= r.right &&
+              e.clientY >= r.top  && e.clientY <= r.bottom) {
+            targetId = el.id;
+            break;
+          }
+        }
+      }
+
       if (targetId) {
         setConnections((prev) => {
           const dup = prev.some(

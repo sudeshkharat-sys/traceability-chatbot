@@ -171,6 +171,33 @@
   font-size: 11px;
 }
 
+/* Inline field (label + control on same row) */
+.modal-field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ON/OFF toggle button for reverse order */
+.modal-toggle-btn {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 2px solid var(--border-color);
+  background-color: var(--bg-light);
+  color: var(--text-gray);
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+  min-width: 44px;
+}
+
+.modal-toggle-btn--on {
+  background-color: var(--mahindra-red);
+  border-color: var(--mahindra-red);
+  color: #ffffff;
+}
+
 /* Textarea for custom IDs */
 .modal-textarea {
   padding: 9px 12px;

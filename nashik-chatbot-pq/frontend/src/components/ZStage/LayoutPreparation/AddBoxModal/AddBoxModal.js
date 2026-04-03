@@ -2,9 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { X } from 'lucide-react';
 import './AddBoxModal.css';
 
-function buildAutoIds(prefix, count) {
+function buildAutoIds(prefix, count, reversed) {
   const p = prefix.trim().toUpperCase();
-  return Array.from({ length: count }, (_, i) => `${p}-${String(i + 1).padStart(2, '0')}`);
+  const ids = Array.from({ length: count }, (_, i) => `${p}-${String(i + 1).padStart(2, '0')}`);
+  return reversed ? ids.slice().reverse() : ids;
 }
 
 const DEFAULT_FORM = { name: '', prefix: '', stationCount: 5, description: '' };
@@ -12,13 +13,14 @@ const DEFAULT_FORM = { name: '', prefix: '', stationCount: 5, description: '' };
 function AddBoxModal({ onAdd, onClose }) {
   const [form, setForm] = useState(DEFAULT_FORM);
   const [mode, setMode] = useState('auto'); // 'auto' | 'custom'
+  const [reversed, setReversed] = useState(false);
   const [customText, setCustomText] = useState('');
   const [errors, setErrors] = useState({});
 
   const autoIds = useMemo(() => {
     if (!form.prefix.trim() || form.stationCount < 1) return [];
-    return buildAutoIds(form.prefix, Number(form.stationCount));
-  }, [form.prefix, form.stationCount]);
+    return buildAutoIds(form.prefix, Number(form.stationCount), reversed);
+  }, [form.prefix, form.stationCount, reversed]);
 
   const handleModeSwitch = (newMode) => {
     if (newMode === 'custom' && mode === 'auto') {
@@ -143,6 +145,21 @@ function AddBoxModal({ onAdd, onClose }) {
                   max={60}
                 />
                 {errors.stationCount && <span className="modal-error">{errors.stationCount}</span>}
+              </div>
+
+              <div className="modal-field modal-field--inline">
+                <label className="modal-label">Reverse Order</label>
+                <button
+                  type="button"
+                  className={`modal-toggle-btn${reversed ? ' modal-toggle-btn--on' : ''}`}
+                  onClick={() => setReversed((v) => !v)}
+                  title="Generate station IDs from highest to lowest"
+                >
+                  {reversed ? 'ON' : 'OFF'}
+                </button>
+                <span className="modal-label-hint">
+                  {reversed ? ' — descending (e.g. -05 → -01)' : ' — ascending (e.g. -01 → -05)'}
+                </span>
               </div>
             </>
           )}

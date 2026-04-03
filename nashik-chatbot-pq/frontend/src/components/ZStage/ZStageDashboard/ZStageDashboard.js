@@ -727,22 +727,6 @@ function ZStageDashboard({ userId }) {
 
         {/* ── Toolbar ──────────────────────────────────────────────────────── */}
         <div className="dash-toolbar">
-          <div className="dash-toolbar-left">
-            <span className="dash-toolbar-label">Layout:</span>
-            <select
-              className="dash-layout-select"
-              value={selectedId || ''}
-              onChange={(e) => setSelectedId(Number(e.target.value))}
-              disabled={layouts.length === 0}
-            >
-              {layouts.length === 0
-                ? <option value="">No layouts saved</option>
-                : layouts.map((l) => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
-                  ))
-              }
-            </select>
-          </div>
           <div className="dash-toolbar-right">
             <div className="dash-legend">
               <span className="dash-legend-chip dash-legend-chip--red">Z</span>

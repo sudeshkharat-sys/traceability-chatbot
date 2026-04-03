@@ -44,6 +44,8 @@ COLUMN_MIGRATIONS = [
     "ALTER TABLE layouts ADD COLUMN IF NOT EXISTS legend_position_x FLOAT",
     "ALTER TABLE layouts ADD COLUMN IF NOT EXISTS legend_position_y FLOAT",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user'",
+    "ALTER TABLE box_connections ADD COLUMN IF NOT EXISTS from_station_id VARCHAR(50)",
+    "ALTER TABLE box_connections ADD COLUMN IF NOT EXISTS to_station_id VARCHAR(50)",
 ]
 
 

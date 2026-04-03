@@ -251,11 +251,10 @@ function AddMonthModal({ existingMonths, onAdd, onClose }) {
   );
 }
 
-export default function InputData({ userId, layouts = [] }) {
+export default function InputData({ userId }) {
   const [activeTab, setActiveTab] = useState('upload');
   const [dragging, setDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [selectedLayoutId, setSelectedLayoutId] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
   const [records, setRecords] = useState([]);
@@ -271,18 +270,18 @@ export default function InputData({ userId, layouts = [] }) {
     setLoadingRecords(true);
     setLoadError(null);
     try {
-      const res = await inputApi.getRecords(userId, selectedLayoutId);
+      const res = await inputApi.getRecords(userId, null);
       setRecords(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       setLoadError('Failed to load records. Is the backend running?');
     } finally {
       setLoadingRecords(false);
     }
-  }, [userId, selectedLayoutId]);
+  }, [userId]);
 
   useEffect(() => {
     if (activeTab === 'master') loadRecords();
-  }, [activeTab, loadRecords, selectedLayoutId]);
+  }, [activeTab, loadRecords]);
 
   const handleRecordSaved = useCallback((recordId, updatedRecord) => {
     setRecords((prev) => prev.map((r) => (r.id === recordId ? updatedRecord : r)));
@@ -323,7 +322,7 @@ export default function InputData({ userId, layouts = [] }) {
     setUploading(true);
     setUploadResult(null);
     try {
-      const res = await inputApi.uploadExcel(selectedFile, userId, selectedLayoutId);
+      const res = await inputApi.uploadExcel(selectedFile, userId, null);
       setUploadResult({ success: true, message: res.data.message, rowsImported: res.data.rows_imported });
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -353,21 +352,6 @@ export default function InputData({ userId, layouts = [] }) {
           Master Data
         </button>
 
-        {layouts.length > 0 && (
-          <div className="tabs-layout-select">
-            <label className="layout-select-label">Layout:</label>
-            <select
-              className="layout-select-dropdown"
-              value={selectedLayoutId ?? ''}
-              onChange={(e) => setSelectedLayoutId(e.target.value ? Number(e.target.value) : null)}
-            >
-              <option value="">All layouts</option>
-              {layouts.map((l) => (
-                <option key={l.id} value={l.id}>{l.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
       </div>
 
       {activeTab === 'upload' && (

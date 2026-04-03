@@ -12,7 +12,7 @@
   flex-direction: column;
   user-select: none;
   z-index: 5;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .station-box--collapsed {
@@ -91,8 +91,9 @@
 
 /* Station ID header — spans 2 sub-columns (40px total) */
 .station-grid-header-cell {
+  position: relative;
   width: 40px;
-  padding: 3px 2px;
+  padding: 3px 2px 3px 2px;
   text-align: center;
   font-size: 10px;
   font-weight: 700;
@@ -100,7 +101,7 @@
   background-color: #45b480;
   border-right: 1px solid #1c4532;
   white-space: nowrap;
-  overflow: hidden;
+  overflow: visible;
   text-overflow: ellipsis;
 }
 
@@ -173,22 +174,12 @@
   border-right: none;
 }
 
-/* ── Connection ports ─────────────────────────────────────────────────────── */
-.station-ports {
+/* ── Per-station-ID connection port dots ──────────────────────────────────── */
+.station-sid-port {
   position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.15s;
-  z-index: 20;
-}
-
-.station-box:hover .station-ports {
-  opacity: 1;
-}
-
-.station-port {
-  position: absolute;
+  top: -7px;
+  left: 50%;
+  transform: translateX(-50%);
   width: 10px;
   height: 10px;
   border-radius: 50%;
@@ -196,24 +187,17 @@
   border: 2px solid #fff;
   cursor: crosshair;
   pointer-events: all;
-  padding: 0;
   box-shadow: 0 0 0 1px var(--mahindra-red);
-  transition: transform 0.1s, background-color 0.1s;
+  opacity: 0;
+  transition: opacity 0.15s, transform 0.1s, background-color 0.1s;
+  z-index: 30;
 }
 
-.station-port:hover {
+.station-box:hover .station-sid-port {
+  opacity: 1;
+}
+
+.station-sid-port:hover {
   background: var(--mahindra-red-dark);
-  transform: scale(1.4);
+  transform: translateX(-50%) scale(1.4);
 }
-
-.station-port--top    { top: -6px;    left: 50%;   transform: translateX(-50%); }
-.station-port--top:hover { transform: translateX(-50%) scale(1.4); }
-
-.station-port--right  { right: -6px;  top: 50%;    transform: translateY(-50%); }
-.station-port--right:hover { transform: translateY(-50%) scale(1.4); }
-
-.station-port--bottom { bottom: -6px; left: 50%;   transform: translateX(-50%); }
-.station-port--bottom:hover { transform: translateX(-50%) scale(1.4); }
-
-.station-port--left   { left: -6px;   top: 50%;    transform: translateY(-50%); }
-.station-port--left:hover { transform: translateY(-50%) scale(1.4); }

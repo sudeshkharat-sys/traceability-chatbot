@@ -165,16 +165,20 @@ BypassIconQueries = BuyoffIconQueries
 
 class ConnectionQueries:
     LIST_BY_LAYOUT = """
-        SELECT id, layout_id, from_box_id, to_box_id, from_buyoff_id, to_buyoff_id, created_at
+        SELECT id, layout_id, from_box_id, to_box_id, from_buyoff_id, to_buyoff_id,
+               from_station_id, to_station_id, created_at
         FROM box_connections
         WHERE layout_id = :layout_id
         ORDER BY id
     """
 
     CREATE_CONNECTION = """
-        INSERT INTO box_connections (layout_id, from_box_id, to_box_id, from_buyoff_id, to_buyoff_id, created_at)
-        VALUES (:layout_id, :from_box_id, :to_box_id, :from_buyoff_id, :to_buyoff_id, NOW())
-        RETURNING id, layout_id, from_box_id, to_box_id, from_buyoff_id, to_buyoff_id, created_at
+        INSERT INTO box_connections (layout_id, from_box_id, to_box_id, from_buyoff_id, to_buyoff_id,
+                                     from_station_id, to_station_id, created_at)
+        VALUES (:layout_id, :from_box_id, :to_box_id, :from_buyoff_id, :to_buyoff_id,
+                :from_station_id, :to_station_id, NOW())
+        RETURNING id, layout_id, from_box_id, to_box_id, from_buyoff_id, to_buyoff_id,
+                  from_station_id, to_station_id, created_at
     """
 
     DELETE_CONNECTION = "DELETE FROM box_connections WHERE id = :conn_id"

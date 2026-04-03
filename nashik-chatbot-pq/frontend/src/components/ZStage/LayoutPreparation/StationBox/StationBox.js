@@ -41,13 +41,15 @@ function StationBox({
     if (onPositionChange) onPositionChange(id, { x: data.x, y: data.y });
   };
 
-  const handlePortDown = (e) => {
+  const makePortId = (sid) => `${id}__${sid}`;
+
+  const handleSidPortDown = (e, portId) => {
     e.preventDefault();
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
-    if (onPortMouseDown) onPortMouseDown(id, cx, cy);
+    if (onPortMouseDown) onPortMouseDown(portId, cx, cy);
   };
 
   return (
@@ -67,14 +69,6 @@ function StationBox({
         className={['station-box', collapsed ? 'station-box--collapsed' : ''].join(' ').trim()}
         style={isDragging ? { zIndex: 1000 } : undefined}
       >
-        {/* Connection ports — visible on hover */}
-        <div className="station-ports">
-          <button className="station-port station-port--top"    onMouseDown={handlePortDown} title="Drag to connect" />
-          <button className="station-port station-port--right"  onMouseDown={handlePortDown} title="Drag to connect" />
-          <button className="station-port station-port--bottom" onMouseDown={handlePortDown} title="Drag to connect" />
-          <button className="station-port station-port--left"   onMouseDown={handlePortDown} title="Drag to connect" />
-        </div>
-
         <div className="station-box-header">
           <span className="station-box-title">{name}</span>
           <div className="station-box-controls">
@@ -102,9 +96,20 @@ function StationBox({
             <table className="station-grid">
               <thead>
                 <tr>
-                  {stationIds.map((sid) => (
-                    <th key={sid} colSpan={2} className="station-grid-header-cell">{sid}</th>
-                  ))}
+                  {stationIds.map((sid) => {
+                    const portId = makePortId(sid);
+                    return (
+                      <th key={sid} colSpan={2} className="station-grid-header-cell">
+                        <div
+                          id={portId}
+                          className="station-sid-port"
+                          onMouseDown={(e) => handleSidPortDown(e, portId)}
+                          title="Drag to connect"
+                        />
+                        {sid}
+                      </th>
+                    );
+                  })}
                 </tr>
                 {description && (
                   <tr>

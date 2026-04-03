@@ -157,22 +157,38 @@ def _execute_snapshot(layout_id: int, payload: schemas.LayoutSnapshotCreate, con
                 buyoff_map[icon.local_id] = row[0]
 
         # 5. Insert connections — resolve each endpoint from box_map or buyoff_map
+        #    Local IDs for station-level connections use "__" as separator:
+        #    e.g. "loc-1__T1-01" → box local_id="loc-1", station_id="T1-01"
         for conn in payload.connections:
-            from_box    = box_map.get(conn.from_local_id)
-            from_buyoff = None if from_box else buyoff_map.get(conn.from_local_id)
-            to_box      = box_map.get(conn.to_local_id)
-            to_buyoff   = None if to_box else buyoff_map.get(conn.to_local_id)
+            from_local = conn.from_local_id
+            from_station_id = None
+            if '__' in from_local:
+                parts = from_local.split('__', 1)
+                from_local, from_station_id = parts[0], parts[1]
+
+            to_local = conn.to_local_id
+            to_station_id = None
+            if '__' in to_local:
+                parts = to_local.split('__', 1)
+                to_local, to_station_id = parts[0], parts[1]
+
+            from_box    = box_map.get(from_local)
+            from_buyoff = None if from_box else buyoff_map.get(from_local)
+            to_box      = box_map.get(to_local)
+            to_buyoff   = None if to_box else buyoff_map.get(to_local)
 
             # Both endpoints must resolve to something
             if (from_box or from_buyoff) and (to_box or to_buyoff):
                 session.execute(
                     text(ConnectionQueries.CREATE_CONNECTION),
                     {
-                        "layout_id":     layout_id,
-                        "from_box_id":   from_box,
-                        "to_box_id":     to_box,
+                        "layout_id":      layout_id,
+                        "from_box_id":    from_box,
+                        "to_box_id":      to_box,
                         "from_buyoff_id": from_buyoff,
-                        "to_buyoff_id":  to_buyoff,
+                        "to_buyoff_id":   to_buyoff,
+                        "from_station_id": from_station_id,
+                        "to_station_id":   to_station_id,
                     },
                 )
 

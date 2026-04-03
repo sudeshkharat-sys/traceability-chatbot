@@ -79,6 +79,8 @@ class ConnectionOut(BaseModel):
     to_box_id: Optional[int] = None
     from_buyoff_id: Optional[int] = None
     to_buyoff_id: Optional[int] = None
+    from_station_id: Optional[str] = None
+    to_station_id: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -151,6 +153,8 @@ SnapshotBypassIcon = SnapshotBuyoffIcon
 class SnapshotConnection(BaseModel):
     from_local_id: str
     to_local_id: str
+    from_station_id: Optional[str] = None
+    to_station_id: Optional[str] = None
 
 
 class LayoutSnapshotCreate(BaseModel):

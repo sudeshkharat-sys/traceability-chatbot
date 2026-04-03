@@ -844,6 +844,8 @@ create_dynamic_table(
             ForeignKey("buyoff_icons.id", ondelete="CASCADE"),
             nullable=True,
         ),
+        Column("from_station_id", String(50), nullable=True),
+        Column("to_station_id", String(50), nullable=True),
         Column(
             "created_at",
             DateTime,
