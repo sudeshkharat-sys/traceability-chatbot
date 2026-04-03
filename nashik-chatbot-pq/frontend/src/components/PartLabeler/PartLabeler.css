@@ -1271,6 +1271,84 @@
   z-index: 1;
 }
 
+/* All Sources ingestion overview */
+.ingest-all-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ingest-all-hint {
+  font-size: 0.8rem;
+  color: var(--text-gray);
+  margin: 0;
+}
+
+.ingest-sources-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ingest-sources-table th {
+  text-align: left;
+  padding: 6px 10px;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  color: var(--text-gray);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ingest-sources-table td {
+  padding: 8px 10px;
+  font-size: 0.8rem;
+  border-bottom: 1px solid #f1f3f5;
+}
+
+.status-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #22c55e;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+.status-missing {
+  color: #ef4444;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-checking {
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+
+.upload-source-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  background: white;
+  border: 1px solid var(--mahindra-red);
+  color: var(--mahindra-red);
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.15s;
+}
+
+.upload-source-btn:hover {
+  background: var(--mahindra-red);
+  color: white;
+}
+
+.custom-modal-card:has(.ingest-all-overview) {
+  width: 460px;
+  max-width: 95%;
+}
+
 /* Data Ingestion Modal Styles */
 .ingest-start-modal {
   display: flex;

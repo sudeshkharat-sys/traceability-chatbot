@@ -682,11 +682,16 @@ function PartLabeler() {
   const [tempFilePath, setTempFilePath] = useState('');
   const [columnMapping, setColumnMapping] = useState({});
   const [ingestResult, setIngestResult] = useState(null);
+  const [ingestingForSource, setIngestingForSource] = useState(null); // which source being uploaded in All mode
+  const [sourceDataStatus, setSourceDataStatus] = useState({}); // { warranty: true/false, rpt: true/false, ... }
 
   // Derived from current data source config
-  const targetColumns = DATA_SOURCES[dataSource]?.targetColumns || DATA_SOURCES.warranty.targetColumns;
+  // When in All mode and uploading for a specific source, use that source's config for the modal
+  const activeIngestSource = ingestingForSource || (dataSource !== 'all' ? dataSource : 'warranty');
+  const targetColumns = DATA_SOURCES[activeIngestSource]?.targetColumns || DATA_SOURCES.warranty.targetColumns;
   const mandatoryColumns = targetColumns.filter(c => c.mandatory);
   const sourceConfig = DATA_SOURCES[dataSource] || DATA_SOURCES.warranty;
+  const ingestConfig = DATA_SOURCES[activeIngestSource] || DATA_SOURCES.warranty;
 
   // When data source changes, reset filters and reload
   const handleDataSourceChange = (newSource) => {
@@ -713,7 +718,33 @@ function PartLabeler() {
     fetchDashboardData(label.partName, src);
   };
 
+  const checkAllSourcesStatus = async () => {
+    const status = {};
+    await Promise.all(REAL_SOURCES.map(async (src) => {
+      try {
+        const res = await fetch(`${API_BASE}/filter-options?userId=${userId}&dataSource=${src}`);
+        const data = await res.json();
+        status[src] = (data.mfg_months?.length > 0 || data.models?.length > 0);
+      } catch {
+        status[src] = false;
+      }
+    }));
+    setSourceDataStatus(status);
+  };
+
   const handleDataIngestionStart = () => {
+    setColumnMapping({});
+    setIngestResult(null);
+    if (dataSource === 'all') {
+      checkAllSourcesStatus();
+      setModalType('ingest-all-overview');
+    } else {
+      setModalType('ingest-start');
+    }
+  };
+
+  const handleIngestForSource = (src) => {
+    setIngestingForSource(src);
     setColumnMapping({});
     setIngestResult(null);
     setModalType('ingest-start');
@@ -759,14 +790,19 @@ function PartLabeler() {
       const res = await fetch(`${API_BASE}/warranty-confirm-mapping`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tempFilePath, mapping: columnMapping, userId, dataSource })
+        body: JSON.stringify({ tempFilePath, mapping: columnMapping, userId, dataSource: activeIngestSource })
       });
       const data = await res.json();
       if (data.success) {
         setIngestResult(data.count);
         setModalType('ingest-success');
-        fetchFilterOptions(dataSource);
+        fetchFilterOptions(activeIngestSource);
         if (selectedImage) fetchLabels(selectedImage.id);
+        // In All Sources mode: mark this source as having data and refresh counts
+        if (dataSource === 'all') {
+          setSourceDataStatus(prev => ({ ...prev, [activeIngestSource]: true }));
+          if (labels.length > 0) updateAllLabelFailuresAllSources(labels);
+        }
       }
     } catch (err) {
       alert("Failed to process mapping");
@@ -1095,7 +1131,8 @@ function PartLabeler() {
                   {modalType === 'name' && 'New CAD Drawing'}
                   {modalType === 'delete-image' && 'Delete Drawing?'}
                   {modalType === 'delete-part' && 'Delete Part?'}
-                  {modalType === 'ingest-start' && `Ingest ${sourceConfig.label}`}
+                  {modalType === 'ingest-all-overview' && 'Ingest All Sources'}
+                  {modalType === 'ingest-start' && `Ingest ${ingestConfig.label}`}
                   {modalType === 'ingest-mapping' && 'Map Columns'}
                   {modalType === 'ingest-success' && 'Success'}
                 </h3>
@@ -1106,6 +1143,37 @@ function PartLabeler() {
                   <div className="modal-input-group">
                     <label>Enter a display name for this CAD:</label>
                     <input type="text" value={customImageName} onChange={(e) => setCustomImageName(e.target.value)} placeholder="e.g. THAR ROXX - Interior" autoFocus />
+                  </div>
+                )}
+                {modalType === 'ingest-all-overview' && (
+                  <div className="ingest-all-overview">
+                    <p className="ingest-all-hint">Upload data for each source. Click <strong>Upload</strong> next to a source to add its data file.</p>
+                    <table className="ingest-sources-table">
+                      <thead>
+                        <tr><th>Data Source</th><th>Status</th><th></th></tr>
+                      </thead>
+                      <tbody>
+                        {REAL_SOURCES.map(src => (
+                          <tr key={src}>
+                            <td>{DATA_SOURCES[src].label}</td>
+                            <td>
+                              {sourceDataStatus[src] === undefined ? (
+                                <span className="status-checking">Checking…</span>
+                              ) : sourceDataStatus[src] ? (
+                                <span className="status-ok"><Check size={13} /> Data Available</span>
+                              ) : (
+                                <span className="status-missing">No Data</span>
+                              )}
+                            </td>
+                            <td>
+                              <button className="upload-source-btn" onClick={() => handleIngestForSource(src)}>
+                                <Upload size={13} /> {sourceDataStatus[src] ? 'Replace' : 'Upload'}
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
                 {modalType === 'delete-image' && <p>Are you sure you want to delete this drawing? This action will remove all mapped parts permanently.</p>}
@@ -1123,7 +1191,7 @@ function PartLabeler() {
                   <div className="ingest-mapping-container">
                     <div className="ingest-notice">
                       <FileSpreadsheet size={20} />
-                      <p>Mapping for <strong>{sourceConfig.label}</strong>. <strong>{mandatoryColumns.length} Required fields (*) must be set.</strong></p>
+                      <p>Mapping for <strong>{ingestConfig.label}</strong>. <strong>{mandatoryColumns.length} Required fields (*) must be set.</strong></p>
                     </div>
                     <div className="mapping-scroll-table">
                       <table className="mapping-table">
@@ -1157,17 +1225,25 @@ function PartLabeler() {
                   <div className="ingest-success-view">
                     <div className="success-icon-circle-large"><Check size={48} /></div>
                     <h3>Data Load Successful</h3>
-                    <p>Successfully processed and loaded <strong>{ingestResult}</strong> {sourceConfig.label} records.</p>
+                    <p>Successfully processed and loaded <strong>{ingestResult}</strong> {ingestConfig.label} records.</p>
                   </div>
                 )}
               </div>
               <div className="modal-footer">
                 {modalType === 'ingest-success' ? (
-                  <button className="modal-btn-confirm success-btn" onClick={() => setModalType(null)}>Close</button>
+                  <button className="modal-btn-confirm success-btn" onClick={() => {
+                    if (dataSource === 'all' && ingestingForSource) {
+                      setIngestingForSource(null);
+                      checkAllSourcesStatus();
+                      setModalType('ingest-all-overview');
+                    } else {
+                      setModalType(null);
+                    }
+                  }}>Close</button>
                 ) : (
                   <>
                     <button className="modal-btn-cancel" onClick={() => setModalType(null)}>Cancel</button>
-                    {modalType !== 'ingest-start' && (
+                    {modalType !== 'ingest-start' && modalType !== 'ingest-all-overview' && (
                       <button className={`modal-btn-confirm ${modalType.includes('delete') ? 'danger' : ''} ${modalType === 'ingest-mapping' ? 'success-btn' : ''}`}
                         onClick={() => {
                           if (modalType === 'name') confirmImageUpload();
