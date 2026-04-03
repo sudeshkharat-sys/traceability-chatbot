@@ -1,32 +1,16 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import Xarrow, { Xwrapper } from 'react-xarrows';
+import { Xwrapper } from 'react-xarrows';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { Pencil, LayoutGrid, Trash2, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import StationBox from './StationBox/StationBox';
 import BuyoffIcon from './BypassIcon/BypassIcon';
 import AddBoxModal from './AddBoxModal/AddBoxModal';
 import { layoutApi } from '../../../services/api/layoutApi';
+import { getPortCanvasPos, buildObstacles, routePath } from '../shared/routeArrow';
 import './LayoutPreparation.css';
 
 let nextId = 1;
 const uid = () => `loc-${nextId++}`;
-
-// Derive Xarrow anchor direction from the dot's id suffix so the path
-// exits/enters each dot on the correct side and never routes through a box.
-// id format: "${boxId}__${stationId}"           → top station dot   → "top"
-//            "${boxId}__${stationId}__b"         → bottom station dot → "bottom"
-//            "${boxId}__left"                    → box left port      → "left"
-//            "${boxId}__right"                   → box right port     → "right"
-//            no "__"  (buyoff id)                → auto
-const dotAnchor = (id) => {
-  if (!id.includes('__')) return 'auto';
-  if (id.endsWith('__left'))   return 'left';
-  if (id.endsWith('__right'))  return 'right';
-  if (id.endsWith('__b'))      return 'bottom';
-  if (id.endsWith('__bottom')) return 'bottom';
-  if (id.endsWith('__top'))    return 'top';
-  return 'top';
-};
 
 // ── Grid constants ────────────────────────────────────────────────────────────
 const GRID = 40;
@@ -649,29 +633,66 @@ function LayoutPreparation({
         )}
       </div>
 
-      {/* ── Connections rendered in screen space (outside TransformComponent) ──
-          Xarrow uses getBoundingClientRect() for start/end element positions.
-          Being outside the scaled canvas means coordinates match exactly — arrows
-          stay between boxes at any zoom level and follow boxes during drag. */}
-      {connections.map((conn) => (
-        <Xarrow
-          key={conn.id}
-          start={conn.fromId}
-          end={conn.toId}
-          startAnchor={dotAnchor(conn.fromId)}
-          endAnchor={dotAnchor(conn.toId)}
-          color="#1a2744"
-          strokeWidth={2}
-          path="grid"
-          headSize={6}
-          zIndex={100}
-          passProps={{
-            onClick: () => handleDeleteConnection(conn.id),
-            style: { cursor: 'pointer' },
-            title: 'Click to remove connection',
-          }}
-        />
-      ))}
+      {/* ── Connections: BFS-routed SVG arrows that avoid box obstacles ─────────
+          Routes are computed in canvas space and converted to screen space via
+          transformState.  The fixed-position SVG overlay sits above everything. */}
+      {(() => {
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (!rect || connections.length === 0) return null;
+        const { left: cl, top: ct } = rect;
+        const { scale, positionX, positionY } = transformState;
+
+        // Convert a canvas-space point to screen-space SVG coordinates
+        const toScreen = (cx, cy) => [
+          cl + positionX + cx * scale,
+          ct + positionY + cy * scale,
+        ];
+
+        const obstacles = buildObstacles(boxes, 0);
+
+        const arrows = connections.map((conn) => {
+          const sp  = getPortCanvasPos(conn.fromId, boxes, buyoffIcons);
+          const ep  = getPortCanvasPos(conn.toId,   boxes, buyoffIcons);
+          const pts = routePath(sp, ep, obstacles);
+          if (!pts || pts.length < 2) return null;
+
+          const screenPts = pts.map(([cx, cy]) => toScreen(cx, cy));
+          const d = 'M ' + screenPts.map(([x, y]) => `${x},${y}`).join(' L ');
+
+          return (
+            <g
+              key={conn.id}
+              style={{ pointerEvents: 'all', cursor: 'pointer' }}
+              onClick={() => handleDeleteConnection(conn.id)}
+            >
+              {/* Wide transparent hit-area so the line is easy to click */}
+              <path d={d} stroke="transparent" strokeWidth={12} fill="none" />
+              {/* Visible arrow */}
+              <path d={d} stroke="#1a2744" strokeWidth={2} fill="none"
+                    markerEnd="url(#lp-arrow-head)" />
+            </g>
+          );
+        });
+
+        return (
+          <svg
+            style={{
+              position: 'fixed', top: 0, left: 0,
+              width: '100vw', height: '100vh',
+              pointerEvents: 'none',
+              zIndex: 100, overflow: 'visible',
+            }}
+          >
+            <defs>
+              <marker id="lp-arrow-head" markerWidth="8" markerHeight="6"
+                      refX="7" refY="3" orient="auto">
+                <polygon points="0 0, 8 3, 0 6" fill="#1a2744" />
+              </marker>
+            </defs>
+            {arrows}
+          </svg>
+        );
+      })()}
     </Xwrapper>
   );
 }

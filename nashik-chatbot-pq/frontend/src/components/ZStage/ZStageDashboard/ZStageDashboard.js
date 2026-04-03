@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import Xarrow, { Xwrapper } from 'react-xarrows';
+import { Xwrapper } from 'react-xarrows';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { ZoomIn, ZoomOut, Maximize2, RefreshCw, GitBranch, X, Loader, TableProperties } from 'lucide-react';
 import { layoutApi, inputApi } from '../../../services/api/layoutApi';
+import { getPortCanvasPos, buildObstacles, routePath } from '../shared/routeArrow';
 import './ZStageDashboard.css';
 
 // ── Constants (mirror LayoutPreparation) ──────────────────────────────────────
@@ -54,17 +55,6 @@ function fmtMonth(key) {
   return new Date(Number(year), Number(month) - 1, 1)
     .toLocaleString('default', { month: 'short' }) + ' ' + year.slice(2);
 }
-
-// Mirror of LayoutPreparation's dotAnchor — keeps arrow routing consistent
-const dotAnchor = (id) => {
-  if (!id.includes('__')) return 'auto';
-  if (id.endsWith('__left'))   return 'left';
-  if (id.endsWith('__right'))  return 'right';
-  if (id.endsWith('__b'))      return 'bottom';
-  if (id.endsWith('__bottom')) return 'bottom';
-  if (id.endsWith('__top'))    return 'top';
-  return 'top';
-};
 
 // ── Inline editable cell ───────────────────────────────────────────────────────
 function EditableCell({ recordId, fieldKey, value, type, onSaved, stickyLeft }) {
@@ -976,22 +966,55 @@ function ZStageDashboard({ userId }) {
         </div>
       </div>
 
-      {/* Connections rendered outside TransformComponent so Xarrow coordinates
-          stay in screen space — identical pattern to LayoutPreparation */}
-      {connections.map((conn) => (
-        <Xarrow
-          key={conn.id}
-          start={conn.fromId}
-          end={conn.toId}
-          startAnchor={dotAnchor(conn.fromId)}
-          endAnchor={dotAnchor(conn.toId)}
-          color="#1a2744"
-          strokeWidth={2}
-          path="grid"
-          headSize={6}
-          zIndex={100}
-        />
-      ))}
+      {/* Connections: BFS-routed SVG arrows that avoid box obstacles */}
+      {(() => {
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (!rect || connections.length === 0) return null;
+        const { left: cl, top: ct } = rect;
+        const { scale, positionX, positionY } = transformState;
+
+        const toScreen = (cx, cy) => [
+          cl + positionX + cx * scale,
+          ct + positionY + cy * scale,
+        ];
+
+        const obstacles = buildObstacles(boxes, 0);
+
+        const arrows = connections.map((conn) => {
+          const sp  = getPortCanvasPos(conn.fromId, boxes, buyoffIcons);
+          const ep  = getPortCanvasPos(conn.toId,   boxes, buyoffIcons);
+          const pts = routePath(sp, ep, obstacles);
+          if (!pts || pts.length < 2) return null;
+
+          const screenPts = pts.map(([cx, cy]) => toScreen(cx, cy));
+          const d = 'M ' + screenPts.map(([x, y]) => `${x},${y}`).join(' L ');
+
+          return (
+            <path key={conn.id} d={d}
+                  stroke="#1a2744" strokeWidth={2} fill="none"
+                  markerEnd="url(#dash-arrow-head)" />
+          );
+        });
+
+        return (
+          <svg
+            style={{
+              position: 'fixed', top: 0, left: 0,
+              width: '100vw', height: '100vh',
+              pointerEvents: 'none',
+              zIndex: 100, overflow: 'visible',
+            }}
+          >
+            <defs>
+              <marker id="dash-arrow-head" markerWidth="8" markerHeight="6"
+                      refX="7" refY="3" orient="auto">
+                <polygon points="0 0, 8 3, 0 6" fill="#1a2744" />
+              </marker>
+            </defs>
+            {arrows}
+          </svg>
+        );
+      })()}
 
       {/* Station detail popup — rendered outside canvas so it's not clipped */}
       {popupStation && (
