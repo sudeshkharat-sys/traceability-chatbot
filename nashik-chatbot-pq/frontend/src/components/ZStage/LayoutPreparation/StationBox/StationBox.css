@@ -173,11 +173,10 @@
   border-right: none;
 }
 
-/* ── Per-station top port dots — rendered directly on .station-box ────────── */
-/* Positioned above the box using absolute coords calculated in JS (left=17+i*40) */
+/* ── Per-station port dots (top & bottom) ─────────────────────────────────── */
+/* Left position calculated in JS: 17 + i*40 px (centers over each 40px column) */
 .station-sid-port {
   position: absolute;
-  top: -7px;          /* sit just above the box border */
   width: 10px;
   height: 10px;
   border-radius: 50%;
@@ -191,6 +190,9 @@
   z-index: 30;
 }
 
+.station-sid-port--top    { top: -7px; }
+.station-sid-port--bottom { bottom: -7px; }
+
 .station-box:hover .station-sid-port {
   opacity: 1;
 }
@@ -200,7 +202,7 @@
   transform: scale(1.4);
 }
 
-/* ── Box-level port dots: bottom / left / right ───────────────────────────── */
+/* ── Box-level port dots: left and right only ─────────────────────────────── */
 .station-box-port {
   position: absolute;
   width: 10px;
@@ -218,20 +220,6 @@
 
 .station-box:hover .station-box-port {
   opacity: 1;
-}
-
-.station-box-port:hover {
-  background: var(--mahindra-red-dark);
-}
-
-.station-box-port--bottom {
-  bottom: -7px;
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.station-box-port--bottom:hover {
-  transform: translateX(-50%) scale(1.4);
 }
 
 .station-box-port--left {

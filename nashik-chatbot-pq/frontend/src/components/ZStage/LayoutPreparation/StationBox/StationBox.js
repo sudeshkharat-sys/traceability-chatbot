@@ -84,7 +84,7 @@ function StationBox({
             <div
               key={portId}
               id={portId}
-              className="station-sid-port"
+              className="station-sid-port station-sid-port--top"
               style={{ left: SID_DOT_LEFT(i) }}
               onMouseDown={(e) => handleSidPortDown(e, portId)}
               title={`Connect from ${sid}`}
@@ -92,10 +92,24 @@ function StationBox({
           );
         })}
 
-        {/* ── Box-level port dots: bottom, left, right ─────────────────── */}
-        <div className="station-box-port station-box-port--bottom" onMouseDown={handleBoxPortDown} title="Drag to connect" />
-        <div className="station-box-port station-box-port--left"   onMouseDown={handleBoxPortDown} title="Drag to connect" />
-        <div className="station-box-port station-box-port--right"  onMouseDown={handleBoxPortDown} title="Drag to connect" />
+        {/* ── Per-station bottom port dots — one below each station column ─ */}
+        {stationIds.map((sid, i) => {
+          const portId = `${id}__${sid}__b`;
+          return (
+            <div
+              key={portId}
+              id={portId}
+              className="station-sid-port station-sid-port--bottom"
+              style={{ left: SID_DOT_LEFT(i) }}
+              onMouseDown={(e) => handleSidPortDown(e, portId)}
+              title={`Connect from ${sid}`}
+            />
+          );
+        })}
+
+        {/* ── Box-level port dots: left and right only ─────────────────── */}
+        <div className="station-box-port station-box-port--left"  onMouseDown={handleBoxPortDown} title="Drag to connect" />
+        <div className="station-box-port station-box-port--right" onMouseDown={handleBoxPortDown} title="Drag to connect" />
 
         <div className="station-box-header">
           <span className="station-box-title">{name}</span>
