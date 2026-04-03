@@ -347,11 +347,22 @@ function parseLayout(apiLayout) {
     position: { x: ic.position_x, y: ic.position_y },
   }));
 
-  const connections = (apiLayout.connections || []).map((c) => ({
-    id: `db-conn-${c.id}`,
-    fromId: c.from_box_id != null ? `db-box-${c.from_box_id}` : `db-buyoff-${c.from_buyoff_id}`,
-    toId:   c.to_box_id   != null ? `db-box-${c.to_box_id}`   : `db-buyoff-${c.to_buyoff_id}`,
-  }));
+  const connections = (apiLayout.connections || []).map((c) => {
+    let fromId, toId;
+    if (c.from_box_id != null) {
+      const base = `db-box-${c.from_box_id}`;
+      fromId = c.from_station_id ? `${base}__${c.from_station_id}` : base;
+    } else {
+      fromId = `db-buyoff-${c.from_buyoff_id}`;
+    }
+    if (c.to_box_id != null) {
+      const base = `db-box-${c.to_box_id}`;
+      toId = c.to_station_id ? `${base}__${c.to_station_id}` : base;
+    } else {
+      toId = `db-buyoff-${c.to_buyoff_id}`;
+    }
+    return { id: `db-conn-${c.id}`, fromId, toId };
+  });
 
   // Normalize negative coordinates — shift everything so min x/y ≥ GRID (40px)
   const allX = [...boxes.map((b) => b.position.x), ...buyoffIcons.map((ic) => ic.position.x)];
@@ -852,6 +863,16 @@ function ZStageDashboard({ userId }) {
                               width: w,
                             }}
                           >
+                            {/* Invisible Xarrow anchor points — mirror the layout editor dot positions */}
+                            {box.stationIds.map((sid, i) => (
+                              <React.Fragment key={sid}>
+                                <div id={`${box.id}__${sid}`}    style={{ position:'absolute', top:0,    left: 17+i*40, width:1, height:1, pointerEvents:'none' }} />
+                                <div id={`${box.id}__${sid}__b`} style={{ position:'absolute', bottom:0, left: 17+i*40, width:1, height:1, pointerEvents:'none' }} />
+                              </React.Fragment>
+                            ))}
+                            <div id={`${box.id}__left`}  style={{ position:'absolute', left:0,  top:'50%', width:1, height:1, pointerEvents:'none' }} />
+                            <div id={`${box.id}__right`} style={{ position:'absolute', right:0, top:'50%', width:1, height:1, pointerEvents:'none' }} />
+
                             {/* Header */}
                             <div className="dash-box-header">
                               <span className="dash-box-title">{box.name}</span>

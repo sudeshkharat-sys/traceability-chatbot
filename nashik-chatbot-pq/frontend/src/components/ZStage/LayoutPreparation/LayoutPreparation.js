@@ -237,17 +237,18 @@ function LayoutPreparation({
         }
       }
 
-      // 2. Box-level port dots (bottom/left/right) — resolve to their parent box ID
+      // 2. Box-level port dots (left/right) — use the dot's own id directly
       if (!targetId) {
         const boxPorts = document.querySelectorAll('.station-box-port');
         for (const el of boxPorts) {
           const box = el.closest('.station-box');
           if (!box || box.id === fromBoxId) continue;
+          if (el.id === dragging.fromId) continue;
           const r = el.getBoundingClientRect();
-          const PAD = 8;
+          const PAD = 10;
           if (e.clientX >= r.left - PAD && e.clientX <= r.right + PAD &&
               e.clientY >= r.top  - PAD && e.clientY <= r.bottom + PAD) {
-            targetId = box.id;
+            targetId = el.id;  // e.g. "db-box-2__left"
             break;
           }
         }

@@ -52,12 +52,13 @@ function StationBox({
     if (onPortMouseDown) onPortMouseDown(portId, rect.left + rect.width / 2, rect.top + rect.height / 2);
   };
 
-  // Box-level dots (bottom/left/right): fromId = boxId
+  // Box-level dots (left/right): each has its own DOM id so Xarrow terminates at the dot
   const handleBoxPortDown = (e) => {
     e.preventDefault();
     e.stopPropagation();
+    const portId = e.currentTarget.id;
     const rect = e.currentTarget.getBoundingClientRect();
-    if (onPortMouseDown) onPortMouseDown(id, rect.left + rect.width / 2, rect.top + rect.height / 2);
+    if (onPortMouseDown) onPortMouseDown(portId, rect.left + rect.width / 2, rect.top + rect.height / 2);
   };
 
   return (
@@ -107,9 +108,9 @@ function StationBox({
           );
         })}
 
-        {/* ── Box-level port dots: left and right only ─────────────────── */}
-        <div className="station-box-port station-box-port--left"  onMouseDown={handleBoxPortDown} title="Drag to connect" />
-        <div className="station-box-port station-box-port--right" onMouseDown={handleBoxPortDown} title="Drag to connect" />
+        {/* ── Box-level port dots: left and right — each has its own id ── */}
+        <div id={`${id}__left`}  className="station-box-port station-box-port--left"  onMouseDown={handleBoxPortDown} title="Drag to connect" />
+        <div id={`${id}__right`} className="station-box-port station-box-port--right" onMouseDown={handleBoxPortDown} title="Drag to connect" />
 
         <div className="station-box-header">
           <span className="station-box-title">{name}</span>
