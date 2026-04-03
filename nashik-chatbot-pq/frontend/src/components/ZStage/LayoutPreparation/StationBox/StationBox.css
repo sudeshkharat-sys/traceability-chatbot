@@ -91,9 +91,8 @@
 
 /* Station ID header — spans 2 sub-columns (40px total) */
 .station-grid-header-cell {
-  position: relative;
   width: 40px;
-  padding: 3px 2px 3px 2px;
+  padding: 3px 2px;
   text-align: center;
   font-size: 10px;
   font-weight: 700;
@@ -101,7 +100,7 @@
   background-color: #45b480;
   border-right: 1px solid #1c4532;
   white-space: nowrap;
-  overflow: visible;
+  overflow: hidden;
   text-overflow: ellipsis;
 }
 
@@ -174,12 +173,11 @@
   border-right: none;
 }
 
-/* ── Per-station-ID connection port dots ──────────────────────────────────── */
+/* ── Per-station top port dots — rendered directly on .station-box ────────── */
+/* Positioned above the box using absolute coords calculated in JS (left=17+i*40) */
 .station-sid-port {
   position: absolute;
-  top: -7px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: -7px;          /* sit just above the box border */
   width: 10px;
   height: 10px;
   border-radius: 50%;
@@ -199,5 +197,59 @@
 
 .station-sid-port:hover {
   background: var(--mahindra-red-dark);
+  transform: scale(1.4);
+}
+
+/* ── Box-level port dots: bottom / left / right ───────────────────────────── */
+.station-box-port {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--mahindra-red);
+  border: 2px solid #fff;
+  cursor: crosshair;
+  pointer-events: all;
+  box-shadow: 0 0 0 1px var(--mahindra-red);
+  opacity: 0;
+  transition: opacity 0.15s, transform 0.1s, background-color 0.1s;
+  z-index: 30;
+}
+
+.station-box:hover .station-box-port {
+  opacity: 1;
+}
+
+.station-box-port:hover {
+  background: var(--mahindra-red-dark);
+}
+
+.station-box-port--bottom {
+  bottom: -7px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.station-box-port--bottom:hover {
   transform: translateX(-50%) scale(1.4);
+}
+
+.station-box-port--left {
+  left: -7px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.station-box-port--left:hover {
+  transform: translateY(-50%) scale(1.4);
+}
+
+.station-box-port--right {
+  right: -7px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.station-box-port--right:hover {
+  transform: translateY(-50%) scale(1.4);
 }

@@ -4,6 +4,11 @@ import { useXarrow } from 'react-xarrows';
 import { ChevronUp, ChevronDown, X } from 'lucide-react';
 import './StationBox.css';
 
+// Each station column is 40px wide; box has a 2px border (box-sizing: border-box).
+// Dot center for station i: border(2) + i*40 + 20 = 22 + i*40 px from left edge.
+// Dot is 10px wide, so left edge offset: 22 + i*40 - 5 = 17 + i*40
+const SID_DOT_LEFT = (i) => 17 + i * 40;
+
 function StationBox({
   id,
   name,
@@ -27,9 +32,7 @@ function StationBox({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parentPosition?.x, parentPosition?.y]);
 
-  const handleStart = () => {
-    setIsDragging(true);
-  };
+  const handleStart = () => setIsDragging(true);
 
   const handleDrag = (e, data) => {
     setPos({ x: data.x, y: data.y });
@@ -41,15 +44,20 @@ function StationBox({
     if (onPositionChange) onPositionChange(id, { x: data.x, y: data.y });
   };
 
-  const makePortId = (sid) => `${id}__${sid}`;
-
+  // Per-station top dot: fromId = "${boxId}__${stationId}"
   const handleSidPortDown = (e, portId) => {
     e.preventDefault();
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    const cx = rect.left + rect.width / 2;
-    const cy = rect.top + rect.height / 2;
-    if (onPortMouseDown) onPortMouseDown(portId, cx, cy);
+    if (onPortMouseDown) onPortMouseDown(portId, rect.left + rect.width / 2, rect.top + rect.height / 2);
+  };
+
+  // Box-level dots (bottom/left/right): fromId = boxId
+  const handleBoxPortDown = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (onPortMouseDown) onPortMouseDown(id, rect.left + rect.width / 2, rect.top + rect.height / 2);
   };
 
   return (
@@ -69,6 +77,26 @@ function StationBox({
         className={['station-box', collapsed ? 'station-box--collapsed' : ''].join(' ').trim()}
         style={isDragging ? { zIndex: 1000 } : undefined}
       >
+        {/* ── Per-station top port dots — one above each station column ─── */}
+        {stationIds.map((sid, i) => {
+          const portId = `${id}__${sid}`;
+          return (
+            <div
+              key={portId}
+              id={portId}
+              className="station-sid-port"
+              style={{ left: SID_DOT_LEFT(i) }}
+              onMouseDown={(e) => handleSidPortDown(e, portId)}
+              title={`Connect from ${sid}`}
+            />
+          );
+        })}
+
+        {/* ── Box-level port dots: bottom, left, right ─────────────────── */}
+        <div className="station-box-port station-box-port--bottom" onMouseDown={handleBoxPortDown} title="Drag to connect" />
+        <div className="station-box-port station-box-port--left"   onMouseDown={handleBoxPortDown} title="Drag to connect" />
+        <div className="station-box-port station-box-port--right"  onMouseDown={handleBoxPortDown} title="Drag to connect" />
+
         <div className="station-box-header">
           <span className="station-box-title">{name}</span>
           <div className="station-box-controls">
@@ -96,20 +124,9 @@ function StationBox({
             <table className="station-grid">
               <thead>
                 <tr>
-                  {stationIds.map((sid) => {
-                    const portId = makePortId(sid);
-                    return (
-                      <th key={sid} colSpan={2} className="station-grid-header-cell">
-                        <div
-                          id={portId}
-                          className="station-sid-port"
-                          onMouseDown={(e) => handleSidPortDown(e, portId)}
-                          title="Drag to connect"
-                        />
-                        {sid}
-                      </th>
-                    );
-                  })}
+                  {stationIds.map((sid) => (
+                    <th key={sid} colSpan={2} className="station-grid-header-cell">{sid}</th>
+                  ))}
                 </tr>
                 {description && (
                   <tr>

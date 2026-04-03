@@ -237,7 +237,23 @@ function LayoutPreparation({
         }
       }
 
-      // 2. Fall back to buyoff icons
+      // 2. Box-level port dots (bottom/left/right) — resolve to their parent box ID
+      if (!targetId) {
+        const boxPorts = document.querySelectorAll('.station-box-port');
+        for (const el of boxPorts) {
+          const box = el.closest('.station-box');
+          if (!box || box.id === fromBoxId) continue;
+          const r = el.getBoundingClientRect();
+          const PAD = 8;
+          if (e.clientX >= r.left - PAD && e.clientX <= r.right + PAD &&
+              e.clientY >= r.top  - PAD && e.clientY <= r.bottom + PAD) {
+            targetId = box.id;
+            break;
+          }
+        }
+      }
+
+      // 3. Fall back to buyoff icons
       if (!targetId) {
         const buyoffs = document.querySelectorAll('.buyoff-icon-wrapper');
         for (const el of buyoffs) {
