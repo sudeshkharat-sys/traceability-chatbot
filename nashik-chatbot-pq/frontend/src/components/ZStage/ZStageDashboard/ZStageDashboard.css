@@ -9,7 +9,7 @@
 /* ── Toolbar ─────────────────────────────────────────────────────────────── */
 .dash-toolbar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   padding: 10px 20px;
   background-color: #ffffff;
@@ -38,6 +38,19 @@
   color: var(--text-dark);
 }
 
+.dash-layout-select-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dash-layout-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-gray);
+  white-space: nowrap;
+}
+
 .dash-layout-select {
   height: 32px;
   padding: 0 10px;
@@ -47,7 +60,7 @@
   font-size: 13px;
   color: var(--text-dark);
   cursor: pointer;
-  min-width: 180px;
+  min-width: 160px;
 }
 
 .dash-layout-select:focus {

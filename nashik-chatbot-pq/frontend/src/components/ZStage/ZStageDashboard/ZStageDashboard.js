@@ -749,6 +749,21 @@ function ZStageDashboard({ userId }) {
               <RefreshCw size={13} className={refreshing ? 'dash-spin' : ''} />
               {refreshing ? 'Refreshing…' : 'Refresh'}
             </button>
+            {layouts.length > 0 && (
+              <div className="dash-layout-select-wrap">
+                <label className="dash-layout-label">Layout:</label>
+                <select
+                  className="dash-layout-select"
+                  value={selectedId || ''}
+                  onChange={(e) => setSelectedId(Number(e.target.value))}
+                  disabled={layouts.length === 0}
+                >
+                  {layouts.map((l) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
 

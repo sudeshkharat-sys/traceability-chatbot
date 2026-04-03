@@ -10,11 +10,38 @@
 
 .input-tabs {
   display: flex;
+  align-items: center;
   gap: 2px;
   padding: 12px 20px 0;
   border-bottom: 1px solid #e2e8f0;
   background: #fff;
   flex-shrink: 0;
+}
+
+.tabs-layout-select {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 8px;
+}
+
+.layout-select-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #718096;
+  white-space: nowrap;
+}
+
+.layout-select-dropdown {
+  padding: 4px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 5px;
+  font-size: 12px;
+  color: #2d3748;
+  background: #fff;
+  cursor: pointer;
+  outline: none;
 }
 
 .input-tab {
