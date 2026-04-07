@@ -136,6 +136,72 @@
   border-color: #3182ce;
 }
 
+/* ── Upload type selector ─────────────────────────────────────────────────── */
+
+.upload-type-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.upload-type-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #4a5568;
+  white-space: nowrap;
+  padding-top: 10px;
+}
+
+.upload-type-options {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.upload-type-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  min-width: 160px;
+  background: #fff;
+}
+
+.upload-type-option input[type="radio"] {
+  display: none;
+}
+
+.upload-type-option:hover {
+  border-color: #3182ce;
+  background: #ebf8ff;
+}
+
+.upload-type-option.selected {
+  border-color: var(--mahindra-red, #c1121f);
+  background: #fff5f5;
+}
+
+.upload-type-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.upload-type-option.selected .upload-type-name {
+  color: var(--mahindra-red, #c1121f);
+}
+
+.upload-type-desc {
+  font-size: 11px;
+  color: #718096;
+  line-height: 1.4;
+}
+
 /* ── Upload panel ─────────────────────────────────────────────────────────── */
 
 .drop-zone {

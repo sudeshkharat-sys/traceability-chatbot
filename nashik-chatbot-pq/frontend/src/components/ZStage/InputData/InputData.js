@@ -256,134 +256,6 @@ function AuditTable({ columns, records }) {
 }
 
 // ── Reusable audit upload + view panel ────────────────────────────────────────
-function AuditPanel({ title, subtitle, columns, uploadFn, fetchFn, userId, layoutId }) {
-  const [innerTab, setInnerTab] = useState('upload');
-  const [dragging, setDragging]     = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [uploading, setUploading]   = useState(false);
-  const [uploadResult, setUploadResult] = useState(null);
-  const [records, setRecords]       = useState([]);
-  const [loading, setLoading]       = useState(false);
-  const [loadError, setLoadError]   = useState(null);
-  const fileRef = useRef(null);
-
-  const loadRecords = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const res = await fetchFn(userId, layoutId);
-      setRecords(Array.isArray(res.data) ? res.data : []);
-    } catch {
-      setLoadError('Failed to load records. Is the backend running?');
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, layoutId, fetchFn]);
-
-  useEffect(() => {
-    if (innerTab === 'view') loadRecords();
-  }, [innerTab, loadRecords]);
-
-  const handleUpload = async () => {
-    if (!selectedFile) return;
-    setUploading(true);
-    setUploadResult(null);
-    try {
-      const res = await uploadFn(selectedFile, userId, layoutId);
-      setUploadResult({ success: true, message: res.data.message, rowsImported: res.data.rows_imported });
-      setSelectedFile(null);
-      if (fileRef.current) fileRef.current.value = '';
-    } catch (err) {
-      const detail = err.response?.data?.detail || 'Upload failed.';
-      setUploadResult({ success: false, message: detail });
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  return (
-    <div>
-      <div className="input-tabs" style={{ borderBottom: '1px solid #e5e7eb', marginBottom: 0 }}>
-        <button
-          className={`input-tab ${innerTab === 'upload' ? 'active' : ''}`}
-          onClick={() => setInnerTab('upload')}
-        >
-          <Upload size={14} /> Upload
-        </button>
-        <button
-          className={`input-tab ${innerTab === 'view' ? 'active' : ''}`}
-          onClick={() => setInnerTab('view')}
-        >
-          <Database size={14} /> View Data
-        </button>
-      </div>
-
-      {innerTab === 'upload' && (
-        <div className="upload-panel">
-          <h2 className="panel-title">{title}</h2>
-          <p className="panel-subtitle">{subtitle}</p>
-          <div
-            className={`drop-zone ${dragging ? 'drag-over' : ''} ${selectedFile ? 'has-file' : ''}`}
-            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) setSelectedFile(f); }}
-            onClick={() => fileRef.current?.click()}
-          >
-            <input ref={fileRef} type="file" accept=".xlsx,.xls" className="file-input-hidden" onChange={(e) => { const f = e.target.files[0]; if (f) setSelectedFile(f); }} />
-            <Upload size={36} strokeWidth={1.5} className="drop-icon" />
-            {selectedFile ? (
-              <><p className="drop-filename">{selectedFile.name}</p><p className="drop-hint">Click to choose a different file</p></>
-            ) : (
-              <><p className="drop-label">Drag & drop your Excel file here</p><p className="drop-hint">or click to browse — .xlsx / .xls only</p></>
-            )}
-          </div>
-          <button className="upload-btn" disabled={!selectedFile || uploading} onClick={handleUpload}>
-            {uploading ? <><Loader size={15} className="spin" /> Uploading…</> : 'Upload File'}
-          </button>
-          {uploadResult && (
-            <div className={`upload-result ${uploadResult.success ? 'result-success' : 'result-error'}`}>
-              {uploadResult.success ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
-              <div>
-                <strong>{uploadResult.success ? 'Success' : 'Error'}</strong>
-                <p>{uploadResult.message}</p>
-                {uploadResult.success && (
-                  <p>{uploadResult.rowsImported} rows imported.{' '}
-                    <button className="link-btn" onClick={() => setInnerTab('view')}>View Data →</button>
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {innerTab === 'view' && (
-        <div className="master-panel">
-          <div className="master-header">
-            <h2 className="panel-title">{title}</h2>
-            <div className="master-actions">
-              <span className="record-count">{records.length} record{records.length !== 1 ? 's' : ''}</span>
-              <button className="refresh-btn" onClick={loadRecords} disabled={loading}>
-                {loading ? <Loader size={13} className="spin" /> : '↻'} Refresh
-              </button>
-            </div>
-          </div>
-          {loading && <div className="master-loading"><Loader size={28} className="spin" /><p>Loading records…</p></div>}
-          {loadError && !loading && <div className="master-error"><AlertCircle size={20} /><p>{loadError}</p></div>}
-          {!loading && !loadError && records.length === 0 && (
-            <div className="master-empty">
-              <Database size={40} strokeWidth={1} />
-              <p>No records yet. Upload an Excel file first.</p>
-              <button className="link-btn" onClick={() => setInnerTab('upload')}>Go to Upload →</button>
-            </div>
-          )}
-          {!loading && records.length > 0 && <AuditTable columns={columns} records={records} />}
-        </div>
-      )}
-    </div>
-  );
-}
-
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const LS_KEY = 'zstage_extra_months';
 
@@ -435,13 +307,42 @@ function AddMonthModal({ existingMonths, onAdd, onClose }) {
   );
 }
 
+// Upload data-type options
+const UPLOAD_TYPES = [
+  {
+    value: 'master',
+    label: 'Master Data',
+    desc: 'Z-Stage input Excel — Sr.No, Concern ID, Stage No, monthly incidences…',
+    viewTab: 'master',
+  },
+  {
+    value: 'layered-audit',
+    label: 'Layered Audit',
+    desc: 'Layered Audit Excel — Model, Date, Station ID, Workstation, Auditor, NC\'s…',
+    viewTab: 'layered-audit',
+  },
+  {
+    value: 'audit-adherence',
+    label: 'Audit Adherence',
+    desc: 'Audit Adherence Excel — Stage No, Stage Name, Auditor, Audit Date.',
+    viewTab: 'audit-adherence',
+  },
+];
+
 export default function InputData({ userId, layouts = [] }) {
   const [activeTab, setActiveTab] = useState('upload');
+  // upload tab state
+  const [uploadType, setUploadType] = useState('master');
   const [dragging, setDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
-  const [selectedLayoutId, setSelectedLayoutId] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
+  const fileInputRef = useRef(null);
+
+  // shared layout selector
+  const [selectedLayoutId, setSelectedLayoutId] = useState(null);
+
+  // Master Data state
   const [records, setRecords] = useState([]);
   const [loadingRecords, setLoadingRecords] = useState(false);
   const [loadError, setLoadError] = useState(null);
@@ -449,22 +350,32 @@ export default function InputData({ userId, layouts = [] }) {
     try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; } catch { return []; }
   });
   const [showAddMonth, setShowAddMonth] = useState(false);
-  const fileInputRef = useRef(null);
 
-  // Auto-select first layout when layouts load
+  // Layered Audit state
+  const [auditRecords, setAuditRecords] = useState([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+  const [auditError, setAuditError] = useState(null);
+
+  // Audit Adherence state
+  const [adherenceRecords, setAdherenceRecords] = useState([]);
+  const [loadingAdherence, setLoadingAdherence] = useState(false);
+  const [adherenceError, setAdherenceError] = useState(null);
+
+  // Auto-select first layout
   useEffect(() => {
     if (layouts.length > 0 && selectedLayoutId === null) {
       setSelectedLayoutId(layouts[0].id);
     }
   }, [layouts, selectedLayoutId]);
 
+  // ── Master Data load ────────────────────────────────────────────────────────
   const loadRecords = useCallback(async () => {
     setLoadingRecords(true);
     setLoadError(null);
     try {
       const res = await inputApi.getRecords(userId, selectedLayoutId);
       setRecords(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
+    } catch {
       setLoadError('Failed to load records. Is the backend running?');
     } finally {
       setLoadingRecords(false);
@@ -473,13 +384,48 @@ export default function InputData({ userId, layouts = [] }) {
 
   useEffect(() => {
     if (activeTab === 'master') loadRecords();
-  }, [activeTab, loadRecords, selectedLayoutId]);
+  }, [activeTab, loadRecords]);
+
+  // ── Layered Audit load ──────────────────────────────────────────────────────
+  const loadAuditRecords = useCallback(async () => {
+    setLoadingAudit(true);
+    setAuditError(null);
+    try {
+      const res = await layeredAuditApi.getAuditRecords(userId, selectedLayoutId);
+      setAuditRecords(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setAuditError('Failed to load records. Is the backend running?');
+    } finally {
+      setLoadingAudit(false);
+    }
+  }, [userId, selectedLayoutId]);
+
+  useEffect(() => {
+    if (activeTab === 'layered-audit') loadAuditRecords();
+  }, [activeTab, loadAuditRecords]);
+
+  // ── Audit Adherence load ────────────────────────────────────────────────────
+  const loadAdherenceRecords = useCallback(async () => {
+    setLoadingAdherence(true);
+    setAdherenceError(null);
+    try {
+      const res = await layeredAuditApi.getAdherenceRecords(userId, selectedLayoutId);
+      setAdherenceRecords(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setAdherenceError('Failed to load records. Is the backend running?');
+    } finally {
+      setLoadingAdherence(false);
+    }
+  }, [userId, selectedLayoutId]);
+
+  useEffect(() => {
+    if (activeTab === 'audit-adherence') loadAdherenceRecords();
+  }, [activeTab, loadAdherenceRecords]);
 
   const handleRecordSaved = useCallback((recordId, updatedRecord) => {
     setRecords((prev) => prev.map((r) => (r.id === recordId ? updatedRecord : r)));
   }, []);
 
-  // Derive full sorted month list: base + keys present in data + user-added extras
   const allMonths = React.useMemo(() => {
     const set = new Set(MONTHLY_KEYS);
     records.forEach((rec) => {
@@ -497,25 +443,22 @@ export default function InputData({ userId, layouts = [] }) {
     localStorage.setItem(LS_KEY, JSON.stringify(updated));
   };
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setDragging(false);
-    const file = e.dataTransfer.files[0];
-    if (file) setSelectedFile(file);
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) setSelectedFile(file);
-  };
-
+  // ── Upload handler (all types) ──────────────────────────────────────────────
   const handleUpload = async () => {
     if (!selectedFile) return;
     setUploading(true);
     setUploadResult(null);
     try {
-      const res = await inputApi.uploadExcel(selectedFile, userId, selectedLayoutId);
-      setUploadResult({ success: true, message: res.data.message, rowsImported: res.data.rows_imported });
+      let res;
+      if (uploadType === 'master') {
+        res = await inputApi.uploadExcel(selectedFile, userId, selectedLayoutId);
+      } else if (uploadType === 'layered-audit') {
+        res = await layeredAuditApi.uploadAudit(selectedFile, userId, selectedLayoutId);
+      } else {
+        res = await layeredAuditApi.uploadAdherence(selectedFile, userId, selectedLayoutId);
+      }
+      const viewTab = UPLOAD_TYPES.find((t) => t.value === uploadType)?.viewTab || 'master';
+      setUploadResult({ success: true, message: res.data.message, rowsImported: res.data.rows_imported, viewTab });
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
@@ -525,6 +468,22 @@ export default function InputData({ userId, layouts = [] }) {
       setUploading(false);
     }
   };
+
+  // Layout dropdown shared across all tabs
+  const layoutDropdown = layouts.length > 0 && (
+    <div className="tabs-layout-select">
+      <label className="layout-select-label">Layout:</label>
+      <select
+        className="layout-select-dropdown"
+        value={selectedLayoutId ?? ''}
+        onChange={(e) => setSelectedLayoutId(e.target.value ? Number(e.target.value) : null)}
+      >
+        {layouts.map((l) => (
+          <option key={l.id} value={l.id}>{l.name}</option>
+        ))}
+      </select>
+    </div>
+  );
 
   return (
     <div className="input-data">
@@ -557,35 +516,39 @@ export default function InputData({ userId, layouts = [] }) {
           <CalendarCheck size={15} />
           Audit Adherence
         </button>
-
-        {layouts.length > 0 && (
-          <div className="tabs-layout-select">
-            <label className="layout-select-label">Layout:</label>
-            <select
-              className="layout-select-dropdown"
-              value={selectedLayoutId ?? ''}
-              onChange={(e) => setSelectedLayoutId(e.target.value ? Number(e.target.value) : null)}
-            >
-              {layouts.map((l) => (
-                <option key={l.id} value={l.id}>{l.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
+        {layoutDropdown}
       </div>
 
+      {/* ── Upload tab ──────────────────────────────────────────────────────── */}
       {activeTab === 'upload' && (
         <div className="upload-panel">
-          <h2 className="panel-title">Upload Input Excel</h2>
-          <p className="panel-subtitle">
-            Upload the Z-Stage input Excel file (.xlsx). The data will replace existing records for the selected layout.
-          </p>
+          <h2 className="panel-title">Upload Excel</h2>
+
+          {/* Data type selector */}
+          <div className="upload-type-row">
+            <label className="upload-type-label">Data Type:</label>
+            <div className="upload-type-options">
+              {UPLOAD_TYPES.map((t) => (
+                <label key={t.value} className={`upload-type-option ${uploadType === t.value ? 'selected' : ''}`}>
+                  <input
+                    type="radio"
+                    name="uploadType"
+                    value={t.value}
+                    checked={uploadType === t.value}
+                    onChange={() => { setUploadType(t.value); setSelectedFile(null); setUploadResult(null); }}
+                  />
+                  <span className="upload-type-name">{t.label}</span>
+                  <span className="upload-type-desc">{t.desc}</span>
+                </label>
+              ))}
+            </div>
+          </div>
 
           <div
             className={`drop-zone ${dragging ? 'drag-over' : ''} ${selectedFile ? 'has-file' : ''}`}
             onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
-            onDrop={handleDrop}
+            onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) setSelectedFile(f); }}
             onClick={() => fileInputRef.current?.click()}
           >
             <input
@@ -593,41 +556,29 @@ export default function InputData({ userId, layouts = [] }) {
               type="file"
               accept=".xlsx,.xls"
               className="file-input-hidden"
-              onChange={handleFileChange}
+              onChange={(e) => { const f = e.target.files[0]; if (f) setSelectedFile(f); }}
             />
             <Upload size={36} strokeWidth={1.5} className="drop-icon" />
             {selectedFile ? (
-              <>
-                <p className="drop-filename">{selectedFile.name}</p>
-                <p className="drop-hint">Click to choose a different file</p>
-              </>
+              <><p className="drop-filename">{selectedFile.name}</p><p className="drop-hint">Click to choose a different file</p></>
             ) : (
-              <>
-                <p className="drop-label">Drag & drop your Excel file here</p>
-                <p className="drop-hint">or click to browse — .xlsx / .xls only</p>
-              </>
+              <><p className="drop-label">Drag & drop your Excel file here</p><p className="drop-hint">or click to browse — .xlsx / .xls only</p></>
             )}
           </div>
 
-          <button
-            className="upload-btn"
-            disabled={!selectedFile || uploading}
-            onClick={handleUpload}
-          >
+          <button className="upload-btn" disabled={!selectedFile || uploading} onClick={handleUpload}>
             {uploading ? <><Loader size={15} className="spin" /> Uploading…</> : 'Upload File'}
           </button>
 
           {uploadResult && (
             <div className={`upload-result ${uploadResult.success ? 'result-success' : 'result-error'}`}>
-              {uploadResult.success
-                ? <CheckCircle size={18} />
-                : <AlertCircle size={18} />}
+              {uploadResult.success ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
               <div>
                 <strong>{uploadResult.success ? 'Success' : 'Error'}</strong>
                 <p>{uploadResult.message}</p>
                 {uploadResult.success && (
                   <p>{uploadResult.rowsImported} rows imported.{' '}
-                    <button className="link-btn" onClick={() => setActiveTab('master')}>View Master Data →</button>
+                    <button className="link-btn" onClick={() => setActiveTab(uploadResult.viewTab)}>View Data →</button>
                   </p>
                 )}
               </div>
@@ -636,30 +587,61 @@ export default function InputData({ userId, layouts = [] }) {
         </div>
       )}
 
+      {/* ── Layered Audit tab ────────────────────────────────────────────────── */}
       {activeTab === 'layered-audit' && (
-        <AuditPanel
-          title="Layered Audit"
-          subtitle="Upload the Layered Audit Excel file (.xlsx). Columns: Model, Sr.No, Date, Station ID, Workstation, Auditor, NC's, Action Plan, 4M, Responsibility, Target Date, Status."
-          columns={LAYERED_AUDIT_COLUMNS}
-          uploadFn={layeredAuditApi.uploadAudit}
-          fetchFn={layeredAuditApi.getAuditRecords}
-          userId={userId}
-          layoutId={selectedLayoutId}
-        />
+        <div className="master-panel">
+          <div className="master-header">
+            <h2 className="panel-title">Layered Audit</h2>
+            <div className="master-actions">
+              <span className="record-count">{auditRecords.length} record{auditRecords.length !== 1 ? 's' : ''}</span>
+              <button className="refresh-btn" onClick={loadAuditRecords} disabled={loadingAudit}>
+                {loadingAudit ? <Loader size={13} className="spin" /> : '↻'} Refresh
+              </button>
+            </div>
+          </div>
+          {loadingAudit && <div className="master-loading"><Loader size={28} className="spin" /><p>Loading records…</p></div>}
+          {auditError && !loadingAudit && <div className="master-error"><AlertCircle size={20} /><p>{auditError}</p></div>}
+          {!loadingAudit && !auditError && auditRecords.length === 0 && (
+            <div className="master-empty">
+              <Database size={40} strokeWidth={1} />
+              <p>No records yet. Upload a Layered Audit Excel file first.</p>
+              <button className="link-btn" onClick={() => { setActiveTab('upload'); setUploadType('layered-audit'); }}>Go to Upload →</button>
+            </div>
+          )}
+          {!loadingAudit && auditRecords.length > 0 && (
+            <AuditTable columns={LAYERED_AUDIT_COLUMNS} records={auditRecords} />
+          )}
+        </div>
       )}
 
+      {/* ── Audit Adherence tab ──────────────────────────────────────────────── */}
       {activeTab === 'audit-adherence' && (
-        <AuditPanel
-          title="Audit Adherence"
-          subtitle="Upload the Layered Audit Adherence Excel file (.xlsx). Columns: Stage No, Stage Name, Auditor, Audit Date."
-          columns={LAYERED_ADHERENCE_COLUMNS}
-          uploadFn={layeredAuditApi.uploadAdherence}
-          fetchFn={layeredAuditApi.getAdherenceRecords}
-          userId={userId}
-          layoutId={selectedLayoutId}
-        />
+        <div className="master-panel">
+          <div className="master-header">
+            <h2 className="panel-title">Audit Adherence</h2>
+            <div className="master-actions">
+              <span className="record-count">{adherenceRecords.length} record{adherenceRecords.length !== 1 ? 's' : ''}</span>
+              <button className="refresh-btn" onClick={loadAdherenceRecords} disabled={loadingAdherence}>
+                {loadingAdherence ? <Loader size={13} className="spin" /> : '↻'} Refresh
+              </button>
+            </div>
+          </div>
+          {loadingAdherence && <div className="master-loading"><Loader size={28} className="spin" /><p>Loading records…</p></div>}
+          {adherenceError && !loadingAdherence && <div className="master-error"><AlertCircle size={20} /><p>{adherenceError}</p></div>}
+          {!loadingAdherence && !adherenceError && adherenceRecords.length === 0 && (
+            <div className="master-empty">
+              <Database size={40} strokeWidth={1} />
+              <p>No records yet. Upload an Audit Adherence Excel file first.</p>
+              <button className="link-btn" onClick={() => { setActiveTab('upload'); setUploadType('audit-adherence'); }}>Go to Upload →</button>
+            </div>
+          )}
+          {!loadingAdherence && adherenceRecords.length > 0 && (
+            <AuditTable columns={LAYERED_ADHERENCE_COLUMNS} records={adherenceRecords} />
+          )}
+        </div>
       )}
 
+      {/* ── Master Data tab ──────────────────────────────────────────────────── */}
       {activeTab === 'master' && (
         <div className="master-panel">
           <div className="master-header">
