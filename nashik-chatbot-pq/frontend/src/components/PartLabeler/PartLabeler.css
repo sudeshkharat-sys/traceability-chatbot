@@ -1350,6 +1350,79 @@
   max-width: 95%;
 }
 
+/* ── Ingest loading states ────────────────────────── */
+.ingest-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 32px 20px;
+  text-align: center;
+}
+
+.ingest-loading p {
+  font-size: 0.88rem;
+  color: var(--text-gray);
+  margin: 0;
+}
+
+.ingest-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid var(--mahindra-red);
+  border-radius: 50%;
+  animation: ingest-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes ingest-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ingest-progress-bar {
+  width: 220px;
+  height: 5px;
+  background: #f0f0f0;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.ingest-progress-fill {
+  height: 100%;
+  width: 45%;
+  background: var(--mahindra-red);
+  border-radius: 99px;
+  animation: ingest-progress 1.4s ease-in-out infinite;
+}
+
+@keyframes ingest-progress {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(600%); }
+}
+
+/* Overlay on top of the mapping table while processing */
+.ingest-loading-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 28px 20px;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.ingest-loading-overlay p {
+  font-size: 0.88rem;
+  color: var(--text-gray);
+  margin: 0;
+}
+
 /* Data Ingestion Modal Styles */
 .ingest-start-modal {
   display: flex;

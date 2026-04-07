@@ -1183,15 +1183,30 @@ function PartLabeler() {
                 {modalType === 'delete-part' && <p>Are you sure you want to remove this component marker?</p>}
                 {modalType === 'ingest-start' && (
                   <div className="ingest-start-modal">
-                    <div className="upload-zone-compact" onClick={() => warrantyInputRef.current.click()}>
-                      <Upload size={32} />
-                      <p>Select your Excel or CSV warranty file to begin mapping.</p>
-                      <input type="file" ref={warrantyInputRef} style={{ display: 'none' }} onChange={handleDataIngestionFile} accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" />
-                    </div>
+                    {isLoading ? (
+                      <div className="ingest-loading">
+                        <div className="ingest-spinner" />
+                        <div className="ingest-progress-bar"><div className="ingest-progress-fill" /></div>
+                        <p>Uploading &amp; parsing file…</p>
+                      </div>
+                    ) : (
+                      <div className="upload-zone-compact" onClick={() => warrantyInputRef.current.click()}>
+                        <Upload size={32} />
+                        <p>Select your Excel or CSV warranty file to begin mapping.</p>
+                        <input type="file" ref={warrantyInputRef} style={{ display: 'none' }} onChange={handleDataIngestionFile} accept=".csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel" />
+                      </div>
+                    )}
                   </div>
                 )}
                 {modalType === 'ingest-mapping' && (
                   <div className="ingest-mapping-container">
+                    {isLoading && (
+                      <div className="ingest-loading-overlay">
+                        <div className="ingest-spinner" />
+                        <div className="ingest-progress-bar"><div className="ingest-progress-fill" /></div>
+                        <p>Processing &amp; loading data…</p>
+                      </div>
+                    )}
                     <div className="ingest-notice">
                       <FileSpreadsheet size={20} />
                       <p>Mapping for <strong>{ingestConfig.label}</strong>. <strong>{mandatoryColumns.length} Required fields (*) must be set.</strong></p>
