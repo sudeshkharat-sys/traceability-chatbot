@@ -54,3 +54,36 @@ export const inputApi = {
   },
   updateRecord: (id, data) => api.put(`/input/records/${id}`, data),
 };
+
+export const layeredAuditApi = {
+  uploadAudit: (file, userId, layoutId) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (userId != null) formData.append('user_id', userId);
+    if (layoutId != null) formData.append('layout_id', layoutId);
+    return axios.post(`${BASE_URL}/layered-audit/upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  getAuditRecords: (userId, layoutId) => {
+    const params = {};
+    if (userId != null) params.user_id = userId;
+    if (layoutId != null) params.layout_id = layoutId;
+    return api.get('/layered-audit/records', { params });
+  },
+  uploadAdherence: (file, userId, layoutId) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (userId != null) formData.append('user_id', userId);
+    if (layoutId != null) formData.append('layout_id', layoutId);
+    return axios.post(`${BASE_URL}/layered-audit/adherence/upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  getAdherenceRecords: (userId, layoutId) => {
+    const params = {};
+    if (userId != null) params.user_id = userId;
+    if (layoutId != null) params.layout_id = layoutId;
+    return api.get('/layered-audit/adherence/records', { params });
+  },
+};

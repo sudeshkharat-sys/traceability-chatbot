@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Xwrapper } from 'react-xarrows';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { ZoomIn, ZoomOut, Maximize2, RefreshCw, GitBranch, X, Loader, TableProperties } from 'lucide-react';
-import { layoutApi, inputApi } from '../../../services/api/layoutApi';
+import { layoutApi, inputApi, layeredAuditApi } from '../../../services/api/layoutApi';
 import { getPortCanvasPos, buildObstacles, routePath } from '../shared/routeArrow';
 import './ZStageDashboard.css';
 
@@ -197,10 +197,72 @@ function MonthlyCell({ recordId, monthKey, monthlyData, onSaved }) {
   );
 }
 
+// ── Audit column definitions (mirrored from InputData) ───────────────────────
+const LAYERED_AUDIT_COLS = [
+  { key: 'model',          label: 'Model',          width: 120 },
+  { key: 'sr_no',          label: 'Sr.No',          width: 200 },
+  { key: 'date_col',       label: 'Date',           width: 110 },
+  { key: 'station_id',     label: 'Station ID',     width: 110 },
+  { key: 'workstation',    label: 'Workstation',    width: 180 },
+  { key: 'auditor',        label: 'Auditor',        width: 200 },
+  { key: 'ncs',            label: "NC's",           width: 280 },
+  { key: 'action_plan',    label: 'Action Plan',    width: 280 },
+  { key: 'four_m',         label: '4M',             width: 100 },
+  { key: 'responsibility', label: 'Responsibility', width: 160 },
+  { key: 'target_date',    label: 'Target Date',    width: 110 },
+  { key: 'status',         label: 'Status',         width: 90  },
+];
+
+const LAYERED_ADHERENCE_COLS = [
+  { key: 'stage_no',   label: 'Stage No',   width: 110 },
+  { key: 'stage_name', label: 'Stage Name', width: 220 },
+  { key: 'auditor',    label: 'Auditor',    width: 200 },
+  { key: 'audit_date', label: 'Audit Date', width: 120 },
+];
+
+// Simple read-only table for audit data inside the modal
+function AuditReadTable({ columns, records, emptyMsg }) {
+  if (records.length === 0) {
+    return (
+      <div className="sdm-empty">
+        <TableProperties size={36} strokeWidth={1} />
+        <p>{emptyMsg}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="sdm-table-wrap">
+      <table className="sdm-table">
+        <thead>
+          <tr>
+            {columns.map((col) => (
+              <th key={col.key} style={{ minWidth: col.width }}>{col.label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {records.map((rec, rowIdx) => (
+            <tr key={rec.id} className={rowIdx % 2 === 0 ? 'sdm-row-even' : 'sdm-row-odd'}>
+              {columns.map((col) => (
+                <td key={col.key} className="sdm-cell-view">
+                  {rec[col.key] != null && rec[col.key] !== ''
+                    ? <span>{String(rec[col.key])}</span>
+                    : <span className="sdm-cell-empty">—</span>}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // ── Station Detail Modal ───────────────────────────────────────────────────────
 // Rendered via portal to document.body so position:fixed is always
 // relative to the true viewport, regardless of ancestor transforms.
-function StationDetailModal({ stationId, records, allMonths, onSaved, onClose }) {
+function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, auditRecords, adherenceRecords }) {
+  const [activeTab, setActiveTab] = useState('master');
   const filtered = records.filter((r) => r.stage_no === stationId);
 
   // Close on Escape key
@@ -226,89 +288,150 @@ function StationDetailModal({ stationId, records, allMonths, onSaved, onClose })
             <div className="sdm-header-icon"><TableProperties size={18} /></div>
             <div>
               <div className="sdm-title">Station <span className="sdm-station-id">{stationId}</span></div>
-              <div className="sdm-subtitle">Master data — click any cell to edit</div>
+              <div className="sdm-subtitle">
+                {activeTab === 'master' && 'Master data — click any cell to edit'}
+                {activeTab === 'layered-audit' && 'Layered Audit records'}
+                {activeTab === 'audit-adherence' && 'Audit Adherence records'}
+              </div>
             </div>
           </div>
           <div className="sdm-header-right">
-            <span className="sdm-count">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
+            {activeTab === 'master' && (
+              <span className="sdm-count">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
+            )}
+            {activeTab === 'layered-audit' && (
+              <span className="sdm-count">{auditRecords.length} record{auditRecords.length !== 1 ? 's' : ''}</span>
+            )}
+            {activeTab === 'audit-adherence' && (
+              <span className="sdm-count">{adherenceRecords.length} record{adherenceRecords.length !== 1 ? 's' : ''}</span>
+            )}
             <button className="sdm-close" onClick={onClose} title="Close (Esc)"><X size={16} /></button>
           </div>
         </div>
 
+        {/* ── Tabs ── */}
+        <div className="sdm-tabs">
+          <button
+            className={`sdm-tab${activeTab === 'master' ? ' sdm-tab--active' : ''}`}
+            onClick={() => setActiveTab('master')}
+          >
+            Master Data
+          </button>
+          <button
+            className={`sdm-tab${activeTab === 'layered-audit' ? ' sdm-tab--active' : ''}`}
+            onClick={() => setActiveTab('layered-audit')}
+          >
+            Layered Audit
+          </button>
+          <button
+            className={`sdm-tab${activeTab === 'audit-adherence' ? ' sdm-tab--active' : ''}`}
+            onClick={() => setActiveTab('audit-adherence')}
+          >
+            Audit Adherence
+          </button>
+        </div>
+
         {/* ── Body ── */}
         <div className="sdm-body">
-          {filtered.length === 0 ? (
-            <div className="sdm-empty">
-              <TableProperties size={36} strokeWidth={1} />
-              <p>No input records found for station <strong>{stationId}</strong>.</p>
-              <p className="sdm-empty-hint">Upload data in the Input section with Stage No = {stationId}</p>
-            </div>
-          ) : (
-            <div className="sdm-table-wrap">
-              <table className="sdm-table">
-                <thead>
-                  <tr>
-                    {FIXED_COLS.map((col, i) => (
-                      <th
-                        key={col.key}
-                        className={i < 3 ? 'sdm-sticky-col' : ''}
-                        style={{ minWidth: col.width, left: i === 0 ? 0 : i === 1 ? 60 : i === 2 ? 190 : undefined }}
-                      >
-                        {col.label}
-                      </th>
-                    ))}
-                    {allMonths.map((key) => (
-                      <th key={key} className="sdm-month-th">{fmtMonth(key)}</th>
-                    ))}
-                    {TRAILING_COLS.map((col) => (
-                      <th key={col.key} style={{ minWidth: col.width }}>{col.label}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((rec, rowIdx) => (
-                    <tr key={rec.id} className={rowIdx % 2 === 0 ? 'sdm-row-even' : 'sdm-row-odd'}>
+
+          {/* Master Data tab */}
+          {activeTab === 'master' && (
+            filtered.length === 0 ? (
+              <div className="sdm-empty">
+                <TableProperties size={36} strokeWidth={1} />
+                <p>No input records found for station <strong>{stationId}</strong>.</p>
+                <p className="sdm-empty-hint">Upload data in the Input section with Stage No = {stationId}</p>
+              </div>
+            ) : (
+              <div className="sdm-table-wrap">
+                <table className="sdm-table">
+                  <thead>
+                    <tr>
                       {FIXED_COLS.map((col, i) => (
-                        <EditableCell
+                        <th
                           key={col.key}
-                          recordId={rec.id}
-                          fieldKey={col.key}
-                          value={rec[col.key]}
-                          type={col.type}
-                          onSaved={onSaved}
-                          stickyLeft={i < 3 ? (i === 0 ? 0 : i === 1 ? 60 : 190) : undefined}
-                        />
+                          className={i < 3 ? 'sdm-sticky-col' : ''}
+                          style={{ minWidth: col.width, left: i === 0 ? 0 : i === 1 ? 60 : i === 2 ? 190 : undefined }}
+                        >
+                          {col.label}
+                        </th>
                       ))}
                       {allMonths.map((key) => (
-                        <MonthlyCell
-                          key={key}
-                          recordId={rec.id}
-                          monthKey={key}
-                          monthlyData={rec.monthly_data}
-                          onSaved={onSaved}
-                        />
+                        <th key={key} className="sdm-month-th">{fmtMonth(key)}</th>
                       ))}
                       {TRAILING_COLS.map((col) => (
-                        <EditableCell
-                          key={col.key}
-                          recordId={rec.id}
-                          fieldKey={col.key}
-                          value={rec[col.key]}
-                          type={col.type}
-                          onSaved={onSaved}
-                        />
+                        <th key={col.key} style={{ minWidth: col.width }}>{col.label}</th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {filtered.map((rec, rowIdx) => (
+                      <tr key={rec.id} className={rowIdx % 2 === 0 ? 'sdm-row-even' : 'sdm-row-odd'}>
+                        {FIXED_COLS.map((col, i) => (
+                          <EditableCell
+                            key={col.key}
+                            recordId={rec.id}
+                            fieldKey={col.key}
+                            value={rec[col.key]}
+                            type={col.type}
+                            onSaved={onSaved}
+                            stickyLeft={i < 3 ? (i === 0 ? 0 : i === 1 ? 60 : 190) : undefined}
+                          />
+                        ))}
+                        {allMonths.map((key) => (
+                          <MonthlyCell
+                            key={key}
+                            recordId={rec.id}
+                            monthKey={key}
+                            monthlyData={rec.monthly_data}
+                            onSaved={onSaved}
+                          />
+                        ))}
+                        {TRAILING_COLS.map((col) => (
+                          <EditableCell
+                            key={col.key}
+                            recordId={rec.id}
+                            fieldKey={col.key}
+                            value={rec[col.key]}
+                            type={col.type}
+                            onSaved={onSaved}
+                          />
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
           )}
+
+          {/* Layered Audit tab */}
+          {activeTab === 'layered-audit' && (
+            <AuditReadTable
+              columns={LAYERED_AUDIT_COLS}
+              records={auditRecords}
+              emptyMsg="No Layered Audit records loaded. Upload data in the Input → Layered Audit section."
+            />
+          )}
+
+          {/* Audit Adherence tab */}
+          {activeTab === 'audit-adherence' && (
+            <AuditReadTable
+              columns={LAYERED_ADHERENCE_COLS}
+              records={adherenceRecords}
+              emptyMsg="No Audit Adherence records loaded. Upload data in the Input → Audit Adherence section."
+            />
+          )}
+
         </div>
 
         {/* ── Footer ── */}
         <div className="sdm-footer">
-          <span className="sdm-footer-hint">Changes save automatically · Scroll horizontally to see monthly columns</span>
+          <span className="sdm-footer-hint">
+            {activeTab === 'master'
+              ? 'Changes save automatically · Scroll horizontally to see monthly columns'
+              : 'Scroll horizontally to see all columns'}
+          </span>
           <button className="sdm-footer-close" onClick={onClose}>Close</button>
         </div>
 
@@ -581,6 +704,8 @@ function ZStageDashboard({ userId }) {
   const [buyoffIcons, setBuyoffIcons] = useState([]);
   const [connections, setConnections] = useState([]);
   const [records, setRecords]         = useState([]);
+  const [auditRecords, setAuditRecords]       = useState([]);
+  const [adherenceRecords, setAdherenceRecords] = useState([]);
   const [loading, setLoading]         = useState(false);
   const [refreshing, setRefreshing]   = useState(false);
   const [error, setError]             = useState(null);
@@ -669,13 +794,17 @@ function ZStageDashboard({ userId }) {
     Promise.all([
       layoutApi.getLayout(selectedId),
       inputApi.getRecords(userId, selectedId),
+      layeredAuditApi.getAuditRecords(userId, selectedId),
+      layeredAuditApi.getAdherenceRecords(userId, selectedId),
     ])
-      .then(([layoutRes, recordsRes]) => {
+      .then(([layoutRes, recordsRes, auditRes, adherenceRes]) => {
         const state = parseLayout(layoutRes.data);
         setBoxes(state.boxes);
         setBuyoffIcons(state.buyoffIcons);
         setConnections(state.connections);
         setRecords(Array.isArray(recordsRes.data) ? recordsRes.data : []);
+        setAuditRecords(Array.isArray(auditRes.data) ? auditRes.data : []);
+        setAdherenceRecords(Array.isArray(adherenceRes.data) ? adherenceRes.data : []);
 
         // Restore saved legend position or compute a default to the right of content
         if (layoutRes.data.legend_position_x != null && layoutRes.data.legend_position_y != null) {
@@ -701,6 +830,8 @@ function ZStageDashboard({ userId }) {
     setRefreshing(true);
     const calls = [
       inputApi.getRecords(userId, selectedId).then((r) => setRecords(Array.isArray(r.data) ? r.data : [])),
+      layeredAuditApi.getAuditRecords(userId, selectedId).then((r) => setAuditRecords(Array.isArray(r.data) ? r.data : [])),
+      layeredAuditApi.getAdherenceRecords(userId, selectedId).then((r) => setAdherenceRecords(Array.isArray(r.data) ? r.data : [])),
     ];
     if (selectedId) {
       calls.push(
@@ -1024,6 +1155,8 @@ function ZStageDashboard({ userId }) {
           allMonths={allMonths}
           onSaved={handleRecordSaved}
           onClose={() => setPopupStation(null)}
+          auditRecords={auditRecords}
+          adherenceRecords={adherenceRecords}
         />
       )}
     </Xwrapper>

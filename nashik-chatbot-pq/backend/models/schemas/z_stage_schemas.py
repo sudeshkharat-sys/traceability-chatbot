@@ -227,3 +227,43 @@ class InputRecordUpdate(BaseModel):
 class UploadResponse(BaseModel):
     message: str
     rows_imported: int
+
+
+# ── LayeredAudit ──────────────────────────────────────────────────────────────
+
+class LayeredAuditOut(BaseModel):
+    id: int
+    user_id: Optional[int] = None
+    layout_id: Optional[int] = None
+    model: Optional[str] = None
+    sr_no: Optional[str] = None
+    date_col: Optional[str] = None
+    station_id: Optional[str] = None
+    workstation: Optional[str] = None
+    auditor: Optional[str] = None
+    ncs: Optional[str] = None
+    action_plan: Optional[str] = None
+    four_m: Optional[str] = None
+    responsibility: Optional[str] = None
+    target_date: Optional[str] = None
+    status: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ── LayeredAuditAdherence ─────────────────────────────────────────────────────
+
+class LayeredAuditAdherenceOut(BaseModel):
+    id: int
+    user_id: Optional[int] = None
+    layout_id: Optional[int] = None
+    stage_no: Optional[str] = None
+    stage_name: Optional[str] = None
+    auditor: Optional[str] = None
+    audit_date: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}

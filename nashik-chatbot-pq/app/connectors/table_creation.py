@@ -863,6 +863,104 @@ create_dynamic_table(
 )
 
 
+layered_audit_id_seq = Sequence("layered_audit_id_seq")
+layered_audit_adherence_id_seq = Sequence("layered_audit_adherence_id_seq")
+
+# ── layered_audit ─────────────────────────────────────────────────────────────
+
+create_dynamic_table(
+    "layered_audit",
+    [
+        Column(
+            "id",
+            Integer,
+            layered_audit_id_seq,
+            primary_key=True,
+            server_default=layered_audit_id_seq.next_value(),
+        ),
+        Column("user_id", Integer, nullable=True),
+        Column(
+            "layout_id",
+            Integer,
+            ForeignKey("layouts.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+        Column("model", String(255), nullable=True),
+        Column("sr_no", String(255), nullable=True),
+        Column("date_col", String(50), nullable=True),
+        Column("station_id", String(100), nullable=True),
+        Column("workstation", String(255), nullable=True),
+        Column("auditor", String(255), nullable=True),
+        Column("ncs", String, nullable=True),
+        Column("action_plan", String, nullable=True),
+        Column("four_m", String(100), nullable=True),
+        Column("responsibility", String(255), nullable=True),
+        Column("target_date", String(50), nullable=True),
+        Column("status", String(50), nullable=True),
+        Column(
+            "created_at",
+            DateTime,
+            default=datetime.datetime.utcnow,
+            nullable=False,
+        ),
+        Column(
+            "updated_at",
+            DateTime,
+            default=datetime.datetime.utcnow,
+            onupdate=datetime.datetime.utcnow,
+            nullable=False,
+        ),
+    ],
+    indexes=[
+        Index("idx_layered_audit_station_id", "station_id"),
+        Index("idx_layered_audit_layout_id", "layout_id"),
+    ],
+)
+
+
+# ── layered_audit_adherence ───────────────────────────────────────────────────
+
+create_dynamic_table(
+    "layered_audit_adherence",
+    [
+        Column(
+            "id",
+            Integer,
+            layered_audit_adherence_id_seq,
+            primary_key=True,
+            server_default=layered_audit_adherence_id_seq.next_value(),
+        ),
+        Column("user_id", Integer, nullable=True),
+        Column(
+            "layout_id",
+            Integer,
+            ForeignKey("layouts.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+        Column("stage_no", String(100), nullable=True),
+        Column("stage_name", String(255), nullable=True),
+        Column("auditor", String(255), nullable=True),
+        Column("audit_date", String(50), nullable=True),
+        Column(
+            "created_at",
+            DateTime,
+            default=datetime.datetime.utcnow,
+            nullable=False,
+        ),
+        Column(
+            "updated_at",
+            DateTime,
+            default=datetime.datetime.utcnow,
+            onupdate=datetime.datetime.utcnow,
+            nullable=False,
+        ),
+    ],
+    indexes=[
+        Index("idx_layered_audit_adherence_stage_no", "stage_no"),
+        Index("idx_layered_audit_adherence_layout_id", "layout_id"),
+    ],
+)
+
 input_record_id_seq = Sequence("input_record_id_seq")
 
 create_dynamic_table(

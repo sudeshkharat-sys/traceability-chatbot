@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Upload, Database, CheckCircle, AlertCircle, Loader, Plus, X } from 'lucide-react';
-import { inputApi } from '../../../services/api/layoutApi';
+import { Upload, Database, CheckCircle, AlertCircle, Loader, Plus, X, ClipboardList, CalendarCheck } from 'lucide-react';
+import { inputApi, layeredAuditApi } from '../../../services/api/layoutApi';
 import './InputData.css';
 
 const MONTHLY_KEYS = [
@@ -200,6 +200,190 @@ function MonthlyCell({ recordId, monthKey, monthlyData, onSaved }) {
   );
 }
 
+// ── Layered Audit column definitions ─────────────────────────────────────────
+
+const LAYERED_AUDIT_COLUMNS = [
+  { key: 'model',          label: 'Model',          width: 120 },
+  { key: 'sr_no',          label: 'Sr.No',          width: 200 },
+  { key: 'date_col',       label: 'Date',           width: 110 },
+  { key: 'station_id',     label: 'Station ID',     width: 110 },
+  { key: 'workstation',    label: 'Workstation',    width: 180 },
+  { key: 'auditor',        label: 'Auditor',        width: 200 },
+  { key: 'ncs',            label: "NC's",           width: 280 },
+  { key: 'action_plan',    label: 'Action Plan',    width: 280 },
+  { key: 'four_m',         label: '4M',             width: 100 },
+  { key: 'responsibility', label: 'Responsibility', width: 160 },
+  { key: 'target_date',    label: 'Target Date',    width: 110 },
+  { key: 'status',         label: 'Status',         width: 90  },
+];
+
+const LAYERED_ADHERENCE_COLUMNS = [
+  { key: 'stage_no',   label: 'Stage No',   width: 110 },
+  { key: 'stage_name', label: 'Stage Name', width: 220 },
+  { key: 'auditor',    label: 'Auditor',    width: 200 },
+  { key: 'audit_date', label: 'Audit Date', width: 120 },
+];
+
+// ── Simple read-only table for audit data ─────────────────────────────────────
+function AuditTable({ columns, records }) {
+  if (records.length === 0) return null;
+  return (
+    <div className="table-wrapper">
+      <table className="master-table">
+        <thead>
+          <tr>
+            {columns.map((col) => (
+              <th key={col.key} style={{ minWidth: col.width }}>{col.label}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {records.map((rec) => (
+            <tr key={rec.id}>
+              {columns.map((col) => (
+                <td key={col.key} className="cell-view">
+                  {rec[col.key] != null && rec[col.key] !== ''
+                    ? <span>{String(rec[col.key])}</span>
+                    : <span className="cell-empty">—</span>}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Reusable audit upload + view panel ────────────────────────────────────────
+function AuditPanel({ title, subtitle, columns, uploadFn, fetchFn, userId, layoutId }) {
+  const [innerTab, setInnerTab] = useState('upload');
+  const [dragging, setDragging]     = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading]   = useState(false);
+  const [uploadResult, setUploadResult] = useState(null);
+  const [records, setRecords]       = useState([]);
+  const [loading, setLoading]       = useState(false);
+  const [loadError, setLoadError]   = useState(null);
+  const fileRef = useRef(null);
+
+  const loadRecords = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await fetchFn(userId, layoutId);
+      setRecords(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setLoadError('Failed to load records. Is the backend running?');
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, layoutId, fetchFn]);
+
+  useEffect(() => {
+    if (innerTab === 'view') loadRecords();
+  }, [innerTab, loadRecords]);
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+    setUploading(true);
+    setUploadResult(null);
+    try {
+      const res = await uploadFn(selectedFile, userId, layoutId);
+      setUploadResult({ success: true, message: res.data.message, rowsImported: res.data.rows_imported });
+      setSelectedFile(null);
+      if (fileRef.current) fileRef.current.value = '';
+    } catch (err) {
+      const detail = err.response?.data?.detail || 'Upload failed.';
+      setUploadResult({ success: false, message: detail });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div>
+      <div className="input-tabs" style={{ borderBottom: '1px solid #e5e7eb', marginBottom: 0 }}>
+        <button
+          className={`input-tab ${innerTab === 'upload' ? 'active' : ''}`}
+          onClick={() => setInnerTab('upload')}
+        >
+          <Upload size={14} /> Upload
+        </button>
+        <button
+          className={`input-tab ${innerTab === 'view' ? 'active' : ''}`}
+          onClick={() => setInnerTab('view')}
+        >
+          <Database size={14} /> View Data
+        </button>
+      </div>
+
+      {innerTab === 'upload' && (
+        <div className="upload-panel">
+          <h2 className="panel-title">{title}</h2>
+          <p className="panel-subtitle">{subtitle}</p>
+          <div
+            className={`drop-zone ${dragging ? 'drag-over' : ''} ${selectedFile ? 'has-file' : ''}`}
+            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) setSelectedFile(f); }}
+            onClick={() => fileRef.current?.click()}
+          >
+            <input ref={fileRef} type="file" accept=".xlsx,.xls" className="file-input-hidden" onChange={(e) => { const f = e.target.files[0]; if (f) setSelectedFile(f); }} />
+            <Upload size={36} strokeWidth={1.5} className="drop-icon" />
+            {selectedFile ? (
+              <><p className="drop-filename">{selectedFile.name}</p><p className="drop-hint">Click to choose a different file</p></>
+            ) : (
+              <><p className="drop-label">Drag & drop your Excel file here</p><p className="drop-hint">or click to browse — .xlsx / .xls only</p></>
+            )}
+          </div>
+          <button className="upload-btn" disabled={!selectedFile || uploading} onClick={handleUpload}>
+            {uploading ? <><Loader size={15} className="spin" /> Uploading…</> : 'Upload File'}
+          </button>
+          {uploadResult && (
+            <div className={`upload-result ${uploadResult.success ? 'result-success' : 'result-error'}`}>
+              {uploadResult.success ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+              <div>
+                <strong>{uploadResult.success ? 'Success' : 'Error'}</strong>
+                <p>{uploadResult.message}</p>
+                {uploadResult.success && (
+                  <p>{uploadResult.rowsImported} rows imported.{' '}
+                    <button className="link-btn" onClick={() => setInnerTab('view')}>View Data →</button>
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {innerTab === 'view' && (
+        <div className="master-panel">
+          <div className="master-header">
+            <h2 className="panel-title">{title}</h2>
+            <div className="master-actions">
+              <span className="record-count">{records.length} record{records.length !== 1 ? 's' : ''}</span>
+              <button className="refresh-btn" onClick={loadRecords} disabled={loading}>
+                {loading ? <Loader size={13} className="spin" /> : '↻'} Refresh
+              </button>
+            </div>
+          </div>
+          {loading && <div className="master-loading"><Loader size={28} className="spin" /><p>Loading records…</p></div>}
+          {loadError && !loading && <div className="master-error"><AlertCircle size={20} /><p>{loadError}</p></div>}
+          {!loading && !loadError && records.length === 0 && (
+            <div className="master-empty">
+              <Database size={40} strokeWidth={1} />
+              <p>No records yet. Upload an Excel file first.</p>
+              <button className="link-btn" onClick={() => setInnerTab('upload')}>Go to Upload →</button>
+            </div>
+          )}
+          {!loading && records.length > 0 && <AuditTable columns={columns} records={records} />}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const LS_KEY = 'zstage_extra_months';
 
@@ -359,6 +543,20 @@ export default function InputData({ userId, layouts = [] }) {
           <Database size={15} />
           Master Data
         </button>
+        <button
+          className={`input-tab ${activeTab === 'layered-audit' ? 'active' : ''}`}
+          onClick={() => setActiveTab('layered-audit')}
+        >
+          <ClipboardList size={15} />
+          Layered Audit
+        </button>
+        <button
+          className={`input-tab ${activeTab === 'audit-adherence' ? 'active' : ''}`}
+          onClick={() => setActiveTab('audit-adherence')}
+        >
+          <CalendarCheck size={15} />
+          Audit Adherence
+        </button>
 
         {layouts.length > 0 && (
           <div className="tabs-layout-select">
@@ -436,6 +634,30 @@ export default function InputData({ userId, layouts = [] }) {
             </div>
           )}
         </div>
+      )}
+
+      {activeTab === 'layered-audit' && (
+        <AuditPanel
+          title="Layered Audit"
+          subtitle="Upload the Layered Audit Excel file (.xlsx). Columns: Model, Sr.No, Date, Station ID, Workstation, Auditor, NC's, Action Plan, 4M, Responsibility, Target Date, Status."
+          columns={LAYERED_AUDIT_COLUMNS}
+          uploadFn={layeredAuditApi.uploadAudit}
+          fetchFn={layeredAuditApi.getAuditRecords}
+          userId={userId}
+          layoutId={selectedLayoutId}
+        />
+      )}
+
+      {activeTab === 'audit-adherence' && (
+        <AuditPanel
+          title="Audit Adherence"
+          subtitle="Upload the Layered Audit Adherence Excel file (.xlsx). Columns: Stage No, Stage Name, Auditor, Audit Date."
+          columns={LAYERED_ADHERENCE_COLUMNS}
+          uploadFn={layeredAuditApi.uploadAdherence}
+          fetchFn={layeredAuditApi.getAdherenceRecords}
+          userId={userId}
+          layoutId={selectedLayoutId}
+        />
       )}
 
       {activeTab === 'master' && (

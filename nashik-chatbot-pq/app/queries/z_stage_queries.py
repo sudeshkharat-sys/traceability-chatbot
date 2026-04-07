@@ -280,3 +280,69 @@ class InputRecordQueries:
     DELETE_ALL = "DELETE FROM input_records WHERE (:user_id IS NULL OR user_id = :user_id) AND (:layout_id IS NULL OR layout_id = :layout_id)"
 
     CHECK_EXISTS = "SELECT id FROM input_records WHERE id = :record_id"
+
+
+# ── Layered audit queries ──────────────────────────────────────────────────────
+
+class LayeredAuditQueries:
+    LIST_ALL = """
+        SELECT id, user_id, layout_id, model, sr_no, date_col, station_id,
+               workstation, auditor, ncs, action_plan, four_m, responsibility,
+               target_date, status, created_at, updated_at
+        FROM layered_audit
+        WHERE (:user_id IS NULL OR user_id = :user_id)
+          AND (:layout_id IS NULL OR layout_id = :layout_id)
+        ORDER BY id
+    """
+
+    CREATE = """
+        INSERT INTO layered_audit (
+            user_id, layout_id, model, sr_no, date_col, station_id,
+            workstation, auditor, ncs, action_plan, four_m, responsibility,
+            target_date, status, created_at, updated_at
+        ) VALUES (
+            :user_id, :layout_id, :model, :sr_no, :date_col, :station_id,
+            :workstation, :auditor, :ncs, :action_plan, :four_m, :responsibility,
+            :target_date, :status, NOW(), NOW()
+        )
+        RETURNING id, user_id, layout_id, model, sr_no, date_col, station_id,
+                  workstation, auditor, ncs, action_plan, four_m, responsibility,
+                  target_date, status, created_at, updated_at
+    """
+
+    DELETE_ALL = """
+        DELETE FROM layered_audit
+        WHERE (:user_id IS NULL OR user_id = :user_id)
+          AND (:layout_id IS NULL OR layout_id = :layout_id)
+    """
+
+
+# ── Layered audit adherence queries ───────────────────────────────────────────
+
+class LayeredAuditAdherenceQueries:
+    LIST_ALL = """
+        SELECT id, user_id, layout_id, stage_no, stage_name, auditor, audit_date,
+               created_at, updated_at
+        FROM layered_audit_adherence
+        WHERE (:user_id IS NULL OR user_id = :user_id)
+          AND (:layout_id IS NULL OR layout_id = :layout_id)
+        ORDER BY id
+    """
+
+    CREATE = """
+        INSERT INTO layered_audit_adherence (
+            user_id, layout_id, stage_no, stage_name, auditor, audit_date,
+            created_at, updated_at
+        ) VALUES (
+            :user_id, :layout_id, :stage_no, :stage_name, :auditor, :audit_date,
+            NOW(), NOW()
+        )
+        RETURNING id, user_id, layout_id, stage_no, stage_name, auditor, audit_date,
+                  created_at, updated_at
+    """
+
+    DELETE_ALL = """
+        DELETE FROM layered_audit_adherence
+        WHERE (:user_id IS NULL OR user_id = :user_id)
+          AND (:layout_id IS NULL OR layout_id = :layout_id)
+    """
