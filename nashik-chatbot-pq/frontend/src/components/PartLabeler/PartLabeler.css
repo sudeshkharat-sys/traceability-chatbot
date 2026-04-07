@@ -577,6 +577,7 @@
   font-weight: 600;
   color: var(--mahindra-red);
   align-self: flex-start;
+  margin-top: 8px;
   margin-bottom: 6px;
 }
 
