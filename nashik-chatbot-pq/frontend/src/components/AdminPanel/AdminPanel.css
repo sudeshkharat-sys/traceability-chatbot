@@ -18,7 +18,8 @@
 
 /* ── Page ─────────────────────────────────────────── */
 .admin-panel {
-  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
   background: var(--bg-page);
   color: var(--text-main);
   font-family: 'Inter', 'Segoe UI', sans-serif;
@@ -84,7 +85,6 @@
   padding: 16px 20px;
   width: 100%;
   box-sizing: border-box;
-  overflow-y: auto;
 }
 
 /* ── Alerts ───────────────────────────────────────── */
