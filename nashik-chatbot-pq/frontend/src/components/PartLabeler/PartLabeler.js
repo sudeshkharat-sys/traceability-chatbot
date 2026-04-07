@@ -533,23 +533,24 @@ function PartLabeler() {
     }
   };
 
-  const fetchActivePartHistory = async (label) => {
+  const fetchActivePartHistory = async (label, srcOverride = null) => {
     if (!userId || !label) return;
+    const src = srcOverride || dataSource;
     try {
       const params = new URLSearchParams();
       params.append('userId', userId);
       params.append('partName', label.partName);
-      params.append('dataSource', dataSource);
+      params.append('dataSource', src);
       if (prefix) params.append('prefix', prefix);
       filterMonth.forEach(m => params.append('month', m));
       filterModel.forEach(m => params.append('baseModel', m));
       filterMIS.forEach(m => params.append('misBucket', m));
       filterMfgQtr.forEach(m => params.append('mfgQtr', m));
-      if (dataSource === 'rpt') {
+      if (src === 'rpt') {
         filterBuyoffStage.forEach(m => params.append('buyoffStage', m));
         filterOnlineOffline.forEach(m => params.append('onlineOffline', m));
       }
-      if (dataSource === 'rfi') {
+      if (src === 'rfi') {
         filterDefectType.forEach(m => params.append('defectType', m));
       }
 
@@ -648,9 +649,10 @@ function PartLabeler() {
 
   useEffect(() => {
     if (dataSource === 'all') {
-      // In drill-down mode, re-fetch charts for the active source when filters change
+      // In drill-down mode, re-fetch charts and active part history for the active source when filters change
       if (allModeActiveSource) {
         fetchDashboardData(allModeActiveSource.label.partName, allModeActiveSource.src);
+        fetchActivePartHistory(allModeActiveSource.label, allModeActiveSource.src);
       } else {
         if (labels.length > 0) updateAllLabelFailuresAllSources(labels);
       }
@@ -716,6 +718,7 @@ function PartLabeler() {
     setActivePopup(label);
     setAllModeActiveSource({ label, src });
     fetchDashboardData(label.partName, src);
+    fetchActivePartHistory(label, src);
   };
 
   const checkAllSourcesStatus = async () => {
@@ -1546,7 +1549,17 @@ function PartLabeler() {
                                 onClick={(e) => { e.stopPropagation(); handleMarkerClick(label); }}
                                 style={{ left: `${label.x}%`, top: `${label.y}%` }}>{index + 1}</div>
                               {isSummaryActive && nodePositions[index] && (
-                                <DraggableNode label={label} initialPos={nodePositions[index]} count={labelFailures[label.id] || 0} />
+                                <DraggableNode
+                                  label={label}
+                                  initialPos={nodePositions[index]}
+                                  count={
+                                    dataSource === 'all' && allModeActiveSource
+                                      ? (labelFailuresBySource[label.id]?.[allModeActiveSource.src] || 0)
+                                      : dataSource === 'all'
+                                      ? Object.values(labelFailuresBySource[label.id] || {}).reduce((s, v) => s + v, 0)
+                                      : (labelFailures[label.id] || 0)
+                                  }
+                                />
                               )}
                             </React.Fragment>
                           ))}
