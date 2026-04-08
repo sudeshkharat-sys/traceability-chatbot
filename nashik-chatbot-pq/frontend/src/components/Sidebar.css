@@ -30,7 +30,7 @@
 .chatbot-title {
   font-size: 16px;
   font-weight: 600;
-  color: #DC143C;
+  color: #1a1a1a;
   margin: 0;
   flex: 1;
   line-height: 1.3;
@@ -88,7 +88,7 @@
 .plus-icon {
   width: 20px;
   height: 20px;
-  background-color: #DC143C;
+  background-color: #666666;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -203,11 +203,11 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background-color: #DC143C;
+  background-color: #666666;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid #DC143C;
+  border: 2px solid #666666;
 }
 
 .user-avatar svg {

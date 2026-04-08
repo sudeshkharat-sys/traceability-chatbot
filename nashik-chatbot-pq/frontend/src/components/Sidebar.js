@@ -111,7 +111,7 @@ const Sidebar = ({
                   className="chat-options"
                   onClick={(e) => toggleOptionsMenu(e, chat.id)}
                 >
-                  &ctdot;
+                  ⋮
                 </button>
                 {showOptionsMenu === chat.id && (
                   <div className="options-menu" ref={optionsMenuRef}>
