@@ -596,18 +596,23 @@
 }
 
 /* Table Styling */
+.bot-message-markdown .table-scroll-wrapper {
+  overflow-x: auto;
+  width: 100%;
+  margin: 12px 0;
+  border-radius: 4px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
 .bot-message-markdown table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
   background-color: #fff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   border-radius: 4px;
   overflow: hidden;
-  table-layout: fixed;
-  margin: 12px 0;
-  display: block;
-  overflow-x: auto;
+  table-layout: auto;
+  margin: 0;
 }
 
 .bot-message-markdown thead {
