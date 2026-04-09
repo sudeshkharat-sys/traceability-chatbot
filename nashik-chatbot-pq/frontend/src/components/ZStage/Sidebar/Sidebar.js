@@ -53,7 +53,7 @@ function Sidebar({ activeSection, onSectionChange, layoutActions }) {
   };
 
   return (
-    <aside className="sidebar">
+    <aside className="zstage-sidebar">
       <div className="sidebar-logo">
         <span className="sidebar-logo-text">Z-Stage</span>
         <button className="sidebar-home-btn" onClick={() => navigate('/')} title="Go to Home">
@@ -128,7 +128,7 @@ function Sidebar({ activeSection, onSectionChange, layoutActions }) {
       </nav>
 
       {/* User profile footer */}
-      <div className="sidebar-footer">
+      <div className="zstage-sidebar-footer">
         <div className="sidebar-user-profile">
           <div className="sidebar-user-avatar">
             <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">

@@ -1,4 +1,4 @@
-.sidebar {
+.zstage-sidebar {
   width: 220px;
   height: 100vh;
   background-color: var(--mahindra-red);
@@ -203,7 +203,7 @@
 
 /* ── Sidebar footer (user profile + logout) ─────────────────────────────── */
 
-.sidebar-footer {
+.zstage-sidebar-footer {
   position: sticky;
   bottom: 0;
   margin-top: auto;
