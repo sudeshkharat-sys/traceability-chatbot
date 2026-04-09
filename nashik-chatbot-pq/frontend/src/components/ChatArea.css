@@ -434,28 +434,14 @@
   transform: scale(1.1);
 }
 
-/* Scrollbar Styling - Gemini-like smooth scrollbar */
+/* Hide scrollbar but keep scrolling functional */
+.chat-content {
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* IE / Edge */
+}
+
 .chat-content::-webkit-scrollbar {
-  width: 8px;
-}
-
-.chat-content::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.chat-content::-webkit-scrollbar-thumb {
-  background: rgba(220, 20, 60, 0.2);
-  border-radius: 10px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
-  transition: background 0.3s ease;
-}
-
-.chat-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(220, 20, 60, 0.35);
-  border-radius: 10px;
-  border: 2px solid transparent;
-  background-clip: padding-box;
+  display: none;               /* Chrome / Safari / Opera */
 }
 
 /* Responsive Design */
