@@ -46,6 +46,8 @@
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
 /* Fade effect at top when scrolling */
@@ -434,14 +436,9 @@
   transform: scale(1.1);
 }
 
-/* Hide scrollbar but keep scrolling functional */
-.chat-content {
-  scrollbar-width: none;       /* Firefox */
-  -ms-overflow-style: none;    /* IE / Edge */
-}
-
 .chat-content::-webkit-scrollbar {
-  display: none;               /* Chrome / Safari / Opera */
+  width: 0;
+  height: 0;
 }
 
 /* Responsive Design */
