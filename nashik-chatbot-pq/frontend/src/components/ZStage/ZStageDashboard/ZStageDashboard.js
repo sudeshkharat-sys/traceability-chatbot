@@ -11,7 +11,7 @@ import './ZStageDashboard.css';
 const GRID = 40;
 const CANVAS_SIZE = 5000;
 
-const boxWidth = (stationCount) => Math.max(5, stationCount) * GRID;
+const boxWidth = (stationCount) => Math.max(1, stationCount) * 40 + 4;
 
 // ── Column definitions (mirror InputData) ─────────────────────────────────────
 const MONTHLY_KEYS = [
@@ -728,7 +728,7 @@ function ZStageDashboard({ userId }) {
     const BOX_H = 4 * GRID; // 160px — mirrors LayoutPreparation boxSize height
 
     loadedBoxes.forEach((box) => {
-      const w = Math.max(5, box.stationIds.length) * GRID;
+      const w = boxWidth(box.stationIds.length);
       minX = Math.min(minX, box.position.x);
       minY = Math.min(minY, box.position.y);
       maxX = Math.max(maxX, box.position.x + w);
