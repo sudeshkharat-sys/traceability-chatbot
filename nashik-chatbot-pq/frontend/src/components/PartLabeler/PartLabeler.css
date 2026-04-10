@@ -2272,6 +2272,55 @@
   flex-shrink: 0;
 }
 
+/* ── Progress status bar ──────────────────────────────────── */
+.agent-progress-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 500;
+  border-top: 1px solid var(--border-color);
+  background: rgba(var(--mahindra-red-rgb, 195, 15, 31), 0.04);
+  color: #555;
+  flex-shrink: 0;
+}
+
+.ap-progress-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: ap-pulse 1.2s ease-in-out infinite;
+}
+
+.agent-progress-thinking .ap-progress-dot {
+  background: #f59e0b;
+}
+
+.agent-progress-generating .ap-progress-dot {
+  background: #10b981;
+}
+
+.agent-progress-retrying .ap-progress-dot {
+  background: var(--mahindra-red);
+}
+
+.agent-progress-generating {
+  background: rgba(16, 185, 129, 0.06);
+  color: #065f46;
+}
+
+.agent-progress-retrying {
+  background: rgba(var(--mahindra-red-rgb, 195, 15, 31), 0.07);
+  color: var(--mahindra-red);
+}
+
+@keyframes ap-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.45; transform: scale(0.75); }
+}
+
 /* ── Footer / input ───────────────────────────────────────── */
 .agent-panel-footer {
   padding: 0.6rem 0.7rem;

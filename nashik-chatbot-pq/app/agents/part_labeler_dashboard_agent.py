@@ -148,6 +148,8 @@ class PartLabelerDashboardAgent:
             FILTERED_NODES = {"tools:edges"}
 
             just_finished_thinking = False
+            response_started = False
+            thinking_step_count = 0
 
             for stream_mode, chunk in self.agent.stream(
                 inputs, config, stream_mode=["custom", "messages", "updates"]
@@ -159,6 +161,7 @@ class PartLabelerDashboardAgent:
                         if node_name in FILTERED_NODES:
                             continue
                         just_finished_thinking = True
+                        thinking_step_count += 1
                         yield {
                             "type": "thinking",
                             "step": "Processing",
@@ -208,6 +211,7 @@ class PartLabelerDashboardAgent:
                                             )
                                             sys.stdout.flush()
                                             just_finished_thinking = True
+                                            thinking_step_count += 1
                                             yield {
                                                 "type": "thinking",
                                                 "step": "Reasoning",
@@ -338,7 +342,15 @@ class PartLabelerDashboardAgent:
                         continue
 
                     if current_node in RESPONSE_NODES:
-                        just_finished_thinking = False
+                        if not response_started:
+                            response_started = True
+                            just_finished_thinking = False
+                            yield {
+                                "type": "progress",
+                                "stage": "generating",
+                                "step_count": thinking_step_count,
+                                "detail": "Generating response…",
+                            }
                         yield {
                             "type": "token",
                             "content": token_content,

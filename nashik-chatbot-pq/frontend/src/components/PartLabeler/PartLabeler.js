@@ -534,6 +534,8 @@ function PartLabeler() {
   const [agentHistory, setAgentHistory] = useState([]);
   const [agentHistoryLoading, setAgentHistoryLoading] = useState(false);
   const [agentThinkingOpen, setAgentThinkingOpen] = useState(false);
+  // Progress tracking: { stage: 'thinking'|'generating'|'retrying', detail: string, stepCount: number }
+  const [agentProgress, setAgentProgress] = useState(null);
   const agentWsRef = useRef(null);
   const agentMessagesRef = useRef([]);
   const agentPanelBodyRef = useRef(null);
@@ -1240,20 +1242,46 @@ function PartLabeler() {
   };
 
   const handleAgentWsMessage = (data) => {
+    if (data.type === 'keepalive') {
+      // Server-side ping to keep connection alive — no UI action needed
+      return;
+    }
+
+    if (data.type === 'progress') {
+      const stage = data.stage || '';
+      if (stage === 'generating') {
+        setAgentProgress({
+          stage: 'generating',
+          detail: `Generating response…`,
+          stepCount: data.step_count || 0,
+        });
+      } else if (stage === 'retrying') {
+        setAgentProgress({
+          stage: 'retrying',
+          detail: 'Agent retrying — generating final answer…',
+          stepCount: 0,
+        });
+      }
+      return;
+    }
+
     if (data.type === 'thinking' || data.type === 'thinking_token') {
       const content = data.content || '';
       const step = (data.step || '').toLowerCase();
       // Skip the backend boilerplate "Processing your query…" initialization line
       if (!content.trim() || step === 'initialization') return;
+      setAgentProgress({ stage: 'thinking', detail: `Thinking…`, stepCount: 0 });
       setAgentThinkingSteps(prev => {
         if (prev.some(s => s.content?.trim() === content.trim())) return prev;
         return [...prev, { step: data.step || 'Reasoning', content }];
       });
     } else if (data.type === 'token') {
+      setAgentProgress(p => p?.stage !== 'generating' ? p : p); // keep generating stage
       setAgentStreamingText(prev => prev + (data.content || ''));
       scrollAgentToBottom();
     } else if (data.type === 'final' || data.type === 'error') {
       setAgentLoading(false);
+      setAgentProgress(null);
       const finalText = data.type === 'error'
         ? `⚠️ ${data.content}`
         : data.content || agentStreamingText;
@@ -1276,6 +1304,7 @@ function PartLabeler() {
     setAgentInput('');
     setAgentThinkingSteps([]);
     setAgentThinkingOpen(false);
+    setAgentProgress(null);
 
     const userMsg = { id: `user-${Date.now()}`, sender: 'user', text };
     setAgentMessages(prev => { const u = [...prev, userMsg]; agentMessagesRef.current = u; return u; });
@@ -2140,6 +2169,18 @@ function PartLabeler() {
                       </div>
                     )}
                   </div>
+
+                  {/* Progress status bar — shows stage between thinking and final response */}
+                  {agentLoading && agentProgress && (
+                    <div className={`agent-progress-bar agent-progress-${agentProgress.stage}`}>
+                      <span className="ap-progress-dot" />
+                      <span className="ap-progress-label">
+                        {agentProgress.stage === 'thinking' && `Thinking${agentProgress.stepCount ? ` (${agentProgress.stepCount} steps)` : '…'}`}
+                        {agentProgress.stage === 'generating' && `Generating response${agentProgress.stepCount ? ` · ${agentProgress.stepCount} steps` : '…'}`}
+                        {agentProgress.stage === 'retrying' && agentProgress.detail}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Input footer */}
                   <div className="agent-panel-footer">

@@ -410,6 +410,22 @@ function ChatPage() {
   const handleWebSocketMessage = (data) => {
     console.log("WebSocket message received:", data);
 
+    // Keepalive pings from server — ignore silently
+    if (data.type === "keepalive") return;
+
+    // Progress stage updates (thinking → generating → retrying)
+    if (data.type === "progress") {
+      const stage = data.stage || "";
+      if (stage === "generating") {
+        setCurrentThinkingStep(
+          `Generating response${data.step_count ? ` (${data.step_count} steps done)` : "…"}`
+        );
+      } else if (stage === "retrying") {
+        setCurrentThinkingStep("Agent retrying — generating final answer…");
+      }
+      return;
+    }
+
     // Handle both "thinking" and "thinking_token" types
     if (data.type === "thinking" || data.type === "thinking_token") {
       // Add thinking step - accumulate, don't replace
