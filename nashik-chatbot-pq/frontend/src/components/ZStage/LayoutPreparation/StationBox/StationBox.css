@@ -34,10 +34,13 @@
 }
 
 .station-box-title {
-  font-size: 13px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--text-dark);
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .station-box-controls {
