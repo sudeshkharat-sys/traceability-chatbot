@@ -1,6 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { fixMarkdownTables } from '../../utils/markdownUtils';
 import {
   ArrowLeft,
   Upload,
@@ -436,6 +439,44 @@ const IndiaMap = ({ data }) => {
           <div className="tooltip-count"><strong>{hoveredState.count}</strong> Failures</div>
         </div>
       )}
+    </div>
+  );
+};
+
+// ── AgentMessage: renders a single chat bubble with markdown support ──
+const AgentMessage = ({ msg }) => {
+  const fixedText = useMemo(() => {
+    if (!msg.text || msg.sender !== 'bot') return msg.text || '';
+    return fixMarkdownTables(msg.text, true);
+  }, [msg.text, msg.sender]);
+
+  if (msg.sender === 'user') {
+    return (
+      <div className="agent-msg user">
+        <div className="agent-msg-bubble">
+          <p>{msg.text}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`agent-msg bot${msg.isError ? ' error' : ''}`}>
+      <div className="agent-msg-avatar"><Bot size={13} /></div>
+      <div className="agent-msg-bubble">
+        <div className="agent-msg-markdown">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              table: ({ node, ...props }) => (
+                <div className="agent-table-wrap"><table {...props} /></div>
+              ),
+            }}
+          >
+            {fixedText}
+          </ReactMarkdown>
+        </div>
+      </div>
     </div>
   );
 };
@@ -1201,7 +1242,9 @@ function PartLabeler() {
   const handleAgentWsMessage = (data) => {
     if (data.type === 'thinking' || data.type === 'thinking_token') {
       const content = data.content || '';
-      if (!content.trim()) return;
+      const step = (data.step || '').toLowerCase();
+      // Skip the backend boilerplate "Processing your query…" initialization line
+      if (!content.trim() || step === 'initialization') return;
       setAgentThinkingSteps(prev => {
         if (prev.some(s => s.content?.trim() === content.trim())) return prev;
         return [...prev, { step: data.step || 'Reasoning', content }];
@@ -2042,14 +2085,7 @@ function PartLabeler() {
                 <>
                   <div className="agent-panel-body" ref={agentPanelBodyRef}>
                     {agentMessages.map(msg => (
-                      <div key={msg.id} className={`agent-msg ${msg.sender === 'user' ? 'user' : 'bot'}${msg.isError ? ' error' : ''}`}>
-                        {msg.sender === 'bot' && (
-                          <div className="agent-msg-avatar"><Bot size={13} /></div>
-                        )}
-                        <div className="agent-msg-bubble">
-                          <p>{msg.text}</p>
-                        </div>
-                      </div>
+                      <AgentMessage key={msg.id} msg={msg} />
                     ))}
 
                     {/* Thinking steps — collapsible */}
@@ -2081,7 +2117,15 @@ function PartLabeler() {
                       <div className="agent-msg bot">
                         <div className="agent-msg-avatar"><Bot size={13} /></div>
                         <div className="agent-msg-bubble streaming">
-                          <p>{agentStreamingText}<span className="stream-cursor" /></p>
+                          <div className="agent-msg-markdown">
+                            <ReactMarkdown
+                              remarkPlugins={[remarkGfm]}
+                              components={{ table: ({ node, ...props }) => <div className="agent-table-wrap"><table {...props} /></div> }}
+                            >
+                              {fixMarkdownTables(agentStreamingText, false)}
+                            </ReactMarkdown>
+                          </div>
+                          <span className="stream-cursor" />
                         </div>
                       </div>
                     )}

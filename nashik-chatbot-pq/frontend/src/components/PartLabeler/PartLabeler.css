@@ -2332,3 +2332,144 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* ============================================================
+   AGENT MARKDOWN RENDERING
+   Scaled-down version of .bot-message-markdown for 360px panel
+   ============================================================ */
+
+/* Bot bubble has no direct <p>; markdown handles all text rendering */
+.agent-msg.bot .agent-msg-bubble > p { display: none; }
+
+.agent-msg-markdown {
+  width: 100%;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--text-dark);
+  overflow-x: hidden;
+  word-break: break-word;
+}
+
+.agent-msg-markdown > *:first-child { margin-top: 0 !important; }
+.agent-msg-markdown > *:last-child  { margin-bottom: 0 !important; }
+
+.agent-msg-markdown h1,
+.agent-msg-markdown h2,
+.agent-msg-markdown h3,
+.agent-msg-markdown h4 {
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 10px 0 4px;
+}
+.agent-msg-markdown h1 { font-size: 0.95rem; }
+.agent-msg-markdown h2 { font-size: 0.88rem; }
+.agent-msg-markdown h3 { font-size: 0.83rem; }
+.agent-msg-markdown h4 { font-size: 0.8rem; }
+
+.agent-msg-markdown p {
+  margin: 0 0 6px;
+  line-height: 1.6;
+}
+
+.agent-msg-markdown ul,
+.agent-msg-markdown ol {
+  margin: 6px 0;
+  padding-left: 18px;
+}
+
+.agent-msg-markdown li {
+  margin-bottom: 3px;
+  line-height: 1.5;
+}
+
+.agent-msg-markdown strong {
+  font-weight: 700;
+  color: #1a1a1a;
+}
+
+.agent-msg-markdown code {
+  background: #f5f5f5;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: 'Consolas', 'Monaco', monospace;
+  font-size: 0.75rem;
+  color: #09ab3b;
+}
+
+.agent-msg-markdown pre {
+  background: #f5f5f5;
+  padding: 8px 10px;
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: 6px 0;
+}
+
+.agent-msg-markdown pre code {
+  background: transparent;
+  padding: 0;
+  color: var(--text-dark);
+}
+
+.agent-msg-markdown hr {
+  margin: 10px 0;
+  border: none;
+  border-top: 1px solid #e9ecef;
+}
+
+/* ── Tables ──────────────────────────────────────────────── */
+.agent-table-wrap {
+  overflow-x: auto;
+  width: 100%;
+  margin: 8px 0;
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+.agent-msg-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.72rem;
+  background: #fff;
+  border-radius: 6px;
+  overflow: hidden;
+  table-layout: auto;
+  margin: 0;
+}
+
+.agent-msg-markdown thead {
+  background: var(--mahindra-red);
+}
+
+.agent-msg-markdown th {
+  padding: 7px 10px;
+  text-align: left;
+  font-weight: 600;
+  color: white;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  border-bottom: 2px solid var(--mahindra-red-dark);
+  white-space: nowrap;
+}
+
+.agent-msg-markdown tbody tr {
+  border-bottom: 1px solid #f0f0f0;
+  transition: background 0.12s;
+}
+
+.agent-msg-markdown tbody tr:hover {
+  background: #fff9f9;
+}
+
+.agent-msg-markdown tbody tr:last-child {
+  border-bottom: none;
+}
+
+.agent-msg-markdown td {
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+  word-break: break-word;
+  font-size: 0.72rem;
+  color: var(--text-dark);
+  line-height: 1.4;
+}
