@@ -229,6 +229,32 @@ class UploadResponse(BaseModel):
     rows_imported: int
 
 
+# ── LayeredAudit update payload ───────────────────────────────────────────────
+
+class LayeredAuditUpdate(BaseModel):
+    model: Optional[str] = None
+    sr_no: Optional[str] = None
+    date_col: Optional[str] = None
+    station_id: Optional[str] = None
+    workstation: Optional[str] = None
+    auditor: Optional[str] = None
+    ncs: Optional[str] = None
+    action_plan: Optional[str] = None
+    four_m: Optional[str] = None
+    responsibility: Optional[str] = None
+    target_date: Optional[str] = None
+    status: Optional[str] = None
+
+
+# ── LayeredAuditAdherence update payload ─────────────────────────────────────
+
+class LayeredAuditAdherenceUpdate(BaseModel):
+    stage_no: Optional[str] = None
+    stage_name: Optional[str] = None
+    auditor: Optional[str] = None
+    audit_date: Optional[str] = None
+
+
 # ── LayeredAudit ──────────────────────────────────────────────────────────────
 
 class LayeredAuditOut(BaseModel):

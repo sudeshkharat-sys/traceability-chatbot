@@ -310,6 +310,29 @@ class LayeredAuditQueries:
                   target_date, status, created_at, updated_at
     """
 
+    UPDATE = """
+        UPDATE layered_audit SET
+            model          = COALESCE(:model,          model),
+            sr_no          = COALESCE(:sr_no,          sr_no),
+            date_col       = COALESCE(:date_col,       date_col),
+            station_id     = COALESCE(:station_id,     station_id),
+            workstation    = COALESCE(:workstation,    workstation),
+            auditor        = COALESCE(:auditor,        auditor),
+            ncs            = COALESCE(:ncs,            ncs),
+            action_plan    = COALESCE(:action_plan,    action_plan),
+            four_m         = COALESCE(:four_m,         four_m),
+            responsibility = COALESCE(:responsibility, responsibility),
+            target_date    = COALESCE(:target_date,    target_date),
+            status         = COALESCE(:status,         status),
+            updated_at     = NOW()
+        WHERE id = :record_id
+        RETURNING id, user_id, layout_id, model, sr_no, date_col, station_id,
+                  workstation, auditor, ncs, action_plan, four_m, responsibility,
+                  target_date, status, created_at, updated_at
+    """
+
+    CHECK_EXISTS = "SELECT id FROM layered_audit WHERE id = :record_id"
+
     DELETE_ALL = """
         DELETE FROM layered_audit
         WHERE (:user_id IS NULL OR user_id = :user_id)
@@ -340,6 +363,20 @@ class LayeredAuditAdherenceQueries:
         RETURNING id, user_id, layout_id, stage_no, stage_name, auditor, audit_date,
                   created_at, updated_at
     """
+
+    UPDATE = """
+        UPDATE layered_audit_adherence SET
+            stage_no   = COALESCE(:stage_no,   stage_no),
+            stage_name = COALESCE(:stage_name, stage_name),
+            auditor    = COALESCE(:auditor,    auditor),
+            audit_date = COALESCE(:audit_date, audit_date),
+            updated_at = NOW()
+        WHERE id = :record_id
+        RETURNING id, user_id, layout_id, stage_no, stage_name, auditor, audit_date,
+                  created_at, updated_at
+    """
+
+    CHECK_EXISTS = "SELECT id FROM layered_audit_adherence WHERE id = :record_id"
 
     DELETE_ALL = """
         DELETE FROM layered_audit_adherence

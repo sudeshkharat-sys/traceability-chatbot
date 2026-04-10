@@ -86,4 +86,6 @@ export const layeredAuditApi = {
     if (layoutId != null) params.layout_id = layoutId;
     return api.get('/layered-audit/adherence/records', { params });
   },
+  updateAuditRecord:     (id, data) => api.put(`/layered-audit/records/${id}`, data),
+  updateAdherenceRecord: (id, data) => api.put(`/layered-audit/adherence/records/${id}`, data),
 };

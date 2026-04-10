@@ -172,6 +172,26 @@ def list_layered_audit(
     return [_row_to_dict(r) for r in rows]
 
 
+@router.put("/records/{record_id}", response_model=schemas.LayeredAuditOut)
+def update_layered_audit(
+    record_id: int,
+    payload: schemas.LayeredAuditUpdate,
+    connector: StateDBConnector = Depends(get_connector),
+):
+    exists = connector.execute_query(
+        LayeredAuditQueries.CHECK_EXISTS, {"record_id": record_id}
+    )
+    if not exists:
+        raise HTTPException(status_code=404, detail="Record not found")
+
+    data = payload.model_dump()
+    data["record_id"] = record_id
+    rows = connector.execute_query(LayeredAuditQueries.UPDATE, data)
+    if not rows:
+        raise HTTPException(status_code=500, detail="Failed to update record")
+    return _row_to_dict(rows[0])
+
+
 # ── Layered Audit Adherence endpoints ────────────────────────────────────────
 
 @router.post("/adherence/upload", response_model=schemas.UploadResponse, status_code=201)
@@ -217,3 +237,27 @@ def list_layered_audit_adherence(
         {"user_id": user_id, "layout_id": layout_id},
     )
     return [_row_to_dict(r) for r in rows]
+
+
+@router.put("/adherence/records/{record_id}", response_model=schemas.LayeredAuditAdherenceOut)
+def update_layered_audit_adherence(
+    record_id: int,
+    payload: schemas.LayeredAuditAdherenceUpdate,
+    connector: StateDBConnector = Depends(get_connector),
+):
+    exists = connector.execute_query(
+        LayeredAuditAdherenceQueries.CHECK_EXISTS, {"record_id": record_id}
+    )
+    if not exists:
+        raise HTTPException(status_code=404, detail="Record not found")
+
+    # Enforce date validation for audit_date (same rule as upload)
+    data = payload.model_dump()
+    if data.get("audit_date") is not None:
+        data["audit_date"] = _strict_date(data["audit_date"])
+
+    data["record_id"] = record_id
+    rows = connector.execute_query(LayeredAuditAdherenceQueries.UPDATE, data)
+    if not rows:
+        raise HTTPException(status_code=500, detail="Failed to update record")
+    return _row_to_dict(rows[0])

@@ -50,19 +50,18 @@ function RYGBadge({ value }) {
   return <span className={`ryg-badge ${cls}`}>{value}</span>;
 }
 
-function EditableCell({ recordId, fieldKey, value, type, onSaved }) {
+// Long-text fields that always use a <textarea> when editing
+const LONG_TEXT_FIELDS = new Set(['concern', 'root_cause', 'action_plan', 'comm', 'ncs']);
+
+// saveFn defaults to the master-data API; pass a different fn for audit tables
+function EditableCell({ recordId, fieldKey, value, type, onSaved, saveFn }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? '');
   const [saving, setSaving] = useState(false);
   const inputRef = useRef(null);
 
-  useEffect(() => {
-    setDraft(value ?? '');
-  }, [value]);
-
-  useEffect(() => {
-    if (editing && inputRef.current) inputRef.current.focus();
-  }, [editing]);
+  useEffect(() => { setDraft(value ?? ''); }, [value]);
+  useEffect(() => { if (editing && inputRef.current) inputRef.current.focus(); }, [editing]);
 
   const commit = useCallback(async () => {
     setEditing(false);
@@ -72,8 +71,15 @@ function EditableCell({ recordId, fieldKey, value, type, onSaved }) {
 
     setSaving(true);
     try {
-      const payload = { [fieldKey]: type === 'number' ? (trimmed === '' ? null : Number(trimmed)) : (trimmed || null) };
-      const res = await inputApi.updateRecord(recordId, payload);
+      let fieldValue;
+      if (type === 'number') {
+        fieldValue = trimmed === '' ? null : Number(trimmed);
+      } else {
+        fieldValue = trimmed || null;
+      }
+      const payload = { [fieldKey]: fieldValue };
+      const fn = saveFn || inputApi.updateRecord;
+      const res = await fn(recordId, payload);
       onSaved(recordId, res.data);
     } catch (err) {
       console.error('Save failed', err);
@@ -81,7 +87,7 @@ function EditableCell({ recordId, fieldKey, value, type, onSaved }) {
     } finally {
       setSaving(false);
     }
-  }, [draft, value, fieldKey, type, recordId, onSaved]);
+  }, [draft, value, fieldKey, type, recordId, onSaved, saveFn]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') commit();
@@ -91,9 +97,10 @@ function EditableCell({ recordId, fieldKey, value, type, onSaved }) {
   if (saving) return <td className="cell-saving"><Loader size={12} className="spin" /></td>;
 
   if (editing) {
+    const isLong = LONG_TEXT_FIELDS.has(fieldKey) || type === 'longtext';
     return (
       <td className="cell-editing">
-        {(fieldKey === 'concern' || fieldKey === 'root_cause' || fieldKey === 'action_plan' || fieldKey === 'comm') ? (
+        {isLong ? (
           <textarea
             ref={inputRef}
             value={draft}
@@ -102,6 +109,16 @@ function EditableCell({ recordId, fieldKey, value, type, onSaved }) {
             onKeyDown={(e) => { if (e.key === 'Escape') { setDraft(value ?? ''); setEditing(false); } }}
             rows={3}
             className="cell-textarea"
+          />
+        ) : type === 'date' ? (
+          <input
+            ref={inputRef}
+            type="date"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={handleKeyDown}
+            className="cell-input"
           />
         ) : (
           <input
@@ -204,25 +221,25 @@ function MonthlyCell({ recordId, monthKey, monthlyData, onSaved }) {
 // ── Layered Audit column definitions ─────────────────────────────────────────
 
 const LAYERED_AUDIT_COLUMNS = [
-  { key: 'model',          label: 'Model',          width: 120 },
-  { key: 'sr_no',          label: 'Sr.No',          width: 200 },
-  { key: 'date_col',       label: 'Date',           width: 110 },
-  { key: 'station_id',     label: 'Station ID',     width: 110 },
-  { key: 'workstation',    label: 'Workstation',    width: 180 },
-  { key: 'auditor',        label: 'Auditor',        width: 200 },
-  { key: 'ncs',            label: "NC's",           width: 280 },
-  { key: 'action_plan',    label: 'Action Plan',    width: 280 },
-  { key: 'four_m',         label: '4M',             width: 100 },
-  { key: 'responsibility', label: 'Responsibility', width: 160 },
-  { key: 'target_date',    label: 'Target Date',    width: 110 },
-  { key: 'status',         label: 'Status',         width: 90  },
+  { key: 'model',          label: 'Model',          width: 120, type: 'text'     },
+  { key: 'sr_no',          label: 'Sr.No',          width: 200, type: 'text'     },
+  { key: 'date_col',       label: 'Date',           width: 110, type: 'text'     },
+  { key: 'station_id',     label: 'Station ID',     width: 110, type: 'text'     },
+  { key: 'workstation',    label: 'Workstation',    width: 180, type: 'text'     },
+  { key: 'auditor',        label: 'Auditor',        width: 200, type: 'text'     },
+  { key: 'ncs',            label: "NC's",           width: 280, type: 'longtext' },
+  { key: 'action_plan',    label: 'Action Plan',    width: 280, type: 'longtext' },
+  { key: 'four_m',         label: '4M',             width: 100, type: 'text'     },
+  { key: 'responsibility', label: 'Responsibility', width: 160, type: 'text'     },
+  { key: 'target_date',    label: 'Target Date',    width: 110, type: 'text'     },
+  { key: 'status',         label: 'Status',         width: 90,  type: 'text'     },
 ];
 
 const LAYERED_ADHERENCE_COLUMNS = [
-  { key: 'stage_no',   label: 'Stage No',   width: 110 },
-  { key: 'stage_name', label: 'Stage Name', width: 220 },
-  { key: 'auditor',    label: 'Auditor',    width: 200 },
-  { key: 'audit_date', label: 'Audit Date', width: 120 },
+  { key: 'stage_no',   label: 'Stage No',   width: 110, type: 'text' },
+  { key: 'stage_name', label: 'Stage Name', width: 220, type: 'text' },
+  { key: 'auditor',    label: 'Auditor',    width: 200, type: 'text' },
+  { key: 'audit_date', label: 'Audit Date', width: 120, type: 'date' },
 ];
 
 // ── Column filter dropdown ─────────────────────────────────────────────────────
@@ -320,8 +337,10 @@ function ColumnFilterDropdown({ colKey, allValues, selectedValues, onChange }) {
   );
 }
 
-// ── Read-only table with per-column dropdown filters ──────────────────────────
-function AuditTable({ columns, records }) {
+// ── Editable table with per-column dropdown filters ───────────────────────────
+// saveFn(id, payload) → Promise<{data: updatedRecord}>
+// onSaved(recordId, updatedRecord) — called on successful save
+function AuditTable({ columns, records, saveFn, onSaved }) {
   // filters: { [colKey]: null | string[] }  null = no filter (all shown)
   const [filters, setFilters] = useState({});
 
@@ -343,7 +362,7 @@ function AuditTable({ columns, records }) {
   const filteredRecords = React.useMemo(() =>
     records.filter((rec) =>
       columns.every((col) => {
-        const f = filters[col.key]; // null | string[]
+        const f = filters[col.key];
         if (f == null) return true;
         return f.includes(String(rec[col.key] ?? ''));
       })
@@ -377,11 +396,15 @@ function AuditTable({ columns, records }) {
           {filteredRecords.map((rec) => (
             <tr key={rec.id}>
               {columns.map((col) => (
-                <td key={col.key} className="cell-view">
-                  {rec[col.key] != null && rec[col.key] !== ''
-                    ? <span>{String(rec[col.key])}</span>
-                    : <span className="cell-empty">—</span>}
-                </td>
+                <EditableCell
+                  key={col.key}
+                  recordId={rec.id}
+                  fieldKey={col.key}
+                  value={rec[col.key]}
+                  type={col.type || 'text'}
+                  onSaved={onSaved}
+                  saveFn={saveFn}
+                />
               ))}
             </tr>
           ))}
@@ -575,6 +598,14 @@ export default function InputData({ userId, layouts = [] }) {
     setRecords((prev) => prev.map((r) => (r.id === recordId ? updatedRecord : r)));
   }, []);
 
+  const handleAuditRecordSaved = useCallback((recordId, updatedRecord) => {
+    setAuditRecords((prev) => prev.map((r) => (r.id === recordId ? updatedRecord : r)));
+  }, []);
+
+  const handleAdherenceRecordSaved = useCallback((recordId, updatedRecord) => {
+    setAdherenceRecords((prev) => prev.map((r) => (r.id === recordId ? updatedRecord : r)));
+  }, []);
+
   const allMonths = React.useMemo(() => {
     const set = new Set(MONTHLY_KEYS);
     records.forEach((rec) => {
@@ -762,7 +793,10 @@ export default function InputData({ userId, layouts = [] }) {
       {activeTab === 'layered-audit' && (
         <div className="master-panel">
           <div className="master-header">
-            <h2 className="panel-title">Layered Audit</h2>
+            <div>
+              <h2 className="panel-title">Layered Audit</h2>
+              <p className="panel-subtitle">Click any cell to edit · Changes save automatically</p>
+            </div>
             <div className="master-actions">
               <span className="record-count">{auditRecords.length} record{auditRecords.length !== 1 ? 's' : ''}</span>
               <button className="refresh-btn" onClick={loadAuditRecords} disabled={loadingAudit}>
@@ -780,7 +814,12 @@ export default function InputData({ userId, layouts = [] }) {
             </div>
           )}
           {!loadingAudit && auditRecords.length > 0 && (
-            <AuditTable columns={LAYERED_AUDIT_COLUMNS} records={auditRecords} />
+            <AuditTable
+              columns={LAYERED_AUDIT_COLUMNS}
+              records={auditRecords}
+              saveFn={layeredAuditApi.updateAuditRecord}
+              onSaved={handleAuditRecordSaved}
+            />
           )}
         </div>
       )}
@@ -789,7 +828,10 @@ export default function InputData({ userId, layouts = [] }) {
       {activeTab === 'audit-adherence' && (
         <div className="master-panel">
           <div className="master-header">
-            <h2 className="panel-title">Audit Adherence</h2>
+            <div>
+              <h2 className="panel-title">Audit Adherence</h2>
+              <p className="panel-subtitle">Click any cell to edit · Audit Date must be a valid date</p>
+            </div>
             <div className="master-actions">
               <span className="record-count">{adherenceRecords.length} record{adherenceRecords.length !== 1 ? 's' : ''}</span>
               <button className="refresh-btn" onClick={loadAdherenceRecords} disabled={loadingAdherence}>
@@ -807,7 +849,12 @@ export default function InputData({ userId, layouts = [] }) {
             </div>
           )}
           {!loadingAdherence && adherenceRecords.length > 0 && (
-            <AuditTable columns={LAYERED_ADHERENCE_COLUMNS} records={adherenceRecords} />
+            <AuditTable
+              columns={LAYERED_ADHERENCE_COLUMNS}
+              records={adherenceRecords}
+              saveFn={layeredAuditApi.updateAdherenceRecord}
+              onSaved={handleAdherenceRecordSaved}
+            />
           )}
         </div>
       )}
