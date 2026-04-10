@@ -19,7 +19,7 @@ const CANVAS_SIZE = 5000;
 
 // Box dimensions are multiples of GRID so edges align to grid lines
 const boxSize = (stationCount) => ({
-  w: Math.max(5, stationCount) * GRID,  // 40px per station column, min 5 cols = 200px
+  w: Math.max(1, stationCount) * GRID,  // 40px per station column, min 5 cols = 200px
   h: 4 * GRID,                          // 160px = 4 grid rows
 });
 

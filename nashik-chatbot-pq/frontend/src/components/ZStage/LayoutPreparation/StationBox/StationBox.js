@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import Draggable from 'react-draggable';
 import { useXarrow } from 'react-xarrows';
-import { ChevronUp, ChevronDown, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import './StationBox.css';
 
 // Each station column is 40px wide; box has a 2px border (box-sizing: border-box).
@@ -21,7 +21,6 @@ function StationBox({
   onPortMouseDown,
   canvasScale,
 }) {
-  const [collapsed, setCollapsed] = useState(false);
   const [pos, setPos] = useState(parentPosition || { x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const nodeRef = useRef(null);
@@ -75,8 +74,12 @@ function StationBox({
       <div
         ref={nodeRef}
         id={id}
-        className={['station-box', collapsed ? 'station-box--collapsed' : ''].join(' ').trim()}
-        style={isDragging ? { zIndex: 1000 } : undefined}
+        className="station-box"
+        style={{
+          width: `${Math.max(1, stationIds.length) * 40 + 4}px`,
+          minWidth: '80px',
+          ...(isDragging ? { zIndex: 1000 } : {}),
+        }}
       >
         {/* ── Per-station top port dots — one above each station column ─── */}
         {stationIds.map((sid, i) => {
@@ -115,13 +118,6 @@ function StationBox({
         <div className="station-box-header">
           <span className="station-box-title">{name}</span>
           <div className="station-box-controls">
-            <button
-              className="station-box-ctrl-btn"
-              title={collapsed ? 'Expand' : 'Collapse'}
-              onClick={(e) => { e.stopPropagation(); setCollapsed((v) => !v); }}
-            >
-              {collapsed ? <ChevronDown size={12} /> : <ChevronUp size={12} />}
-            </button>
             {onDelete && (
               <button
                 className="station-box-ctrl-btn station-box-ctrl-btn--delete"
@@ -134,8 +130,7 @@ function StationBox({
           </div>
         </div>
 
-        {!collapsed && (
-          <div className="station-box-body">
+        <div className="station-box-body">
             <table className="station-grid">
               <thead>
                 <tr>
@@ -173,7 +168,6 @@ function StationBox({
               </tbody>
             </table>
           </div>
-        )}
       </div>
     </Draggable>
   );

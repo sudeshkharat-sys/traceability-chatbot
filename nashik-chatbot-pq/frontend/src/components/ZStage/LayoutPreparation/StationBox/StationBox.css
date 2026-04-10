@@ -15,9 +15,6 @@
   overflow: visible;
 }
 
-.station-box--collapsed {
-  height: 40px;
-}
 
 .station-box-header {
   display: flex;
@@ -85,7 +82,7 @@
 
 .station-grid {
   border-collapse: collapse;
-  width: max-content;
+  width: 100%;
   table-layout: fixed;
 }
 
