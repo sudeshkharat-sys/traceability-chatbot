@@ -181,11 +181,11 @@ async def websocket_endpoint(
             agent_type = payload_data.get("agent_type", "analyst")
 
             # Validate agent type
-            if agent_type not in ["analyst", "cypher", "standards_guidelines"]:
+            if agent_type not in ["analyst", "cypher", "standards_guidelines", "part_labeler_dashboard"]:
                 await websocket.send_json(
                     {
                         "type": "error",
-                        "content": f"Invalid agent type: {agent_type}. Must be 'analyst', 'cypher', or 'standards_guidelines'.",
+                        "content": f"Invalid agent type: {agent_type}. Must be 'analyst', 'cypher', 'standards_guidelines', or 'part_labeler_dashboard'.",
                     }
                 )
                 return

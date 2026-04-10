@@ -23,7 +23,10 @@ import {
   Map as MapIcon,
   Activity,
   History,
-  ChevronUp
+  ChevronUp,
+  Bot,
+  Send,
+  ChevronLeft
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -39,7 +42,7 @@ import {
 } from 'recharts';
 import { ComposableMap, Geographies, Geography } from "react-simple-maps";
 import { scaleLinear } from "d3-scale";
-import { backend_url } from '../../services/api/config';
+import { backend_url, backend_url_ws } from '../../services/api/config';
 import { authService } from '../../services/api';
 import logoImg from '../../assests/logo.png';
 import utilityLogo from '../../assests/image.png';
@@ -477,6 +480,18 @@ function PartLabeler() {
   const [partName, setPartName] = useState('');
   const [isEditingLabel, setIsEditingLabel] = useState(false);
   const [editLabelName, setEditLabelName] = useState('');
+
+  // ── Agent panel state ─────────────────────────────────────────────────
+  const [showAgentPanel, setShowAgentPanel] = useState(false);
+  const [agentMessages, setAgentMessages] = useState([]);
+  const [agentInput, setAgentInput] = useState('');
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentConvId, setAgentConvId] = useState(null);
+  const [agentThinkingSteps, setAgentThinkingSteps] = useState([]);
+  const [agentStreamingText, setAgentStreamingText] = useState('');
+  const agentWsRef = useRef(null);
+  const agentMessagesRef = useRef([]);
+  const agentPanelBodyRef = useRef(null);
 
   useEffect(() => {
     const handleOutsideClick = (e) => {
@@ -1096,7 +1111,130 @@ function PartLabeler() {
     setShowInput(null);
   };
 
-  const currentMonthFailures = filterMonth.includes('All') 
+  // ── Agent panel helpers ───────────────────────────────────────────────
+  const scrollAgentToBottom = () => {
+    if (agentPanelBodyRef.current) {
+      agentPanelBodyRef.current.scrollTop = agentPanelBodyRef.current.scrollHeight;
+    }
+  };
+
+  const openAgentPanel = () => {
+    setShowAgentPanel(true);
+    if (agentMessages.length === 0) {
+      setAgentMessages([{
+        id: 'welcome',
+        sender: 'bot',
+        text: 'Hello! I\'m your Part Labeler Dashboard Assistant. Ask me anything about your warranty, RPT, GNOVAC, RFI, or e-SQA data.',
+      }]);
+    }
+  };
+
+  const closeAgentPanel = () => {
+    setShowAgentPanel(false);
+    if (agentWsRef.current) {
+      agentWsRef.current.close();
+      agentWsRef.current = null;
+    }
+  };
+
+  const handleAgentWsMessage = (data) => {
+    if (data.type === 'thinking' || data.type === 'thinking_token') {
+      const content = data.content || '';
+      if (!content.trim()) return;
+      setAgentThinkingSteps(prev => {
+        const isDuplicate = prev.some(s => s.content && s.content.trim() === content.trim());
+        if (isDuplicate) return prev;
+        return [...prev, { step: data.step || 'Reasoning', content }];
+      });
+    } else if (data.type === 'token') {
+      setAgentStreamingText(prev => {
+        const next = prev + (data.content || '');
+        setTimeout(scrollAgentToBottom, 0);
+        return next;
+      });
+    } else if (data.type === 'final' || data.type === 'error') {
+      setAgentLoading(false);
+      const finalText = data.type === 'error'
+        ? `Error: ${data.content}`
+        : data.content || agentStreamingText;
+      setAgentStreamingText('');
+      setAgentThinkingSteps([]);
+      const botMsg = {
+        id: `bot-${Date.now()}`,
+        sender: 'bot',
+        text: finalText,
+      };
+      setAgentMessages(prev => {
+        const updated = [...prev.filter(m => m.id !== 'streaming'), botMsg];
+        agentMessagesRef.current = updated;
+        return updated;
+      });
+      setTimeout(scrollAgentToBottom, 100);
+    }
+  };
+
+  const handleAgentSend = async () => {
+    const text = agentInput.trim();
+    if (!text || agentLoading) return;
+    setAgentInput('');
+
+    const userMsg = { id: `user-${Date.now()}`, sender: 'user', text };
+    setAgentMessages(prev => {
+      const updated = [...prev, userMsg];
+      agentMessagesRef.current = updated;
+      return updated;
+    });
+    setAgentLoading(true);
+    setAgentThinkingSteps([]);
+    setAgentStreamingText('');
+    setTimeout(scrollAgentToBottom, 0);
+
+    let convId = agentConvId;
+    try {
+      if (!convId) {
+        const res = await fetch(`${backend_url}/conversations/initiate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: userId || parseInt(sessionStorage.getItem('user_id'), 10) || 1,
+            agent_type: 'part_labeler_dashboard',
+          }),
+        });
+        const data = await res.json();
+        convId = data.conversationId;
+        setAgentConvId(convId);
+      }
+
+      if (!agentWsRef.current || agentWsRef.current.readyState !== WebSocket.OPEN) {
+        const ws = new WebSocket(`${backend_url_ws}/conversations/${convId}/ws`);
+        agentWsRef.current = ws;
+        await new Promise((resolve, reject) => {
+          const t = setTimeout(() => reject(new Error('WS timeout')), 5000);
+          ws.onopen = () => { clearTimeout(t); resolve(); };
+          ws.onerror = () => { clearTimeout(t); reject(new Error('WS error')); };
+        });
+        ws.onmessage = (e) => {
+          try { handleAgentWsMessage(JSON.parse(e.data)); } catch {}
+        };
+        ws.onclose = () => { setAgentLoading(false); };
+      }
+
+      agentWsRef.current.send(JSON.stringify({
+        user_id: userId || parseInt(sessionStorage.getItem('user_id'), 10) || 1,
+        user_message: text,
+        agent_type: 'part_labeler_dashboard',
+      }));
+    } catch (err) {
+      setAgentLoading(false);
+      setAgentMessages(prev => [...prev, {
+        id: `err-${Date.now()}`, sender: 'bot',
+        text: 'Failed to send message. Please try again.',
+        isError: true,
+      }]);
+    }
+  };
+
+  const currentMonthFailures = filterMonth.includes('All')
     ? warrantyHistory.reduce((sum, item) => sum + item.failureCount, 0)
     : warrantyHistory.filter(h => filterMonth.includes(h.month)).reduce((sum, item) => sum + item.failureCount, 0);
 
@@ -1296,11 +1434,19 @@ function PartLabeler() {
             <span className="stat-value">{labels.length}</span>
             <span className="stat-label">Mapped Components</span>
           </div>
+          <button
+            className={`agent-toggle-btn ${showAgentPanel ? 'active' : ''}`}
+            onClick={showAgentPanel ? closeAgentPanel : openAgentPanel}
+            title="Open Dashboard Agent"
+          >
+            <Bot size={18} />
+            <span>Agent</span>
+          </button>
           <img src={utilityLogo} alt="Mahindra Utility Logo" className="header-corner-logo" />
         </div>
       </div>
 
-      <div className="part-labeler-content">
+      <div className={`part-labeler-content ${showAgentPanel ? 'agent-panel-open' : ''}`}>
         <aside className="part-labeler-sidebar">
           <button className="sidebar-back-btn" onClick={() => navigate('/')}><ArrowLeft size={16} /><span>Dashboard</span></button>
           <div className="sidebar-section">
@@ -1766,6 +1912,105 @@ function PartLabeler() {
             )}
           </div>
         </main>
+
+        {/* ── Agent Panel (right-side drawer) ────────────────────────── */}
+        <AnimatePresence>
+          {showAgentPanel && (
+            <motion.aside
+              className="agent-panel"
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 380, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+            >
+              {/* Panel header */}
+              <div className="agent-panel-header">
+                <div className="agent-panel-title">
+                  <Bot size={18} />
+                  <span>Dashboard Agent</span>
+                </div>
+                <button className="agent-panel-close" onClick={closeAgentPanel} title="Close">
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Messages */}
+              <div className="agent-panel-body" ref={agentPanelBodyRef}>
+                {agentMessages.map(msg => (
+                  <div key={msg.id} className={`agent-msg ${msg.sender === 'user' ? 'user' : 'bot'} ${msg.isError ? 'error' : ''}`}>
+                    {msg.sender === 'bot' && (
+                      <div className="agent-msg-avatar"><Bot size={14} /></div>
+                    )}
+                    <div className="agent-msg-bubble">
+                      <p>{msg.text}</p>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Thinking steps */}
+                {agentLoading && agentThinkingSteps.length > 0 && (
+                  <div className="agent-thinking">
+                    {agentThinkingSteps.map((step, i) => (
+                      <div key={i} className="agent-thinking-step">
+                        <span className="thinking-label">{step.step}</span>
+                        <p className="thinking-content">{step.content}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Streaming text */}
+                {agentLoading && agentStreamingText && (
+                  <div className="agent-msg bot">
+                    <div className="agent-msg-avatar"><Bot size={14} /></div>
+                    <div className="agent-msg-bubble streaming">
+                      <p>{agentStreamingText}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Loading dots */}
+                {agentLoading && !agentStreamingText && (
+                  <div className="agent-msg bot">
+                    <div className="agent-msg-avatar"><Bot size={14} /></div>
+                    <div className="agent-msg-bubble">
+                      <div className="agent-typing-dots">
+                        <span /><span /><span />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Input area */}
+              <div className="agent-panel-footer">
+                <textarea
+                  className="agent-input"
+                  placeholder="Ask about your quality data…"
+                  value={agentInput}
+                  onChange={e => setAgentInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleAgentSend();
+                    }
+                  }}
+                  rows={2}
+                  disabled={agentLoading}
+                />
+                <button
+                  className="agent-send-btn"
+                  onClick={handleAgentSend}
+                  disabled={agentLoading || !agentInput.trim()}
+                  title="Send"
+                >
+                  <Send size={16} />
+                </button>
+              </div>
+            </motion.aside>
+          )}
+        </AnimatePresence>
+
       </div>
     </div>
   );
