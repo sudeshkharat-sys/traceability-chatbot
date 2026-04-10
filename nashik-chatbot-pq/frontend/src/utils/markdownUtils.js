@@ -143,6 +143,17 @@ export function fixMarkdownTables(markdown, isComplete = false) {
     }
   );
 
+  // Fix 13: Table name at start of line immediately followed by pipe with no space/newline
+  // Pattern: "raw_warranty_data| Column | Count |" -> "raw_warranty_data\n\n| Column | Count |"
+  // The LLM sometimes concatenates a table/source name directly with the first table pipe.
+  // Use ^ (line-start) with gm flag to avoid touching mid-line pipe characters.
+  result = result.replace(
+    /^([A-Za-z0-9_]+)\|([^\n]+\|[^\n]*)/gm,
+    (match, word, tableContent) => {
+      return word + "\n\n|" + tableContent;
+    }
+  );
+
   // Re-normalise after new fixes (avoid triple+ newlines introduced above)
   result = result.replace(/\n{3,}/g, "\n\n");
 
