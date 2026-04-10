@@ -1992,7 +1992,7 @@
 /* ── Message bubbles ──────────────────────────────────────── */
 .agent-msg {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;   /* avatar pins to top, never disappears with tall bubbles */
   gap: 0.4rem;
 }
 
@@ -2011,11 +2011,13 @@
   justify-content: center;
   color: var(--mahindra-red);
   flex-shrink: 0;
-  margin-bottom: 2px;
+  margin-top: 3px;  /* slight top offset so icon sits just below bubble top edge */
 }
 
 .agent-msg-bubble {
-  max-width: 82%;
+  flex: 1;          /* take remaining space */
+  min-width: 0;     /* prevent flex overflow that hides the avatar */
+  max-width: calc(100% - 32px); /* always leave room for the 24px avatar + gap */
   padding: 0.45rem 0.65rem;
   font-size: 0.8rem;
   line-height: 1.55;
@@ -2090,6 +2092,8 @@
 
 /* ── Thinking — collapsible ───────────────────────────────── */
 .agent-thinking-wrap {
+  flex: 1;          /* fills the space beside the avatar */
+  min-width: 0;     /* prevents flex overflow */
   border: 1px solid #fecaca;
   border-radius: 8px;
   overflow: hidden;

@@ -2137,27 +2137,30 @@ function PartLabeler() {
                       <AgentMessage key={msg.id} msg={msg} />
                     ))}
 
-                    {/* Thinking steps — collapsible */}
+                    {/* Thinking steps — bot avatar + collapsible panel */}
                     {agentLoading && agentThinkingSteps.length > 0 && (
-                      <div className="agent-thinking-wrap">
-                        <button
-                          className="agent-thinking-toggle"
-                          onClick={() => setAgentThinkingOpen(o => !o)}
-                        >
-                          <span className="thinking-pulse" />
-                          <span>Thinking…</span>
-                          <ChevronDown size={13} className={agentThinkingOpen ? 'rotate' : ''} />
-                        </button>
-                        {agentThinkingOpen && (
-                          <div className="agent-thinking-steps">
-                            {agentThinkingSteps.map((s, i) => (
-                              <div key={i} className="agent-thinking-step">
-                                <span className="thinking-label">{s.step}</span>
-                                <p className="thinking-content">{s.content}</p>
-                              </div>
-                            ))}
-                          </div>
-                        )}
+                      <div className="agent-msg bot">
+                        <div className="agent-msg-avatar"><Bot size={13} /></div>
+                        <div className="agent-thinking-wrap">
+                          <button
+                            className="agent-thinking-toggle"
+                            onClick={() => setAgentThinkingOpen(o => !o)}
+                          >
+                            <span className="thinking-pulse" />
+                            <span>Thinking…</span>
+                            <ChevronDown size={13} className={agentThinkingOpen ? 'rotate' : ''} />
+                          </button>
+                          {agentThinkingOpen && (
+                            <div className="agent-thinking-steps">
+                              {agentThinkingSteps.map((s, i) => (
+                                <div key={i} className="agent-thinking-step">
+                                  <span className="thinking-label">{s.step}</span>
+                                  <p className="thinking-content">{s.content}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
                     )}
 
