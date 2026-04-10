@@ -1302,8 +1302,8 @@ function PartLabeler() {
         sender: 'bot',
         text: finalText,
         isError: data.type === 'error',
-        // Attach any chart that arrived before the final event
-        ...(agentPendingChartRef.current && { chart_data: agentPendingChartRef.current }),
+        // Attach chart: prefer ref (from chart event), fall back to chart_data embedded in final event
+        chart_data: agentPendingChartRef.current || data.chart_data || undefined,
       };
       agentPendingChartRef.current = null;
       setAgentMessages(prev => {

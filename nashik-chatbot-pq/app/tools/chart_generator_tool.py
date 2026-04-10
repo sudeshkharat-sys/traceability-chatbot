@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 # ── Thread-local chart storage ──────────────────────────────────────────────
 # The main streaming loop in PartLabelerDashboardAgent.stream() reads from
 # _chart_store after the generator exhausts, then emits the chart event.
+# LangGraph executes sync tools synchronously within the same graph thread,
+# so the thread-local written by the tool is readable from stream() after the loop.
 
 _chart_store: threading.local = threading.local()
 
@@ -37,6 +39,23 @@ def get_pending_chart() -> Optional[Dict[str, Any]]:
 def clear_pending_chart() -> None:
     """Clear any pending chart (call at the start of each stream)."""
     _chart_store.chart = None
+
+
+# ── Singleton chart agent ────────────────────────────────────────────────────
+# Initialised once on first use; avoids creating a new LangChain agent graph
+# on every generate_chart tool call.
+_chart_agent_instance = None
+_chart_agent_lock = threading.Lock()
+
+
+def _get_chart_agent():
+    global _chart_agent_instance
+    if _chart_agent_instance is None:
+        with _chart_agent_lock:
+            if _chart_agent_instance is None:
+                from app.agents.part_labeler_chart_agent import PartLabelerChartAgent
+                _chart_agent_instance = PartLabelerChartAgent()
+    return _chart_agent_instance
 
 
 # ── Tool ────────────────────────────────────────────────────────────────────
@@ -95,10 +114,7 @@ def generate_chart(query_results_json: str, user_question: str) -> str:
                 "message": f"Need ≥2 rows for a chart (got {len(rows) if rows else 0})",
             })
 
-        # Lazy import to avoid circular imports at module load time
-        from app.agents.part_labeler_chart_agent import PartLabelerChartAgent
-
-        chart_agent = PartLabelerChartAgent()
+        chart_agent = _get_chart_agent()
         chart_data = chart_agent.generate(query_results=rows, user_question=user_question)
 
         if chart_data is None:

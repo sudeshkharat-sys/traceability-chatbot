@@ -164,29 +164,46 @@ class PartLabelerChartAgent:
                 {"messages": [{"role": "user", "content": user_prompt}]}
             )
 
-            # Extract ChartConfig from response
+            # ── Extract ChartConfig — mirrors CypherAgent pattern ───────────
+            # create_agent with response_format stores the Pydantic object at
+            # result["structured_response"] (not result["messages"]).
             config: Optional[ChartConfig] = None
 
-            if hasattr(response, "response_format") and response.response_format:
-                config = response.response_format
-            elif isinstance(response, dict) and "messages" in response:
-                last_msg = response["messages"][-1]
-                raw_content = getattr(last_msg, "content", "")
-                if isinstance(raw_content, str):
+            if isinstance(response, dict):
+                sr = response.get("structured_response")
+                if isinstance(sr, ChartConfig):
+                    config = sr
+                elif isinstance(sr, dict):
                     try:
-                        config = ChartConfig(**json.loads(raw_content))
+                        config = ChartConfig(**sr)
                     except Exception:
-                        # Try to find JSON in the text
-                        import re
-                        m = re.search(r"\{.*\}", raw_content, re.DOTALL)
-                        if m:
-                            try:
-                                config = ChartConfig(**json.loads(m.group()))
-                            except Exception:
-                                pass
+                        pass
+
+            if config is None:
+                # Fallback: try to parse JSON from the last message content
+                import re as _re
+                messages = (response.get("messages") or []) if isinstance(response, dict) else []
+                for msg in reversed(messages):
+                    raw = getattr(msg, "content", "")
+                    if not isinstance(raw, str):
+                        continue
+                    # Try direct JSON parse first, then regex extraction
+                    for candidate in [raw, (_re.search(r"\{[\s\S]*\}", raw) or _re.Match()).group() if _re.search(r"\{[\s\S]*\}", raw) else None]:
+                        if not candidate:
+                            continue
+                        try:
+                            config = ChartConfig(**json.loads(candidate))
+                            break
+                        except Exception:
+                            continue
+                    if config is not None:
+                        break
 
             if config is None or not config.should_generate:
-                logger.debug("Chart agent returned should_generate=false or no config")
+                logger.debug(
+                    f"Chart agent: should_generate=False or no config parsed "
+                    f"(response keys: {list(response.keys()) if isinstance(response, dict) else type(response)})"
+                )
                 return None
 
             return self._build_chart_data(config, query_results)
