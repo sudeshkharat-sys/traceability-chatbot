@@ -47,6 +47,7 @@ import { ComposableMap, Geographies, Geography } from "react-simple-maps";
 import { scaleLinear } from "d3-scale";
 import { backend_url, backend_url_ws } from '../../services/api/config';
 import { authService } from '../../services/api';
+import ChartComponent from '../ChartComponent';
 import logoImg from '../../assests/logo.png';
 import utilityLogo from '../../assests/image.png';
 import mahindraRiseLogo from '../../assests/mahindra_rise_logo.png';
@@ -443,7 +444,7 @@ const IndiaMap = ({ data }) => {
   );
 };
 
-// ── AgentMessage: renders a single chat bubble with markdown support ──
+// ── AgentMessage: renders a single chat bubble with markdown + optional chart ──
 const AgentMessage = ({ msg }) => {
   const fixedText = useMemo(() => {
     if (!msg.text || msg.sender !== 'bot') return msg.text || '';
@@ -464,6 +465,12 @@ const AgentMessage = ({ msg }) => {
     <div className={`agent-msg bot${msg.isError ? ' error' : ''}`}>
       <div className="agent-msg-avatar"><Bot size={13} /></div>
       <div className="agent-msg-bubble">
+        {/* Chart rendered above the text, matching ChatMessage.js pattern */}
+        {msg.chart_data && (
+          <div className="agent-chart-wrap">
+            <ChartComponent chartData={msg.chart_data} />
+          </div>
+        )}
         <div className="agent-msg-markdown">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
@@ -536,6 +543,8 @@ function PartLabeler() {
   const [agentThinkingOpen, setAgentThinkingOpen] = useState(false);
   // Progress tracking: { stage: 'thinking'|'generating'|'retrying', detail: string, stepCount: number }
   const [agentProgress, setAgentProgress] = useState(null);
+  // Holds chart data received from the backend until the final message is committed
+  const agentPendingChartRef = useRef(null);
   const agentWsRef = useRef(null);
   const agentMessagesRef = useRef([]);
   const agentPanelBodyRef = useRef(null);
@@ -1275,8 +1284,10 @@ function PartLabeler() {
         if (prev.some(s => s.content?.trim() === content.trim())) return prev;
         return [...prev, { step: data.step || 'Reasoning', content }];
       });
+    } else if (data.type === 'chart') {
+      // Store chart data — will be attached to the final bot message
+      agentPendingChartRef.current = data.chart_data || null;
     } else if (data.type === 'token') {
-      setAgentProgress(p => p?.stage !== 'generating' ? p : p); // keep generating stage
       setAgentStreamingText(prev => prev + (data.content || ''));
       scrollAgentToBottom();
     } else if (data.type === 'final' || data.type === 'error') {
@@ -1286,7 +1297,15 @@ function PartLabeler() {
         ? `⚠️ ${data.content}`
         : data.content || agentStreamingText;
       setAgentStreamingText('');
-      const botMsg = { id: `bot-${Date.now()}`, sender: 'bot', text: finalText, isError: data.type === 'error' };
+      const botMsg = {
+        id: `bot-${Date.now()}`,
+        sender: 'bot',
+        text: finalText,
+        isError: data.type === 'error',
+        // Attach any chart that arrived before the final event
+        ...(agentPendingChartRef.current && { chart_data: agentPendingChartRef.current }),
+      };
+      agentPendingChartRef.current = null;
       setAgentMessages(prev => {
         const updated = [...prev, botMsg];
         agentMessagesRef.current = updated;
@@ -1305,6 +1324,7 @@ function PartLabeler() {
     setAgentThinkingSteps([]);
     setAgentThinkingOpen(false);
     setAgentProgress(null);
+    agentPendingChartRef.current = null;
 
     const userMsg = { id: `user-${Date.now()}`, sender: 'user', text };
     setAgentMessages(prev => { const u = [...prev, userMsg]; agentMessagesRef.current = u; return u; });

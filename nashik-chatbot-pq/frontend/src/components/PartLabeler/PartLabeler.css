@@ -2465,6 +2465,20 @@
   border-top: 1px solid #e9ecef;
 }
 
+/* ── Chart wrapper inside agent panel ────────────────────── */
+.agent-chart-wrap {
+  width: 100%;
+  overflow-x: auto;
+  margin-bottom: 8px;
+  /* Ensure charts scale down to fit the 360px panel */
+  max-width: 100%;
+}
+
+.agent-chart-wrap .recharts-wrapper,
+.agent-chart-wrap .recharts-surface {
+  max-width: 100% !important;
+}
+
 /* ── Tables ──────────────────────────────────────────────── */
 .agent-table-wrap {
   overflow-x: auto;

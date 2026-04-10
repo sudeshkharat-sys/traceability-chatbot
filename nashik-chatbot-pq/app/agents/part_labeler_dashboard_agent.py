@@ -52,6 +52,7 @@ class PartLabelerDashboardAgent:
         try:
             from app.tools.pg_schema_tool import get_part_labeler_schema
             from app.tools.pg_query_tool import execute_read_query
+            from app.tools.chart_generator_tool import generate_chart
             from app.tools.think_tool import think
             from app.services.prompt_manager import (
                 get_part_labeler_dashboard_prompt,
@@ -67,7 +68,7 @@ class PartLabelerDashboardAgent:
 
             agent_kwargs = {
                 "model": self.llm,
-                "tools": [get_part_labeler_schema, execute_read_query, think],
+                "tools": [get_part_labeler_schema, execute_read_query, generate_chart, think],
                 "system_prompt": prompt,
                 "name": "part_labeler_dashboard_agent",
             }
@@ -128,12 +129,21 @@ class PartLabelerDashboardAgent:
         Yields the same event types as AnalystAgent:
             {"type": "thinking", "step": str,     "content": str}
             {"type": "token",    "content": str,  "metadata": {...}}
+            {"type": "chart",    "chart_data": dict}
+            {"type": "progress", "stage": str,    "step_count": int}
             {"type": "error",    "content": str}
         """
         try:
             logger.info(
                 f"Streaming Part Labeler Dashboard for: {user_question[:100]}…"
             )
+
+            # Clear any chart left over from a previous call on this thread
+            from app.tools.chart_generator_tool import (
+                clear_pending_chart,
+                get_pending_chart,
+            )
+            clear_pending_chart()
 
             inputs = {"messages": [{"role": "user", "content": user_question}]}
             config = {"configurable": {"thread_id": self.thread_id}}
@@ -217,6 +227,16 @@ class PartLabelerDashboardAgent:
                                                 "step": "Reasoning",
                                                 "content": thought,
                                             }
+
+                                    elif tool_name == "generate_chart":
+                                        # Show a brief thinking step so the user
+                                        # knows a chart is being prepared
+                                        thinking_step_count += 1
+                                        yield {
+                                            "type": "thinking",
+                                            "step": "Charting",
+                                            "content": "Generating chart from query results…",
+                                        }
 
                                     elif tool_name in (
                                         "write_todos",
@@ -363,6 +383,15 @@ class PartLabelerDashboardAgent:
                     elif current_node in THINKING_NODES:
                         just_finished_thinking = True
                         continue
+
+            # ── Emit chart if the generate_chart tool produced one ──────────
+            pending_chart = get_pending_chart()
+            if pending_chart:
+                logger.info(
+                    f"Emitting chart: type={pending_chart.get('type')!r}, "
+                    f"title={pending_chart.get('title')!r}"
+                )
+                yield {"type": "chart", "chart_data": pending_chart}
 
         except Exception as e:
             logger.error(
