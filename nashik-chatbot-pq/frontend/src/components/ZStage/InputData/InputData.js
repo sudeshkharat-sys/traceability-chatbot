@@ -224,9 +224,27 @@ const LAYERED_ADHERENCE_COLUMNS = [
   { key: 'audit_date', label: 'Audit Date', width: 120 },
 ];
 
-// ── Simple read-only table for audit data ─────────────────────────────────────
+// ── Read-only table with per-column header filters ────────────────────────────
 function AuditTable({ columns, records }) {
+  const [filters, setFilters] = useState({});
+
+  const filteredRecords = React.useMemo(() =>
+    records.filter((rec) =>
+      columns.every((col) => {
+        const f = (filters[col.key] || '').trim();
+        if (!f) return true;
+        return String(rec[col.key] ?? '').toLowerCase().includes(f.toLowerCase());
+      })
+    ),
+    [records, filters, columns]
+  );
+
+  const handleFilter = useCallback((key, val) => {
+    setFilters((prev) => ({ ...prev, [key]: val }));
+  }, []);
+
   if (records.length === 0) return null;
+
   return (
     <div className="table-wrapper">
       <table className="master-table">
@@ -236,9 +254,21 @@ function AuditTable({ columns, records }) {
               <th key={col.key} style={{ minWidth: col.width }}>{col.label}</th>
             ))}
           </tr>
+          <tr className="filter-row">
+            {columns.map((col) => (
+              <th key={col.key} className="filter-th">
+                <input
+                  className="col-filter-input"
+                  placeholder="Filter…"
+                  value={filters[col.key] || ''}
+                  onChange={(e) => handleFilter(col.key, e.target.value)}
+                />
+              </th>
+            ))}
+          </tr>
         </thead>
         <tbody>
-          {records.map((rec) => (
+          {filteredRecords.map((rec) => (
             <tr key={rec.id}>
               {columns.map((col) => (
                 <td key={col.key} className="cell-view">
@@ -249,6 +279,13 @@ function AuditTable({ columns, records }) {
               ))}
             </tr>
           ))}
+          {filteredRecords.length === 0 && (
+            <tr>
+              <td colSpan={columns.length} className="filter-no-results">
+                No records match the current filter.
+              </td>
+            </tr>
+          )}
         </tbody>
       </table>
     </div>
@@ -361,6 +398,12 @@ export default function InputData({ userId, layouts = [] }) {
   const [loadingAdherence, setLoadingAdherence] = useState(false);
   const [adherenceError, setAdherenceError] = useState(null);
 
+  // Master Data column filters
+  const [masterFilters, setMasterFilters] = useState({});
+  const handleMasterFilter = useCallback((key, val) => {
+    setMasterFilters((prev) => ({ ...prev, [key]: val }));
+  }, []);
+
   // Auto-select first layout
   useEffect(() => {
     if (layouts.length > 0 && selectedLayoutId === null) {
@@ -436,6 +479,17 @@ export default function InputData({ userId, layouts = [] }) {
     extraMonths.forEach((k) => set.add(k));
     return Array.from(set).sort();
   }, [records, extraMonths]);
+
+  const filteredMasterRecords = React.useMemo(() => {
+    const allCols = [...FIXED_COLUMNS, ...TRAILING_COLUMNS];
+    return records.filter((rec) =>
+      allCols.every((col) => {
+        const f = (masterFilters[col.key] || '').trim();
+        if (!f) return true;
+        return String(rec[col.key] ?? '').toLowerCase().includes(f.toLowerCase());
+      })
+    );
+  }, [records, masterFilters]);
 
   const handleAddMonth = (key) => {
     const updated = [...extraMonths, key];
@@ -702,30 +756,44 @@ export default function InputData({ userId, layouts = [] }) {
                       <th key={col.key} style={{ minWidth: col.width }}>{col.label}</th>
                     ))}
                   </tr>
+                  <tr className="filter-row">
+                    {FIXED_COLUMNS.map((col) => (
+                      <th key={col.key} className="filter-th">
+                        <input
+                          className="col-filter-input"
+                          placeholder="Filter…"
+                          value={masterFilters[col.key] || ''}
+                          onChange={(e) => handleMasterFilter(col.key, e.target.value)}
+                        />
+                      </th>
+                    ))}
+                    {allMonths.map((key) => (
+                      <th key={key} className="filter-th filter-th--monthly" />
+                    ))}
+                    {TRAILING_COLUMNS.map((col) => (
+                      <th key={col.key} className="filter-th">
+                        <input
+                          className="col-filter-input"
+                          placeholder="Filter…"
+                          value={masterFilters[col.key] || ''}
+                          onChange={(e) => handleMasterFilter(col.key, e.target.value)}
+                        />
+                      </th>
+                    ))}
+                  </tr>
                 </thead>
                 <tbody>
-                  {records.map((rec) => (
+                  {filteredMasterRecords.map((rec) => (
                     <tr key={rec.id}>
                       {FIXED_COLUMNS.map((col) => (
-                        col.key === 'ryg' || col.key === 'status_3m' ? (
-                          <EditableCell
-                            key={col.key}
-                            recordId={rec.id}
-                            fieldKey={col.key}
-                            value={rec[col.key]}
-                            type={col.type}
-                            onSaved={handleRecordSaved}
-                          />
-                        ) : (
-                          <EditableCell
-                            key={col.key}
-                            recordId={rec.id}
-                            fieldKey={col.key}
-                            value={rec[col.key]}
-                            type={col.type}
-                            onSaved={handleRecordSaved}
-                          />
-                        )
+                        <EditableCell
+                          key={col.key}
+                          recordId={rec.id}
+                          fieldKey={col.key}
+                          value={rec[col.key]}
+                          type={col.type}
+                          onSaved={handleRecordSaved}
+                        />
                       ))}
                       {allMonths.map((key) => (
                         <MonthlyCell
@@ -748,6 +816,16 @@ export default function InputData({ userId, layouts = [] }) {
                       ))}
                     </tr>
                   ))}
+                  {filteredMasterRecords.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={FIXED_COLUMNS.length + allMonths.length + TRAILING_COLUMNS.length}
+                        className="filter-no-results"
+                      >
+                        No records match the current filter.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

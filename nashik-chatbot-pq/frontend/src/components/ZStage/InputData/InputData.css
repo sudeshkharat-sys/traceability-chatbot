@@ -674,6 +674,55 @@
 .ryg-r { background: #fed7d7; color: #9b2c2c; }
 .ryg-y { background: #fefcbf; color: #744210; }
 
+/* ── Column filter row ────────────────────────────────────────────────────── */
+
+.filter-row {
+  position: sticky;
+  top: 27px; /* sits directly below the label row */
+  z-index: 2;
+}
+
+.filter-th {
+  background: #1a2744;
+  padding: 3px 4px;
+  border-right: 1px solid #4a5568;
+}
+
+.filter-th--monthly {
+  min-width: 58px;
+}
+
+.col-filter-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 3px 6px;
+  border: 1px solid #4a6fa5;
+  border-radius: 3px;
+  background: #2d3748;
+  color: #e2e8f0;
+  font-size: 10px;
+  outline: none;
+  min-width: 40px;
+}
+
+.col-filter-input::placeholder {
+  color: #718096;
+  font-style: italic;
+}
+
+.col-filter-input:focus {
+  border-color: #63b3ed;
+  background: #2a4365;
+}
+
+.filter-no-results {
+  padding: 20px;
+  text-align: center;
+  color: #718096;
+  font-size: 13px;
+  font-style: italic;
+}
+
 /* ── Spinner ──────────────────────────────────────────────────────────────── */
 
 @keyframes spin {

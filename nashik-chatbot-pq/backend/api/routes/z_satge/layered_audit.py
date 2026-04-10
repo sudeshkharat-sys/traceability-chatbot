@@ -1,6 +1,7 @@
 import io
 import logging
 import re
+import datetime
 from typing import List, Optional
 
 import openpyxl
@@ -42,6 +43,33 @@ def _safe_date(value) -> str | None:
     if not s or s.startswith("=") or s == "00:00:00":
         return None
     return s
+
+
+_DATE_FORMATS = (
+    "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%m/%d/%Y",
+    "%d.%m.%Y", "%Y/%m/%d", "%d-%b-%Y", "%d %b %Y",
+)
+
+def _strict_date(value) -> str | None:
+    """Strict date parser for audit_date: only accepts real dates.
+    Rejects 'NA', 'N/A', free-text strings — stores None (blank) instead."""
+    if value is None:
+        return None
+    if hasattr(value, "strftime"):
+        return value.strftime("%Y-%m-%d")
+    s = str(value).strip()
+    if not s or s.startswith("=") or s == "00:00:00":
+        return None
+    # Try all known date formats; only store if a valid date can be parsed
+    token = s[:10]  # ignore any time component
+    for fmt in _DATE_FORMATS:
+        try:
+            dt = datetime.datetime.strptime(token, fmt)
+            return dt.strftime("%Y-%m-%d")
+        except ValueError:
+            continue
+    # Could not parse → leave blank (NA, N/A, invalid text, etc.)
+    return None
 
 
 # ── Parse Layered Audit Excel ─────────────────────────────────────────────────
@@ -92,7 +120,7 @@ def _parse_layered_audit_adherence(file_bytes: bytes) -> list[dict]:
             "stage_no":   _safe_str(row[0] if len(row) > 0 else None),
             "stage_name": _safe_str(row[1] if len(row) > 1 else None),
             "auditor":    _safe_str(row[2] if len(row) > 2 else None),
-            "audit_date": _safe_date(row[3] if len(row) > 3 else None),
+            "audit_date": _strict_date(row[3] if len(row) > 3 else None),
         })
     return records
 

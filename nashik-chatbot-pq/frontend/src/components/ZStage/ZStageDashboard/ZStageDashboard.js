@@ -263,7 +263,9 @@ function AuditReadTable({ columns, records, emptyMsg }) {
 // relative to the true viewport, regardless of ancestor transforms.
 function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, auditRecords, adherenceRecords }) {
   const [activeTab, setActiveTab] = useState('master');
-  const filtered = records.filter((r) => r.stage_no === stationId);
+  const filtered           = records.filter((r) => r.stage_no === stationId);
+  const filteredAudit      = auditRecords.filter((r) => r.station_id === stationId);
+  const filteredAdherence  = adherenceRecords.filter((r) => r.stage_no === stationId);
 
   // Close on Escape key
   useEffect(() => {
@@ -300,10 +302,10 @@ function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, a
               <span className="sdm-count">{filtered.length} record{filtered.length !== 1 ? 's' : ''}</span>
             )}
             {activeTab === 'layered-audit' && (
-              <span className="sdm-count">{auditRecords.length} record{auditRecords.length !== 1 ? 's' : ''}</span>
+              <span className="sdm-count">{filteredAudit.length} record{filteredAudit.length !== 1 ? 's' : ''}</span>
             )}
             {activeTab === 'audit-adherence' && (
-              <span className="sdm-count">{adherenceRecords.length} record{adherenceRecords.length !== 1 ? 's' : ''}</span>
+              <span className="sdm-count">{filteredAdherence.length} record{filteredAdherence.length !== 1 ? 's' : ''}</span>
             )}
             <button className="sdm-close" onClick={onClose} title="Close (Esc)"><X size={16} /></button>
           </div>
@@ -409,8 +411,8 @@ function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, a
           {activeTab === 'layered-audit' && (
             <AuditReadTable
               columns={LAYERED_AUDIT_COLS}
-              records={auditRecords}
-              emptyMsg="No Layered Audit records loaded. Upload data in the Input → Layered Audit section."
+              records={filteredAudit}
+              emptyMsg={`No Layered Audit records found for station ${stationId}. Upload data with Station ID = ${stationId}.`}
             />
           )}
 
@@ -418,8 +420,8 @@ function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, a
           {activeTab === 'audit-adherence' && (
             <AuditReadTable
               columns={LAYERED_ADHERENCE_COLS}
-              records={adherenceRecords}
-              emptyMsg="No Audit Adherence records loaded. Upload data in the Input → Audit Adherence section."
+              records={filteredAdherence}
+              emptyMsg={`No Audit Adherence records found for station ${stationId}. Upload data with Stage No = ${stationId}.`}
             />
           )}
 
