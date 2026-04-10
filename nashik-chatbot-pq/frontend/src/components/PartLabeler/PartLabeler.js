@@ -483,12 +483,16 @@ function PartLabeler() {
 
   // ── Agent panel state ─────────────────────────────────────────────────
   const [showAgentPanel, setShowAgentPanel] = useState(false);
+  const [agentView, setAgentView] = useState('chat'); // 'chat' | 'history'
   const [agentMessages, setAgentMessages] = useState([]);
   const [agentInput, setAgentInput] = useState('');
   const [agentLoading, setAgentLoading] = useState(false);
   const [agentConvId, setAgentConvId] = useState(null);
   const [agentThinkingSteps, setAgentThinkingSteps] = useState([]);
   const [agentStreamingText, setAgentStreamingText] = useState('');
+  const [agentHistory, setAgentHistory] = useState([]);
+  const [agentHistoryLoading, setAgentHistoryLoading] = useState(false);
+  const [agentThinkingOpen, setAgentThinkingOpen] = useState(false);
   const agentWsRef = useRef(null);
   const agentMessagesRef = useRef([]);
   const agentPanelBodyRef = useRef(null);
@@ -1112,29 +1116,86 @@ function PartLabeler() {
   };
 
   // ── Agent panel helpers ───────────────────────────────────────────────
+  const AGENT_WELCOME = 'Hi! I\'m your Part Labeler Dashboard Assistant. Ask me about warranty, RPT, GNOVAC, RFI, or e-SQA data.';
+
   const scrollAgentToBottom = () => {
-    if (agentPanelBodyRef.current) {
-      agentPanelBodyRef.current.scrollTop = agentPanelBodyRef.current.scrollHeight;
+    setTimeout(() => {
+      if (agentPanelBodyRef.current) {
+        agentPanelBodyRef.current.scrollTop = agentPanelBodyRef.current.scrollHeight;
+      }
+    }, 30);
+  };
+
+  const resetAgentChat = () => {
+    if (agentWsRef.current) { agentWsRef.current.close(); agentWsRef.current = null; }
+    setAgentConvId(null);
+    setAgentMessages([{ id: 'welcome', sender: 'bot', text: AGENT_WELCOME }]);
+    agentMessagesRef.current = [];
+    setAgentInput('');
+    setAgentLoading(false);
+    setAgentThinkingSteps([]);
+    setAgentStreamingText('');
+    setAgentThinkingOpen(false);
+  };
+
+  const loadAgentHistory = async () => {
+    const uid = userId || parseInt(sessionStorage.getItem('user_id'), 10) || 1;
+    setAgentHistoryLoading(true);
+    try {
+      const res = await fetch(`${backend_url}/conversations/user/${uid}/history?agent_type=part_labeler_dashboard`);
+      const data = await res.json();
+      const list = (data.response || []).map(c => ({
+        id: c.conversation_id,
+        title: c.chat_title || 'Untitled',
+        date: c.creation_ts ? new Date(c.creation_ts) : null,
+      }));
+      setAgentHistory(list);
+    } catch (e) {
+      console.error('Failed to load agent history', e);
+    } finally {
+      setAgentHistoryLoading(false);
+    }
+  };
+
+  const selectAgentConversation = async (convId) => {
+    try {
+      const res = await fetch(`${backend_url}/conversations/${convId}`);
+      const data = await res.json();
+      const conv = data.response;
+      const loaded = [{ id: 'welcome', sender: 'bot', text: AGENT_WELCOME }];
+      if (conv?.query_responses) {
+        conv.query_responses.forEach(item => {
+          loaded.push({ id: `u-${item.message_id}`, sender: 'user', text: item.query });
+          let txt = 'No response';
+          try {
+            const r = typeof item.response === 'string' ? JSON.parse(item.response) : item.response;
+            txt = r?.response || r?.text || r?.content || (typeof r === 'string' ? r : JSON.stringify(r));
+          } catch { txt = String(item.response); }
+          loaded.push({ id: `b-${item.message_id}`, sender: 'bot', text: txt });
+        });
+      }
+      setAgentMessages(loaded);
+      agentMessagesRef.current = loaded;
+      setAgentConvId(convId);
+      if (agentWsRef.current) { agentWsRef.current.close(); agentWsRef.current = null; }
+      setAgentView('chat');
+      scrollAgentToBottom();
+    } catch (e) {
+      console.error('Failed to load agent conversation', e);
     }
   };
 
   const openAgentPanel = () => {
     setShowAgentPanel(true);
+    setAgentView('chat');
     if (agentMessages.length === 0) {
-      setAgentMessages([{
-        id: 'welcome',
-        sender: 'bot',
-        text: 'Hello! I\'m your Part Labeler Dashboard Assistant. Ask me anything about your warranty, RPT, GNOVAC, RFI, or e-SQA data.',
-      }]);
+      setAgentMessages([{ id: 'welcome', sender: 'bot', text: AGENT_WELCOME }]);
     }
   };
 
   const closeAgentPanel = () => {
     setShowAgentPanel(false);
-    if (agentWsRef.current) {
-      agentWsRef.current.close();
-      agentWsRef.current = null;
-    }
+    if (agentWsRef.current) { agentWsRef.current.close(); agentWsRef.current = null; }
   };
 
   const handleAgentWsMessage = (data) => {
@@ -1142,34 +1203,27 @@ function PartLabeler() {
       const content = data.content || '';
       if (!content.trim()) return;
       setAgentThinkingSteps(prev => {
-        const isDuplicate = prev.some(s => s.content && s.content.trim() === content.trim());
-        if (isDuplicate) return prev;
+        if (prev.some(s => s.content?.trim() === content.trim())) return prev;
         return [...prev, { step: data.step || 'Reasoning', content }];
       });
     } else if (data.type === 'token') {
-      setAgentStreamingText(prev => {
-        const next = prev + (data.content || '');
-        setTimeout(scrollAgentToBottom, 0);
-        return next;
-      });
+      setAgentStreamingText(prev => prev + (data.content || ''));
+      scrollAgentToBottom();
     } else if (data.type === 'final' || data.type === 'error') {
       setAgentLoading(false);
       const finalText = data.type === 'error'
-        ? `Error: ${data.content}`
+        ? `⚠️ ${data.content}`
         : data.content || agentStreamingText;
       setAgentStreamingText('');
-      setAgentThinkingSteps([]);
-      const botMsg = {
-        id: `bot-${Date.now()}`,
-        sender: 'bot',
-        text: finalText,
-      };
+      const botMsg = { id: `bot-${Date.now()}`, sender: 'bot', text: finalText, isError: data.type === 'error' };
       setAgentMessages(prev => {
-        const updated = [...prev.filter(m => m.id !== 'streaming'), botMsg];
+        const updated = [...prev, botMsg];
         agentMessagesRef.current = updated;
         return updated;
       });
-      setTimeout(scrollAgentToBottom, 100);
+      scrollAgentToBottom();
+      // refresh history so new chat title appears
+      loadAgentHistory();
     }
   };
 
@@ -1177,17 +1231,13 @@ function PartLabeler() {
     const text = agentInput.trim();
     if (!text || agentLoading) return;
     setAgentInput('');
+    setAgentThinkingSteps([]);
+    setAgentThinkingOpen(false);
 
     const userMsg = { id: `user-${Date.now()}`, sender: 'user', text };
-    setAgentMessages(prev => {
-      const updated = [...prev, userMsg];
-      agentMessagesRef.current = updated;
-      return updated;
-    });
+    setAgentMessages(prev => { const u = [...prev, userMsg]; agentMessagesRef.current = u; return u; });
     setAgentLoading(true);
-    setAgentThinkingSteps([]);
-    setAgentStreamingText('');
-    setTimeout(scrollAgentToBottom, 0);
+    scrollAgentToBottom();
 
     let convId = agentConvId;
     try {
@@ -1200,8 +1250,8 @@ function PartLabeler() {
             agent_type: 'part_labeler_dashboard',
           }),
         });
-        const data = await res.json();
-        convId = data.conversationId;
+        const d = await res.json();
+        convId = d.conversationId;
         setAgentConvId(convId);
       }
 
@@ -1213,9 +1263,7 @@ function PartLabeler() {
           ws.onopen = () => { clearTimeout(t); resolve(); };
           ws.onerror = () => { clearTimeout(t); reject(new Error('WS error')); };
         });
-        ws.onmessage = (e) => {
-          try { handleAgentWsMessage(JSON.parse(e.data)); } catch {}
-        };
+        ws.onmessage = (e) => { try { handleAgentWsMessage(JSON.parse(e.data)); } catch {} };
         ws.onclose = () => { setAgentLoading(false); };
       }
 
@@ -1226,11 +1274,7 @@ function PartLabeler() {
       }));
     } catch (err) {
       setAgentLoading(false);
-      setAgentMessages(prev => [...prev, {
-        id: `err-${Date.now()}`, sender: 'bot',
-        text: 'Failed to send message. Please try again.',
-        isError: true,
-      }]);
+      setAgentMessages(prev => [...prev, { id: `err-${Date.now()}`, sender: 'bot', text: 'Failed to send. Please try again.', isError: true }]);
     }
   };
 
@@ -1919,94 +1963,164 @@ function PartLabeler() {
             <motion.aside
               className="agent-panel"
               initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 380, opacity: 1 }}
+              animate={{ width: 360, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
-              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              transition={{ duration: 0.22, ease: 'easeInOut' }}
             >
-              {/* Panel header */}
+              {/* ── Header ──────────────────────────────────────────────── */}
               <div className="agent-panel-header">
                 <div className="agent-panel-title">
-                  <Bot size={18} />
+                  <Bot size={16} />
                   <span>Dashboard Agent</span>
                 </div>
-                <button className="agent-panel-close" onClick={closeAgentPanel} title="Close">
-                  <X size={16} />
-                </button>
+                <div className="agent-panel-actions">
+                  {/* History toggle */}
+                  <button
+                    className={`ap-icon-btn ${agentView === 'history' ? 'active' : ''}`}
+                    title="Chat history"
+                    onClick={() => {
+                      if (agentView === 'history') {
+                        setAgentView('chat');
+                      } else {
+                        setAgentView('history');
+                        loadAgentHistory();
+                      }
+                    }}
+                  >
+                    <History size={15} />
+                  </button>
+                  {/* New chat */}
+                  <button className="ap-icon-btn" title="New chat" onClick={() => { resetAgentChat(); setAgentView('chat'); }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M12 5v14M5 12h14"/>
+                    </svg>
+                  </button>
+                  {/* Close */}
+                  <button className="ap-icon-btn" title="Close" onClick={closeAgentPanel}>
+                    <X size={15} />
+                  </button>
+                </div>
               </div>
 
-              {/* Messages */}
-              <div className="agent-panel-body" ref={agentPanelBodyRef}>
-                {agentMessages.map(msg => (
-                  <div key={msg.id} className={`agent-msg ${msg.sender === 'user' ? 'user' : 'bot'} ${msg.isError ? 'error' : ''}`}>
-                    {msg.sender === 'bot' && (
-                      <div className="agent-msg-avatar"><Bot size={14} /></div>
-                    )}
-                    <div className="agent-msg-bubble">
-                      <p>{msg.text}</p>
+              {/* ── History view ────────────────────────────────────────── */}
+              {agentView === 'history' && (
+                <div className="agent-history-view">
+                  <div className="agent-history-label">Recent conversations</div>
+                  {agentHistoryLoading ? (
+                    <div className="agent-history-loading">
+                      <div className="agent-typing-dots"><span /><span /><span /></div>
                     </div>
-                  </div>
-                ))}
+                  ) : agentHistory.length === 0 ? (
+                    <div className="agent-history-empty">No conversations yet</div>
+                  ) : (
+                    <div className="agent-history-list">
+                      {agentHistory.map(h => (
+                        <button
+                          key={h.id}
+                          className={`agent-history-item ${h.id === agentConvId ? 'active' : ''}`}
+                          onClick={() => selectAgentConversation(h.id)}
+                        >
+                          <div className="ahi-icon"><Bot size={13} /></div>
+                          <div className="ahi-body">
+                            <span className="ahi-title">{h.title}</span>
+                            {h.date && (
+                              <span className="ahi-date">
+                                {h.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                              </span>
+                            )}
+                          </div>
+                          {h.id === agentConvId && <div className="ahi-dot" />}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
-                {/* Thinking steps */}
-                {agentLoading && agentThinkingSteps.length > 0 && (
-                  <div className="agent-thinking">
-                    {agentThinkingSteps.map((step, i) => (
-                      <div key={i} className="agent-thinking-step">
-                        <span className="thinking-label">{step.step}</span>
-                        <p className="thinking-content">{step.content}</p>
+              {/* ── Chat view ───────────────────────────────────────────── */}
+              {agentView === 'chat' && (
+                <>
+                  <div className="agent-panel-body" ref={agentPanelBodyRef}>
+                    {agentMessages.map(msg => (
+                      <div key={msg.id} className={`agent-msg ${msg.sender === 'user' ? 'user' : 'bot'}${msg.isError ? ' error' : ''}`}>
+                        {msg.sender === 'bot' && (
+                          <div className="agent-msg-avatar"><Bot size={13} /></div>
+                        )}
+                        <div className="agent-msg-bubble">
+                          <p>{msg.text}</p>
+                        </div>
                       </div>
                     ))}
-                  </div>
-                )}
 
-                {/* Streaming text */}
-                {agentLoading && agentStreamingText && (
-                  <div className="agent-msg bot">
-                    <div className="agent-msg-avatar"><Bot size={14} /></div>
-                    <div className="agent-msg-bubble streaming">
-                      <p>{agentStreamingText}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Loading dots */}
-                {agentLoading && !agentStreamingText && (
-                  <div className="agent-msg bot">
-                    <div className="agent-msg-avatar"><Bot size={14} /></div>
-                    <div className="agent-msg-bubble">
-                      <div className="agent-typing-dots">
-                        <span /><span /><span />
+                    {/* Thinking steps — collapsible */}
+                    {agentLoading && agentThinkingSteps.length > 0 && (
+                      <div className="agent-thinking-wrap">
+                        <button
+                          className="agent-thinking-toggle"
+                          onClick={() => setAgentThinkingOpen(o => !o)}
+                        >
+                          <span className="thinking-pulse" />
+                          <span>Thinking…</span>
+                          <ChevronDown size={13} className={agentThinkingOpen ? 'rotate' : ''} />
+                        </button>
+                        {agentThinkingOpen && (
+                          <div className="agent-thinking-steps">
+                            {agentThinkingSteps.map((s, i) => (
+                              <div key={i} className="agent-thinking-step">
+                                <span className="thinking-label">{s.step}</span>
+                                <p className="thinking-content">{s.content}</p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+                    )}
 
-              {/* Input area */}
-              <div className="agent-panel-footer">
-                <textarea
-                  className="agent-input"
-                  placeholder="Ask about your quality data…"
-                  value={agentInput}
-                  onChange={e => setAgentInput(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleAgentSend();
-                    }
-                  }}
-                  rows={2}
-                  disabled={agentLoading}
-                />
-                <button
-                  className="agent-send-btn"
-                  onClick={handleAgentSend}
-                  disabled={agentLoading || !agentInput.trim()}
-                  title="Send"
-                >
-                  <Send size={16} />
-                </button>
-              </div>
+                    {/* Streaming response */}
+                    {agentLoading && agentStreamingText && (
+                      <div className="agent-msg bot">
+                        <div className="agent-msg-avatar"><Bot size={13} /></div>
+                        <div className="agent-msg-bubble streaming">
+                          <p>{agentStreamingText}<span className="stream-cursor" /></p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Typing dots while waiting */}
+                    {agentLoading && !agentStreamingText && agentThinkingSteps.length === 0 && (
+                      <div className="agent-msg bot">
+                        <div className="agent-msg-avatar"><Bot size={13} /></div>
+                        <div className="agent-msg-bubble">
+                          <div className="agent-typing-dots"><span /><span /><span /></div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Input footer */}
+                  <div className="agent-panel-footer">
+                    <textarea
+                      className="agent-input"
+                      placeholder="Ask about warranty, RPT, GNOVAC…"
+                      value={agentInput}
+                      onChange={e => setAgentInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAgentSend(); }
+                      }}
+                      rows={2}
+                      disabled={agentLoading}
+                    />
+                    <button
+                      className="agent-send-btn"
+                      onClick={handleAgentSend}
+                      disabled={agentLoading || !agentInput.trim()}
+                      title="Send (Enter)"
+                    >
+                      <Send size={15} />
+                    </button>
+                  </div>
+                </>
+              )}
             </motion.aside>
           )}
         </AnimatePresence>
