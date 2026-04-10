@@ -123,15 +123,19 @@ def generate_chart(query_results_json: str, user_question: str) -> str:
                 "message": "Chart agent determined the data is not suitable for charting",
             })
 
-        # Store in thread-local so the stream() loop can emit it as a chart event
+        # Also store in thread-local as a backup (works when tool runs in same thread)
         _chart_store.chart = chart_data
         logger.info(
             f"Chart generated: type={chart_data.get('type')}, title={chart_data.get('title')!r}"
         )
 
+        # Return chart_data embedded in the tool result so the stream() loop can
+        # capture it directly from the ToolMessage — this is the reliable path
+        # regardless of which thread the tool executor uses.
         return json.dumps({
             "success": True,
             "message": f"Chart generated: {chart_data.get('type', 'bar')} — \"{chart_data.get('title', '')}\"",
+            "chart_data": chart_data,
         })
 
     except Exception as exc:

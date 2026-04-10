@@ -160,6 +160,7 @@ class PartLabelerDashboardAgent:
             just_finished_thinking = False
             response_started = False
             thinking_step_count = 0
+            pending_chart = None  # Captured from generate_chart ToolMessage
 
             for stream_mode, chunk in self.agent.stream(
                 inputs, config, stream_mode=["custom", "messages", "updates"]
@@ -287,7 +288,31 @@ class PartLabelerDashboardAgent:
                                 tool_name = getattr(msg, "name", "")
                                 tool_content = getattr(msg, "content", "")
 
-                                if (
+                                if tool_name == "generate_chart" and tool_content:
+                                    # Capture chart_data directly from the ToolMessage.
+                                    # This is reliable regardless of thread-local scope.
+                                    import json as _json
+                                    try:
+                                        result = (
+                                            _json.loads(tool_content)
+                                            if isinstance(tool_content, str)
+                                            else tool_content
+                                        )
+                                        if (
+                                            isinstance(result, dict)
+                                            and result.get("success")
+                                            and result.get("chart_data")
+                                        ):
+                                            pending_chart = result["chart_data"]
+                                            logger.info(
+                                                f"Chart captured from ToolMessage: "
+                                                f"type={pending_chart.get('type')!r}, "
+                                                f"title={pending_chart.get('title')!r}"
+                                            )
+                                    except Exception as _ce:
+                                        logger.debug(f"generate_chart ToolMessage parse error: {_ce}")
+
+                                elif (
                                     tool_name
                                     in (
                                         "write_todos",
@@ -385,7 +410,10 @@ class PartLabelerDashboardAgent:
                         continue
 
             # ── Emit chart if the generate_chart tool produced one ──────────
-            pending_chart = get_pending_chart()
+            # Primary: captured from ToolMessage in the updates loop (thread-safe)
+            # Fallback: thread-local written by the tool (same-thread only)
+            if pending_chart is None:
+                pending_chart = get_pending_chart()
             if pending_chart:
                 logger.info(
                     f"Emitting chart: type={pending_chart.get('type')!r}, "
