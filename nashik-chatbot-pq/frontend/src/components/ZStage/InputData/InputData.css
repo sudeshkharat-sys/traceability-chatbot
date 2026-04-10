@@ -674,45 +674,154 @@
 .ryg-r { background: #fed7d7; color: #9b2c2c; }
 .ryg-y { background: #fefcbf; color: #744210; }
 
-/* ── Column filter row ────────────────────────────────────────────────────── */
+/* ── Column header with embedded filter button ────────────────────────────── */
 
-.filter-row {
-  position: sticky;
-  top: 27px; /* sits directly below the label row */
-  z-index: 2;
-}
-
-.filter-th {
-  background: #1a2744;
-  padding: 3px 4px;
-  border-right: 1px solid #4a5568;
-}
-
-.filter-th--monthly {
-  min-width: 58px;
-}
-
-.col-filter-input {
+.col-header-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
   width: 100%;
-  box-sizing: border-box;
-  padding: 3px 6px;
-  border: 1px solid #4a6fa5;
+}
+
+.col-header-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Filter trigger button (lives inside the <th>) ────────────────────────── */
+
+.col-filter-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 3px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.18);
   border-radius: 3px;
-  background: #2d3748;
-  color: #e2e8f0;
+  color: #a0aec0;
   font-size: 10px;
-  outline: none;
-  min-width: 40px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  white-space: nowrap;
 }
 
-.col-filter-input::placeholder {
-  color: #718096;
+.col-filter-btn:hover {
+  background: rgba(255,255,255,0.18);
+  color: #e2e8f0;
+}
+
+.col-filter-btn--active {
+  background: #3182ce;
+  border-color: #2b6cb0;
+  color: #fff;
+}
+
+/* ── Dropdown panel (portalled to document.body, position: fixed) ─────────── */
+
+.col-filter-dropdown {
+  min-width: 180px;
+  max-width: 280px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Select All / Deselect All row ────────────────────────────────────────── */
+
+.col-filter-actions {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px;
+  background: #f7fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.col-filter-action-btn {
+  flex: 1;
+  padding: 4px 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background: #fff;
+  color: #2d3748;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.col-filter-action-btn:hover {
+  background: #ebf8ff;
+  border-color: #3182ce;
+  color: #2b6cb0;
+}
+
+.col-filter-action-btn--deselect:hover {
+  background: #fff5f5;
+  border-color: #fc8181;
+  color: #c53030;
+}
+
+/* ── Scrollable value list ────────────────────────────────────────────────── */
+
+.col-filter-list {
+  overflow-y: auto;
+  max-height: 220px;
+  padding: 4px 0;
+}
+
+.col-filter-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #2d3748;
+  transition: background 0.1s;
+}
+
+.col-filter-item:hover {
+  background: #ebf8ff;
+}
+
+.col-filter-item input[type="checkbox"] {
+  flex-shrink: 0;
+  width: 13px;
+  height: 13px;
+  cursor: pointer;
+  accent-color: #3182ce;
+}
+
+.col-filter-val {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.col-filter-blank {
+  color: #a0aec0;
   font-style: italic;
+  font-size: 11px;
 }
 
-.col-filter-input:focus {
-  border-color: #63b3ed;
-  background: #2a4365;
+.col-filter-empty {
+  padding: 12px;
+  text-align: center;
+  color: #a0aec0;
+  font-size: 12px;
+  font-style: italic;
 }
 
 .filter-no-results {

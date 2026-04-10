@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Upload, Database, CheckCircle, AlertCircle, Loader, Plus, X, ClipboardList, CalendarCheck } from 'lucide-react';
 import { inputApi, layeredAuditApi } from '../../../services/api/layoutApi';
 import './InputData.css';
@@ -224,24 +225,131 @@ const LAYERED_ADHERENCE_COLUMNS = [
   { key: 'audit_date', label: 'Audit Date', width: 120 },
 ];
 
-// ── Read-only table with per-column header filters ────────────────────────────
+// ── Column filter dropdown ─────────────────────────────────────────────────────
+// selectedValues: null = no filter (all shown) | string[] = only these values shown
+function ColumnFilterDropdown({ colKey, allValues, selectedValues, onChange }) {
+  const [open, setOpen]       = useState(false);
+  const [dropPos, setDropPos] = useState({ top: 0, left: 0 });
+  const btnRef  = useRef(null);
+  const dropRef = useRef(null);
+
+  // Close when clicking outside
+  useEffect(() => {
+    if (!open) return;
+    const h = (e) => {
+      if (!btnRef.current?.contains(e.target) && !dropRef.current?.contains(e.target))
+        setOpen(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, [open]);
+
+  const handleToggle = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setDropPos({ top: r.bottom + 2, left: r.left });
+    }
+    setOpen((o) => !o);
+  };
+
+  const isFiltered       = selectedValues !== null;
+  const effectiveSelected = selectedValues ?? allValues;
+  const noneChecked      = isFiltered && selectedValues.length === 0;
+
+  const toggle = (val) => {
+    const current = selectedValues !== null ? [...selectedValues] : [...allValues];
+    const next = current.includes(val)
+      ? current.filter((v) => v !== val)
+      : [...current, val];
+    // Back to "no filter" when everything is re-selected
+    onChange(colKey, next.length === allValues.length ? null : next);
+  };
+
+  const btnLabel = noneChecked
+    ? '0'
+    : isFiltered
+      ? `${effectiveSelected.length}/${allValues.length}`
+      : '▾';
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        className={`col-filter-btn${isFiltered ? ' col-filter-btn--active' : ''}`}
+        onClick={handleToggle}
+        title="Filter column values"
+      >
+        {btnLabel}
+      </button>
+
+      {open && createPortal(
+        <div
+          ref={dropRef}
+          className="col-filter-dropdown"
+          style={{ position: 'fixed', top: dropPos.top, left: dropPos.left, zIndex: 9999 }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="col-filter-actions">
+            <button className="col-filter-action-btn" onClick={() => onChange(colKey, null)}>
+              Select All
+            </button>
+            <button className="col-filter-action-btn col-filter-action-btn--deselect"
+                    onClick={() => onChange(colKey, [])}>
+              Deselect All
+            </button>
+          </div>
+          <div className="col-filter-list">
+            {allValues.length === 0 && <div className="col-filter-empty">No values</div>}
+            {allValues.map((val, i) => (
+              <label key={i} className="col-filter-item">
+                <input
+                  type="checkbox"
+                  checked={effectiveSelected.includes(val)}
+                  onChange={() => toggle(val)}
+                />
+                <span className="col-filter-val" title={val}>
+                  {val !== '' ? val : <em className="col-filter-blank">(blank)</em>}
+                </span>
+              </label>
+            ))}
+          </div>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+// ── Read-only table with per-column dropdown filters ──────────────────────────
 function AuditTable({ columns, records }) {
+  // filters: { [colKey]: null | string[] }  null = no filter (all shown)
   const [filters, setFilters] = useState({});
+
+  // Unique sorted values per column, derived from all records
+  const uniqueValues = React.useMemo(() => {
+    const map = {};
+    columns.forEach((col) => {
+      map[col.key] = [
+        ...new Set(records.map((r) => String(r[col.key] ?? '')))
+      ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    });
+    return map;
+  }, [records, columns]);
+
+  const handleFilterChange = useCallback((key, val) => {
+    setFilters((prev) => ({ ...prev, [key]: val }));
+  }, []);
 
   const filteredRecords = React.useMemo(() =>
     records.filter((rec) =>
       columns.every((col) => {
-        const f = (filters[col.key] || '').trim();
-        if (!f) return true;
-        return String(rec[col.key] ?? '').toLowerCase().includes(f.toLowerCase());
+        const f = filters[col.key]; // null | string[]
+        if (f == null) return true;
+        return f.includes(String(rec[col.key] ?? ''));
       })
     ),
     [records, filters, columns]
   );
-
-  const handleFilter = useCallback((key, val) => {
-    setFilters((prev) => ({ ...prev, [key]: val }));
-  }, []);
 
   if (records.length === 0) return null;
 
@@ -251,18 +359,16 @@ function AuditTable({ columns, records }) {
         <thead>
           <tr>
             {columns.map((col) => (
-              <th key={col.key} style={{ minWidth: col.width }}>{col.label}</th>
-            ))}
-          </tr>
-          <tr className="filter-row">
-            {columns.map((col) => (
-              <th key={col.key} className="filter-th">
-                <input
-                  className="col-filter-input"
-                  placeholder="Filter…"
-                  value={filters[col.key] || ''}
-                  onChange={(e) => handleFilter(col.key, e.target.value)}
-                />
+              <th key={col.key} style={{ minWidth: col.width }}>
+                <div className="col-header-wrap">
+                  <span className="col-header-label">{col.label}</span>
+                  <ColumnFilterDropdown
+                    colKey={col.key}
+                    allValues={uniqueValues[col.key] || []}
+                    selectedValues={filters[col.key] ?? null}
+                    onChange={handleFilterChange}
+                  />
+                </div>
               </th>
             ))}
           </tr>
@@ -398,9 +504,9 @@ export default function InputData({ userId, layouts = [] }) {
   const [loadingAdherence, setLoadingAdherence] = useState(false);
   const [adherenceError, setAdherenceError] = useState(null);
 
-  // Master Data column filters
+  // Master Data column filters — { [colKey]: null | string[] }
   const [masterFilters, setMasterFilters] = useState({});
-  const handleMasterFilter = useCallback((key, val) => {
+  const handleMasterFilterChange = useCallback((key, val) => {
     setMasterFilters((prev) => ({ ...prev, [key]: val }));
   }, []);
 
@@ -480,13 +586,24 @@ export default function InputData({ userId, layouts = [] }) {
     return Array.from(set).sort();
   }, [records, extraMonths]);
 
+  const masterUniqueValues = React.useMemo(() => {
+    const allCols = [...FIXED_COLUMNS, ...TRAILING_COLUMNS];
+    const map = {};
+    allCols.forEach((col) => {
+      map[col.key] = [
+        ...new Set(records.map((r) => String(r[col.key] ?? '')))
+      ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    });
+    return map;
+  }, [records]);
+
   const filteredMasterRecords = React.useMemo(() => {
     const allCols = [...FIXED_COLUMNS, ...TRAILING_COLUMNS];
     return records.filter((rec) =>
       allCols.every((col) => {
-        const f = (masterFilters[col.key] || '').trim();
-        if (!f) return true;
-        return String(rec[col.key] ?? '').toLowerCase().includes(f.toLowerCase());
+        const f = masterFilters[col.key]; // null | string[]
+        if (f == null) return true;
+        return f.includes(String(rec[col.key] ?? ''));
       })
     );
   }, [records, masterFilters]);
@@ -747,37 +864,32 @@ export default function InputData({ userId, layouts = [] }) {
                 <thead>
                   <tr>
                     {FIXED_COLUMNS.map((col) => (
-                      <th key={col.key} style={{ minWidth: col.width }}>{col.label}</th>
+                      <th key={col.key} style={{ minWidth: col.width }}>
+                        <div className="col-header-wrap">
+                          <span className="col-header-label">{col.label}</span>
+                          <ColumnFilterDropdown
+                            colKey={col.key}
+                            allValues={masterUniqueValues[col.key] || []}
+                            selectedValues={masterFilters[col.key] ?? null}
+                            onChange={handleMasterFilterChange}
+                          />
+                        </div>
+                      </th>
                     ))}
                     {allMonths.map((key) => (
                       <th key={key} className="month-header">{formatMonthLabel(key)}</th>
                     ))}
                     {TRAILING_COLUMNS.map((col) => (
-                      <th key={col.key} style={{ minWidth: col.width }}>{col.label}</th>
-                    ))}
-                  </tr>
-                  <tr className="filter-row">
-                    {FIXED_COLUMNS.map((col) => (
-                      <th key={col.key} className="filter-th">
-                        <input
-                          className="col-filter-input"
-                          placeholder="Filter…"
-                          value={masterFilters[col.key] || ''}
-                          onChange={(e) => handleMasterFilter(col.key, e.target.value)}
-                        />
-                      </th>
-                    ))}
-                    {allMonths.map((key) => (
-                      <th key={key} className="filter-th filter-th--monthly" />
-                    ))}
-                    {TRAILING_COLUMNS.map((col) => (
-                      <th key={col.key} className="filter-th">
-                        <input
-                          className="col-filter-input"
-                          placeholder="Filter…"
-                          value={masterFilters[col.key] || ''}
-                          onChange={(e) => handleMasterFilter(col.key, e.target.value)}
-                        />
+                      <th key={col.key} style={{ minWidth: col.width }}>
+                        <div className="col-header-wrap">
+                          <span className="col-header-label">{col.label}</span>
+                          <ColumnFilterDropdown
+                            colKey={col.key}
+                            allValues={masterUniqueValues[col.key] || []}
+                            selectedValues={masterFilters[col.key] ?? null}
+                            onChange={handleMasterFilterChange}
+                          />
+                        </div>
                       </th>
                     ))}
                   </tr>
