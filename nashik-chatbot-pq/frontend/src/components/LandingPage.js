@@ -16,7 +16,7 @@ const PART_LABELER_ALLOWED = ["part-labeler", "part-labeler-plant"];
 const ROLE_ALLOWED = {
   part_labeler:       ["part-labeler", "part-labeler-plant"],
   part_labeler_field: ["part-labeler"],
-  part_labeler_plant: ["part-labeler-plant"],
+  part_labeler_plant: ["part-labeler-plant", "z-stage"],
 };
 
 function LandingPage() {
