@@ -521,13 +521,15 @@ function ChatPage() {
       // Handle chart data event
       console.log("Chart data received:", data.chart_data);
 
-      // Store chart data in the last bot message
+      // Store chart data in the last bot message.
+      // Note: do NOT guard with !out[idx].messageId — the "final" event can arrive
+      // before the "chart" event, so messageId may already be set when we get here.
       setMessages((prev) => {
         if (!prev.length) return prev;
         const out = [...prev];
         const idx = out.length - 1;
 
-        if (out[idx].sender === "bot" && !out[idx].messageId) {
+        if (out[idx].sender === "bot") {
           out[idx] = {
             ...out[idx],
             chart_data: data.chart_data,
