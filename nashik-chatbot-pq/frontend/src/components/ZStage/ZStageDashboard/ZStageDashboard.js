@@ -268,15 +268,17 @@ const ALLOWED = {
   status_3m:   ['R', 'G'],
 };
 
-// Helper: get last N months keys from today
-function getLastNMonths(n) {
+// Helper: returns current month + last 3 months (4 keys total, oldest first)
+function getFormMonths() {
   const now = new Date();
+  const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const months = [];
-  for (let i = 1; i <= n; i++) {
+  for (let i = 3; i >= 1; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.unshift(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   }
-  return months;
+  months.push(currentKey);
+  return months; // [3-months-ago, 2-months-ago, last-month, current]
 }
 
 const DOC_TYPES = [
@@ -288,21 +290,21 @@ const DOC_TYPES = [
 ];
 
 // ── Add Record Modal ──────────────────────────────────────────────────────────
-function AddRecordModal({ type, stationId, onClose, onSaved, userId, layoutId, allMonths }) {
-  const last3Months = getLastNMonths(3);
+function AddRecordModal({ type, stationId, onClose, onSaved, userId, layoutId, stationIds = [] }) {
+  const formMonths = getFormMonths(); // current + last 3 (4 total)
 
   const defaultMaster = () => {
     const m = {};
-    last3Months.forEach((k) => { m[k] = ''; });
+    formMonths.forEach((k) => { m[k] = ''; });
     return {
-      sr_no: '', concern_id: '', concern: '', type: '', root_cause: '', action_plan: '',
+      concern_id: '', concern: '', type: '', root_cause: '', action_plan: '',
       target_date: '', closure_date: '', ryg: '', attri: '', comm: '', line: '',
       stage_no: stationId || '', z_e: '', attribution: '', part: '', phenomena: '',
-      field_defect_after_cutoff: '', status_3m: '', monthly: m,
+      status_3m: '', monthly: m,
     };
   };
   const defaultAudit = () => ({
-    model: '', sr_no: '', date_col: '', station_id: stationId || '',
+    model: '', date_col: '', station_id: stationId || '',
     workstation: '', auditor: '', ncs: '', action_plan: '',
     four_m: '', responsibility: '', target_date: '', status: '',
   });
@@ -334,7 +336,7 @@ function AddRecordModal({ type, stationId, onClose, onSaved, userId, layoutId, a
         });
         const total = Object.values(monthlyObj).reduce((s, v) => s + v, 0);
         const payload = {
-          sr_no: form.sr_no ? parseInt(form.sr_no, 10) : null,
+          // sr_no is auto-assigned by backend
           concern_id: form.concern_id || null,
           concern: form.concern || null,
           type: form.type || null,
@@ -351,7 +353,7 @@ function AddRecordModal({ type, stationId, onClose, onSaved, userId, layoutId, a
           attribution: form.attribution || null,
           part: form.part || null,
           phenomena: form.phenomena || null,
-          field_defect_after_cutoff: form.field_defect_after_cutoff ? parseInt(form.field_defect_after_cutoff, 10) : null,
+          field_defect_after_cutoff: null, // not shown in form, always null
           status_3m: form.status_3m || null,
           monthly_data: Object.keys(monthlyObj).length ? JSON.stringify(monthlyObj) : null,
           total_incidences: total || null,
@@ -359,7 +361,7 @@ function AddRecordModal({ type, stationId, onClose, onSaved, userId, layoutId, a
         res = await inputApi.createRecord(payload, userId, layoutId);
       } else if (type === 'layered-audit') {
         const payload = {
-          model: form.model || null, sr_no: form.sr_no || null,
+          model: form.model || null,
           date_col: form.date_col || null, station_id: form.station_id || null,
           workstation: form.workstation || null, auditor: form.auditor || null,
           ncs: form.ncs || null, action_plan: form.action_plan || null,
@@ -416,7 +418,6 @@ function AddRecordModal({ type, stationId, onClose, onSaved, userId, layoutId, a
         <div className="sdm-body sdm-body--form">
           {type === 'master' && (
             <div className="sdm-form-grid">
-              <label>Sr. No{inp('sr_no', 'number')}</label>
               <label>Concern ID{inp('concern_id')}</label>
               <label className="sdm-form-full">Concern{ta('concern')}</label>
               <label>Type {sel('type', ALLOWED.type)}</label>
@@ -425,7 +426,12 @@ function AddRecordModal({ type, stationId, onClose, onSaved, userId, layoutId, a
               <label>Attribution {sel('attribution', ALLOWED.attribution)}</label>
               <label>Attri. {sel('attri', ALLOWED.attri)}</label>
               <label>Status (3M) {sel('status_3m', ALLOWED.status_3m)}</label>
-              <label>Stage No{inp('stage_no')}</label>
+              <label>Stage No
+                <select className="sdm-form-input" value={form.stage_no || ''} onChange={(e) => set('stage_no', e.target.value)}>
+                  <option value="">— select —</option>
+                  {stationIds.map((id) => <option key={id} value={id}>{id}</option>)}
+                </select>
+              </label>
               <label>Line{inp('line')}</label>
               <label>Part{inp('part')}</label>
               <label>Phenomena{inp('phenomena')}</label>
@@ -434,11 +440,10 @@ function AddRecordModal({ type, stationId, onClose, onSaved, userId, layoutId, a
               <label className="sdm-form-full">Root Cause{ta('root_cause')}</label>
               <label className="sdm-form-full">Action Plan{ta('action_plan')}</label>
               <label className="sdm-form-full">Comm{ta('comm')}</label>
-              <label>Field Defect After Cut-off{inp('field_defect_after_cutoff', 'number')}</label>
               <div className="sdm-form-full">
-                <div className="sdm-form-section-title">Monthly Incidences (last 3 months)</div>
+                <div className="sdm-form-section-title">Monthly Incidences (current + last 3 months)</div>
                 <div className="sdm-form-months">
-                  {last3Months.map((k) => (
+                  {formMonths.map((k) => (
                     <label key={k}>{fmtMonth(k)}
                       <input
                         className="sdm-form-input sdm-form-input--month"
@@ -450,7 +455,7 @@ function AddRecordModal({ type, stationId, onClose, onSaved, userId, layoutId, a
                   ))}
                 </div>
                 <p className="sdm-form-note">
-                  ℹ️ To add records for more than 3 months, use the Excel upload in the Input section.
+                  ℹ️ To add records for more months, use the Excel upload in the Input section.
                 </p>
               </div>
             </div>
@@ -459,9 +464,13 @@ function AddRecordModal({ type, stationId, onClose, onSaved, userId, layoutId, a
           {type === 'layered-audit' && (
             <div className="sdm-form-grid">
               <label>Model{inp('model')}</label>
-              <label>Sr. No{inp('sr_no')}</label>
               <label>Date{inp('date_col')}</label>
-              <label>Station ID{inp('station_id')}</label>
+              <label>Station ID
+                <select className="sdm-form-input" value={form.station_id || ''} onChange={(e) => set('station_id', e.target.value)}>
+                  <option value="">— select —</option>
+                  {stationIds.map((id) => <option key={id} value={id}>{id}</option>)}
+                </select>
+              </label>
               <label>Workstation{inp('workstation')}</label>
               <label>Auditor{inp('auditor')}</label>
               <label className="sdm-form-full">NC's{ta('ncs')}</label>
@@ -475,7 +484,12 @@ function AddRecordModal({ type, stationId, onClose, onSaved, userId, layoutId, a
 
           {type === 'audit-adherence' && (
             <div className="sdm-form-grid">
-              <label>Stage No{inp('stage_no')}</label>
+              <label>Stage No
+                <select className="sdm-form-input" value={form.stage_no || ''} onChange={(e) => set('stage_no', e.target.value)}>
+                  <option value="">— select —</option>
+                  {stationIds.map((id) => <option key={id} value={id}>{id}</option>)}
+                </select>
+              </label>
               <label>Stage Name{inp('stage_name')}</label>
               <label>Auditor{inp('auditor')}</label>
               <label>Audit Date{inp('audit_date')}</label>
@@ -635,7 +649,7 @@ function DocsTab({ stationId, masterRecords, userId, layoutId }) {
 // ── Station Detail Modal ───────────────────────────────────────────────────────
 // Rendered via portal to document.body so position:fixed is always
 // relative to the true viewport, regardless of ancestor transforms.
-function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, auditRecords, adherenceRecords, userId, layoutId, onRecordAdded }) {
+function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, auditRecords, adherenceRecords, userId, layoutId, onRecordAdded, stationIds = [] }) {
   const [activeTab, setActiveTab] = useState('master');
   const [showAddRecord, setShowAddRecord] = useState(false);
   const filtered           = records.filter((r) => r.stage_no === stationId);
@@ -854,7 +868,7 @@ function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, a
           }}
           userId={userId}
           layoutId={layoutId}
-          allMonths={allMonths}
+          stationIds={stationIds}
         />
       )}
     </>
@@ -1590,6 +1604,7 @@ function ZStageDashboard({ userId }) {
           userId={userId}
           layoutId={selectedId}
           onRecordAdded={handleRecordAdded}
+          stationIds={boxes.flatMap((b) => b.stationIds)}
         />
       )}
     </Xwrapper>

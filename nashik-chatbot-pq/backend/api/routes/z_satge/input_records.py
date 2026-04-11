@@ -125,7 +125,7 @@ def _parse_excel(file_bytes: bytes) -> list[dict]:
         ) else sum(monthly.values())
 
         records.append({
-            "sr_no":                    _safe_int(row[0] if len(row) > 0 else None),
+            "sr_no":                    len(records) + 1,   # auto-sequential (1-based)
             "concern_id":               _safe_str(row[1] if len(row) > 1 else None),
             "concern":                  _safe_str(row[2] if len(row) > 2 else None),
             "type":                     _safe_str(row[3] if len(row) > 3 else None),
@@ -236,8 +236,17 @@ def create_record(
 
     data["user_id"] = user_id
     data["layout_id"] = layout_id
-    # Ensure all required keys present
-    for key in ["sr_no", "concern_id", "concern", "type", "root_cause", "action_plan",
+
+    # Auto-assign SR No as max existing + 1
+    max_rows = connector.execute_query(
+        InputRecordQueries.GET_MAX_SR_NO,
+        {"user_id": user_id, "layout_id": layout_id},
+    )
+    max_sr = max_rows[0][0] if max_rows else 0
+    data["sr_no"] = (max_sr or 0) + 1
+
+    # Ensure all required keys present (field_defect_after_cutoff always null from form)
+    for key in ["concern_id", "concern", "type", "root_cause", "action_plan",
                 "target_date", "closure_date", "ryg", "attri", "comm", "line", "stage_no",
                 "z_e", "attribution", "part", "phenomena", "total_incidences",
                 "monthly_data", "field_defect_after_cutoff", "status_3m"]:

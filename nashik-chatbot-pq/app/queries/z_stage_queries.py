@@ -281,6 +281,13 @@ class InputRecordQueries:
 
     CHECK_EXISTS = "SELECT id FROM input_records WHERE id = :record_id"
 
+    GET_MAX_SR_NO = """
+        SELECT COALESCE(MAX(sr_no), 0) AS max_sr_no
+        FROM input_records
+        WHERE (:user_id IS NULL OR user_id = :user_id)
+          AND (:layout_id IS NULL OR layout_id = :layout_id)
+    """
+
 
 # ── Layered audit queries ──────────────────────────────────────────────────────
 

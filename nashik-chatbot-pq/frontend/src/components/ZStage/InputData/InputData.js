@@ -496,20 +496,31 @@ function AddMonthModal({ existingMonths, onAdd, onClose }) {
 
 // ── Add Record Modal for InputData ──────────────────────────────────────────
 function AddRecordModal({ type, onClose, onSaved, userId, layoutId, layoutStageIds = [] }) {
-  const last3Months = getLastNMonths(3);
+  // current month + last 3 months (4 total, oldest first)
+  const formMonths = React.useMemo(() => {
+    const now = new Date();
+    const currentKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const months = [];
+    for (let i = 3; i >= 1; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
+    months.push(currentKey);
+    return months;
+  }, []);
 
   const defaultMaster = () => {
     const m = {};
-    last3Months.forEach((k) => { m[k] = ''; });
+    formMonths.forEach((k) => { m[k] = ''; });
     return {
-      sr_no: '', concern_id: '', concern: '', type: '', root_cause: '', action_plan: '',
+      concern_id: '', concern: '', type: '', root_cause: '', action_plan: '',
       target_date: '', closure_date: '', ryg: '', attri: '', comm: '', line: '',
       stage_no: '', z_e: '', attribution: '', part: '', phenomena: '',
-      field_defect_after_cutoff: '', status_3m: '', monthly: m,
+      status_3m: '', monthly: m,
     };
   };
   const defaultAudit = () => ({
-    model: '', sr_no: '', date_col: '', station_id: '',
+    model: '', date_col: '', station_id: '',
     workstation: '', auditor: '', ncs: '', action_plan: '',
     four_m: '', responsibility: '', target_date: '', status: '',
   });
@@ -541,7 +552,7 @@ function AddRecordModal({ type, onClose, onSaved, userId, layoutId, layoutStageI
         });
         const total = Object.values(monthlyObj).reduce((s, v) => s + v, 0);
         const payload = {
-          sr_no: form.sr_no ? parseInt(form.sr_no, 10) : null,
+          // sr_no is auto-assigned by backend
           concern_id: form.concern_id || null, concern: form.concern || null,
           type: form.type || null, root_cause: form.root_cause || null,
           action_plan: form.action_plan || null, target_date: form.target_date || null,
@@ -550,7 +561,7 @@ function AddRecordModal({ type, onClose, onSaved, userId, layoutId, layoutStageI
           stage_no: form.stage_no || null, z_e: form.z_e || null,
           attribution: form.attribution || null, part: form.part || null,
           phenomena: form.phenomena || null,
-          field_defect_after_cutoff: form.field_defect_after_cutoff ? parseInt(form.field_defect_after_cutoff, 10) : null,
+          field_defect_after_cutoff: null, // not shown in form, always null
           status_3m: form.status_3m || null,
           monthly_data: Object.keys(monthlyObj).length ? JSON.stringify(monthlyObj) : null,
           total_incidences: total || null,
@@ -558,7 +569,7 @@ function AddRecordModal({ type, onClose, onSaved, userId, layoutId, layoutStageI
         res = await inputApi.createRecord(payload, userId, layoutId);
       } else if (type === 'layered-audit') {
         const payload = {
-          model: form.model || null, sr_no: form.sr_no || null,
+          model: form.model || null,
           date_col: form.date_col || null, station_id: form.station_id || null,
           workstation: form.workstation || null, auditor: form.auditor || null,
           ncs: form.ncs || null, action_plan: form.action_plan || null,
@@ -608,7 +619,6 @@ function AddRecordModal({ type, onClose, onSaved, userId, layoutId, layoutStageI
         <div className="modal-body modal-body--form">
           {type === 'master' && (
             <div className="modal-form-grid">
-              <label>Sr. No{inp('sr_no', 'number')}</label>
               <label>Concern ID{inp('concern_id')}</label>
               <label className="modal-form-full">Concern{ta('concern')}</label>
               <label>Type {sel('type', STRICT_VALUES.type)}</label>
@@ -630,11 +640,10 @@ function AddRecordModal({ type, onClose, onSaved, userId, layoutId, layoutStageI
               <label className="modal-form-full">Root Cause{ta('root_cause')}</label>
               <label className="modal-form-full">Action Plan{ta('action_plan')}</label>
               <label className="modal-form-full">Comm{ta('comm')}</label>
-              <label>Field Defect After Cut-off{inp('field_defect_after_cutoff', 'number')}</label>
               <div className="modal-form-full">
-                <div className="modal-form-section-title">Monthly Incidences (last 3 months)</div>
+                <div className="modal-form-section-title">Monthly Incidences (current + last 3 months)</div>
                 <div className="modal-form-months">
-                  {last3Months.map((k) => (
+                  {formMonths.map((k) => (
                     <label key={k}>{formatMonthLabel(k)}
                       <input
                         className="modal-input modal-input--month"
@@ -646,7 +655,7 @@ function AddRecordModal({ type, onClose, onSaved, userId, layoutId, layoutStageI
                   ))}
                 </div>
                 <p className="modal-form-note">
-                  ℹ️ To add records for more than 3 months, use the Excel upload. Same format as download.
+                  ℹ️ To add records for more months, use the Excel upload. Same format as download.
                 </p>
               </div>
             </div>
@@ -654,9 +663,12 @@ function AddRecordModal({ type, onClose, onSaved, userId, layoutId, layoutStageI
           {type === 'layered-audit' && (
             <div className="modal-form-grid">
               <label>Model{inp('model')}</label>
-              <label>Sr. No{inp('sr_no')}</label>
               <label>Date{inp('date_col')}</label>
-              <label>Station ID{inp('station_id')}</label>
+              <label>Station ID
+                {layoutStageIds.length > 0
+                  ? sel('station_id', layoutStageIds)
+                  : inp('station_id')}
+              </label>
               <label>Workstation{inp('workstation')}</label>
               <label>Auditor{inp('auditor')}</label>
               <label className="modal-form-full">NC's{ta('ncs')}</label>
@@ -669,7 +681,11 @@ function AddRecordModal({ type, onClose, onSaved, userId, layoutId, layoutStageI
           )}
           {type === 'audit-adherence' && (
             <div className="modal-form-grid">
-              <label>Stage No{inp('stage_no')}</label>
+              <label>Stage No
+                {layoutStageIds.length > 0
+                  ? sel('stage_no', layoutStageIds)
+                  : inp('stage_no')}
+              </label>
               <label>Stage Name{inp('stage_name')}</label>
               <label>Auditor{inp('auditor')}</label>
               <label>Audit Date{inp('audit_date')}</label>
