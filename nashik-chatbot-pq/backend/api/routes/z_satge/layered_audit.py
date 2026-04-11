@@ -127,6 +127,25 @@ def _parse_layered_audit_adherence(file_bytes: bytes) -> list[dict]:
 
 # ── Layered Audit endpoints ───────────────────────────────────────────────────
 
+@router.post("/records", response_model=schemas.LayeredAuditOut, status_code=201)
+def create_layered_audit(
+    payload: schemas.LayeredAuditCreate,
+    user_id: Optional[int] = Query(None),
+    layout_id: Optional[int] = Query(None),
+    connector: StateDBConnector = Depends(get_connector),
+):
+    data = payload.model_dump()
+    data["user_id"] = user_id
+    data["layout_id"] = layout_id
+    for key in ["model", "sr_no", "date_col", "station_id", "workstation", "auditor",
+                "ncs", "action_plan", "four_m", "responsibility", "target_date", "status"]:
+        data.setdefault(key, None)
+    rows = connector.execute_query(LayeredAuditQueries.CREATE, data)
+    if not rows:
+        raise HTTPException(status_code=500, detail="Failed to create record")
+    return _row_to_dict(rows[0])
+
+
 @router.post("/upload", response_model=schemas.UploadResponse, status_code=201)
 async def upload_layered_audit(
     file: UploadFile = File(...),
@@ -193,6 +212,27 @@ def update_layered_audit(
 
 
 # ── Layered Audit Adherence endpoints ────────────────────────────────────────
+
+@router.post("/adherence/records", response_model=schemas.LayeredAuditAdherenceOut, status_code=201)
+def create_layered_audit_adherence(
+    payload: schemas.LayeredAuditAdherenceCreate,
+    user_id: Optional[int] = Query(None),
+    layout_id: Optional[int] = Query(None),
+    connector: StateDBConnector = Depends(get_connector),
+):
+    data = payload.model_dump()
+    # Enforce date validation for audit_date
+    if data.get("audit_date") is not None:
+        data["audit_date"] = _strict_date(data["audit_date"])
+    data["user_id"] = user_id
+    data["layout_id"] = layout_id
+    for key in ["stage_no", "stage_name", "auditor", "audit_date"]:
+        data.setdefault(key, None)
+    rows = connector.execute_query(LayeredAuditAdherenceQueries.CREATE, data)
+    if not rows:
+        raise HTTPException(status_code=500, detail="Failed to create record")
+    return _row_to_dict(rows[0])
+
 
 @router.post("/adherence/upload", response_model=schemas.UploadResponse, status_code=201)
 async def upload_layered_audit_adherence(

@@ -842,3 +842,134 @@
   animation: spin 0.8s linear infinite;
   display: inline-block;
 }
+
+/* ── Add Record button ────────────────────────────────────────────────────── */
+.add-record-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  background: #1a2744;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.add-record-btn:hover { background: #2b3f6e; }
+
+/* ── Skipped rows notice in upload result ─────────────────────────────────── */
+.upload-skipped {
+  margin-top: 10px;
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  border-radius: 5px;
+  padding: 8px 12px;
+}
+.upload-skipped-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #92400e;
+  margin-bottom: 5px;
+}
+.upload-skipped-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 11px;
+  color: #78350f;
+  max-height: 120px;
+  overflow-y: auto;
+}
+.upload-skipped-list li {
+  margin-bottom: 3px;
+}
+
+/* ── Add Record modal ─────────────────────────────────────────────────────── */
+.add-record-modal {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+  width: min(680px, 96vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.modal-body--form {
+  padding: 14px 18px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.modal-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 16px;
+}
+
+.modal-form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #4a5568;
+}
+
+.modal-form-full {
+  grid-column: 1 / -1;
+}
+
+.modal-textarea {
+  padding: 5px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #1e293b;
+  background: #fff;
+  resize: vertical;
+  outline: none;
+}
+.modal-textarea:focus { border-color: #3b82f6; }
+
+.modal-form-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1a2744;
+  margin-bottom: 8px;
+}
+
+.modal-form-months {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.modal-input--month {
+  width: 80px;
+}
+
+.modal-form-note {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 8px;
+  font-style: italic;
+}
+
+.modal-error-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fee2e2;
+  color: #b91c1c;
+  border-radius: 5px;
+  padding: 8px 12px;
+  font-size: 12px;
+  margin-top: 10px;
+}

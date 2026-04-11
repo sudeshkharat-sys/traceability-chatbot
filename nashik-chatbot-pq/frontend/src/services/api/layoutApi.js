@@ -53,6 +53,12 @@ export const inputApi = {
     return api.get('/input/records', { params });
   },
   updateRecord: (id, data) => api.put(`/input/records/${id}`, data),
+  createRecord: (data, userId, layoutId) => {
+    const params = {};
+    if (userId != null) params.user_id = userId;
+    if (layoutId != null) params.layout_id = layoutId;
+    return api.post('/input/records', data, { params });
+  },
 };
 
 export const layeredAuditApi = {
@@ -88,4 +94,39 @@ export const layeredAuditApi = {
   },
   updateAuditRecord:     (id, data) => api.put(`/layered-audit/records/${id}`, data),
   updateAdherenceRecord: (id, data) => api.put(`/layered-audit/adherence/records/${id}`, data),
+  createAuditRecord: (data, userId, layoutId) => {
+    const params = {};
+    if (userId != null) params.user_id = userId;
+    if (layoutId != null) params.layout_id = layoutId;
+    return api.post('/layered-audit/records', data, { params });
+  },
+  createAdherenceRecord: (data, userId, layoutId) => {
+    const params = {};
+    if (userId != null) params.user_id = userId;
+    if (layoutId != null) params.layout_id = layoutId;
+    return api.post('/layered-audit/adherence/records', data, { params });
+  },
+};
+
+export const docApi = {
+  uploadDoc: (file, userId, layoutId, stationId, concernId, docType) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (userId != null) formData.append('user_id', userId);
+    if (layoutId != null) formData.append('layout_id', layoutId);
+    formData.append('station_id', stationId);
+    if (concernId != null) formData.append('concern_id', concernId);
+    formData.append('doc_type', docType);
+    return axios.post(`${BASE_URL}/docs/upload`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  listDocs: (stationId, userId, layoutId) => {
+    const params = { station_id: stationId };
+    if (userId != null) params.user_id = userId;
+    if (layoutId != null) params.layout_id = layoutId;
+    return api.get('/docs/list', { params });
+  },
+  getDownloadUrl: (docId) => `${BASE_URL}/docs/${docId}/download`,
+  deleteDoc: (docId) => api.delete(`/docs/${docId}`),
 };

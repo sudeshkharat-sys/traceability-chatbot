@@ -224,9 +224,15 @@ class InputRecordUpdate(BaseModel):
     status_3m: Optional[str] = None
 
 
+class SkippedRow(BaseModel):
+    row_number: int
+    reason: str
+
+
 class UploadResponse(BaseModel):
     message: str
     rows_imported: int
+    skipped_rows: Optional[List[SkippedRow]] = None
 
 
 # ── LayeredAudit update payload ───────────────────────────────────────────────
@@ -279,7 +285,7 @@ class LayeredAuditOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# ── LayeredAuditAdherence ─────────────────────────────────────────────────────
+# ── LayeredAuditAdherence ──────────────��─────────────────────────────��────────
 
 class LayeredAuditAdherenceOut(BaseModel):
     id: int
@@ -291,5 +297,71 @@ class LayeredAuditAdherenceOut(BaseModel):
     audit_date: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ── Single-record create payloads ──��──────────────────────────────────────────
+
+class InputRecordCreate(BaseModel):
+    sr_no: Optional[int] = None
+    concern_id: Optional[str] = None
+    concern: Optional[str] = None
+    type: Optional[str] = None
+    root_cause: Optional[str] = None
+    action_plan: Optional[str] = None
+    target_date: Optional[str] = None
+    closure_date: Optional[str] = None
+    ryg: Optional[str] = None
+    attri: Optional[str] = None
+    comm: Optional[str] = None
+    line: Optional[str] = None
+    stage_no: Optional[str] = None
+    z_e: Optional[str] = None
+    attribution: Optional[str] = None
+    part: Optional[str] = None
+    phenomena: Optional[str] = None
+    total_incidences: Optional[int] = None
+    monthly_data: Optional[str] = None
+    field_defect_after_cutoff: Optional[int] = None
+    status_3m: Optional[str] = None
+
+
+class LayeredAuditCreate(BaseModel):
+    model: Optional[str] = None
+    sr_no: Optional[str] = None
+    date_col: Optional[str] = None
+    station_id: Optional[str] = None
+    workstation: Optional[str] = None
+    auditor: Optional[str] = None
+    ncs: Optional[str] = None
+    action_plan: Optional[str] = None
+    four_m: Optional[str] = None
+    responsibility: Optional[str] = None
+    target_date: Optional[str] = None
+    status: Optional[str] = None
+
+
+class LayeredAuditAdherenceCreate(BaseModel):
+    stage_no: Optional[str] = None
+    stage_name: Optional[str] = None
+    auditor: Optional[str] = None
+    audit_date: Optional[str] = None
+
+
+# ── StationDocument ───────────────────────────────────────────────────────────
+
+class StationDocumentOut(BaseModel):
+    id: int
+    user_id: Optional[int] = None
+    layout_id: Optional[int] = None
+    station_id: str
+    concern_id: Optional[str] = None
+    doc_type: str
+    filename: str
+    file_path: Optional[str] = None
+    file_size: Optional[int] = None
+    mime_type: Optional[str] = None
+    created_at: datetime
 
     model_config = {"from_attributes": True}

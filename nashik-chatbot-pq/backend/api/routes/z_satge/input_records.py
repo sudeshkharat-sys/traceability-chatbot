@@ -16,6 +16,33 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/input", tags=["input"])
 
+# ── Strict allowed values for constrained columns ─────────────────────────────
+ALLOWED_TYPE        = {"WH", "USV"}
+ALLOWED_RYG         = {"R", "Y", "G"}
+ALLOWED_ATTRI       = {"M&M Design", "M&M process", "Supplier Design", "Supplier Process", "Under Analysis"}
+ALLOWED_Z_E         = {"Z", "E"}
+ALLOWED_ATTRIBUTION = {"M", "P", "D", "U"}
+ALLOWED_STATUS_3M   = {"R", "G"}
+
+
+def _validate_row(rec: dict) -> str | None:
+    """Return a human-readable reason string if the row is invalid, else None."""
+    issues = []
+    if rec.get("type") is not None and rec["type"] not in ALLOWED_TYPE:
+        issues.append(f"Type '{rec['type']}' not in {sorted(ALLOWED_TYPE)}")
+    if rec.get("ryg") is not None and rec["ryg"] not in ALLOWED_RYG:
+        issues.append(f"RYG '{rec['ryg']}' not in {sorted(ALLOWED_RYG)}")
+    if rec.get("attri") is not None and rec["attri"] not in ALLOWED_ATTRI:
+        issues.append(f"Attri. '{rec['attri']}' not in allowed values")
+    if rec.get("z_e") is not None and rec["z_e"] not in ALLOWED_Z_E:
+        issues.append(f"Z/E '{rec['z_e']}' not in {sorted(ALLOWED_Z_E)}")
+    if rec.get("attribution") is not None and rec["attribution"] not in ALLOWED_ATTRIBUTION:
+        issues.append(f"Attribution '{rec['attribution']}' not in {sorted(ALLOWED_ATTRIBUTION)}")
+    if rec.get("status_3m") is not None and rec["status_3m"] not in ALLOWED_STATUS_3M:
+        issues.append(f"Status(3M) '{rec['status_3m']}' not in {sorted(ALLOWED_STATUS_3M)}")
+    return "; ".join(issues) if issues else None
+
+
 # Month keys expected in the Excel (Jan 2024 → Mar 2026)
 MONTHLY_KEYS = [
     "2024-01", "2024-02", "2024-03", "2024-04", "2024-05", "2024-06",
@@ -146,18 +173,39 @@ async def upload_excel(
     if not records:
         raise HTTPException(status_code=422, detail="No data rows found in the uploaded file")
 
+    # Validate each row — skip invalid ones and collect skipped info
+    valid_records = []
+    skipped = []
+    for i, rec in enumerate(records, start=2):  # row 1 is header, data starts at row 2
+        reason = _validate_row(rec)
+        if reason:
+            skipped.append({"row_number": i, "reason": reason})
+        else:
+            valid_records.append(rec)
+
+    if not valid_records:
+        raise HTTPException(
+            status_code=422,
+            detail=f"All rows were invalid and skipped. No records imported.",
+        )
+
     # Full replace for this user+layout scope, then insert fresh ones
     connector.execute_update(
         InputRecordQueries.DELETE_ALL,
         {"user_id": user_id, "layout_id": layout_id},
     )
 
-    for rec in records:
+    for rec in valid_records:
         rec["user_id"] = user_id
         rec["layout_id"] = layout_id
         connector.execute_query(InputRecordQueries.CREATE, rec)
 
-    return {"message": "Upload successful", "rows_imported": len(records)}
+    skipped_out = [{"row_number": s["row_number"], "reason": s["reason"]} for s in skipped]
+    return {
+        "message": "Upload successful",
+        "rows_imported": len(valid_records),
+        "skipped_rows": skipped_out if skipped_out else None,
+    }
 
 
 @router.get("/records", response_model=List[schemas.InputRecordOut])
@@ -171,6 +219,34 @@ def list_records(
         {"user_id": user_id, "layout_id": layout_id},
     )
     return [_row_to_dict(r) for r in rows]
+
+
+@router.post("/records", response_model=schemas.InputRecordOut, status_code=201)
+def create_record(
+    payload: schemas.InputRecordCreate,
+    user_id: Optional[int] = Query(None),
+    layout_id: Optional[int] = Query(None),
+    connector: StateDBConnector = Depends(get_connector),
+):
+    data = payload.model_dump()
+    # Validate constrained fields
+    reason = _validate_row(data)
+    if reason:
+        raise HTTPException(status_code=422, detail=f"Validation error: {reason}")
+
+    data["user_id"] = user_id
+    data["layout_id"] = layout_id
+    # Ensure all required keys present
+    for key in ["sr_no", "concern_id", "concern", "type", "root_cause", "action_plan",
+                "target_date", "closure_date", "ryg", "attri", "comm", "line", "stage_no",
+                "z_e", "attribution", "part", "phenomena", "total_incidences",
+                "monthly_data", "field_defect_after_cutoff", "status_3m"]:
+        data.setdefault(key, None)
+
+    rows = connector.execute_query(InputRecordQueries.CREATE, data)
+    if not rows:
+        raise HTTPException(status_code=500, detail="Failed to create record")
+    return _row_to_dict(rows[0])
 
 
 @router.put("/records/{record_id}", response_model=schemas.InputRecordOut)

@@ -1,8 +1,29 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Upload, Database, CheckCircle, AlertCircle, Loader, Plus, X, ClipboardList, CalendarCheck } from 'lucide-react';
-import { inputApi, layeredAuditApi } from '../../../services/api/layoutApi';
+import { Upload, Database, CheckCircle, AlertCircle, Loader, Plus, X, ClipboardList, CalendarCheck, FileWarning } from 'lucide-react';
+import { inputApi, layeredAuditApi, layoutApi } from '../../../services/api/layoutApi';
 import './InputData.css';
+
+// ── Strict allowed values for constrained master columns ─────────────────────
+const STRICT_VALUES = {
+  type:        ['WH', 'USV'],
+  ryg:         ['R', 'Y', 'G'],
+  attri:       ['M&M Design', 'M&M process', 'Supplier Design', 'Supplier Process', 'Under Analysis'],
+  z_e:         ['Z', 'E'],
+  attribution: ['M', 'P', 'D', 'U'],
+  status_3m:   ['R', 'G'],
+};
+
+// Helper: get last N months as 'YYYY-MM' keys
+function getLastNMonths(n) {
+  const now = new Date();
+  const months = [];
+  for (let i = 1; i <= n; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.unshift(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return months;
+}
 
 const MONTHLY_KEYS = [
   '2024-01','2024-02','2024-03','2024-04','2024-05','2024-06',
@@ -473,6 +494,205 @@ function AddMonthModal({ existingMonths, onAdd, onClose }) {
   );
 }
 
+// ── Add Record Modal for InputData ──────────────────────────────────────────
+function AddRecordModal({ type, onClose, onSaved, userId, layoutId, layoutStageIds = [] }) {
+  const last3Months = getLastNMonths(3);
+
+  const defaultMaster = () => {
+    const m = {};
+    last3Months.forEach((k) => { m[k] = ''; });
+    return {
+      sr_no: '', concern_id: '', concern: '', type: '', root_cause: '', action_plan: '',
+      target_date: '', closure_date: '', ryg: '', attri: '', comm: '', line: '',
+      stage_no: '', z_e: '', attribution: '', part: '', phenomena: '',
+      field_defect_after_cutoff: '', status_3m: '', monthly: m,
+    };
+  };
+  const defaultAudit = () => ({
+    model: '', sr_no: '', date_col: '', station_id: '',
+    workstation: '', auditor: '', ncs: '', action_plan: '',
+    four_m: '', responsibility: '', target_date: '', status: '',
+  });
+  const defaultAdherence = () => ({
+    stage_no: '', stage_name: '', auditor: '', audit_date: '',
+  });
+
+  const [form, setForm] = useState(
+    type === 'master' ? defaultMaster() :
+    type === 'layered-audit' ? defaultAudit() :
+    defaultAdherence()
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState('');
+
+  const set = (key, val) => setForm((p) => ({ ...p, [key]: val }));
+  const setMonthly = (key, val) => setForm((p) => ({ ...p, monthly: { ...p.monthly, [key]: val } }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      let res;
+      if (type === 'master') {
+        const monthlyObj = {};
+        Object.entries(form.monthly).forEach(([k, v]) => {
+          const n = parseInt(v, 10);
+          if (!isNaN(n)) monthlyObj[k] = n;
+        });
+        const total = Object.values(monthlyObj).reduce((s, v) => s + v, 0);
+        const payload = {
+          sr_no: form.sr_no ? parseInt(form.sr_no, 10) : null,
+          concern_id: form.concern_id || null, concern: form.concern || null,
+          type: form.type || null, root_cause: form.root_cause || null,
+          action_plan: form.action_plan || null, target_date: form.target_date || null,
+          closure_date: form.closure_date || null, ryg: form.ryg || null,
+          attri: form.attri || null, comm: form.comm || null, line: form.line || null,
+          stage_no: form.stage_no || null, z_e: form.z_e || null,
+          attribution: form.attribution || null, part: form.part || null,
+          phenomena: form.phenomena || null,
+          field_defect_after_cutoff: form.field_defect_after_cutoff ? parseInt(form.field_defect_after_cutoff, 10) : null,
+          status_3m: form.status_3m || null,
+          monthly_data: Object.keys(monthlyObj).length ? JSON.stringify(monthlyObj) : null,
+          total_incidences: total || null,
+        };
+        res = await inputApi.createRecord(payload, userId, layoutId);
+      } else if (type === 'layered-audit') {
+        const payload = {
+          model: form.model || null, sr_no: form.sr_no || null,
+          date_col: form.date_col || null, station_id: form.station_id || null,
+          workstation: form.workstation || null, auditor: form.auditor || null,
+          ncs: form.ncs || null, action_plan: form.action_plan || null,
+          four_m: form.four_m || null, responsibility: form.responsibility || null,
+          target_date: form.target_date || null, status: form.status || null,
+        };
+        res = await layeredAuditApi.createAuditRecord(payload, userId, layoutId);
+      } else {
+        const payload = {
+          stage_no: form.stage_no || null, stage_name: form.stage_name || null,
+          auditor: form.auditor || null, audit_date: form.audit_date || null,
+        };
+        res = await layeredAuditApi.createAdherenceRecord(payload, userId, layoutId);
+      }
+      onSaved(res.data);
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to save record.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const sel = (key, opts) => (
+    <select className="modal-select" value={form[key] || ''} onChange={(e) => set(key, e.target.value)}>
+      <option value="">— select —</option>
+      {opts.map((o) => <option key={o} value={o}>{o}</option>)}
+    </select>
+  );
+  const inp = (key, t = 'text') => (
+    <input className="modal-input" type={t} value={form[key] || ''} onChange={(e) => set(key, e.target.value)} />
+  );
+  const ta = (key) => (
+    <textarea className="modal-textarea" rows={2} value={form[key] || ''} onChange={(e) => set(key, e.target.value)} />
+  );
+
+  return createPortal(
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="add-record-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <span className="modal-title">Add Record — {
+            type === 'master' ? 'Master Data' :
+            type === 'layered-audit' ? 'Layered Audit' : 'Audit Adherence'
+          }</span>
+          <button className="modal-close" onClick={onClose}><X size={16} /></button>
+        </div>
+        <div className="modal-body modal-body--form">
+          {type === 'master' && (
+            <div className="modal-form-grid">
+              <label>Sr. No{inp('sr_no', 'number')}</label>
+              <label>Concern ID{inp('concern_id')}</label>
+              <label className="modal-form-full">Concern{ta('concern')}</label>
+              <label>Type {sel('type', STRICT_VALUES.type)}</label>
+              <label>RYG {sel('ryg', STRICT_VALUES.ryg)}</label>
+              <label>Z/E {sel('z_e', STRICT_VALUES.z_e)}</label>
+              <label>Attribution {sel('attribution', STRICT_VALUES.attribution)}</label>
+              <label>Attri. {sel('attri', STRICT_VALUES.attri)}</label>
+              <label>Status (3M) {sel('status_3m', STRICT_VALUES.status_3m)}</label>
+              <label>Stage No
+                {layoutStageIds.length > 0
+                  ? sel('stage_no', layoutStageIds)
+                  : inp('stage_no')}
+              </label>
+              <label>Line{inp('line')}</label>
+              <label>Part{inp('part')}</label>
+              <label>Phenomena{inp('phenomena')}</label>
+              <label>Target Date{inp('target_date')}</label>
+              <label>Closure Date{inp('closure_date')}</label>
+              <label className="modal-form-full">Root Cause{ta('root_cause')}</label>
+              <label className="modal-form-full">Action Plan{ta('action_plan')}</label>
+              <label className="modal-form-full">Comm{ta('comm')}</label>
+              <label>Field Defect After Cut-off{inp('field_defect_after_cutoff', 'number')}</label>
+              <div className="modal-form-full">
+                <div className="modal-form-section-title">Monthly Incidences (last 3 months)</div>
+                <div className="modal-form-months">
+                  {last3Months.map((k) => (
+                    <label key={k}>{formatMonthLabel(k)}
+                      <input
+                        className="modal-input modal-input--month"
+                        type="number" min="0"
+                        value={form.monthly[k] || ''}
+                        onChange={(e) => setMonthly(k, e.target.value)}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <p className="modal-form-note">
+                  ℹ️ To add records for more than 3 months, use the Excel upload. Same format as download.
+                </p>
+              </div>
+            </div>
+          )}
+          {type === 'layered-audit' && (
+            <div className="modal-form-grid">
+              <label>Model{inp('model')}</label>
+              <label>Sr. No{inp('sr_no')}</label>
+              <label>Date{inp('date_col')}</label>
+              <label>Station ID{inp('station_id')}</label>
+              <label>Workstation{inp('workstation')}</label>
+              <label>Auditor{inp('auditor')}</label>
+              <label className="modal-form-full">NC's{ta('ncs')}</label>
+              <label className="modal-form-full">Action Plan{ta('action_plan')}</label>
+              <label>4M{inp('four_m')}</label>
+              <label>Responsibility{inp('responsibility')}</label>
+              <label>Target Date{inp('target_date')}</label>
+              <label>Status{inp('status')}</label>
+            </div>
+          )}
+          {type === 'audit-adherence' && (
+            <div className="modal-form-grid">
+              <label>Stage No{inp('stage_no')}</label>
+              <label>Stage Name{inp('stage_name')}</label>
+              <label>Auditor{inp('auditor')}</label>
+              <label>Audit Date{inp('audit_date')}</label>
+            </div>
+          )}
+          {error && (
+            <div className="modal-error-bar">
+              <AlertCircle size={14} /> {error}
+            </div>
+          )}
+        </div>
+        <div className="modal-footer">
+          <button className="modal-cancel" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="modal-confirm" onClick={handleSave} disabled={saving}>
+            {saving ? <><Loader size={13} className="spin" /> Saving…</> : 'Save Record'}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // Upload data-type options
 const UPLOAD_TYPES = [
   {
@@ -532,6 +752,28 @@ export default function InputData({ userId, layouts = [] }) {
   const handleMasterFilterChange = useCallback((key, val) => {
     setMasterFilters((prev) => ({ ...prev, [key]: val }));
   }, []);
+
+  // Add Record modal state
+  const [showAddRecord, setShowAddRecord] = useState(null); // null | 'master' | 'layered-audit' | 'audit-adherence'
+
+  // Stage IDs from the selected layout's station boxes (for Stage No filter)
+  const [layoutStageIds, setLayoutStageIds] = useState([]);
+  useEffect(() => {
+    if (!selectedLayoutId) return;
+    layoutApi.getLayout(selectedLayoutId)
+      .then((res) => {
+        const boxes = res.data?.station_boxes || [];
+        const ids = [];
+        boxes.forEach((b) => {
+          const sids = b.station_ids
+            ? (typeof b.station_ids === 'string' ? b.station_ids.split(',') : b.station_ids)
+            : [];
+          sids.forEach((s) => { if (s && !ids.includes(s)) ids.push(s); });
+        });
+        setLayoutStageIds(ids.sort());
+      })
+      .catch(() => setLayoutStageIds([]));
+  }, [selectedLayoutId]);
 
   // Auto-select first layout
   useEffect(() => {
@@ -606,6 +848,12 @@ export default function InputData({ userId, layouts = [] }) {
     setAdherenceRecords((prev) => prev.map((r) => (r.id === recordId ? updatedRecord : r)));
   }, []);
 
+  const handleRecordAdded = useCallback((tabType, newRec) => {
+    if (tabType === 'master') setRecords((p) => [...p, newRec]);
+    else if (tabType === 'layered-audit') setAuditRecords((p) => [...p, newRec]);
+    else if (tabType === 'audit-adherence') setAdherenceRecords((p) => [...p, newRec]);
+  }, []);
+
   const allMonths = React.useMemo(() => {
     const set = new Set(MONTHLY_KEYS);
     records.forEach((rec) => {
@@ -621,12 +869,20 @@ export default function InputData({ userId, layouts = [] }) {
     const allCols = [...FIXED_COLUMNS, ...TRAILING_COLUMNS];
     const map = {};
     allCols.forEach((col) => {
-      map[col.key] = [
-        ...new Set(records.map((r) => String(r[col.key] ?? '')))
-      ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+      if (STRICT_VALUES[col.key]) {
+        // Use only allowed values for constrained columns — always show fixed options
+        map[col.key] = STRICT_VALUES[col.key];
+      } else if (col.key === 'stage_no' && layoutStageIds.length > 0) {
+        // Stage No: only show stage IDs that exist in the current layout's station boxes
+        map[col.key] = layoutStageIds;
+      } else {
+        map[col.key] = [
+          ...new Set(records.map((r) => String(r[col.key] ?? '')))
+        ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+      }
     });
     return map;
-  }, [records]);
+  }, [records, layoutStageIds]);
 
   const filteredMasterRecords = React.useMemo(() => {
     const allCols = [...FIXED_COLUMNS, ...TRAILING_COLUMNS];
@@ -660,7 +916,13 @@ export default function InputData({ userId, layouts = [] }) {
         res = await layeredAuditApi.uploadAdherence(selectedFile, userId, selectedLayoutId);
       }
       const viewTab = UPLOAD_TYPES.find((t) => t.value === uploadType)?.viewTab || 'master';
-      setUploadResult({ success: true, message: res.data.message, rowsImported: res.data.rows_imported, viewTab });
+      setUploadResult({
+        success: true,
+        message: res.data.message,
+        rowsImported: res.data.rows_imported,
+        skippedRows: res.data.skipped_rows || null,
+        viewTab,
+      });
       setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err) {
@@ -783,6 +1045,18 @@ export default function InputData({ userId, layouts = [] }) {
                     <button className="link-btn" onClick={() => setActiveTab(uploadResult.viewTab)}>View Data →</button>
                   </p>
                 )}
+                {uploadResult.success && uploadResult.skippedRows && uploadResult.skippedRows.length > 0 && (
+                  <div className="upload-skipped">
+                    <div className="upload-skipped-title">
+                      <FileWarning size={14} /> {uploadResult.skippedRows.length} row{uploadResult.skippedRows.length !== 1 ? 's' : ''} skipped (invalid values):
+                    </div>
+                    <ul className="upload-skipped-list">
+                      {uploadResult.skippedRows.map((s) => (
+                        <li key={s.row_number}>Row {s.row_number}: {s.reason}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -799,6 +1073,9 @@ export default function InputData({ userId, layouts = [] }) {
             </div>
             <div className="master-actions">
               <span className="record-count">{auditRecords.length} record{auditRecords.length !== 1 ? 's' : ''}</span>
+              <button className="add-record-btn" onClick={() => setShowAddRecord('layered-audit')}>
+                <Plus size={13} /> Add Record
+              </button>
               <button className="refresh-btn" onClick={loadAuditRecords} disabled={loadingAudit}>
                 {loadingAudit ? <Loader size={13} className="spin" /> : '↻'} Refresh
               </button>
@@ -834,6 +1111,9 @@ export default function InputData({ userId, layouts = [] }) {
             </div>
             <div className="master-actions">
               <span className="record-count">{adherenceRecords.length} record{adherenceRecords.length !== 1 ? 's' : ''}</span>
+              <button className="add-record-btn" onClick={() => setShowAddRecord('audit-adherence')}>
+                <Plus size={13} /> Add Record
+              </button>
               <button className="refresh-btn" onClick={loadAdherenceRecords} disabled={loadingAdherence}>
                 {loadingAdherence ? <Loader size={13} className="spin" /> : '↻'} Refresh
               </button>
@@ -866,6 +1146,9 @@ export default function InputData({ userId, layouts = [] }) {
             <h2 className="panel-title">Master Data</h2>
             <div className="master-actions">
               <span className="record-count">{records.length} record{records.length !== 1 ? 's' : ''}</span>
+              <button className="add-record-btn" onClick={() => setShowAddRecord('master')}>
+                <Plus size={13} /> Add Record
+              </button>
               <button className="add-month-btn" onClick={() => setShowAddMonth(true)}>
                 <Plus size={13} /> Add New Month
               </button>
@@ -990,6 +1273,18 @@ export default function InputData({ userId, layouts = [] }) {
             </div>
           )}
         </div>
+      )}
+
+      {/* ── Add Record modal ─────────────────────────────────────────────────── */}
+      {showAddRecord && (
+        <AddRecordModal
+          type={showAddRecord}
+          onClose={() => setShowAddRecord(null)}
+          onSaved={(newRec) => { handleRecordAdded(showAddRecord, newRec); setShowAddRecord(null); }}
+          userId={userId}
+          layoutId={selectedLayoutId}
+          layoutStageIds={layoutStageIds}
+        />
       )}
     </div>
   );

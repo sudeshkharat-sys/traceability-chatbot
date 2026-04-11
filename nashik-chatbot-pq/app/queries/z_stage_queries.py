@@ -383,3 +383,48 @@ class LayeredAuditAdherenceQueries:
         WHERE (:user_id IS NULL OR user_id = :user_id)
           AND (:layout_id IS NULL OR layout_id = :layout_id)
     """
+
+
+# ── Station document queries ───────────────────────────────────────────────────
+
+class StationDocumentQueries:
+    LIST_BY_STATION = """
+        SELECT id, user_id, layout_id, station_id, concern_id, doc_type, filename,
+               file_path, file_size, mime_type, created_at
+        FROM station_documents
+        WHERE (:user_id IS NULL OR user_id = :user_id)
+          AND (:layout_id IS NULL OR layout_id = :layout_id)
+          AND station_id = :station_id
+        ORDER BY concern_id, doc_type, id
+    """
+
+    LIST_BY_LAYOUT = """
+        SELECT id, user_id, layout_id, station_id, concern_id, doc_type, filename,
+               file_path, file_size, mime_type, created_at
+        FROM station_documents
+        WHERE (:user_id IS NULL OR user_id = :user_id)
+          AND (:layout_id IS NULL OR layout_id = :layout_id)
+        ORDER BY station_id, concern_id, doc_type, id
+    """
+
+    CREATE = """
+        INSERT INTO station_documents
+            (user_id, layout_id, station_id, concern_id, doc_type, filename,
+             file_path, file_size, mime_type, created_at, updated_at)
+        VALUES
+            (:user_id, :layout_id, :station_id, :concern_id, :doc_type, :filename,
+             :file_path, :file_size, :mime_type, NOW(), NOW())
+        RETURNING id, user_id, layout_id, station_id, concern_id, doc_type, filename,
+                  file_path, file_size, mime_type, created_at
+    """
+
+    GET_BY_ID = """
+        SELECT id, user_id, layout_id, station_id, concern_id, doc_type, filename,
+               file_path, file_size, mime_type, created_at
+        FROM station_documents
+        WHERE id = :doc_id
+    """
+
+    DELETE = "DELETE FROM station_documents WHERE id = :doc_id"
+
+    CHECK_EXISTS = "SELECT id FROM station_documents WHERE id = :doc_id"

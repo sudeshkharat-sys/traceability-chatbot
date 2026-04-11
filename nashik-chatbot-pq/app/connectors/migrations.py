@@ -46,6 +46,26 @@ COLUMN_MIGRATIONS = [
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user'",
     "ALTER TABLE box_connections ADD COLUMN IF NOT EXISTS from_station_id VARCHAR(50)",
     "ALTER TABLE box_connections ADD COLUMN IF NOT EXISTS to_station_id VARCHAR(50)",
+    # station_documents table (created idempotently)
+    """
+    CREATE TABLE IF NOT EXISTS station_documents (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER,
+        layout_id INTEGER REFERENCES layouts(id) ON DELETE SET NULL,
+        station_id VARCHAR(100) NOT NULL,
+        concern_id VARCHAR(255),
+        doc_type VARCHAR(50) NOT NULL,
+        filename VARCHAR(500) NOT NULL,
+        file_path VARCHAR(1000),
+        file_size INTEGER,
+        mime_type VARCHAR(100),
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_station_docs_station_id ON station_documents (station_id)",
+    "CREATE INDEX IF NOT EXISTS idx_station_docs_layout_id ON station_documents (layout_id)",
+    "CREATE INDEX IF NOT EXISTS idx_station_docs_concern_id ON station_documents (concern_id)",
 ]
 
 

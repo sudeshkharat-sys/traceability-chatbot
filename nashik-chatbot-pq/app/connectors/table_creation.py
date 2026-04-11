@@ -1021,4 +1021,52 @@ create_dynamic_table(
 )
 
 
+station_document_id_seq = Sequence("station_document_id_seq")
+
+create_dynamic_table(
+    "station_documents",
+    [
+        Column(
+            "id",
+            Integer,
+            station_document_id_seq,
+            primary_key=True,
+            server_default=station_document_id_seq.next_value(),
+        ),
+        Column("user_id", Integer, nullable=True),
+        Column(
+            "layout_id",
+            Integer,
+            ForeignKey("layouts.id", ondelete="SET NULL"),
+            nullable=True,
+        ),
+        Column("station_id", String(100), nullable=False),
+        Column("concern_id", String(255), nullable=True),
+        Column("doc_type", String(50), nullable=False),  # DDR_LO / SOS / PFMEA / CONTROL_PLAN / CCR
+        Column("filename", String(500), nullable=False),
+        Column("file_path", String(1000), nullable=True),
+        Column("file_size", Integer, nullable=True),
+        Column("mime_type", String(100), nullable=True),
+        Column(
+            "created_at",
+            DateTime,
+            default=datetime.datetime.utcnow,
+            nullable=False,
+        ),
+        Column(
+            "updated_at",
+            DateTime,
+            default=datetime.datetime.utcnow,
+            onupdate=datetime.datetime.utcnow,
+            nullable=False,
+        ),
+    ],
+    indexes=[
+        Index("idx_station_docs_station_id", "station_id"),
+        Index("idx_station_docs_layout_id", "layout_id"),
+        Index("idx_station_docs_concern_id", "concern_id"),
+    ],
+)
+
+
 logger.info("All Z-Stage table definitions registered")

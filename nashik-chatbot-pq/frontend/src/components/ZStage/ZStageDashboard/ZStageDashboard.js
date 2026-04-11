@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Xwrapper } from 'react-xarrows';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { ZoomIn, ZoomOut, Maximize2, RefreshCw, GitBranch, X, Loader, TableProperties } from 'lucide-react';
-import { layoutApi, inputApi, layeredAuditApi } from '../../../services/api/layoutApi';
+import { ZoomIn, ZoomOut, Maximize2, RefreshCw, GitBranch, X, Loader, TableProperties, Upload, FileText, Trash2, Plus, AlertCircle, CheckCircle } from 'lucide-react';
+import { layoutApi, inputApi, layeredAuditApi, docApi } from '../../../services/api/layoutApi';
 import { getPortCanvasPos, buildObstacles, routePath } from '../shared/routeArrow';
 import './ZStageDashboard.css';
 
@@ -258,11 +258,386 @@ function AuditReadTable({ columns, records, emptyMsg }) {
   );
 }
 
+// ── Allowed values for constrained fields ─────────────────────────────────────
+const ALLOWED = {
+  type:        ['WH', 'USV'],
+  ryg:         ['R', 'Y', 'G'],
+  attri:       ['M&M Design', 'M&M process', 'Supplier Design', 'Supplier Process', 'Under Analysis'],
+  z_e:         ['Z', 'E'],
+  attribution: ['M', 'P', 'D', 'U'],
+  status_3m:   ['R', 'G'],
+};
+
+// Helper: get last N months keys from today
+function getLastNMonths(n) {
+  const now = new Date();
+  const months = [];
+  for (let i = 1; i <= n; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.unshift(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return months;
+}
+
+const DOC_TYPES = [
+  { key: 'DDR_LO',       label: 'DDR / LO' },
+  { key: 'SOS',          label: 'SOS' },
+  { key: 'PFMEA',        label: 'PFMEA' },
+  { key: 'CONTROL_PLAN', label: 'Control Plan' },
+  { key: 'CCR',          label: 'CCR' },
+];
+
+// ── Add Record Modal ──────────────────────────────────────────────────────────
+function AddRecordModal({ type, stationId, onClose, onSaved, userId, layoutId, allMonths }) {
+  const last3Months = getLastNMonths(3);
+
+  const defaultMaster = () => {
+    const m = {};
+    last3Months.forEach((k) => { m[k] = ''; });
+    return {
+      sr_no: '', concern_id: '', concern: '', type: '', root_cause: '', action_plan: '',
+      target_date: '', closure_date: '', ryg: '', attri: '', comm: '', line: '',
+      stage_no: stationId || '', z_e: '', attribution: '', part: '', phenomena: '',
+      field_defect_after_cutoff: '', status_3m: '', monthly: m,
+    };
+  };
+  const defaultAudit = () => ({
+    model: '', sr_no: '', date_col: '', station_id: stationId || '',
+    workstation: '', auditor: '', ncs: '', action_plan: '',
+    four_m: '', responsibility: '', target_date: '', status: '',
+  });
+  const defaultAdherence = () => ({
+    stage_no: stationId || '', stage_name: '', auditor: '', audit_date: '',
+  });
+
+  const [form, setForm] = useState(
+    type === 'master' ? defaultMaster() :
+    type === 'layered-audit' ? defaultAudit() :
+    defaultAdherence()
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const set = (key, val) => setForm((p) => ({ ...p, [key]: val }));
+  const setMonthly = (key, val) => setForm((p) => ({ ...p, monthly: { ...p.monthly, [key]: val } }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      let res;
+      if (type === 'master') {
+        const monthlyObj = {};
+        Object.entries(form.monthly).forEach(([k, v]) => {
+          const n = parseInt(v, 10);
+          if (!isNaN(n)) monthlyObj[k] = n;
+        });
+        const total = Object.values(monthlyObj).reduce((s, v) => s + v, 0);
+        const payload = {
+          sr_no: form.sr_no ? parseInt(form.sr_no, 10) : null,
+          concern_id: form.concern_id || null,
+          concern: form.concern || null,
+          type: form.type || null,
+          root_cause: form.root_cause || null,
+          action_plan: form.action_plan || null,
+          target_date: form.target_date || null,
+          closure_date: form.closure_date || null,
+          ryg: form.ryg || null,
+          attri: form.attri || null,
+          comm: form.comm || null,
+          line: form.line || null,
+          stage_no: form.stage_no || null,
+          z_e: form.z_e || null,
+          attribution: form.attribution || null,
+          part: form.part || null,
+          phenomena: form.phenomena || null,
+          field_defect_after_cutoff: form.field_defect_after_cutoff ? parseInt(form.field_defect_after_cutoff, 10) : null,
+          status_3m: form.status_3m || null,
+          monthly_data: Object.keys(monthlyObj).length ? JSON.stringify(monthlyObj) : null,
+          total_incidences: total || null,
+        };
+        res = await inputApi.createRecord(payload, userId, layoutId);
+      } else if (type === 'layered-audit') {
+        const payload = {
+          model: form.model || null, sr_no: form.sr_no || null,
+          date_col: form.date_col || null, station_id: form.station_id || null,
+          workstation: form.workstation || null, auditor: form.auditor || null,
+          ncs: form.ncs || null, action_plan: form.action_plan || null,
+          four_m: form.four_m || null, responsibility: form.responsibility || null,
+          target_date: form.target_date || null, status: form.status || null,
+        };
+        res = await layeredAuditApi.createAuditRecord(payload, userId, layoutId);
+      } else {
+        const payload = {
+          stage_no: form.stage_no || null, stage_name: form.stage_name || null,
+          auditor: form.auditor || null, audit_date: form.audit_date || null,
+        };
+        res = await layeredAuditApi.createAdherenceRecord(payload, userId, layoutId);
+      }
+      onSaved(res.data);
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to save record.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const sel = (key, opts) => (
+    <select className="sdm-form-input" value={form[key] || ''} onChange={(e) => set(key, e.target.value)}>
+      <option value="">— select —</option>
+      {opts.map((o) => <option key={o} value={o}>{o}</option>)}
+    </select>
+  );
+  const inp = (key, t = 'text') => (
+    <input className="sdm-form-input" type={t} value={form[key] || ''} onChange={(e) => set(key, e.target.value)} />
+  );
+  const ta = (key) => (
+    <textarea className="sdm-form-textarea" rows={2} value={form[key] || ''} onChange={(e) => set(key, e.target.value)} />
+  );
+
+  return createPortal(
+    <div className="sdm-overlay" onClick={onClose}>
+      <div className="sdm-modal sdm-modal--form" onClick={(e) => e.stopPropagation()}>
+        <div className="sdm-header">
+          <div className="sdm-header-left">
+            <div className="sdm-header-icon"><Plus size={18} /></div>
+            <div>
+              <div className="sdm-title">Add Record — {
+                type === 'master' ? 'Master Data' :
+                type === 'layered-audit' ? 'Layered Audit' : 'Audit Adherence'
+              }</div>
+              <div className="sdm-subtitle">Station: <strong>{stationId}</strong></div>
+            </div>
+          </div>
+          <button className="sdm-close" onClick={onClose}><X size={16} /></button>
+        </div>
+
+        <div className="sdm-body sdm-body--form">
+          {type === 'master' && (
+            <div className="sdm-form-grid">
+              <label>Sr. No{inp('sr_no', 'number')}</label>
+              <label>Concern ID{inp('concern_id')}</label>
+              <label className="sdm-form-full">Concern{ta('concern')}</label>
+              <label>Type {sel('type', ALLOWED.type)}</label>
+              <label>RYG {sel('ryg', ALLOWED.ryg)}</label>
+              <label>Z/E {sel('z_e', ALLOWED.z_e)}</label>
+              <label>Attribution {sel('attribution', ALLOWED.attribution)}</label>
+              <label>Attri. {sel('attri', ALLOWED.attri)}</label>
+              <label>Status (3M) {sel('status_3m', ALLOWED.status_3m)}</label>
+              <label>Stage No{inp('stage_no')}</label>
+              <label>Line{inp('line')}</label>
+              <label>Part{inp('part')}</label>
+              <label>Phenomena{inp('phenomena')}</label>
+              <label>Target Date{inp('target_date')}</label>
+              <label>Closure Date{inp('closure_date')}</label>
+              <label className="sdm-form-full">Root Cause{ta('root_cause')}</label>
+              <label className="sdm-form-full">Action Plan{ta('action_plan')}</label>
+              <label className="sdm-form-full">Comm{ta('comm')}</label>
+              <label>Field Defect After Cut-off{inp('field_defect_after_cutoff', 'number')}</label>
+              <div className="sdm-form-full">
+                <div className="sdm-form-section-title">Monthly Incidences (last 3 months)</div>
+                <div className="sdm-form-months">
+                  {last3Months.map((k) => (
+                    <label key={k}>{fmtMonth(k)}
+                      <input
+                        className="sdm-form-input sdm-form-input--month"
+                        type="number" min="0"
+                        value={form.monthly[k] || ''}
+                        onChange={(e) => setMonthly(k, e.target.value)}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <p className="sdm-form-note">
+                  ℹ️ To add records for more than 3 months, use the Excel upload in the Input section.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {type === 'layered-audit' && (
+            <div className="sdm-form-grid">
+              <label>Model{inp('model')}</label>
+              <label>Sr. No{inp('sr_no')}</label>
+              <label>Date{inp('date_col')}</label>
+              <label>Station ID{inp('station_id')}</label>
+              <label>Workstation{inp('workstation')}</label>
+              <label>Auditor{inp('auditor')}</label>
+              <label className="sdm-form-full">NC's{ta('ncs')}</label>
+              <label className="sdm-form-full">Action Plan{ta('action_plan')}</label>
+              <label>4M{inp('four_m')}</label>
+              <label>Responsibility{inp('responsibility')}</label>
+              <label>Target Date{inp('target_date')}</label>
+              <label>Status{inp('status')}</label>
+            </div>
+          )}
+
+          {type === 'audit-adherence' && (
+            <div className="sdm-form-grid">
+              <label>Stage No{inp('stage_no')}</label>
+              <label>Stage Name{inp('stage_name')}</label>
+              <label>Auditor{inp('auditor')}</label>
+              <label>Audit Date{inp('audit_date')}</label>
+            </div>
+          )}
+
+          {error && (
+            <div className="sdm-form-error">
+              <AlertCircle size={15} /> {error}
+            </div>
+          )}
+        </div>
+
+        <div className="sdm-footer">
+          <button className="sdm-footer-close" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="sdm-footer-save" onClick={handleSave} disabled={saving}>
+            {saving ? <><Loader size={13} className="sdm-spin" /> Saving…</> : 'Save Record'}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+// ── Docs Tab ──────────────────────────────────────────────────────────────────
+function DocsTab({ stationId, masterRecords, userId, layoutId }) {
+  const [docs, setDocs] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState({});  // key = `${concernId}__${docType}`
+  const [uploadMsg, setUploadMsg] = useState({});
+  const fileRefs = useRef({});
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await docApi.listDocs(stationId, userId, layoutId);
+      setDocs(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setDocs([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [stationId, userId, layoutId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const handleUpload = async (file, concernId, docType) => {
+    const key = `${concernId}__${docType}`;
+    setUploading((p) => ({ ...p, [key]: true }));
+    setUploadMsg((p) => ({ ...p, [key]: null }));
+    try {
+      await docApi.uploadDoc(file, userId, layoutId, stationId, concernId, docType);
+      setUploadMsg((p) => ({ ...p, [key]: { ok: true, text: 'Uploaded!' } }));
+      load();
+    } catch (err) {
+      setUploadMsg((p) => ({ ...p, [key]: { ok: false, text: err.response?.data?.detail || 'Upload failed' } }));
+    } finally {
+      setUploading((p) => ({ ...p, [key]: false }));
+    }
+  };
+
+  const handleDelete = async (docId) => {
+    try {
+      await docApi.deleteDoc(docId);
+      setDocs((p) => p.filter((d) => d.id !== docId));
+    } catch {}
+  };
+
+  const concerns = masterRecords.length > 0
+    ? [...new Map(masterRecords.map((r) => [r.concern_id, r])).values()]
+    : [];
+
+  if (loading) return <div className="sdm-empty"><Loader size={28} className="sdm-spin" /><p>Loading documents…</p></div>;
+
+  if (concerns.length === 0) {
+    return (
+      <div className="sdm-empty">
+        <FileText size={36} strokeWidth={1} />
+        <p>No master data records found for station <strong>{stationId}</strong>.</p>
+        <p className="sdm-empty-hint">Upload master data with Stage No = {stationId} first, then documents will be linked here.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="sdm-docs-container">
+      {concerns.map((rec) => {
+        const cid = rec.concern_id || '(no concern ID)';
+        const clabel = rec.concern ? `${cid} — ${rec.concern.slice(0, 60)}` : cid;
+        return (
+          <div key={cid} className="sdm-docs-concern">
+            <div className="sdm-docs-concern-title">{clabel}</div>
+            <div className="sdm-docs-types">
+              {DOC_TYPES.map(({ key, label }) => {
+                const uploaded = docs.filter((d) => d.concern_id === rec.concern_id && d.doc_type === key);
+                const uKey = `${cid}__${key}`;
+                const msg = uploadMsg[uKey];
+                const inputId = `doc-upload-${cid}-${key}`.replace(/[^a-z0-9-]/gi, '_');
+                return (
+                  <div key={key} className="sdm-doc-type-card">
+                    <div className="sdm-doc-type-label">{label}</div>
+                    <div className="sdm-doc-list">
+                      {uploaded.map((d) => (
+                        <div key={d.id} className="sdm-doc-item">
+                          <a
+                            href={docApi.getDownloadUrl(d.id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="sdm-doc-link"
+                          >
+                            <FileText size={12} /> {d.filename}
+                          </a>
+                          <button
+                            className="sdm-doc-delete"
+                            onClick={() => handleDelete(d.id)}
+                            title="Delete"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      ))}
+                      {uploaded.length === 0 && (
+                        <span className="sdm-doc-empty">No file uploaded</span>
+                      )}
+                    </div>
+                    <div className="sdm-doc-upload-row">
+                      <input
+                        id={inputId}
+                        type="file"
+                        className="sdm-doc-file-hidden"
+                        onChange={(e) => {
+                          const f = e.target.files[0];
+                          if (f) { handleUpload(f, rec.concern_id, key); e.target.value = ''; }
+                        }}
+                      />
+                      <label htmlFor={inputId} className="sdm-doc-upload-btn">
+                        {uploading[uKey] ? <><Loader size={11} className="sdm-spin" /> Uploading…</> : <><Upload size={11} /> Upload</>}
+                      </label>
+                      {msg && (
+                        <span className={`sdm-doc-msg${msg.ok ? ' sdm-doc-msg--ok' : ' sdm-doc-msg--err'}`}>
+                          {msg.ok ? <CheckCircle size={11} /> : <AlertCircle size={11} />} {msg.text}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── Station Detail Modal ───────────────────────────────────────────────────────
 // Rendered via portal to document.body so position:fixed is always
 // relative to the true viewport, regardless of ancestor transforms.
-function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, auditRecords, adherenceRecords }) {
+function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, auditRecords, adherenceRecords, userId, layoutId, onRecordAdded }) {
   const [activeTab, setActiveTab] = useState('master');
+  const [showAddRecord, setShowAddRecord] = useState(false);
   const filtered           = records.filter((r) => r.stage_no === stationId);
   const filteredAudit      = auditRecords.filter((r) => r.station_id === stationId);
   const filteredAdherence  = adherenceRecords.filter((r) => r.stage_no === stationId);
@@ -294,6 +669,7 @@ function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, a
                 {activeTab === 'master' && 'Master data — click any cell to edit'}
                 {activeTab === 'layered-audit' && 'Layered Audit records'}
                 {activeTab === 'audit-adherence' && 'Audit Adherence records'}
+                {activeTab === 'docs' && 'Documents linked to each concern'}
               </div>
             </div>
           </div>
@@ -306,6 +682,11 @@ function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, a
             )}
             {activeTab === 'audit-adherence' && (
               <span className="sdm-count">{filteredAdherence.length} record{filteredAdherence.length !== 1 ? 's' : ''}</span>
+            )}
+            {activeTab !== 'docs' && (
+              <button className="sdm-add-btn" onClick={() => setShowAddRecord(true)} title="Add new record">
+                <Plus size={14} /> Add Record
+              </button>
             )}
             <button className="sdm-close" onClick={onClose} title="Close (Esc)"><X size={16} /></button>
           </div>
@@ -330,6 +711,12 @@ function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, a
             onClick={() => setActiveTab('audit-adherence')}
           >
             Audit Adherence
+          </button>
+          <button
+            className={`sdm-tab${activeTab === 'docs' ? ' sdm-tab--active' : ''}`}
+            onClick={() => setActiveTab('docs')}
+          >
+            <FileText size={13} style={{ marginRight: 4 }} />Docs
           </button>
         </div>
 
@@ -425,6 +812,16 @@ function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, a
             />
           )}
 
+          {/* Docs tab */}
+          {activeTab === 'docs' && (
+            <DocsTab
+              stationId={stationId}
+              masterRecords={filtered}
+              userId={userId}
+              layoutId={layoutId}
+            />
+          )}
+
         </div>
 
         {/* ── Footer ── */}
@@ -432,6 +829,8 @@ function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, a
           <span className="sdm-footer-hint">
             {activeTab === 'master'
               ? 'Changes save automatically · Scroll horizontally to see monthly columns'
+              : activeTab === 'docs'
+              ? 'Upload documents per concern and document type'
               : 'Scroll horizontally to see all columns'}
           </span>
           <button className="sdm-footer-close" onClick={onClose}>Close</button>
@@ -441,7 +840,25 @@ function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, a
     </div>
   );
 
-  return createPortal(modal, document.body);
+  return (
+    <>
+      {createPortal(modal, document.body)}
+      {showAddRecord && (
+        <AddRecordModal
+          type={activeTab}
+          stationId={stationId}
+          onClose={() => setShowAddRecord(false)}
+          onSaved={(newRec) => {
+            if (onRecordAdded) onRecordAdded(activeTab, newRec);
+            setShowAddRecord(false);
+          }}
+          userId={userId}
+          layoutId={layoutId}
+          allMonths={allMonths}
+        />
+      )}
+    </>
+  );
 }
 
 // ── Parse API layout into flat state ─────────────────────────────────────────
@@ -853,6 +1270,17 @@ function ZStageDashboard({ userId }) {
     setRecords((prev) => prev.map((r) => (r.id === recordId ? updatedRecord : r)));
   }, []);
 
+  // When a new record is added via form popup, append it to the right list
+  const handleRecordAdded = useCallback((tabType, newRec) => {
+    if (tabType === 'master') {
+      setRecords((prev) => [...prev, newRec]);
+    } else if (tabType === 'layered-audit') {
+      setAuditRecords((prev) => [...prev, newRec]);
+    } else if (tabType === 'audit-adherence') {
+      setAdherenceRecords((prev) => [...prev, newRec]);
+    }
+  }, []);
+
   // Legend data derived from all records
   const legendData = React.useMemo(() => computeLegendData(records), [records]);
 
@@ -1159,6 +1587,9 @@ function ZStageDashboard({ userId }) {
           onClose={() => setPopupStation(null)}
           auditRecords={auditRecords}
           adherenceRecords={adherenceRecords}
+          userId={userId}
+          layoutId={selectedId}
+          onRecordAdded={handleRecordAdded}
         />
       )}
     </Xwrapper>
