@@ -117,41 +117,43 @@ const ChartComponent = ({ chartData }) => {
     if (yAxes.length === 0) return <div style={{color:'#9ca3af',padding:'16px',textAlign:'center'}}>No numeric columns to chart.</div>;
 
     return (
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart
-          data={coercedData}
-          margin={{ top: 5, right: 10, left: 10, bottom: 40 }}
-          onClick={null}
-        >
-          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-          <XAxis
-            dataKey={xAxis}
-            stroke="#9ca3af"
-            tick={{ fill: '#9ca3af', fontSize: 10 }}
-            angle={-35}
-            textAnchor="end"
-            interval={0}
-            height={60}
-          />
-          <YAxis
-            stroke="#9ca3af"
-            tick={{ fill: '#9ca3af', fontSize: 10 }}
-            width={45}
-            tickFormatter={v => (v >= 1000 ? `${(v/1000).toFixed(1)}k` : v)}
-          />
-          <Tooltip content={<CustomTooltip />} />
-          {yAxes.map((key, index) => (
-            <Bar
-              key={key}
-              dataKey={key}
-              name={key.replace(/_/g, ' ')}
-              fill={colors[index % colors.length]}
-              radius={[3, 3, 0, 0]}
-              onClick={null}
+      <div style={{ width: '100%', height: 300 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={coercedData}
+            margin={{ top: 5, right: 10, left: 10, bottom: 40 }}
+            onClick={null}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+            <XAxis
+              dataKey={xAxis}
+              stroke="#9ca3af"
+              tick={{ fill: '#9ca3af', fontSize: 10 }}
+              angle={-35}
+              textAnchor="end"
+              interval={0}
+              height={60}
             />
-          ))}
-        </BarChart>
-      </ResponsiveContainer>
+            <YAxis
+              stroke="#9ca3af"
+              tick={{ fill: '#9ca3af', fontSize: 10 }}
+              width={45}
+              tickFormatter={v => (v >= 1000 ? `${(v/1000).toFixed(1)}k` : v)}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            {yAxes.map((key, index) => (
+              <Bar
+                key={key}
+                dataKey={key}
+                name={key.replace(/_/g, ' ')}
+                fill={colors[index % colors.length]}
+                radius={[3, 3, 0, 0]}
+                onClick={null}
+              />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
     );
   };
 
@@ -179,45 +181,47 @@ const ChartComponent = ({ chartData }) => {
     if (yAxes.length === 0) return <div style={{color:'#9ca3af',padding:'16px',textAlign:'center'}}>No numeric columns to chart.</div>;
 
     return (
-      <ResponsiveContainer width="100%" height={300}>
-        <LineChart
-          data={coercedData}
-          margin={{ top: 5, right: 10, left: 10, bottom: 40 }}
-          onClick={null}
-        >
-          <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-          <XAxis
-            dataKey={xAxis}
-            stroke="#9ca3af"
-            tick={{ fill: '#9ca3af', fontSize: 10 }}
-            tickFormatter={formatMonth}
-            angle={-35}
-            textAnchor="end"
-            interval={0}
-            height={60}
-          />
-          <YAxis
-            stroke="#9ca3af"
-            tick={{ fill: '#9ca3af', fontSize: 10 }}
-            width={45}
-            tickFormatter={v => (v >= 1000 ? `${(v/1000).toFixed(1)}k` : v)}
-          />
-          <Tooltip content={<CustomTooltip />} />
-          {yAxes.map((key, index) => (
-            <Line
-              key={key}
-              type="monotone"
-              dataKey={key}
-              name={key.replace(/_/g, ' ')}
-              stroke={colors[index % colors.length]}
-              strokeWidth={2}
-              dot={{ fill: colors[index % colors.length], r: 4 }}
-              activeDot={{ r: 6 }}
-              onClick={null}
+      <div style={{ width: '100%', height: 300 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart
+            data={coercedData}
+            margin={{ top: 5, right: 10, left: 10, bottom: 40 }}
+            onClick={null}
+          >
+            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+            <XAxis
+              dataKey={xAxis}
+              stroke="#9ca3af"
+              tick={{ fill: '#9ca3af', fontSize: 10 }}
+              tickFormatter={formatMonth}
+              angle={-35}
+              textAnchor="end"
+              interval={0}
+              height={60}
             />
-          ))}
-        </LineChart>
-      </ResponsiveContainer>
+            <YAxis
+              stroke="#9ca3af"
+              tick={{ fill: '#9ca3af', fontSize: 10 }}
+              width={45}
+              tickFormatter={v => (v >= 1000 ? `${(v/1000).toFixed(1)}k` : v)}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            {yAxes.map((key, index) => (
+              <Line
+                key={key}
+                type="monotone"
+                dataKey={key}
+                name={key.replace(/_/g, ' ')}
+                stroke={colors[index % colors.length]}
+                strokeWidth={2}
+                dot={{ fill: colors[index % colors.length], r: 4 }}
+                activeDot={{ r: 6 }}
+                onClick={null}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
     );
   };
 
@@ -291,29 +295,31 @@ const ChartComponent = ({ chartData }) => {
     };
 
     return (
-      <ResponsiveContainer width="100%" height={350}>
-        <PieChart onClick={null}>
-          <Pie
-            data={pieData}
-            cx="50%"
-            cy="50%"
-            labelLine={{
-              stroke: '#9ca3af',
-              strokeWidth: 1
-            }}
-            label={renderCustomLabel}
-            outerRadius={100}
-            fill="#8884d8"
-            dataKey="value"
-            onClick={null}
-          >
-            {pieData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
-            ))}
-          </Pie>
-          <Tooltip content={<PieTooltip />} />
-        </PieChart>
-      </ResponsiveContainer>
+      <div style={{ width: '100%', height: 350 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart onClick={null}>
+            <Pie
+              data={pieData}
+              cx="50%"
+              cy="50%"
+              labelLine={{
+                stroke: '#9ca3af',
+                strokeWidth: 1
+              }}
+              label={renderCustomLabel}
+              outerRadius={100}
+              fill="#8884d8"
+              dataKey="value"
+              onClick={null}
+            >
+              {pieData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+              ))}
+            </Pie>
+            <Tooltip content={<PieTooltip />} />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
     );
   };
 
@@ -338,7 +344,8 @@ const ChartComponent = ({ chartData }) => {
           {title}
         </h3>
       )}
-      <div className="chart-wrapper">
+      {/* Explicit block + width so ResponsiveContainer always gets a measured pixel width */}
+      <div className="chart-wrapper" style={{ display: 'block', width: '100%' }}>
         {renderChart()}
       </div>
     </div>
