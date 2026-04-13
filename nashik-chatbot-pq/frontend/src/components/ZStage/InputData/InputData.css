@@ -627,6 +627,10 @@
   background: #fff;
 }
 
+.cell-select {
+  cursor: pointer;
+}
+
 .cell-textarea {
   width: 100%;
   min-width: 200px;

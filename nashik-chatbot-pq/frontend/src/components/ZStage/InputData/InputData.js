@@ -4,6 +4,9 @@ import { Upload, Database, CheckCircle, AlertCircle, Loader, Plus, X, ClipboardL
 import { inputApi, layeredAuditApi, layoutApi } from '../../../services/api/layoutApi';
 import './InputData.css';
 
+// Fixed options for 4M field
+const FOUR_M_OPTIONS = ['MAN', 'MATERIAL', 'METHOD', 'MACHINE'];
+
 // ── Strict allowed values for constrained master columns ─────────────────────
 const STRICT_VALUES = {
   type:        ['WH', 'USV'],
@@ -75,7 +78,7 @@ function RYGBadge({ value }) {
 const LONG_TEXT_FIELDS = new Set(['concern', 'root_cause', 'action_plan', 'comm', 'ncs']);
 
 // saveFn defaults to the master-data API; pass a different fn for audit tables
-function EditableCell({ recordId, fieldKey, value, type, onSaved, saveFn }) {
+function EditableCell({ recordId, fieldKey, value, type, options, onSaved, saveFn }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? '');
   const [saving, setSaving] = useState(false);
@@ -84,9 +87,10 @@ function EditableCell({ recordId, fieldKey, value, type, onSaved, saveFn }) {
   useEffect(() => { setDraft(value ?? ''); }, [value]);
   useEffect(() => { if (editing && inputRef.current) inputRef.current.focus(); }, [editing]);
 
-  const commit = useCallback(async () => {
+  const commit = useCallback(async (overrideVal) => {
     setEditing(false);
-    const trimmed = draft.trim();
+    const raw = overrideVal !== undefined ? overrideVal : draft;
+    const trimmed = typeof raw === 'string' ? raw.trim() : '';
     const original = String(value ?? '');
     if (trimmed === original) return;
 
@@ -131,6 +135,17 @@ function EditableCell({ recordId, fieldKey, value, type, onSaved, saveFn }) {
             rows={3}
             className="cell-textarea"
           />
+        ) : type === 'select' ? (
+          <select
+            ref={inputRef}
+            value={draft}
+            onChange={(e) => { const v = e.target.value; setDraft(v); commit(v); }}
+            onBlur={() => setEditing(false)}
+            className="cell-input cell-select"
+          >
+            <option value="">— select —</option>
+            {(options || []).map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
         ) : type === 'date' ? (
           <input
             ref={inputRef}
@@ -244,15 +259,15 @@ function MonthlyCell({ recordId, monthKey, monthlyData, onSaved }) {
 const LAYERED_AUDIT_COLUMNS = [
   { key: 'model',          label: 'Model',          width: 120, type: 'text'     },
   { key: 'sr_no',          label: 'Sr.No',          width: 200, type: 'text'     },
-  { key: 'date_col',       label: 'Date',           width: 110, type: 'text'     },
+  { key: 'date_col',       label: 'Date',           width: 120, type: 'date'     },
   { key: 'station_id',     label: 'Station ID',     width: 110, type: 'text'     },
   { key: 'workstation',    label: 'Workstation',    width: 180, type: 'text'     },
   { key: 'auditor',        label: 'Auditor',        width: 200, type: 'text'     },
   { key: 'ncs',            label: "NC's",           width: 280, type: 'longtext' },
   { key: 'action_plan',    label: 'Action Plan',    width: 280, type: 'longtext' },
-  { key: 'four_m',         label: '4M',             width: 100, type: 'text'     },
+  { key: 'four_m',         label: '4M',             width: 120, type: 'select',  options: FOUR_M_OPTIONS },
   { key: 'responsibility', label: 'Responsibility', width: 160, type: 'text'     },
-  { key: 'target_date',    label: 'Target Date',    width: 110, type: 'text'     },
+  { key: 'target_date',    label: 'Target Date',    width: 120, type: 'date'     },
   { key: 'status',         label: 'Status',         width: 90,  type: 'text'     },
 ];
 
@@ -423,6 +438,7 @@ function AuditTable({ columns, records, saveFn, onSaved }) {
                   fieldKey={col.key}
                   value={rec[col.key]}
                   type={col.type || 'text'}
+                  options={col.options}
                   onSaved={onSaved}
                   saveFn={saveFn}
                 />
@@ -663,7 +679,7 @@ function AddRecordModal({ type, onClose, onSaved, userId, layoutId, layoutStageI
           {type === 'layered-audit' && (
             <div className="modal-form-grid">
               <label>Model{inp('model')}</label>
-              <label>Date{inp('date_col')}</label>
+              <label>Date{inp('date_col', 'date')}</label>
               <label>Station ID
                 {layoutStageIds.length > 0
                   ? sel('station_id', layoutStageIds)
@@ -673,9 +689,9 @@ function AddRecordModal({ type, onClose, onSaved, userId, layoutId, layoutStageI
               <label>Auditor{inp('auditor')}</label>
               <label className="modal-form-full">NC's{ta('ncs')}</label>
               <label className="modal-form-full">Action Plan{ta('action_plan')}</label>
-              <label>4M{inp('four_m')}</label>
+              <label>4M {sel('four_m', FOUR_M_OPTIONS)}</label>
               <label>Responsibility{inp('responsibility')}</label>
-              <label>Target Date{inp('target_date')}</label>
+              <label>Target Date{inp('target_date', 'date')}</label>
               <label>Status{inp('status')}</label>
             </div>
           )}
@@ -688,7 +704,7 @@ function AddRecordModal({ type, onClose, onSaved, userId, layoutId, layoutStageI
               </label>
               <label>Stage Name{inp('stage_name')}</label>
               <label>Auditor{inp('auditor')}</label>
-              <label>Audit Date{inp('audit_date')}</label>
+              <label>Audit Date{inp('audit_date', 'date')}</label>
             </div>
           )}
           {error && (
