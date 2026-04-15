@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   BarChart,
   Bar,
@@ -24,6 +24,24 @@ import {
  * @param {Object} chartData.config - Chart configuration (axes, colors, etc.)
  */
 const ChartComponent = ({ chartData }) => {
+  // Measure the wrapper's actual pixel width via ResizeObserver so charts
+  // render correctly even when mounted inside animating or flex containers
+  // (e.g. the Framer Motion panel that starts at width:0).
+  const wrapperRef = useRef(null);
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    // Measure immediately in case the container already has a layout
+    if (el.offsetWidth > 0) setContainerWidth(el.offsetWidth);
+    const ro = new ResizeObserver(() => {
+      if (el.offsetWidth > 0) setContainerWidth(el.offsetWidth);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   if (!chartData || !chartData.data || chartData.data.length === 0) {
     return null;
   }
@@ -129,7 +147,7 @@ const ChartComponent = ({ chartData }) => {
 
     return (
       <div style={{ width: '100%', height: 300 }}>
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width={containerWidth} height={300}>
           <BarChart
             data={coercedData}
             margin={{ top: 5, right: 10, left: 10, bottom: 40 }}
@@ -193,7 +211,7 @@ const ChartComponent = ({ chartData }) => {
 
     return (
       <div style={{ width: '100%', height: 300 }}>
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width={containerWidth} height={300}>
           <LineChart
             data={coercedData}
             margin={{ top: 5, right: 10, left: 10, bottom: 40 }}
@@ -307,7 +325,7 @@ const ChartComponent = ({ chartData }) => {
 
     return (
       <div style={{ width: '100%', height: 350 }}>
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width={containerWidth} height={350}>
           <PieChart onClick={null}>
             <Pie
               data={pieData}
@@ -371,9 +389,10 @@ const ChartComponent = ({ chartData }) => {
           {title}
         </h3>
       )}
-      {/* Explicit block + width so ResponsiveContainer always gets a measured pixel width */}
-      <div style={{ display: 'block', width: '100%' }}>
-        {renderChart()}
+      {/* wrapperRef measures the actual pixel width so charts render correctly
+          inside animating / flex containers where width:"100%" resolves to 0 */}
+      <div ref={wrapperRef} style={{ display: 'block', width: '100%' }}>
+        {containerWidth > 0 && renderChart()}
       </div>
     </div>
   );
