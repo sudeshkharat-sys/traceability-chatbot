@@ -49,16 +49,16 @@ const ChartComponent = ({ chartData }) => {
 
   const { type, title, data, config = {} } = chartData;
 
-  // Theme-matched colors: crimson red primary, white + warm accents
+  // Theme-matched colors: all visible on white, crimson red primary
   const DEFAULT_COLORS = [
     '#CC0000', // Mahindra crimson red
-    '#FFFFFF', // white
-    '#FF6B6B', // coral red
+    '#E8A838', // amber gold (distinct, warm complement)
     '#8B0000', // dark crimson
-    '#FFB347', // amber (warm complement)
-    '#E84545', // lighter crimson
-    '#FF9999', // pale rose
-    '#B22222', // firebrick
+    '#FF6B6B', // coral red
+    '#B5770D', // dark amber
+    '#C0392B', // pomegranate
+    '#F4845F', // salmon
+    '#7B1B1B', // very dark red
   ];
 
   const colors = config.colors || DEFAULT_COLORS;
