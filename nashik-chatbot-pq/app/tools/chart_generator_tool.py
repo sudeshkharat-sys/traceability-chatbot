@@ -118,6 +118,16 @@ def generate_chart(query_results_json: str, user_question: str) -> str:
         chart_data = chart_agent.generate(query_results=rows, user_question=user_question)
 
         if chart_data is None:
+            # Fallback: use the rule-based formatter so charts always render
+            # when data is suitable, even if the LLM sub-agent can't produce
+            # structured output.
+            try:
+                from app.utils.chart_formatter import format_neo4j_results_for_chart
+                chart_data = format_neo4j_results_for_chart(rows, user_question)
+            except Exception as _fe:
+                logger.debug(f"Rule-based chart fallback failed: {_fe}")
+
+        if chart_data is None:
             return json.dumps({
                 "success": False,
                 "message": "Chart agent determined the data is not suitable for charting",

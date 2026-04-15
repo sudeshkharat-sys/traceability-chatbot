@@ -1219,11 +1219,13 @@ function PartLabeler() {
         conv.query_responses.forEach(item => {
           loaded.push({ id: `u-${item.message_id}`, sender: 'user', text: item.query });
           let txt = 'No response';
+          let chartData;
           try {
             const r = typeof item.response === 'string' ? JSON.parse(item.response) : item.response;
             txt = r?.response || r?.text || r?.content || (typeof r === 'string' ? r : JSON.stringify(r));
+            chartData = r?.chart_data || undefined;
           } catch { txt = String(item.response); }
-          loaded.push({ id: `b-${item.message_id}`, sender: 'bot', text: txt });
+          loaded.push({ id: `b-${item.message_id}`, sender: 'bot', text: txt, ...(chartData && { chart_data: chartData }) });
         });
       }
       setAgentMessages(loaded);

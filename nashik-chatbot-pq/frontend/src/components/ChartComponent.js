@@ -88,6 +88,16 @@ const ChartComponent = ({ chartData }) => {
     );
   };
 
+  // Helper: returns true if a value is numeric or a string that parses as a finite number
+  const isNumericValue = (v) => {
+    if (typeof v === 'number') return true;
+    if (typeof v === 'string' && v.trim() !== '') {
+      const n = parseFloat(v.replace(/[^0-9.-]/g, ''));
+      return !isNaN(n) && isFinite(n);
+    }
+    return false;
+  };
+
   // Render Bar Chart
   const renderBarChart = () => {
     // Detect xAxis key — fall back to first string column if specified key isn't in data
@@ -96,13 +106,14 @@ const ChartComponent = ({ chartData }) => {
       ? specifiedX
       : Object.keys(data[0]).find(k => typeof data[0][k] === 'string') || Object.keys(data[0])[0];
 
-    // Detect yAxis keys — fall back to all numeric columns if none specified or none match
+    // Detect yAxis keys — fall back to all numeric columns if none specified or none match.
+    // Also handles PostgreSQL Decimal values serialised as strings (e.g. "123.45").
     const specifiedY = Array.isArray(config.yAxis) && config.yAxis.length > 0
       ? config.yAxis.filter(k => k in data[0])
       : [];
     const yAxes = specifiedY.length > 0
       ? specifiedY
-      : Object.keys(data[0]).filter(k => k !== xAxis && typeof data[0][k] === 'number');
+      : Object.keys(data[0]).filter(k => k !== xAxis && isNumericValue(data[0][k]));
 
     // Coerce y values to numbers in case SQL returned string numerics
     const coercedData = data.map(row => {
@@ -169,7 +180,7 @@ const ChartComponent = ({ chartData }) => {
       : [];
     const yAxes = specifiedY.length > 0
       ? specifiedY
-      : Object.keys(data[0]).filter(k => k !== xAxis && typeof data[0][k] === 'number');
+      : Object.keys(data[0]).filter(k => k !== xAxis && isNumericValue(data[0][k]));
     const coercedData = data.map(row => {
       const r = { ...row };
       yAxes.forEach(k => { r[k] = parseFloat(String(r[k]).replace(/[^0-9.-]/g, '')) || 0; });
@@ -338,14 +349,30 @@ const ChartComponent = ({ chartData }) => {
   };
 
   return (
-    <div className="chart-container my-3 p-3 bg-gray-800 rounded-lg border border-gray-700">
+    <div style={{
+      display: 'block',
+      width: '100%',
+      margin: '8px 0',
+      padding: '12px',
+      backgroundColor: '#1f2937',
+      borderRadius: '8px',
+      border: '1px solid #374151',
+      boxSizing: 'border-box',
+    }}>
       {title && (
-        <h3 className="text-sm font-semibold text-gray-100 mb-3 pb-2 border-b border-gray-700">
+        <h3 style={{
+          fontSize: '0.8rem',
+          fontWeight: '600',
+          color: '#f3f4f6',
+          marginBottom: '10px',
+          paddingBottom: '8px',
+          borderBottom: '1px solid #374151',
+        }}>
           {title}
         </h3>
       )}
       {/* Explicit block + width so ResponsiveContainer always gets a measured pixel width */}
-      <div className="chart-wrapper" style={{ display: 'block', width: '100%' }}>
+      <div style={{ display: 'block', width: '100%' }}>
         {renderChart()}
       </div>
     </div>
