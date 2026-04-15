@@ -11,6 +11,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from 'recharts';
 
@@ -48,16 +49,16 @@ const ChartComponent = ({ chartData }) => {
 
   const { type, title, data, config = {} } = chartData;
 
-  // Default colors for charts
+  // Theme-matched colors: crimson red primary, white + warm accents
   const DEFAULT_COLORS = [
-    '#3b82f6', // blue
-    '#ef4444', // red
-    '#22c55e', // green
-    '#f59e0b', // amber
-    '#8b5cf6', // purple
-    '#ec4899', // pink
-    '#14b8a6', // teal
-    '#f97316', // orange
+    '#CC0000', // Mahindra crimson red
+    '#FFFFFF', // white
+    '#FF6B6B', // coral red
+    '#8B0000', // dark crimson
+    '#FFB347', // amber (warm complement)
+    '#E84545', // lighter crimson
+    '#FF9999', // pale rose
+    '#B22222', // firebrick
   ];
 
   const colors = config.colors || DEFAULT_COLORS;
@@ -89,12 +90,12 @@ const ChartComponent = ({ chartData }) => {
     return (
       <div style={{
         backgroundColor: '#1f2937',
-        border: '1px solid #374151',
+        border: '1px solid #CC0000',
         borderRadius: '6px',
-        padding: '10px',
+        padding: '8px 10px',
         color: '#ffffff'
       }}>
-        <p style={{fontWeight: 'bold', color: '#ffffff' }}>
+        <p style={{fontWeight: 'bold', color: '#CC0000', fontSize: '11px' }}>
           {formatMonth(label)}
         </p>
         {payload.map((entry, index) => (
@@ -273,72 +274,63 @@ const ChartComponent = ({ chartData }) => {
       value: parseFloat(String(item[valueKey] || '0').replace(/[^0-9.-]/g, '')) || 0
     }));
 
-    // Custom label that stays visible (not just on hover)
-    const renderCustomLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
+    // Inline % label rendered inside the slice (never overflows SVG bounds)
+    const renderInlineLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }) => {
+      if (percent < 0.08) return null; // skip tiny slices
       const RADIAN = Math.PI / 180;
-      const radius = outerRadius + 20;
-      const x = cx + radius * Math.cos(-midAngle * RADIAN);
-      const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-      // Only show label if percentage is > 5% (to avoid cluttering small slices)
-      if (percent < 0.05) return null;
-
+      const r = innerRadius + (outerRadius - innerRadius) * 0.55;
+      const x = cx + r * Math.cos(-midAngle * RADIAN);
+      const y = cy + r * Math.sin(-midAngle * RADIAN);
       return (
         <text
           x={x}
           y={y}
-          fill="#9ca3af"
-          textAnchor={x > cx ? 'start' : 'end'}
+          fill="#ffffff"
+          textAnchor="middle"
           dominantBaseline="central"
-          style={{ fontSize: '11px', fontWeight: '500' }}
+          style={{ fontSize: '10px', fontWeight: '600' }}
         >
-          {`${name}: ${(percent * 100).toFixed(1)}%`}
+          {`${(percent * 100).toFixed(1)}%`}
         </text>
       );
     };
 
-    // Custom pie tooltip with white text
+    // Custom pie tooltip
     const PieTooltip = ({ active, payload }) => {
       if (!active || !payload || !payload[0]) return null;
-
-      const data = payload[0];
+      const item = payload[0];
       const total = pieData.reduce((sum, d) => sum + d.value, 0);
-      const percent = ((data.value / total) * 100).toFixed(1);
-
+      const percent = ((item.value / total) * 100).toFixed(1);
       return (
         <div style={{
           backgroundColor: '#1f2937',
-          border: '1px solid #374151',
+          border: '1px solid #CC0000',
           borderRadius: '6px',
-          padding: '10px',
+          padding: '8px 10px',
           color: '#ffffff'
         }}>
-          <p style={{ margin: '0', fontWeight: 'bold', color: '#ffffff' }}>
-            {data.name}
+          <p style={{ margin: '0', fontWeight: 'bold', color: '#CC0000', fontSize: '11px' }}>
+            {item.name}
           </p>
-          <p style={{ margin: '3px 0 0 0', color: '#ffffff' }}>
-            {data.value} ({percent}%)
+          <p style={{ margin: '3px 0 0', color: '#ffffff', fontSize: '11px' }}>
+            {item.value} ({percent}%)
           </p>
         </div>
       );
     };
 
     return (
-      <div style={{ width: '100%', height: 350 }}>
-        <ResponsiveContainer width={containerWidth} height={350}>
-          <PieChart onClick={null}>
+      <div style={{ width: '100%', height: 340 }}>
+        <ResponsiveContainer width={containerWidth} height={340}>
+          <PieChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
             <Pie
               data={pieData}
               cx="50%"
-              cy="50%"
-              labelLine={{
-                stroke: '#9ca3af',
-                strokeWidth: 1
-              }}
-              label={renderCustomLabel}
-              outerRadius={100}
-              fill="#8884d8"
+              cy="44%"
+              outerRadius={80}
               dataKey="value"
+              label={renderInlineLabel}
+              labelLine={false}
               onClick={null}
             >
               {pieData.map((entry, index) => (
@@ -346,6 +338,16 @@ const ChartComponent = ({ chartData }) => {
               ))}
             </Pie>
             <Tooltip content={<PieTooltip />} />
+            <Legend
+              iconType="square"
+              iconSize={8}
+              wrapperStyle={{ fontSize: '10px', color: '#9ca3af', paddingTop: '6px' }}
+              formatter={(value) => (
+                <span style={{ color: '#9ca3af', fontSize: '10px' }}>
+                  {value && value.length > 18 ? value.slice(0, 18) + '…' : value}
+                </span>
+              )}
+            />
           </PieChart>
         </ResponsiveContainer>
       </div>
