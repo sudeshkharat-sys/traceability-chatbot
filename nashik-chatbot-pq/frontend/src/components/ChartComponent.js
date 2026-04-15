@@ -89,17 +89,18 @@ const ChartComponent = ({ chartData }) => {
 
     return (
       <div style={{
-        backgroundColor: '#1f2937',
+        backgroundColor: '#ffffff',
         border: '1px solid #CC0000',
         borderRadius: '6px',
         padding: '8px 10px',
-        color: '#ffffff'
+        color: '#111827',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
       }}>
         <p style={{fontWeight: 'bold', color: '#CC0000', fontSize: '11px' }}>
           {formatMonth(label)}
         </p>
         {payload.map((entry, index) => (
-          <p key={index} style={{ color: '#ffffff' }}>
+          <p key={index} style={{ color: '#374151' }}>
             <span style={{ color: entry.color }}>●</span> {entry.name}: {entry.value}
           </p>
         ))}
@@ -154,19 +155,19 @@ const ChartComponent = ({ chartData }) => {
             margin={{ top: 5, right: 10, left: 10, bottom: 40 }}
             onClick={null}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis
               dataKey={xAxis}
-              stroke="#9ca3af"
-              tick={{ fill: '#9ca3af', fontSize: 10 }}
+              stroke="#d1d5db"
+              tick={{ fill: '#6b7280', fontSize: 10 }}
               angle={-35}
               textAnchor="end"
               interval={0}
               height={60}
             />
             <YAxis
-              stroke="#9ca3af"
-              tick={{ fill: '#9ca3af', fontSize: 10 }}
+              stroke="#d1d5db"
+              tick={{ fill: '#6b7280', fontSize: 10 }}
               width={45}
               tickFormatter={v => (v >= 1000 ? `${(v/1000).toFixed(1)}k` : v)}
             />
@@ -218,11 +219,11 @@ const ChartComponent = ({ chartData }) => {
             margin={{ top: 5, right: 10, left: 10, bottom: 40 }}
             onClick={null}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis
               dataKey={xAxis}
-              stroke="#9ca3af"
-              tick={{ fill: '#9ca3af', fontSize: 10 }}
+              stroke="#d1d5db"
+              tick={{ fill: '#6b7280', fontSize: 10 }}
               tickFormatter={formatMonth}
               angle={-35}
               textAnchor="end"
@@ -230,8 +231,8 @@ const ChartComponent = ({ chartData }) => {
               height={60}
             />
             <YAxis
-              stroke="#9ca3af"
-              tick={{ fill: '#9ca3af', fontSize: 10 }}
+              stroke="#d1d5db"
+              tick={{ fill: '#6b7280', fontSize: 10 }}
               width={45}
               tickFormatter={v => (v >= 1000 ? `${(v/1000).toFixed(1)}k` : v)}
             />
@@ -288,7 +289,7 @@ const ChartComponent = ({ chartData }) => {
           fill="#ffffff"
           textAnchor="middle"
           dominantBaseline="central"
-          style={{ fontSize: '10px', fontWeight: '600' }}
+          style={{ fontSize: '10px', fontWeight: '700' }}
         >
           {`${(percent * 100).toFixed(1)}%`}
         </text>
@@ -303,16 +304,17 @@ const ChartComponent = ({ chartData }) => {
       const percent = ((item.value / total) * 100).toFixed(1);
       return (
         <div style={{
-          backgroundColor: '#1f2937',
+          backgroundColor: '#ffffff',
           border: '1px solid #CC0000',
           borderRadius: '6px',
           padding: '8px 10px',
-          color: '#ffffff'
+          color: '#111827',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.12)'
         }}>
           <p style={{ margin: '0', fontWeight: 'bold', color: '#CC0000', fontSize: '11px' }}>
             {item.name}
           </p>
-          <p style={{ margin: '3px 0 0', color: '#ffffff', fontSize: '11px' }}>
+          <p style={{ margin: '3px 0 0', color: '#374151', fontSize: '11px' }}>
             {item.value} ({percent}%)
           </p>
         </div>
@@ -341,9 +343,9 @@ const ChartComponent = ({ chartData }) => {
             <Legend
               iconType="square"
               iconSize={8}
-              wrapperStyle={{ fontSize: '10px', color: '#9ca3af', paddingTop: '6px' }}
+              wrapperStyle={{ fontSize: '10px', color: '#374151', paddingTop: '6px' }}
               formatter={(value) => (
-                <span style={{ color: '#9ca3af', fontSize: '10px' }}>
+                <span style={{ color: '#374151', fontSize: '10px' }}>
                   {value && value.length > 18 ? value.slice(0, 18) + '…' : value}
                 </span>
               )}
@@ -374,19 +376,19 @@ const ChartComponent = ({ chartData }) => {
       width: '100%',
       margin: '8px 0',
       padding: '12px',
-      backgroundColor: '#1f2937',
+      backgroundColor: '#ffffff',
       borderRadius: '8px',
-      border: '1px solid #374151',
+      border: '1px solid #e5e7eb',
       boxSizing: 'border-box',
     }}>
       {title && (
         <h3 style={{
           fontSize: '0.8rem',
           fontWeight: '600',
-          color: '#f3f4f6',
+          color: '#CC0000',
           marginBottom: '10px',
           paddingBottom: '8px',
-          borderBottom: '1px solid #374151',
+          borderBottom: '1px solid #e5e7eb',
         }}>
           {title}
         </h3>
