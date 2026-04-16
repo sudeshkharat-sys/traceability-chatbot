@@ -20,7 +20,7 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/" replace />;
   }
 
-  if (!authService.canAccess(location.pathname)) {
+  if (!authService.canAccess(location.pathname + location.search)) {
     return <Navigate to="/" replace />;
   }
 
