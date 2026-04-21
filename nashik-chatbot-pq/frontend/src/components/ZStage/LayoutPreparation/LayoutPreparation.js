@@ -1,13 +1,73 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Xwrapper } from 'react-xarrows';
 import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
-import { Pencil, LayoutGrid, Trash2, ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
+import { Pencil, LayoutGrid, Trash2, ZoomIn, ZoomOut, Maximize2, Check, Cloud, AlertCircle, X } from 'lucide-react';
 import StationBox from './StationBox/StationBox';
 import BuyoffIcon from './BypassIcon/BypassIcon';
 import AddBoxModal from './AddBoxModal/AddBoxModal';
 import { layoutApi } from '../../../services/api/layoutApi';
 import { getPortCanvasPos, buildObstacles, routePath } from '../shared/routeArrow';
+import HelpGuide from '../shared/HelpGuide/HelpGuide';
 import './LayoutPreparation.css';
+
+const LAYOUT_HELP = {
+  title: 'Layout Preparation — Guide',
+  sections: [
+    {
+      heading: 'Getting Started',
+      items: [
+        { icon: '➕', label: 'Add Box',         desc: 'Click "Add Box" in the sidebar to create a new station group. Enter a name, choose station IDs (Auto, Range, or Custom), and optionally add station names.' },
+        { icon: '💎', label: 'Add Buyoff',      desc: 'Click "Add Buyoff" in the sidebar to drop a diamond-shaped buyoff / bypass icon onto the canvas.' },
+        { icon: '💾', label: 'Save Layout',     desc: 'Click "Save Layout" in the sidebar to manually save the current state. Changes are also auto-saved after 1.5 s — the cloud indicator in the toolbar shows Saved / Saving / Pending.' },
+      ],
+    },
+    {
+      heading: 'Canvas Navigation',
+      items: [
+        { icon: '🖱️', label: 'Pan',            desc: 'Click and drag on an empty area of the canvas to pan around.' },
+        { icon: '🔍', label: 'Zoom',            desc: 'Use the scroll wheel, or the +/− toolbar buttons (top-right), to zoom in and out.' },
+        { icon: '⊡',  label: 'Fit View',       desc: 'Click the "Fit" button in the toolbar to zoom and centre all boxes in view.' },
+      ],
+    },
+    {
+      heading: 'Working with Boxes',
+      items: [
+        { icon: '✋', label: 'Move',             desc: 'Drag a box by its header bar to reposition it. Boxes snap to the grid.' },
+        { icon: '✏️', label: 'Edit Title',       desc: 'Double-click the box title to rename it inline.' },
+        { icon: '🏷️', label: 'Edit Station ID',  desc: 'Double-click a green station ID header cell to rename that station.' },
+        { icon: '📝', label: 'Station Name',     desc: 'Double-click the blue row below a station ID to add or edit the station\'s display name.' },
+        { icon: '📄', label: 'Description',      desc: 'Click the grey description bar (below the blue row) to add a short description for the whole box.' },
+        { icon: '🗑️', label: 'Delete Box',       desc: 'Click the × in the top-right corner of a box, or select the box and press Delete / Backspace.' },
+      ],
+    },
+    {
+      heading: 'Connections (Arrows)',
+      items: [
+        { icon: '🔴', label: 'Draw Arrow',       desc: 'Hover over a box to reveal the red port dots on each edge. Drag from one dot to another box\'s dot to create a connection arrow.' },
+        { icon: '🖱️', label: 'Delete Arrow',     desc: 'Click an existing arrow to select it, then click the red × that appears on it to delete.' },
+      ],
+    },
+    {
+      heading: 'Selection & Clipboard',
+      items: [
+        { icon: '🖱️', label: 'Select',           desc: 'Click a box to select it (blue outline). Hold Ctrl and click to multi-select.' },
+        { icon: '📋', label: 'Copy / Paste',     desc: 'Ctrl+C to copy selected boxes, Ctrl+V to paste with a small offset. Sidebar also has Copy and Paste buttons.' },
+        { icon: '↩️', label: 'Undo / Redo',      desc: 'Ctrl+Z to undo, Ctrl+Y (or Ctrl+Shift+Z) to redo — up to 50 steps.' },
+        { icon: '⌫',  label: 'Delete Selected',  desc: 'Press Delete or Backspace to remove all selected boxes at once.' },
+        { icon: '⎋',  label: 'Deselect',         desc: 'Press Escape to clear the current selection.' },
+      ],
+    },
+    {
+      heading: 'Managing Layouts',
+      items: [
+        { icon: '📂', label: 'Open Layout',      desc: 'Click "Open Layout" in the sidebar to expand a dropdown listing all saved layouts. Click any layout name to load it onto the canvas.' },
+        { icon: '📑', label: 'Copy a Layout',    desc: 'In the Open Layout dropdown, click the ⋯ (three-dot) menu on any layout and choose "Copy" to create a full duplicate.' },
+        { icon: '✏️', label: 'Rename a Layout',  desc: 'In the Open Layout dropdown, click ⋯ → "Rename" to edit the layout\'s name inline.' },
+        { icon: '🗑️', label: 'Delete a Layout',  desc: 'In the Open Layout dropdown, click ⋯ → "Delete" to permanently remove that layout (a confirmation prompt appears).' },
+      ],
+    },
+  ],
+};
 
 let nextId = 1;
 const uid = () => `loc-${nextId++}`;
@@ -20,7 +80,7 @@ const CANVAS_SIZE = 5000;
 // Box dimensions are multiples of GRID so edges align to grid lines
 const boxSize = (stationCount) => ({
   w: Math.max(2, stationCount) * GRID + 4, // 40px per station + 4px border, min 2 cols = 84px
-  h: 4 * GRID,                             // 160px = 4 grid rows
+  h: 5 * GRID,                             // 200px = 5 grid rows (includes station names row)
 });
 
 const snap = (v) => Math.round(v / GRID) * GRID;
@@ -89,6 +149,15 @@ function stateFromApi(apiLayout) {
         });
       } catch (_) { parsedStationData = {}; }
     }
+
+    // Lift station names out of stationData into a first-class field so they
+    // survive every save→rebuild cycle independently of the stationData blob.
+    const stationNames = Array.isArray(parsedStationData.__station_names__)
+      ? parsedStationData.__station_names__
+      : [];
+    const cleanStationData = { ...parsedStationData };
+    delete cleanStationData.__station_names__;
+
     return {
       id: `db-box-${b.id}`,
       dbId: b.id,
@@ -96,7 +165,8 @@ function stateFromApi(apiLayout) {
       stationIds: b.station_ids
         ? (typeof b.station_ids === 'string' ? b.station_ids.split(',') : b.station_ids)
         : buildIds(b.prefix, b.station_count),
-      stationData: parsedStationData,
+      stationNames,
+      stationData: cleanStationData,
       position: { x: b.position_x, y: b.position_y },
       orderIndex: b.order_index,
     };
@@ -150,6 +220,7 @@ function LayoutPreparation({
   addBuyoffSignal,
   onSaveLayout,
   onLoadLayout,
+  onCopyLayout,
   userId,
 }) {
   const [boxes, setBoxes] = useState([]);
@@ -160,6 +231,74 @@ function LayoutPreparation({
   const [currentLayoutId, setCurrentLayoutId] = useState(null);
   const [canvasScale, setCanvasScale] = useState(1);
   const [transformState, setTransformState] = useState({ scale: 1, positionX: 0, positionY: 0 });
+
+  // ── Selection + clipboard ────────────────────────────────────────────────────
+  const [selectedIds, setSelectedIds] = useState([]); // string[]
+  const [clipboard, setClipboard]     = useState(null); // box[] | null
+
+  // ── Auto-save state ──────────────────────────────────────────────────────────
+  // 'idle' | 'pending' | 'saving' | 'saved' | 'error'
+  const [autoSaveStatus, setAutoSaveStatus] = useState('idle');
+  const [showNameModal, setShowNameModal] = useState(false);
+  const [nameDraft, setNameDraft]           = useState('');
+  const autoSaveTimerRef   = useRef(null);
+  const isSavingRef        = useRef(false);
+  const isLoadingRef       = useRef(false);
+  const nameModalShownRef  = useRef(false); // show name modal only once per new layout
+  const isDirtyRef         = useRef(false);
+  const handleSaveRef      = useRef(null);  // always points to latest handleSave
+
+  // ── Undo / Redo history ───────────────────────────────────────────────────────
+  const undoStackRef  = useRef([]);  // snapshots we can go back to
+  const redoStackRef  = useRef([]);  // snapshots we can go forward to
+  // Mirror refs so history callbacks always read current state without stale closure
+  const boxesRef      = useRef([]);
+  const buyoffRef     = useRef([]);
+  const connsRef      = useRef([]);
+  useEffect(() => { boxesRef.current  = boxes;       }, [boxes]);
+  useEffect(() => { buyoffRef.current = buyoffIcons; }, [buyoffIcons]);
+  useEffect(() => { connsRef.current  = connections; }, [connections]);
+
+  // Call BEFORE any mutation to snapshot the current state
+  const pushHistory = useCallback(() => {
+    const snap = { boxes: boxesRef.current, buyoffIcons: buyoffRef.current, connections: connsRef.current };
+    undoStackRef.current = [...undoStackRef.current.slice(-49), snap];
+    redoStackRef.current = [];
+  }, []);
+
+  // Ref so the keyboard handler always calls the latest version
+  const pushHistoryRef = useRef(pushHistory);
+  useEffect(() => { pushHistoryRef.current = pushHistory; }, [pushHistory]);
+
+  const handleUndo = useCallback(() => {
+    if (undoStackRef.current.length === 0) return;
+    const prev = undoStackRef.current[undoStackRef.current.length - 1];
+    undoStackRef.current = undoStackRef.current.slice(0, -1);
+    redoStackRef.current = [
+      { boxes: boxesRef.current, buyoffIcons: buyoffRef.current, connections: connsRef.current },
+      ...redoStackRef.current.slice(0, 49),
+    ];
+    isLoadingRef.current = true;
+    setBoxes(prev.boxes);
+    setBuyoffIcons(prev.buyoffIcons);
+    setConnections(prev.connections);
+    setTimeout(() => { isLoadingRef.current = false; }, 50);
+  }, []);
+
+  const handleRedo = useCallback(() => {
+    if (redoStackRef.current.length === 0) return;
+    const next = redoStackRef.current[0];
+    redoStackRef.current = redoStackRef.current.slice(1);
+    undoStackRef.current = [
+      ...undoStackRef.current.slice(-49),
+      { boxes: boxesRef.current, buyoffIcons: buyoffRef.current, connections: connsRef.current },
+    ];
+    isLoadingRef.current = true;
+    setBoxes(next.boxes);
+    setBuyoffIcons(next.buyoffIcons);
+    setConnections(next.connections);
+    setTimeout(() => { isLoadingRef.current = false; }, 50);
+  }, []);
 
   // ── Drag-to-connect state ────────────────────────────────────────────────────
   const [dragging, setDragging] = useState(null);
@@ -176,7 +315,7 @@ function LayoutPreparation({
 
     loadedBoxes.forEach((box) => {
       const w = boxSize(box.stationIds?.length ?? 2).w;
-      const h = 4 * GRID; // boxSize height is always 160px
+      const h = 5 * GRID; // boxSize height is always 200px
       minX = Math.min(minX, box.position.x);
       minY = Math.min(minY, box.position.y);
       maxX = Math.max(maxX, box.position.x + w);
@@ -287,6 +426,7 @@ function LayoutPreparation({
       }
 
       if (targetId) {
+        pushHistoryRef.current();
         setConnections((prev) => {
           const dup = prev.some(
             (c) => c.fromId === dragging.fromId && c.toId === targetId,
@@ -325,17 +465,19 @@ function LayoutPreparation({
 
   // ── Box actions ─────────────────────────────────────────────────────────────
   const handleAddBox = useCallback((boxData) => {
+    pushHistory();
     const id = uid();
     setBoxes((prev) => {
       const baseStationData = boxData.stationData || {};
+      const extra = {};
+      if (boxData.description) extra.__box_desc__ = boxData.description;
       const newBox = {
         id,
         dbId: null,
         name: boxData.name,
         stationIds: boxData.stationIds,
-        stationData: boxData.description
-          ? { ...baseStationData, __box_desc__: boxData.description }
-          : baseStationData,
+        stationNames: boxData.stationNames || [],   // top-level field
+        stationData: { ...baseStationData, ...extra },
         orderIndex: prev.length,
         position: { x: 0, y: 0 },
       };
@@ -349,6 +491,7 @@ function LayoutPreparation({
   }, []);
 
   const handleBoxPositionChange = useCallback((id, rawPos) => {
+    pushHistory();
     const snapped = { x: snap(rawPos.x), y: snap(rawPos.y) };
     setBoxes((prev) => {
       const updated = prev.map((b) => (b.id === id ? { ...b, position: snapped } : b));
@@ -362,12 +505,126 @@ function LayoutPreparation({
   }, []);
 
   const handleDeleteBox = useCallback((id) => {
+    pushHistory();
     setBoxes((prev) => prev.filter((b) => b.id !== id));
     setConnections((prev) => prev.filter((c) => c.fromId !== id && c.toId !== id));
+    setSelectedIds((prev) => prev.filter((sid) => sid !== id));
   }, []);
+
+  // ── Selection ────────────────────────────────────────────────────────────────
+  const handleBoxSelect = useCallback((id, multi) => {
+    setSelectedIds((prev) => {
+      if (multi) {
+        return prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id];
+      }
+      // Single click: deselect if already sole selection, else select only this
+      return prev.length === 1 && prev[0] === id ? [] : [id];
+    });
+  }, []);
+
+  const clearSelection = useCallback(() => setSelectedIds([]), []);
+
+  // ── Copy selected boxes ───────────────────────────────────────────────────────
+  const handleCopySelected = useCallback(() => {
+    if (selectedIds.length === 0) return;
+    const toCopy = boxes.filter((b) => selectedIds.includes(b.id));
+    setClipboard(toCopy);
+  }, [selectedIds, boxes]);
+
+  // ── Paste clipboard ───────────────────────────────────────────────────────────
+  const handlePaste = useCallback(() => {
+    if (!clipboard || clipboard.length === 0) return;
+    pushHistory();
+    const OFFSET = GRID * 2; // 80px offset so pasted boxes are visually distinct
+    setBoxes((prev) => {
+      let updated = [...prev];
+      const newIds = [];
+      for (const src of clipboard) {
+        const id = uid();
+        newIds.push(id);
+        const rawPos = { x: src.position.x + OFFSET, y: src.position.y + OFFSET };
+        const position = findValidPos(
+          { ...src, id, stationCount: src.stationIds.length },
+          rawPos,
+          updated,
+        );
+        updated = [...updated, { ...src, id, dbId: null, position }];
+      }
+      // Select the newly pasted boxes
+      setSelectedIds(newIds);
+      return updated;
+    });
+  }, [clipboard]);
+
+  // ── Delete selected boxes ─────────────────────────────────────────────────────
+  const handleDeleteSelected = useCallback(() => {
+    if (selectedIds.length === 0) return;
+    pushHistory();
+    setBoxes((prev) => prev.filter((b) => !selectedIds.includes(b.id)));
+    setConnections((prev) =>
+      prev.filter((c) => !selectedIds.includes(c.fromId.split('__')[0]) && !selectedIds.includes(c.toId.split('__')[0]))
+    );
+    setSelectedIds([]);
+  }, [selectedIds]);
+
+  const handleBoxNameChange = useCallback((id, newName) => {
+    pushHistory();
+    setBoxes((prev) => prev.map((b) => b.id === id ? { ...b, name: newName } : b));
+  }, [pushHistory]);
+
+  const handleBoxDescriptionChange = useCallback((id, newDesc) => {
+    pushHistory();
+    setBoxes((prev) => prev.map((b) => {
+      if (b.id !== id) return b;
+      return {
+        ...b,
+        stationData: { ...b.stationData, __box_desc__: newDesc },
+      };
+    }));
+  }, [pushHistory]);
+
+  const handleBoxStationNamesChange = useCallback((id, newNames) => {
+    pushHistory();
+    setBoxes((prev) => prev.map((b) =>
+      b.id !== id ? b : { ...b, stationNames: newNames }
+    ));
+  }, []);
+
+  const handleBoxStationIdChange = useCallback((boxId, stationIndex, newSid) => {
+    const targetBox = boxes.find((b) => b.id === boxId);
+    if (!targetBox) return;
+    const oldSid = targetBox.stationIds[stationIndex];
+    if (!newSid || newSid === oldSid) return;
+    pushHistory();
+
+    setBoxes((prev) => prev.map((b) => {
+      if (b.id !== boxId) return b;
+      const newIds = [...b.stationIds];
+      newIds[stationIndex] = newSid;
+      // Rename stationData key if present
+      const newStationData = { ...b.stationData };
+      if (oldSid in newStationData) {
+        newStationData[newSid] = newStationData[oldSid];
+        delete newStationData[oldSid];
+      }
+      return { ...b, stationIds: newIds, stationData: newStationData };
+    }));
+
+    // Update any connections that referenced the old station port IDs
+    const oldTop    = `${boxId}__${oldSid}`;
+    const oldBottom = `${boxId}__${oldSid}__b`;
+    const newTop    = `${boxId}__${newSid}`;
+    const newBottom = `${boxId}__${newSid}__b`;
+    setConnections((prev) => prev.map((c) => ({
+      ...c,
+      fromId: c.fromId === oldTop ? newTop : c.fromId === oldBottom ? newBottom : c.fromId,
+      toId:   c.toId   === oldTop ? newTop : c.toId   === oldBottom ? newBottom : c.toId,
+    })));
+  }, [boxes]);
 
   // ── Buyoff icon actions ─────────────────────────────────────────────────────
   const handleAddBuyoff = useCallback(() => {
+    pushHistory();
     const id = uid();
     setBuyoffIcons((prev) => [
       ...prev,
@@ -376,19 +633,22 @@ function LayoutPreparation({
   }, []);
 
   const handleBuyoffPositionChange = useCallback((id, rawPos) => {
+    pushHistory();
     const snapped = { x: snapBypass(rawPos.x), y: snapBypass(rawPos.y) };
     setBuyoffIcons((prev) => prev.map((b) => (b.id === id ? { ...b, position: snapped } : b)));
   }, []);
 
   const handleDeleteBuyoff = useCallback((id) => {
+    pushHistory();
     setBuyoffIcons((prev) => prev.filter((b) => b.id !== id));
     setConnections((prev) => prev.filter((c) => c.fromId !== id && c.toId !== id));
   }, []);
 
   // ── Delete connection ────────────────────────────────────────────────────────
   const handleDeleteConnection = useCallback((connId) => {
+    pushHistory();
     setConnections((prev) => prev.filter((c) => c.id !== connId));
-  }, []);
+  }, [pushHistory]);
 
   // ── Save layout ─────────────────────────────────────────────────────────────
   const handleSave = useCallback(async () => {
@@ -400,7 +660,11 @@ function LayoutPreparation({
         prefix: b.stationIds?.[0]?.split('-')[0] ?? 'ST',
         station_count: b.stationIds?.length ?? 0,
         station_ids: b.stationIds?.join(','),
-        station_data: JSON.stringify(b.stationData ?? {}),
+        station_data: JSON.stringify(
+          b.stationNames?.length
+            ? { ...b.stationData, __station_names__: b.stationNames }
+            : (b.stationData ?? {})
+        ),
         position_x: b.position.x,
         position_y: b.position.y,
         order_index: b.orderIndex,
@@ -424,12 +688,16 @@ function LayoutPreparation({
         response = await layoutApi.createSnapshot(payload, userId);
       }
       const saved = response.data;
+      // Suppress auto-save re-trigger while we apply the server response
+      isLoadingRef.current = true;
       setCurrentLayoutId(saved.id);
       const rebuilt = stateFromApi(saved);
       setBoxes(rebuilt.boxes);
       setBuyoffIcons(rebuilt.buyoffIcons);
       setConnections(rebuilt.connections);
       setLayoutName(saved.name);
+      isDirtyRef.current = false;
+      setTimeout(() => { isLoadingRef.current = false; }, 100);
       return true;
     } catch (err) {
       console.error('Save failed:', err);
@@ -439,6 +707,11 @@ function LayoutPreparation({
 
   // ── Load layout ─────────────────────────────────────────────────────────────
   const handleLoad = useCallback(async (layoutId) => {
+    isLoadingRef.current = true;
+    nameModalShownRef.current = false; // allow name modal again if user clears and re-adds
+    // Fresh load = fresh history (nothing to undo back to)
+    undoStackRef.current = [];
+    redoStackRef.current = [];
     try {
       const response = await layoutApi.getLayout(layoutId);
       const data = response.data;
@@ -448,16 +721,79 @@ function LayoutPreparation({
       setConnections(rebuilt.connections);
       setLayoutName(data.name);
       setCurrentLayoutId(data.id);
-      // Auto-fit: wait one tick for React to render new positions, then zoom to fit
-      setTimeout(() => fitView(rebuilt.boxes, rebuilt.buyoffIcons), 80);
+      isDirtyRef.current = false;
+      setAutoSaveStatus('idle');
+      setTimeout(() => {
+        isLoadingRef.current = false;
+        fitView(rebuilt.boxes, rebuilt.buyoffIcons);
+      }, 100);
     } catch (err) {
       console.error('Load failed:', err);
+      isLoadingRef.current = false;
     }
   }, [fitView]);
+
+  // ── Copy layout ─────────────────────────────────────────────────────────────
+  const handleCopyLayout = useCallback(async () => {
+    if (boxes.length === 0 && buyoffIcons.length === 0) return;
+    const copyName = `Copy of ${layoutName}`;
+    const payload = {
+      name: copyName,
+      boxes: boxes.map((b) => ({
+        local_id: b.id,
+        name: b.name,
+        prefix: b.stationIds?.[0]?.split('-')[0] ?? 'ST',
+        station_count: b.stationIds?.length ?? 0,
+        station_ids: b.stationIds?.join(','),
+        station_data: JSON.stringify(
+          b.stationNames?.length
+            ? { ...b.stationData, __station_names__: b.stationNames }
+            : (b.stationData ?? {})
+        ),
+        position_x: b.position.x,
+        position_y: b.position.y,
+        order_index: b.orderIndex,
+      })),
+      buyoff_icons: buyoffIcons.map((ic) => ({
+        local_id: ic.id,
+        position_x: ic.position.x,
+        position_y: ic.position.y,
+      })),
+      connections: connections.map((c) => ({
+        from_local_id: c.fromId,
+        to_local_id: c.toId,
+      })),
+    };
+    try {
+      isLoadingRef.current = true;
+      setAutoSaveStatus('saving');
+      const response = await layoutApi.createSnapshot(payload, userId);
+      const saved = response.data;
+      setCurrentLayoutId(saved.id);
+      const rebuilt = stateFromApi(saved);
+      setBoxes(rebuilt.boxes);
+      setBuyoffIcons(rebuilt.buyoffIcons);
+      setConnections(rebuilt.connections);
+      setLayoutName(saved.name);
+      isDirtyRef.current = false;
+      nameModalShownRef.current = false;
+      setTimeout(() => { isLoadingRef.current = false; }, 100);
+      setAutoSaveStatus('saved');
+      setTimeout(() => setAutoSaveStatus((s) => s === 'saved' ? 'idle' : s), 2000);
+      return saved.id;
+    } catch (err) {
+      console.error('Copy failed:', err);
+      isLoadingRef.current = false;
+      setAutoSaveStatus('error');
+      return null;
+    }
+  }, [layoutName, boxes, buyoffIcons, connections, userId]);
 
   // ── Clear all ───────────────────────────────────────────────────────────────
   const handleClearAll = () => {
     if (window.confirm('Clear the canvas? (Saved layouts are not deleted.)')) {
+      undoStackRef.current = [];
+      redoStackRef.current = [];
       setBoxes([]);
       setBuyoffIcons([]);
       setConnections([]);
@@ -475,10 +811,148 @@ function LayoutPreparation({
     if (onLoadLayout) onLoadLayout(handleLoad);
   }, [handleLoad, onLoadLayout]);
 
+  useEffect(() => {
+    if (onCopyLayout) onCopyLayout(handleCopyLayout);
+  }, [handleCopyLayout, onCopyLayout]);
+
+  // ── Keyboard shortcuts: Ctrl+Z / Ctrl+Y / Ctrl+C / Ctrl+V / Delete / Escape ──
+  useEffect(() => {
+    const onKey = (e) => {
+      // Ignore when typing in an input or textarea
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleUndo();
+      } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))) {
+        e.preventDefault();
+        handleRedo();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        e.preventDefault();
+        handleCopySelected();
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        e.preventDefault();
+        handlePaste();
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (selectedIds.length > 0) { e.preventDefault(); handleDeleteSelected(); }
+      } else if (e.key === 'Escape') {
+        clearSelection();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [handleUndo, handleRedo, handleCopySelected, handlePaste, handleDeleteSelected, clearSelection, selectedIds]);
+
+  // Keep ref always pointing to latest handleSave (avoids stale closure in timer)
+  useEffect(() => { handleSaveRef.current = handleSave; }, [handleSave]);
+
+  // ── Auto-save: debounce 1.5s after any canvas change ────────────────────────
+  useEffect(() => {
+    if (isLoadingRef.current || isSavingRef.current) return;
+    if (boxes.length === 0 && buyoffIcons.length === 0 && connections.length === 0) return;
+
+    isDirtyRef.current = true;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+
+    if (currentLayoutId) {
+      setAutoSaveStatus('pending');
+      autoSaveTimerRef.current = setTimeout(async () => {
+        if (isSavingRef.current || isLoadingRef.current) return;
+        isSavingRef.current = true;
+        setAutoSaveStatus('saving');
+        const ok = await handleSaveRef.current();
+        isSavingRef.current = false;
+        setAutoSaveStatus(ok ? 'saved' : 'error');
+        if (ok) setTimeout(() => setAutoSaveStatus((s) => s === 'saved' ? 'idle' : s), 2000);
+      }, 1500);
+    } else if (!nameModalShownRef.current) {
+      // New layout — prompt for a name before first save
+      nameModalShownRef.current = true;
+      setNameDraft('');
+      setShowNameModal(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boxes, buyoffIcons, connections, currentLayoutId]);
+
+  // ── Save immediately when user leaves the tab / page ────────────────────────
+  useEffect(() => {
+    const flush = () => {
+      if (!isDirtyRef.current || isSavingRef.current || isLoadingRef.current) return;
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+      handleSaveRef.current?.();
+    };
+    document.addEventListener('visibilitychange', flush);
+    window.addEventListener('pagehide', flush);
+    return () => {
+      document.removeEventListener('visibilitychange', flush);
+      window.removeEventListener('pagehide', flush);
+    };
+  }, []);
+
+  // ── Name-modal confirm handler ───────────────────────────────────────────────
+  const handleNameModalConfirm = useCallback(async () => {
+    const trimmed = nameDraft.trim();
+    if (!trimmed) return;
+    setShowNameModal(false);
+    setLayoutName(trimmed);
+    // Save immediately using the trimmed name directly (bypass stale layoutName closure)
+    isSavingRef.current = true;
+    setAutoSaveStatus('saving');
+    try {
+      const payload = {
+        name: trimmed,
+        boxes: boxes.map((b) => ({
+          local_id: b.id,
+          name: b.name,
+          prefix: b.stationIds?.[0]?.split('-')[0] ?? 'ST',
+          station_count: b.stationIds?.length ?? 0,
+          station_ids: b.stationIds?.join(','),
+          station_data: JSON.stringify(
+          b.stationNames?.length
+            ? { ...b.stationData, __station_names__: b.stationNames }
+            : (b.stationData ?? {})
+        ),
+          position_x: b.position.x,
+          position_y: b.position.y,
+          order_index: b.orderIndex,
+        })),
+        buyoff_icons: buyoffIcons.map((ic) => ({
+          local_id: ic.id,
+          position_x: ic.position.x,
+          position_y: ic.position.y,
+        })),
+        connections: connections.map((c) => ({
+          from_local_id: c.fromId,
+          to_local_id: c.toId,
+        })),
+      };
+      const response = await layoutApi.createSnapshot(payload, userId);
+      const saved = response.data;
+      isLoadingRef.current = true;
+      setCurrentLayoutId(saved.id);
+      const rebuilt = stateFromApi(saved);
+      setBoxes(rebuilt.boxes);
+      setBuyoffIcons(rebuilt.buyoffIcons);
+      setConnections(rebuilt.connections);
+      setLayoutName(saved.name);
+      isDirtyRef.current = false;
+      setTimeout(() => { isLoadingRef.current = false; }, 100);
+      setAutoSaveStatus('saved');
+      setTimeout(() => setAutoSaveStatus((s) => s === 'saved' ? 'idle' : s), 2000);
+    } catch (err) {
+      console.error('Save failed:', err);
+      setAutoSaveStatus('error');
+    } finally {
+      isSavingRef.current = false;
+    }
+  }, [nameDraft, boxes, buyoffIcons, connections, userId]);
+
   return (
-    // Xwrapper wraps the whole component so Xarrow SVGs render in screen space
-    // (outside TransformComponent) — this is required for correct arrow positioning
-    // at any zoom/pan level, since Xarrow uses getBoundingClientRect() for coordinates.
+    <>
+    {/* Xwrapper wraps the whole component so Xarrow SVGs render in screen space
+        (outside TransformComponent) — this is required for correct arrow positioning
+        at any zoom/pan level, since Xarrow uses getBoundingClientRect() for coordinates. */}
     <Xwrapper>
       <div className="layout-prep">
         {/* Toolbar */}
@@ -496,14 +970,68 @@ function LayoutPreparation({
             ) : (
               <h2 className="layout-name" onClick={() => setEditingName(true)} title="Click to edit">
                 {layoutName}
-                {currentLayoutId && <span className="layout-saved-badge">Saved</span>}
                 <span className="layout-name-edit-icon"><Pencil size={13} /></span>
               </h2>
+            )}
+
+            {/* Auto-save status indicator */}
+            {autoSaveStatus === 'pending' && (
+              <span className="autosave-badge autosave-badge--pending">
+                <Cloud size={12} /> Unsaved changes
+              </span>
+            )}
+            {autoSaveStatus === 'saving' && (
+              <span className="autosave-badge autosave-badge--saving">
+                <Cloud size={12} className="autosave-spin" /> Saving…
+              </span>
+            )}
+            {autoSaveStatus === 'saved' && (
+              <span className="autosave-badge autosave-badge--saved">
+                <Check size={12} /> Saved
+              </span>
+            )}
+            {autoSaveStatus === 'error' && (
+              <span className="autosave-badge autosave-badge--error">
+                <AlertCircle size={12} /> Save failed
+              </span>
             )}
           </div>
 
           <div className="layout-toolbar-right">
-            <span className="layout-connect-hint">Drag from a port dot to connect</span>
+            {selectedIds.length > 0 ? (
+              <div className="selection-bar">
+                <span className="selection-bar-count">
+                  {selectedIds.length} box{selectedIds.length !== 1 ? 'es' : ''} selected
+                </span>
+                <button className="selection-bar-btn" onClick={handleCopySelected} title="Copy (Ctrl+C)">
+                  Copy
+                </button>
+                {clipboard && (
+                  <button className="selection-bar-btn selection-bar-btn--paste" onClick={handlePaste} title="Paste (Ctrl+V)">
+                    Paste
+                  </button>
+                )}
+                <button className="selection-bar-btn selection-bar-btn--delete" onClick={handleDeleteSelected} title="Delete (Del)">
+                  Delete
+                </button>
+                <button className="selection-bar-btn selection-bar-btn--deselect" onClick={clearSelection} title="Deselect (Esc)">
+                  ✕ Deselect
+                </button>
+              </div>
+            ) : (
+              <>
+                <span className="layout-connect-hint">
+                  {clipboard
+                    ? `Clipboard: ${clipboard.length} box${clipboard.length !== 1 ? 'es' : ''} · Ctrl+V to paste`
+                    : 'Drag from a port dot to connect · Click box to select'}
+                </span>
+                {clipboard && (
+                  <button className="toolbar-btn toolbar-btn--paste" onClick={handlePaste} title="Paste (Ctrl+V)">
+                    Paste ({clipboard.length})
+                  </button>
+                )}
+              </>
+            )}
             <button className="toolbar-btn toolbar-btn--clear" onClick={handleClearAll}>
               <Trash2 size={14} />
               Clear All
@@ -534,7 +1062,7 @@ function LayoutPreparation({
             minScale={0.15}
             maxScale={3}
             wheel={{ step: 0.08 }}
-            panning={{ excluded: ['station-box-header', 'buyoff-drag-handle', 'station-port', 'buyoff-port'] }}
+            panning={{ excluded: ['station-box-drag-handle--fill', 'buyoff-drag-handle', 'station-port', 'buyoff-port'] }}
             onTransformed={(_, state) => {
                 setCanvasScale(state.scale);
                 setTransformState({ scale: state.scale, positionX: state.positionX, positionY: state.positionY });
@@ -549,6 +1077,7 @@ function LayoutPreparation({
                   <div
                     className="layout-virtual-canvas"
                     style={{ width: CANVAS_SIZE, height: CANVAS_SIZE }}
+                    onClick={(e) => { if (e.target === e.currentTarget) clearSelection(); }}
                   >
                     {boxes.length === 0 && buyoffIcons.length === 0 && (
                       <div className="layout-canvas-empty">
@@ -578,12 +1107,19 @@ function LayoutPreparation({
                         id={box.id}
                         name={box.name}
                         stationIds={box.stationIds}
+                        stationNames={box.stationNames || []}
                         stationData={box.stationData}
                         description={box.stationData?.__box_desc__ || ''}
                         position={box.position}
                         onPositionChange={handleBoxPositionChange}
                         onDelete={handleDeleteBox}
                         onPortMouseDown={handlePortMouseDown}
+                        onNameChange={handleBoxNameChange}
+                        onDescriptionChange={handleBoxDescriptionChange}
+                        onStationNamesChange={handleBoxStationNamesChange}
+                        onStationIdChange={handleBoxStationIdChange}
+                        onSelect={handleBoxSelect}
+                        isSelected={selectedIds.includes(box.id)}
                         canvasScale={canvasScale}
                       />
                     ))}
@@ -630,6 +1166,44 @@ function LayoutPreparation({
 
         {showAddBoxModal && (
           <AddBoxModal onAdd={handleAddBox} onClose={onCloseAddBoxModal} />
+        )}
+
+        {/* ── Layout Name Modal (first-time save) ─────────────────────────── */}
+        {showNameModal && (
+          <div className="lnm-overlay" onClick={() => setShowNameModal(false)}>
+            <div className="lnm-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="lnm-header">
+                <span className="lnm-title">Name your layout</span>
+                <button className="lnm-close" onClick={() => setShowNameModal(false)}><X size={14} /></button>
+              </div>
+              <div className="lnm-body">
+                <label className="lnm-label">Layout name</label>
+                <input
+                  className="lnm-input"
+                  type="text"
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleNameModalConfirm();
+                    if (e.key === 'Escape') setShowNameModal(false);
+                  }}
+                  placeholder="e.g. TRIM Line — Assembly A"
+                  maxLength={80}
+                  autoFocus
+                />
+              </div>
+              <div className="lnm-footer">
+                <button className="lnm-btn lnm-btn--cancel" onClick={() => setShowNameModal(false)}>Cancel</button>
+                <button
+                  className="lnm-btn lnm-btn--save"
+                  onClick={handleNameModalConfirm}
+                  disabled={!nameDraft.trim()}
+                >
+                  Save Layout
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
@@ -694,6 +1268,8 @@ function LayoutPreparation({
         );
       })()}
     </Xwrapper>
+    <HelpGuide {...LAYOUT_HELP} />
+    </>
   );
 }
 

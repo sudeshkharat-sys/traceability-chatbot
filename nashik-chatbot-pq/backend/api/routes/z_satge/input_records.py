@@ -24,6 +24,16 @@ ALLOWED_Z_E         = {"Z", "E"}
 ALLOWED_ATTRIBUTION = {"M", "P", "D", "U"}
 ALLOWED_STATUS_3M   = {"R", "G"}
 
+# Case-insensitive lookup maps — normalise incoming values to the canonical form
+_ATTRI_NORM = {v.lower(): v for v in ALLOWED_ATTRI}
+
+
+def _normalise_attri(val: str | None) -> str | None:
+    """Return the canonical Attri. value regardless of how the user typed it."""
+    if val is None:
+        return None
+    return _ATTRI_NORM.get(val.strip().lower(), val.strip())
+
 
 def _validate_row(rec: dict) -> str | None:
     """Return a human-readable reason string if the row is invalid, else None."""
@@ -134,7 +144,7 @@ def _parse_excel(file_bytes: bytes) -> list[dict]:
             "target_date":              _safe_date(row[6] if len(row) > 6 else None),
             "closure_date":             _safe_date(row[7] if len(row) > 7 else None),
             "ryg":                      _safe_str(row[8] if len(row) > 8 else None),
-            "attri":                    _safe_str(row[9] if len(row) > 9 else None),
+            "attri":                    _normalise_attri(_safe_str(row[9] if len(row) > 9 else None)),
             "comm":                     _safe_str(row[10] if len(row) > 10 else None),
             "line":                     _safe_str(row[11] if len(row) > 11 else None),
             "stage_no":                 _safe_str(row[12] if len(row) > 12 else None),
@@ -258,6 +268,14 @@ def create_record(
     return _row_to_dict(rows[0])
 
 
+_IR_RETURNING = (
+    "id, user_id, layout_id, sr_no, concern_id, concern, type, root_cause, action_plan, "
+    "target_date, closure_date, ryg, attri, comm, line, stage_no, z_e, attribution, "
+    "part, phenomena, total_incidences, monthly_data, field_defect_after_cutoff, "
+    "status_3m, created_at, updated_at"
+)
+
+
 @router.put("/records/{record_id}", response_model=schemas.InputRecordOut)
 def update_record(
     record_id: int,
@@ -270,10 +288,19 @@ def update_record(
     if not exists:
         raise HTTPException(status_code=404, detail="Record not found")
 
-    data = payload.model_dump()
-    data["record_id"] = record_id
+    # Use only explicitly sent fields so that null genuinely clears the column
+    # (COALESCE in the static query would silently keep the old value).
+    data = payload.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(status_code=400, detail="No fields provided to update")
 
-    rows = connector.execute_query(InputRecordQueries.UPDATE, data)
+    set_clause = ", ".join(f"{col} = :{col}" for col in data)
+    query = (
+        f"UPDATE input_records SET {set_clause}, updated_at = NOW() "
+        f"WHERE id = :record_id RETURNING {_IR_RETURNING}"
+    )
+    data["record_id"] = record_id
+    rows = connector.execute_query(query, data)
     if not rows:
         raise HTTPException(status_code=500, detail="Failed to update record")
     return _row_to_dict(rows[0])

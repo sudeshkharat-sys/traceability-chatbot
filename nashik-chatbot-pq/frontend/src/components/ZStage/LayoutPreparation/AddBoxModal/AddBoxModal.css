@@ -135,7 +135,7 @@
   background-color: var(--mahindra-red-dark);
 }
 
-/* Mode toggle */
+/* Mode toggle — supports 2 or 3 tabs */
 .modal-mode-toggle {
   display: flex;
   border: 1px solid var(--border-color);
@@ -150,18 +150,38 @@
   font-weight: 600;
   cursor: pointer;
   border: none;
+  border-right: 1px solid var(--border-color);
   background-color: var(--bg-light);
   color: var(--text-gray);
   transition: background-color 0.15s, color 0.15s;
 }
 
-.modal-mode-btn:first-child {
-  border-right: 1px solid var(--border-color);
+.modal-mode-btn:last-child {
+  border-right: none;
 }
 
 .modal-mode-btn--active {
   background-color: var(--mahindra-red);
   color: #ffffff;
+}
+
+/* Range inputs row */
+.modal-range-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-range-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.modal-range-sep {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-gray);
+  flex-shrink: 0;
 }
 
 /* Label hint */

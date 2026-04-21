@@ -236,7 +236,7 @@
   border-radius: 4px;
   position: relative;
   box-shadow: none;
-  height: 160px;
+  height: 200px;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -306,6 +306,34 @@
 
 .dash-grid-th:last-child {
   border-right: none;
+}
+
+/* Station names row — mirrors StationBox station-grid-sname-cell */
+.dash-grid-sname {
+  height: 18px;
+  padding: 1px 3px;
+  font-size: 9px;
+  font-weight: 600;
+  color: #1a365d;
+  background-color: #ebf4ff;
+  border-right: 1px solid #bee3f8;
+  border-bottom: 1px solid #bee3f8;
+  text-align: center;
+  vertical-align: middle;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 40px;
+}
+
+.dash-grid-sname:last-child {
+  border-right: none;
+}
+
+.dash-grid-sname--empty {
+  color: #bbb;
+  font-style: italic;
+  font-weight: 400;
 }
 
 /* Station header turns red when Z/E has active issues */

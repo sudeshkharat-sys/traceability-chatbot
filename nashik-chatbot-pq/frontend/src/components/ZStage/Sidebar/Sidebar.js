@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import {
   LayoutGrid,
@@ -8,6 +9,12 @@ import {
   Diamond,
   Save,
   FolderOpen,
+  Copy,
+  MoreHorizontal,
+  FolderOpen as OpenIcon,
+  Pencil,
+  Trash2,
+  ChevronDown,
 } from 'lucide-react';
 import { authService } from '../../../services/api';
 import './Sidebar.css';
@@ -18,9 +25,141 @@ const NAV_ITEMS = [
   { id: 'dashboard', label: 'Z-Stage Dashboard',   Icon: BarChart2 },
 ];
 
+// ── Per-layout three-dot menu ──────────────────────────────────────────────────
+function LayoutItem({
+  layout,
+  isActive,
+  onOpen,
+  onRename,
+  onCopy,
+  onDelete,
+}) {
+  const [menuOpen, setMenuOpen]     = useState(false);
+  const [menuPos, setMenuPos]       = useState({ top: 0, left: 0 });
+  const [renaming, setRenaming]     = useState(false);
+  const [draft, setDraft]           = useState(layout.name);
+  const dotsBtnRef                  = useRef(null);
+  const dropdownRef                 = useRef(null);
+  const inputRef                    = useRef(null);
+
+  // Close menu on outside click or scroll
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (e) => {
+      if (
+        dotsBtnRef.current && !dotsBtnRef.current.contains(e.target) &&
+        dropdownRef.current && !dropdownRef.current.contains(e.target)
+      ) setMenuOpen(false);
+    };
+    const closeOnScroll = () => setMenuOpen(false);
+    document.addEventListener('mousedown', close);
+    document.addEventListener('scroll', closeOnScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('scroll', closeOnScroll, true);
+    };
+  }, [menuOpen]);
+
+  // Focus rename input
+  useEffect(() => {
+    if (renaming && inputRef.current) inputRef.current.focus();
+  }, [renaming]);
+
+  const commitRename = () => {
+    const trimmed = draft.trim();
+    setRenaming(false);
+    if (trimmed && trimmed !== layout.name) onRename(layout.id, trimmed);
+    else setDraft(layout.name);
+  };
+
+  const handleDotsClick = useCallback((e) => {
+    e.stopPropagation();
+    if (!menuOpen && dotsBtnRef.current) {
+      const rect = dotsBtnRef.current.getBoundingClientRect();
+      // Position dropdown to the RIGHT of the sidebar (outside it), aligned to button top
+      setMenuPos({
+        top: rect.top,
+        left: rect.right + 6,
+      });
+    }
+    setMenuOpen((v) => !v);
+  }, [menuOpen]);
+
+  return (
+    <div className={`layout-item${isActive ? ' layout-item--active' : ''}`}>
+      {renaming ? (
+        <input
+          ref={inputRef}
+          className="layout-item-rename-input"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commitRename}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter')  commitRename();
+            if (e.key === 'Escape') { setDraft(layout.name); setRenaming(false); }
+          }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <button
+          className="layout-item-name"
+          onClick={() => onOpen(layout.id)}
+          title={`Open: ${layout.name}`}
+        >
+          <FolderOpen size={12} className="layout-item-folder-icon" />
+          <span className="layout-item-label">{layout.name}</span>
+          {isActive && <span className="layout-item-active-dot" />}
+        </button>
+      )}
+
+      {/* Three-dot button */}
+      <button
+        ref={dotsBtnRef}
+        className="layout-item-dots"
+        title="Options"
+        onClick={handleDotsClick}
+      >
+        <MoreHorizontal size={13} />
+      </button>
+
+      {/* Dropdown rendered via portal so sidebar overflow never clips it */}
+      {menuOpen && createPortal(
+        <div
+          ref={dropdownRef}
+          className="layout-item-dropdown"
+          style={{ position: 'fixed', top: menuPos.top, left: menuPos.left }}
+        >
+          <button className="lid-item" onClick={() => { setMenuOpen(false); onOpen(layout.id); }}>
+            <OpenIcon size={12} /> Open
+          </button>
+          <button className="lid-item" onClick={() => { setMenuOpen(false); setDraft(layout.name); setRenaming(true); }}>
+            <Pencil size={12} /> Rename
+          </button>
+          <button className="lid-item" onClick={() => { setMenuOpen(false); onCopy(layout.id); }}>
+            <Copy size={12} /> Copy
+          </button>
+          <div className="lid-divider" />
+          <button
+            className="lid-item lid-item--danger"
+            onClick={() => {
+              setMenuOpen(false);
+              if (window.confirm(`Delete "${layout.name}"? This cannot be undone.`)) onDelete(layout.id);
+            }}
+          >
+            <Trash2 size={12} /> Delete
+          </button>
+        </div>,
+        document.body
+      )}
+    </div>
+  );
+}
+
+// ── Main Sidebar ───────────────────────────────────────────────────────────────
 function Sidebar({ activeSection, onSectionChange, layoutActions }) {
   const navigate = useNavigate();
-  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [showSettingsMenu, setShowSettingsMenu]   = useState(false);
+  const [layoutDropdownOpen, setLayoutDropdownOpen] = useState(false);
   const settingsMenuRef = useRef(null);
   const currentUsername = authService.getFullName();
 
@@ -29,7 +168,11 @@ function Sidebar({ activeSection, onSectionChange, layoutActions }) {
     onAddBuyoff,
     onSaveLayout,
     onLoadLayout,
+    onDuplicateLayout,
+    onRenameLayout,
+    onDeleteLayout,
     savedLayouts = [],
+    activeLayoutId,
     isSaving,
   } = layoutActions || {};
 
@@ -70,9 +213,7 @@ function Sidebar({ activeSection, onSectionChange, layoutActions }) {
               className={`sidebar-nav-item${activeSection === id ? ' sidebar-nav-item--active' : ''}`}
               onClick={() => onSectionChange(id)}
             >
-              <span className="sidebar-nav-icon">
-                <Icon size={16} />
-              </span>
+              <span className="sidebar-nav-icon"><Icon size={16} /></span>
               <span className="sidebar-nav-label">{label}</span>
             </button>
 
@@ -80,17 +221,16 @@ function Sidebar({ activeSection, onSectionChange, layoutActions }) {
               <div className="sidebar-sub-panel">
 
                 <button className="sidebar-sub-btn sidebar-sub-btn--primary" onClick={onAddBox}>
-                  <Plus size={14} />
-                  Add Box
+                  <Plus size={14} /> Add Box
                 </button>
 
                 <button className="sidebar-sub-btn sidebar-sub-btn--buyoff" onClick={onAddBuyoff}>
-                  <Diamond size={14} className="sidebar-diamond-icon" />
-                  Add Buyoff
+                  <Diamond size={14} className="sidebar-diamond-icon" /> Add Buyoff
                 </button>
 
                 <div className="sidebar-sub-divider" />
 
+                {/* Save Layout */}
                 <button
                   className="sidebar-sub-btn sidebar-sub-btn--save"
                   onClick={onSaveLayout}
@@ -100,27 +240,44 @@ function Sidebar({ activeSection, onSectionChange, layoutActions }) {
                   {isSaving ? 'Saving…' : 'Save Layout'}
                 </button>
 
-                {savedLayouts.length > 0 && (
-                  <div className="sidebar-load-section">
-                    <span className="sidebar-load-label">
-                      <FolderOpen size={11} style={{ verticalAlign: 'middle', marginRight: 4 }} />
-                      Load saved
-                    </span>
-                    <select
-                      className="sidebar-load-select"
-                      defaultValue=""
-                      onChange={(e) => {
-                        if (e.target.value) onLoadLayout(Number(e.target.value));
-                        e.target.value = '';
-                      }}
-                    >
-                      <option value="" disabled>Select layout…</option>
-                      {savedLayouts.map((l) => (
-                        <option key={l.id} value={l.id}>{l.name}</option>
-                      ))}
-                    </select>
+                {/* Open Layout — toggles the layout list dropdown */}
+                <button
+                  className={`sidebar-open-layout-btn${layoutDropdownOpen ? ' sidebar-open-layout-btn--active' : ''}`}
+                  onClick={() => setLayoutDropdownOpen((v) => !v)}
+                >
+                  <span className="sidebar-open-layout-left">
+                    <FolderOpen size={15} />
+                    <span>Open Layout</span>
+                  </span>
+                  <ChevronDown
+                    size={14}
+                    className={`sidebar-open-layout-chevron${layoutDropdownOpen ? ' sidebar-open-layout-chevron--up' : ''}`}
+                  />
+                </button>
+
+                {/* Inline layout list */}
+                {layoutDropdownOpen && (
+                  <div className="layout-dropdown-panel">
+                    {savedLayouts.length === 0 ? (
+                      <div className="layout-dropdown-empty">No saved layouts yet</div>
+                    ) : (
+                      <div className="layout-list">
+                        {savedLayouts.map((l) => (
+                          <LayoutItem
+                            key={l.id}
+                            layout={l}
+                            isActive={l.id === activeLayoutId}
+                            onOpen={(id) => { onLoadLayout(id); setLayoutDropdownOpen(false); }}
+                            onRename={onRenameLayout}
+                            onCopy={onDuplicateLayout}
+                            onDelete={onDeleteLayout}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
+
               </div>
             )}
           </div>
