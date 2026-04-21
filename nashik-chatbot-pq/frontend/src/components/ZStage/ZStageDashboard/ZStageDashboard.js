@@ -5,7 +5,67 @@ import { TransformWrapper, TransformComponent } from 'react-zoom-pan-pinch';
 import { ZoomIn, ZoomOut, Maximize2, RefreshCw, GitBranch, X, Loader, TableProperties, Upload, FileText, Trash2, Plus, AlertCircle, CheckCircle } from 'lucide-react';
 import { layoutApi, inputApi, layeredAuditApi, docApi } from '../../../services/api/layoutApi';
 import { getPortCanvasPos, buildObstacles, routePath } from '../shared/routeArrow';
+import HelpGuide from '../shared/HelpGuide/HelpGuide';
 import './ZStageDashboard.css';
+
+const DASHBOARD_HELP = {
+  title: 'Z Stage Dashboard — Guide',
+  sections: [
+    {
+      heading: 'Canvas Overview',
+      items: [
+        { icon: '🗺️', label: 'Canvas View',       desc: 'Read-only view of your saved layout. Station boxes are overlaid with live concern data from Master Data records.' },
+        { icon: '🟥', label: 'Red Header',         desc: 'A station header turns red when it has at least one active concern (Status 3M = R with total incidences > 0). E classification has priority over Z.' },
+        { icon: '🟩', label: 'Green Header',        desc: 'Station header is green when Z/E records exist for the station but all are resolved (no active incidences).' },
+        { icon: '🔵', label: 'Station Names Row',   desc: 'The blue row shows the station names defined in the Layout editor below each station ID.' },
+        { icon: '💎', label: 'Buyoff / Bypass',     desc: 'Diamond-shaped icons on the canvas represent buyoff or bypass points defined in the layout.' },
+        { icon: '➡️', label: 'Connection Arrows',   desc: 'Arrows between boxes show the flow connections drawn in the Layout editor.' },
+      ],
+    },
+    {
+      heading: 'Navigation',
+      items: [
+        { icon: '🖱️', label: 'Pan',               desc: 'Click and drag on any empty canvas area to pan around the layout.' },
+        { icon: '🔍', label: 'Zoom',              desc: 'Use the scroll wheel to zoom, or use the +  /  −  /  ⊡ zoom buttons in the bottom-right corner of the canvas.' },
+        { icon: '⊡',  label: 'Reset View',        desc: 'Click the square icon (bottom-right zoom controls) to reset zoom and re-center the view.' },
+        { icon: '↻',  label: 'Refresh',           desc: 'Click the Refresh button (top toolbar) to reload the latest records and update all station colours.' },
+      ],
+    },
+    {
+      heading: 'Station Detail Popup',
+      items: [
+        { icon: '👆', label: 'Open Popup',         desc: 'Click any station ID header (the green or red cell) to open a detail panel for that station.' },
+        { icon: '🗄️', label: 'Master Data tab',    desc: 'View and inline-edit all concern records for this station. Click any cell to edit; changes save automatically.' },
+        { icon: '📋', label: 'Layered Audit tab',  desc: 'View layered audit observations linked to this station.' },
+        { icon: '📅', label: 'Audit Adherence tab',desc: 'View audit adherence records for this station.' },
+        { icon: '📎', label: 'Docs tab',           desc: 'Upload and download documents attached to each concern. Documents are grouped by concern and document type.' },
+        { icon: '➕', label: 'Add Record',          desc: 'Click "Add Record" in any data tab to add a new row directly linked to this station.' },
+      ],
+    },
+    {
+      heading: 'Data Inside Each Station Box',
+      items: [
+        { icon: '⚡', label: 'Z / E symbol',       desc: 'Shows whether the station has Z or E classification concerns. E takes priority over Z. Colour (red/green) reflects active issue status.' },
+        { icon: '🔤', label: 'P / M / D / U rows', desc: 'Shows "X/Y" per attribution — X = number of records with active incidences, Y = total incidence count. Only status_3m = R records are counted.' },
+      ],
+    },
+    {
+      heading: 'Legend Box (on canvas)',
+      items: [
+        { icon: '📊', label: 'Summary Table',      desc: 'A draggable box on the canvas showing totals by TYPE (WH/USV) and ATTRIBUTION (Parts/Design/Process/U/A) — Phenomenons, Incidences, Stages, Red count, and Effectiveness %.' },
+        { icon: '✋', label: 'Drag to Move',        desc: 'Click and drag the legend box to reposition it anywhere on the canvas.' },
+      ],
+    },
+    {
+      heading: 'Toolbar',
+      items: [
+        { icon: '🎨', label: 'Colour Legend',      desc: 'The top bar shows colour chips: red Z = active issues, green Z = no issues, M/P/D/U chips = attribution colour codes.' },
+        { icon: '📂', label: 'Layout Dropdown',    desc: 'Switch between saved layouts using the "Layout:" dropdown in the top-right toolbar.' },
+        { icon: '↻',  label: 'Refresh',            desc: 'Reloads all records and recalculates station colours with the latest data.' },
+      ],
+    },
+  ],
+};
 
 // ── Constants (mirror LayoutPreparation) ──────────────────────────────────────
 const GRID = 40;
@@ -33,7 +93,7 @@ const FIXED_COLS = [
   { key: 'closure_date',    label: 'Closure Date',    width: 110, type: 'text'   },
   { key: 'ryg',             label: 'RYG',             width: 60,  type: 'text'   },
   { key: 'attri',           label: 'Attri.',          width: 90,  type: 'text'   },
-  { key: 'comm',            label: 'Comm',            width: 160, type: 'text'   },
+  { key: 'comm',            label: 'Commodity',       width: 160, type: 'text'   },
   { key: 'line',            label: 'Line',            width: 120, type: 'text'   },
   { key: 'stage_no',        label: 'Stage No',        width: 90,  type: 'text'   },
   { key: 'z_e',             label: 'Z/E',             width: 55,  type: 'text'   },
@@ -282,7 +342,7 @@ function getFormMonths() {
 }
 
 const DOC_TYPES = [
-  { key: 'DDR_LO',       label: 'DDR / LO' },
+  { key: 'DDR_LO',       label: 'DRF / L0' },
   { key: 'SOS',          label: 'SOS' },
   { key: 'PFMEA',        label: 'PFMEA' },
   { key: 'CONTROL_PLAN', label: 'Control Plan' },
@@ -322,6 +382,22 @@ function AddRecordModal({ type, stationId, onClose, onSaved, userId, layoutId, s
 
   const set = (key, val) => setForm((p) => ({ ...p, [key]: val }));
   const setMonthly = (key, val) => setForm((p) => ({ ...p, monthly: { ...p.monthly, [key]: val } }));
+
+  // Auto-map: Attri. → Attribution
+  const ATTRI_MAP = {
+    'M&M Design': 'D', 'M&M process': 'P',
+    'Supplier Design': 'D', 'Supplier Process': 'P', 'Under Analysis': 'U',
+  };
+  const handleAttriChange = (val) => {
+    const mapped = ATTRI_MAP[val];
+    setForm((p) => ({ ...p, attri: val, ...(mapped ? { attribution: mapped } : {}) }));
+  };
+  // Auto-map: Stage No → Line (prefix before first '-')
+  const handleStageChange = (val) => {
+    const dashIdx = val.indexOf('-');
+    const autoLine = dashIdx > 0 ? val.substring(0, dashIdx) : '';
+    setForm((p) => ({ ...p, stage_no: val, ...(autoLine ? { line: autoLine } : {}) }));
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -424,10 +500,15 @@ function AddRecordModal({ type, stationId, onClose, onSaved, userId, layoutId, s
               <label>RYG {sel('ryg', ALLOWED.ryg)}</label>
               <label>Z/E {sel('z_e', ALLOWED.z_e)}</label>
               <label>Attribution {sel('attribution', ALLOWED.attribution)}</label>
-              <label>Attri. {sel('attri', ALLOWED.attri)}</label>
+              <label>Attri.
+                <select className="sdm-form-input" value={form.attri || ''} onChange={(e) => handleAttriChange(e.target.value)}>
+                  <option value="">— select —</option>
+                  {ALLOWED.attri.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </label>
               <label>Status (3M) {sel('status_3m', ALLOWED.status_3m)}</label>
               <label>Stage No
-                <select className="sdm-form-input" value={form.stage_no || ''} onChange={(e) => set('stage_no', e.target.value)}>
+                <select className="sdm-form-input" value={form.stage_no || ''} onChange={(e) => handleStageChange(e.target.value)}>
                   <option value="">— select —</option>
                   {stationIds.map((id) => <option key={id} value={id}>{id}</option>)}
                 </select>
@@ -439,7 +520,7 @@ function AddRecordModal({ type, stationId, onClose, onSaved, userId, layoutId, s
               <label>Closure Date{inp('closure_date')}</label>
               <label className="sdm-form-full">Root Cause{ta('root_cause')}</label>
               <label className="sdm-form-full">Action Plan{ta('action_plan')}</label>
-              <label className="sdm-form-full">Comm{ta('comm')}</label>
+              <label className="sdm-form-full">Commodity{ta('comm')}</label>
               <div className="sdm-form-full">
                 <div className="sdm-form-section-title">Monthly Incidences (current + last 3 months)</div>
                 <div className="sdm-form-months">
@@ -882,16 +963,19 @@ function parseLayout(apiLayout) {
   }
   const boxes = (apiLayout.station_boxes || []).map((b) => {
     let description = '';
+    let stationNames = [];
     if (b.station_data) {
       try {
         const sd = typeof b.station_data === 'string' ? JSON.parse(b.station_data) : b.station_data;
         description = sd.__box_desc__ || '';
+        stationNames = Array.isArray(sd.__station_names__) ? sd.__station_names__ : [];
       } catch {}
     }
     return {
       id: `db-box-${b.id}`,
       name: b.name,
       description,
+      stationNames,
       stationIds: b.station_ids
         ? (typeof b.station_ids === 'string' ? b.station_ids.split(',') : b.station_ids)
         : [],
@@ -1158,7 +1242,7 @@ function ZStageDashboard({ userId }) {
     if (loadedBoxes.length === 0 && loadedBuyoffIcons.length === 0) return;
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    const BOX_H = 4 * GRID; // 160px — mirrors LayoutPreparation boxSize height
+    const BOX_H = 5 * GRID; // 200px — mirrors LayoutPreparation boxSize height
 
     loadedBoxes.forEach((box) => {
       const w = boxWidth(box.stationIds.length);
@@ -1310,7 +1394,8 @@ function ZStageDashboard({ userId }) {
   }, [selectedId]);
 
   return (
-    // Xwrapper must wrap everything so Xarrow SVGs render in screen space
+    <>
+    {/* Xwrapper must wrap everything so Xarrow SVGs render in screen space */}
     <Xwrapper>
       <div className="z-dashboard">
 
@@ -1484,6 +1569,22 @@ function ZStageDashboard({ userId }) {
                                       );
                                     })}
                                   </tr>
+                                  {/* Station names row */}
+                                  <tr>
+                                    {box.stationIds.map((sid, i) => {
+                                      const sname = (Array.isArray(box.stationNames) && box.stationNames[i]) || '';
+                                      return (
+                                        <td
+                                          key={`sname-${sid}`}
+                                          colSpan={2}
+                                          className={`dash-grid-sname${!sname ? ' dash-grid-sname--empty' : ''}`}
+                                          title={sname || sid}
+                                        >
+                                          {sname || '—'}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
                                 </thead>
                                 <tbody>
                                   {/* Z / E row */}
@@ -1608,6 +1709,8 @@ function ZStageDashboard({ userId }) {
         />
       )}
     </Xwrapper>
+    <HelpGuide {...DASHBOARD_HELP} />
+    </>
   );
 }
 

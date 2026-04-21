@@ -191,6 +191,13 @@ def list_layered_audit(
     return [_row_to_dict(r) for r in rows]
 
 
+_LA_RETURNING = (
+    "id, user_id, layout_id, model, sr_no, date_col, station_id, "
+    "workstation, auditor, ncs, action_plan, four_m, responsibility, "
+    "target_date, status, created_at, updated_at"
+)
+
+
 @router.put("/records/{record_id}", response_model=schemas.LayeredAuditOut)
 def update_layered_audit(
     record_id: int,
@@ -203,9 +210,19 @@ def update_layered_audit(
     if not exists:
         raise HTTPException(status_code=404, detail="Record not found")
 
-    data = payload.model_dump()
+    # Use only the fields that were explicitly sent (exclude_unset=True) so that
+    # sending null actually clears the column instead of being swallowed by COALESCE.
+    data = payload.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(status_code=400, detail="No fields provided to update")
+
+    set_clause = ", ".join(f"{col} = :{col}" for col in data)
+    query = (
+        f"UPDATE layered_audit SET {set_clause}, updated_at = NOW() "
+        f"WHERE id = :record_id RETURNING {_LA_RETURNING}"
+    )
     data["record_id"] = record_id
-    rows = connector.execute_query(LayeredAuditQueries.UPDATE, data)
+    rows = connector.execute_query(query, data)
     if not rows:
         raise HTTPException(status_code=500, detail="Failed to update record")
     return _row_to_dict(rows[0])
@@ -279,6 +296,12 @@ def list_layered_audit_adherence(
     return [_row_to_dict(r) for r in rows]
 
 
+_LAA_RETURNING = (
+    "id, user_id, layout_id, stage_no, stage_name, auditor, audit_date, "
+    "created_at, updated_at"
+)
+
+
 @router.put("/adherence/records/{record_id}", response_model=schemas.LayeredAuditAdherenceOut)
 def update_layered_audit_adherence(
     record_id: int,
@@ -291,13 +314,21 @@ def update_layered_audit_adherence(
     if not exists:
         raise HTTPException(status_code=404, detail="Record not found")
 
-    # Enforce date validation for audit_date (same rule as upload)
-    data = payload.model_dump()
-    if data.get("audit_date") is not None:
+    data = payload.model_dump(exclude_unset=True)
+    if not data:
+        raise HTTPException(status_code=400, detail="No fields provided to update")
+
+    # Enforce date validation for audit_date when it is explicitly provided
+    if "audit_date" in data and data["audit_date"] is not None:
         data["audit_date"] = _strict_date(data["audit_date"])
 
+    set_clause = ", ".join(f"{col} = :{col}" for col in data)
+    query = (
+        f"UPDATE layered_audit_adherence SET {set_clause}, updated_at = NOW() "
+        f"WHERE id = :record_id RETURNING {_LAA_RETURNING}"
+    )
     data["record_id"] = record_id
-    rows = connector.execute_query(LayeredAuditAdherenceQueries.UPDATE, data)
+    rows = connector.execute_query(query, data)
     if not rows:
         raise HTTPException(status_code=500, detail="Failed to update record")
     return _row_to_dict(rows[0])

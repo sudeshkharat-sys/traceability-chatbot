@@ -1,8 +1,69 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Upload, Database, CheckCircle, AlertCircle, Loader, Plus, X, ClipboardList, CalendarCheck, FileWarning } from 'lucide-react';
+import { Upload, Database, CheckCircle, AlertCircle, Loader, Plus, X, ClipboardList, CalendarCheck, FileWarning, FileDown, Download } from 'lucide-react';
 import { inputApi, layeredAuditApi, layoutApi } from '../../../services/api/layoutApi';
+import HelpGuide from '../shared/HelpGuide/HelpGuide';
 import './InputData.css';
+
+const INPUT_HELP = {
+  title: 'Input Data — Guide',
+  sections: [
+    {
+      heading: 'Tabs Overview',
+      items: [
+        { icon: '📤', label: 'Upload',           desc: 'Two-step wizard to import Excel data. Step 1: pick the data type. Step 2: drag-and-drop (or browse) your .xlsx file and click Upload.' },
+        { icon: '🗄️', label: 'Master Data',       desc: 'View and edit Z-Stage concern records with all fixed columns and monthly incidence counts.' },
+        { icon: '📋', label: 'Layered Audit',     desc: 'View and edit layered audit observations per station (NC\'s, action plan, 4M, status, etc.).' },
+        { icon: '📅', label: 'Audit Adherence',   desc: 'View and edit stage-wise audit adherence records — stage, auditor, and audit date.' },
+        { icon: '📥', label: 'Template',          desc: 'Full-page column reference for all three data types. Each card shows the complete column table inline — scroll to browse all three.' },
+      ],
+    },
+    {
+      heading: 'Upload Tab',
+      items: [
+        { icon: '1️⃣', label: 'Select Data Type',  desc: 'Click one of the three cards on the left — Master Data, Layered Audit, or Audit Adherence — to tell the system which table to update.' },
+        { icon: '👁️', label: 'View Template',      desc: 'Each type card has a "View" button that opens a column-reference popup so you can check the expected format without leaving the upload screen.' },
+        { icon: '⬇️', label: 'Download Template',  desc: 'Each type card also has a "Download" button to get a blank CSV with the correct headers, a hints row, and an example row.' },
+        { icon: '📂', label: 'Choose File',        desc: 'Drag-and-drop your .xlsx file onto the right-side drop zone, or click it to browse. Only Excel files are accepted.' },
+        { icon: '✅', label: 'Upload',             desc: 'Click "Upload File" to process. A banner confirms how many rows were imported and lists any skipped rows with the reason.' },
+      ],
+    },
+    {
+      heading: 'Master Data Tab',
+      items: [
+        { icon: '✏️', label: 'Edit a Cell',        desc: 'Click any cell to edit it inline. Constrained fields (Type, RYG, Z/E, Attribution, Attri., Status 3M) show a dropdown. Press Enter to save or Escape to cancel.' },
+        { icon: '➕', label: 'Add Record',          desc: 'Click "Add Record" to open a form for a new row. Selecting Attri. auto-fills Attribution; entering Stage No auto-fills Line.' },
+        { icon: '🔍', label: 'Filter Columns',     desc: 'Click the filter badge (▾) in any column header to show/hide rows by value. Badge turns blue when a filter is active.' },
+        { icon: '📅', label: 'Add New Month',      desc: 'Click "+ Add New Month" to add a monthly incidence column for any year/month not already shown.' },
+        { icon: '↻',  label: 'Refresh',            desc: 'Reloads the latest records from the server.' },
+      ],
+    },
+    {
+      heading: 'Layered Audit & Adherence Tabs',
+      items: [
+        { icon: '✏️', label: 'Edit a Cell',        desc: 'Click any cell to edit. Long-text fields (NC\'s, Action Plan) open a resizable text area. Date fields use a date picker.' },
+        { icon: '➕', label: 'Add Record',          desc: 'Click "Add Record" to open a form and manually add a new audit or adherence row.' },
+        { icon: '🔍', label: 'Filter Columns',     desc: 'Same per-column filter as Master Data — click ▾ in any header to filter by value.' },
+        { icon: '↻',  label: 'Refresh',            desc: 'Reloads the latest records from the server.' },
+      ],
+    },
+    {
+      heading: 'Template Tab',
+      items: [
+        { icon: '📖', label: 'Column Reference',   desc: 'All three data types are shown on one scrollable page. Each card lists column name, allowed values / format hint, and an example value.' },
+        { icon: '⬇️', label: 'Download Template',  desc: 'Click "Download Template" on any card to get a blank CSV with the correct headers, a hints row, and an example row ready to fill.' },
+      ],
+    },
+    {
+      heading: 'Tips',
+      items: [
+        { icon: '💡', label: 'Layout Filter',      desc: 'Use the Layout dropdown (top-right of the tabs bar) to scope data to a specific layout. Only records for that layout are shown and saved.' },
+        { icon: '⚠️', label: 'Allowed Values',     desc: 'Type (WH/USV), RYG (R/Y/G), Z/E (Z/E), Attribution (M/P/D/U), Status 3M (R/G) must match exactly. Invalid rows are skipped on upload with a reason shown in the result banner.' },
+        { icon: '🔄', label: 'Clear a Cell',       desc: 'To remove a value you set earlier, click the cell and clear the text / select the blank option, then press Enter. The field will be saved as empty.' },
+      ],
+    },
+  ],
+};
 
 // Fixed options for 4M field
 const FOUR_M_OPTIONS = ['MAN', 'MATERIAL', 'METHOD', 'MACHINE'];
@@ -15,6 +76,15 @@ const STRICT_VALUES = {
   z_e:         ['Z', 'E'],
   attribution: ['M', 'P', 'D', 'U'],
   status_3m:   ['R', 'G'],
+};
+
+// Auto-mapping: selecting Attri. pre-fills Attribution
+const ATTRI_TO_ATTRIBUTION = {
+  'M&M Design':      'D',
+  'M&M process':     'P',
+  'Supplier Design': 'D',
+  'Supplier Process':'P',
+  'Under Analysis':  'U',
 };
 
 // Helper: get last N months as 'YYYY-MM' keys
@@ -47,7 +117,7 @@ const FIXED_COLUMNS = [
   { key: 'closure_date',   label: 'Closure Date',    width: 110, type: 'text'   },
   { key: 'ryg',            label: 'RYG',             width: 60,  type: 'text'   },
   { key: 'attri',          label: 'Attri.',          width: 90,  type: 'text'   },
-  { key: 'comm',           label: 'Comm',            width: 160, type: 'text'   },
+  { key: 'comm',           label: 'Commodity',       width: 160, type: 'text'   },
   { key: 'line',           label: 'Line',            width: 120, type: 'text'   },
   { key: 'stage_no',       label: 'Stage No',        width: 90,  type: 'text'   },
   { key: 'z_e',            label: 'Z/E',             width: 55,  type: 'text'   },
@@ -61,6 +131,105 @@ const TRAILING_COLUMNS = [
   { key: 'field_defect_after_cutoff', label: 'Field Defect After Cut-off', width: 130, type: 'number' },
   { key: 'status_3m',                 label: 'Status (3M)',                 width: 90,  type: 'text'   },
 ];
+
+// ── Template definitions (column name + hint + example value) ────────────────
+// A few representative recent months to include in the Master Data template
+const TEMPLATE_MONTHS = (() => {
+  const now = new Date();
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  return months;
+})();
+
+const TEMPLATE_DEFS = {
+  master: {
+    label: 'Master Data',
+    filename: 'master_data_template.csv',
+    desc: 'Z-Stage concern tracking. Fill in rows below the header and upload via the Upload tab.',
+    columns: [
+      { name: 'Sr.No',                       hint: 'Sequential number',                                                         example: '1'            },
+      { name: 'Concern ID',                   hint: 'Unique concern identifier',                                                 example: 'CID-001'      },
+      { name: 'Concern',                      hint: 'Description of the concern',                                                example: 'Surface finish issue' },
+      { name: 'Type',                         hint: 'WH  |  USV',                                                                example: 'WH'           },
+      { name: 'Root Cause',                   hint: 'Root cause analysis',                                                       example: ''             },
+      { name: 'Action Plan',                  hint: 'Corrective action taken / planned',                                         example: ''             },
+      { name: 'Target Date',                  hint: 'YYYY-MM-DD',                                                                example: '2025-06-30'   },
+      { name: 'Closure Date',                 hint: 'YYYY-MM-DD',                                                                example: ''             },
+      { name: 'RYG',                          hint: 'R  |  Y  |  G',                                                             example: 'R'            },
+      { name: 'Attri.',                       hint: 'M&M Design  |  M&M process  |  Supplier Design  |  Supplier Process  |  Under Analysis', example: 'M&M Design' },
+      { name: 'Commodity',                    hint: 'Commodity / material name',                                                  example: ''             },
+      { name: 'Line',                         hint: 'Production line prefix (e.g. T1)',                                           example: 'T1'           },
+      { name: 'Stage No',                     hint: 'Station ID (e.g. T1-01)',                                                    example: 'T1-01'        },
+      { name: 'Z/E',                          hint: 'Z  |  E',                                                                    example: 'Z'            },
+      { name: 'Attribution',                  hint: 'M  |  P  |  D  |  U',                                                       example: 'D'            },
+      { name: 'Part',                         hint: 'Part name or number',                                                        example: ''             },
+      { name: 'Phenomena',                    hint: 'Phenomena / symptom description',                                            example: ''             },
+      { name: 'Total',                        hint: 'Total incidences count',                                                     example: '5'            },
+      ...TEMPLATE_MONTHS.map((m) => ({ name: m, hint: `Monthly count for ${m}`, example: '' })),
+      { name: 'Field Defect After Cut-off',   hint: 'Number of field defects after cut-off date',                                 example: ''             },
+      { name: 'Status (3M)',                  hint: 'R  |  G',                                                                    example: 'R'            },
+    ],
+  },
+  'layered-audit': {
+    label: 'Layered Audit',
+    filename: 'layered_audit_template.csv',
+    desc: 'Layered audit observation records. One row per audit observation.',
+    columns: [
+      { name: 'Model',          hint: 'Vehicle model name',                    example: 'XUV700'      },
+      { name: 'Date',           hint: 'YYYY-MM-DD',                            example: '2025-04-01'  },
+      { name: 'Station ID',     hint: 'Station / stage identifier',             example: 'T1-01'       },
+      { name: 'Workstation',    hint: 'Workstation name or code',               example: ''            },
+      { name: 'Auditor',        hint: 'Name of the auditor',                    example: ''            },
+      { name: "NC's",           hint: 'Non-conformance observed',               example: ''            },
+      { name: 'Action Plan',    hint: 'Corrective action taken / planned',      example: ''            },
+      { name: '4M',             hint: 'MAN  |  MATERIAL  |  METHOD  |  MACHINE', example: 'MAN'       },
+      { name: 'Responsibility', hint: 'Responsible person or department',       example: ''            },
+      { name: 'Target Date',    hint: 'YYYY-MM-DD',                            example: ''            },
+      { name: 'Status',         hint: 'Open / Closed / In Progress',            example: 'Open'        },
+    ],
+  },
+  'audit-adherence': {
+    label: 'Audit Adherence',
+    filename: 'audit_adherence_template.csv',
+    desc: 'Audit adherence tracking per stage. One row per audit entry.',
+    columns: [
+      { name: 'Stage No',   hint: 'Station / stage identifier', example: 'T1-01'      },
+      { name: 'Stage Name', hint: 'Name of the stage',          example: 'Welding'    },
+      { name: 'Auditor',    hint: 'Name of the auditor',        example: ''           },
+      { name: 'Audit Date', hint: 'YYYY-MM-DD',                 example: '2025-04-15' },
+    ],
+  },
+};
+
+// ── CSV utilities ─────────────────────────────────────────────────────────────
+
+// Download a CSV file to the user's machine
+function downloadCsv(filename, headers, rows) {
+  const esc = (v) => {
+    const s = String(v ?? '');
+    return /[,"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = [headers.map(esc).join(','), ...rows.map((r) => r.map(esc).join(','))];
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Download a blank template CSV (headers + hints row + example row)
+function downloadTemplate(key) {
+  const def = TEMPLATE_DEFS[key];
+  if (!def) return;
+  downloadCsv(
+    def.filename,
+    def.columns.map((c) => c.name),
+    [def.columns.map((c) => c.hint), def.columns.map((c) => c.example)]
+  );
+}
 
 function formatMonthLabel(key) {
   const [year, month] = key.split('-');
@@ -555,6 +724,19 @@ function AddRecordModal({ type, onClose, onSaved, userId, layoutId, layoutStageI
   const set = (key, val) => setForm((p) => ({ ...p, [key]: val }));
   const setMonthly = (key, val) => setForm((p) => ({ ...p, monthly: { ...p.monthly, [key]: val } }));
 
+  // Auto-map Attri. → Attribution in a single state update
+  const handleAttriChange = (val) => {
+    const mapped = ATTRI_TO_ATTRIBUTION[val];
+    setForm((p) => ({ ...p, attri: val, ...(mapped ? { attribution: mapped } : {}) }));
+  };
+
+  // Auto-map Stage No → Line (extract prefix before first '-', e.g. T1-01 → T1)
+  const handleStageChange = (val) => {
+    const dashIdx = val.indexOf('-');
+    const autoLine = dashIdx > 0 ? val.substring(0, dashIdx) : '';
+    setForm((p) => ({ ...p, stage_no: val, ...(autoLine ? { line: autoLine } : {}) }));
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setError('');
@@ -641,12 +823,21 @@ function AddRecordModal({ type, onClose, onSaved, userId, layoutId, layoutStageI
               <label>RYG {sel('ryg', STRICT_VALUES.ryg)}</label>
               <label>Z/E {sel('z_e', STRICT_VALUES.z_e)}</label>
               <label>Attribution {sel('attribution', STRICT_VALUES.attribution)}</label>
-              <label>Attri. {sel('attri', STRICT_VALUES.attri)}</label>
+              <label>Attri.
+                <select className="modal-select" value={form.attri || ''} onChange={(e) => handleAttriChange(e.target.value)}>
+                  <option value="">— select —</option>
+                  {STRICT_VALUES.attri.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </label>
               <label>Status (3M) {sel('status_3m', STRICT_VALUES.status_3m)}</label>
               <label>Stage No
                 {layoutStageIds.length > 0
-                  ? sel('stage_no', layoutStageIds)
-                  : inp('stage_no')}
+                  ? <select className="modal-select" value={form.stage_no || ''} onChange={(e) => handleStageChange(e.target.value)}>
+                      <option value="">— select —</option>
+                      {layoutStageIds.map((o) => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  : <input className="modal-input" type="text" value={form.stage_no || ''} onChange={(e) => handleStageChange(e.target.value)} />
+                }
               </label>
               <label>Line{inp('line')}</label>
               <label>Part{inp('part')}</label>
@@ -655,7 +846,7 @@ function AddRecordModal({ type, onClose, onSaved, userId, layoutId, layoutStageI
               <label>Closure Date{inp('closure_date')}</label>
               <label className="modal-form-full">Root Cause{ta('root_cause')}</label>
               <label className="modal-form-full">Action Plan{ta('action_plan')}</label>
-              <label className="modal-form-full">Comm{ta('comm')}</label>
+              <label className="modal-form-full">Commodity{ta('comm')}</label>
               <div className="modal-form-full">
                 <div className="modal-form-section-title">Monthly Incidences (current + last 3 months)</div>
                 <div className="modal-form-months">
@@ -727,24 +918,9 @@ function AddRecordModal({ type, onClose, onSaved, userId, layoutId, layoutStageI
 
 // Upload data-type options
 const UPLOAD_TYPES = [
-  {
-    value: 'master',
-    label: 'Master Data',
-    desc: 'Z-Stage input Excel — Sr.No, Concern ID, Stage No, monthly incidences…',
-    viewTab: 'master',
-  },
-  {
-    value: 'layered-audit',
-    label: 'Layered Audit',
-    desc: 'Layered Audit Excel — Model, Date, Station ID, Workstation, Auditor, NC\'s…',
-    viewTab: 'layered-audit',
-  },
-  {
-    value: 'audit-adherence',
-    label: 'Audit Adherence',
-    desc: 'Audit Adherence Excel — Stage No, Stage Name, Auditor, Audit Date.',
-    viewTab: 'audit-adherence',
-  },
+  { value: 'master',          label: 'Master Data',      desc: 'Concern records & monthly incidences', viewTab: 'master'          },
+  { value: 'layered-audit',   label: 'Layered Audit',    desc: 'Audit observations per station',       viewTab: 'layered-audit'   },
+  { value: 'audit-adherence', label: 'Audit Adherence',  desc: 'Stage-wise adherence per auditor',     viewTab: 'audit-adherence' },
 ];
 
 export default function InputData({ userId, layouts = [] }) {
@@ -784,6 +960,9 @@ export default function InputData({ userId, layouts = [] }) {
   const handleMasterFilterChange = useCallback((key, val) => {
     setMasterFilters((prev) => ({ ...prev, [key]: val }));
   }, []);
+
+  // Template preview modal — null means closed, otherwise the key ('master' | 'layered-audit' | 'audit-adherence')
+  const [templatePreviewModal, setTemplatePreviewModal] = useState(null);
 
   // Add Record modal state
   const [showAddRecord, setShowAddRecord] = useState(null); // null | 'master' | 'layered-audit' | 'audit-adherence'
@@ -1012,60 +1191,107 @@ export default function InputData({ userId, layouts = [] }) {
           <CalendarCheck size={15} />
           Audit Adherence
         </button>
+        <button
+          className={`input-tab ${activeTab === 'template' ? 'active' : ''}`}
+          onClick={() => setActiveTab('template')}
+        >
+          <FileDown size={15} />
+          Template
+        </button>
         {layoutDropdown}
       </div>
 
       {/* ── Upload tab ──────────────────────────────────────────────────────── */}
       {activeTab === 'upload' && (
         <div className="upload-panel">
-          <h2 className="panel-title">Upload Excel</h2>
 
-          {/* Data type selector */}
-          <div className="upload-type-row">
-            <label className="upload-type-label">Data Type:</label>
-            <div className="upload-type-options">
-              {UPLOAD_TYPES.map((t) => (
-                <label key={t.value} className={`upload-type-option ${uploadType === t.value ? 'selected' : ''}`}>
-                  <input
-                    type="radio"
-                    name="uploadType"
-                    value={t.value}
-                    checked={uploadType === t.value}
-                    onChange={() => { setUploadType(t.value); setSelectedFile(null); setUploadResult(null); }}
-                  />
-                  <span className="upload-type-name">{t.label}</span>
-                  <span className="upload-type-desc">{t.desc}</span>
-                </label>
-              ))}
+          {/* Two-column layout: Step 1 (left) | Step 2 (right) */}
+          <div className="upload-columns">
+
+            {/* ── Step 1: Select data type ──────────────────────────────────── */}
+            <div className="upload-col upload-col--left">
+              <div className="upload-step-heading">
+                <span className="upload-step-badge">1</span>
+                <span className="upload-step-title">Select Data Type</span>
+              </div>
+
+              <div className="upload-type-options">
+                {UPLOAD_TYPES.map((t) => (
+                  <div key={t.value} className="upload-type-card-wrap">
+                    <div
+                      className={`upload-type-option ${uploadType === t.value ? 'selected' : ''}`}
+                      onClick={() => { setUploadType(t.value); setSelectedFile(null); setUploadResult(null); }}
+                    >
+                      <input type="radio" name="uploadType" value={t.value}
+                        checked={uploadType === t.value} onChange={() => {}} style={{ display: 'none' }} />
+
+                      <span className={`upload-type-dot${uploadType === t.value ? ' upload-type-dot--on' : ''}`} />
+
+                      <div className="upload-type-body">
+                        <span className="upload-type-name">{t.label}</span>
+                        <span className="upload-type-desc">{t.desc}</span>
+                      </div>
+
+                      <div className="upload-type-btns">
+                        <button
+                          className="upload-type-template-btn upload-type-template-btn--view"
+                          title="Preview column reference in a popup"
+                          onClick={(e) => { e.stopPropagation(); setTemplatePreviewModal(t.value); }}
+                        >
+                          <FileDown size={12} /> View
+                        </button>
+                        <button
+                          className="upload-type-template-btn"
+                          title="Download blank template CSV"
+                          onClick={(e) => { e.stopPropagation(); downloadTemplate(t.value); }}
+                        >
+                          <Download size={12} /> Download
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Step 2: Upload file ───────────────────────────────────────── */}
+            <div className="upload-col upload-col--right">
+              <div className="upload-step-heading">
+                <span className="upload-step-badge">2</span>
+                <span className="upload-step-title">Upload File</span>
+              </div>
+
+              <div
+                className={`drop-zone ${dragging ? 'drag-over' : ''} ${selectedFile ? 'has-file' : ''}`}
+                onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) setSelectedFile(f); }}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input ref={fileInputRef} type="file" accept=".xlsx,.xls"
+                  className="file-input-hidden"
+                  onChange={(e) => { const f = e.target.files[0]; if (f) setSelectedFile(f); }} />
+                <Upload size={40} strokeWidth={1.3} className="drop-icon" />
+                {selectedFile ? (
+                  <>
+                    <p className="drop-filename">{selectedFile.name}</p>
+                    <p className="drop-hint">Click to choose a different file</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="drop-label">Drag & drop your Excel file here</p>
+                    <p className="drop-hint">.xlsx / .xls only — or click to browse</p>
+                  </>
+                )}
+              </div>
+
+              <button className="upload-btn" disabled={!selectedFile || uploading} onClick={handleUpload}>
+                {uploading ? <><Loader size={15} className="spin" /> Uploading…</> : <><Upload size={15} /> Upload File</>}
+              </button>
             </div>
           </div>
 
-          <div
-            className={`drop-zone ${dragging ? 'drag-over' : ''} ${selectedFile ? 'has-file' : ''}`}
-            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-            onDragLeave={() => setDragging(false)}
-            onDrop={(e) => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) setSelectedFile(f); }}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              className="file-input-hidden"
-              onChange={(e) => { const f = e.target.files[0]; if (f) setSelectedFile(f); }}
-            />
-            <Upload size={36} strokeWidth={1.5} className="drop-icon" />
-            {selectedFile ? (
-              <><p className="drop-filename">{selectedFile.name}</p><p className="drop-hint">Click to choose a different file</p></>
-            ) : (
-              <><p className="drop-label">Drag & drop your Excel file here</p><p className="drop-hint">or click to browse — .xlsx / .xls only</p></>
-            )}
-          </div>
-
-          <button className="upload-btn" disabled={!selectedFile || uploading} onClick={handleUpload}>
-            {uploading ? <><Loader size={15} className="spin" /> Uploading…</> : 'Upload File'}
-          </button>
-
+          {/* Result banner — full width below both columns */}
           {uploadResult && (
             <div className={`upload-result ${uploadResult.success ? 'result-success' : 'result-error'}`}>
               {uploadResult.success ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
@@ -1077,7 +1303,7 @@ export default function InputData({ userId, layouts = [] }) {
                     <button className="link-btn" onClick={() => setActiveTab(uploadResult.viewTab)}>View Data →</button>
                   </p>
                 )}
-                {uploadResult.success && uploadResult.skippedRows && uploadResult.skippedRows.length > 0 && (
+                {uploadResult.success && uploadResult.skippedRows?.length > 0 && (
                   <div className="upload-skipped">
                     <div className="upload-skipped-title">
                       <FileWarning size={14} /> {uploadResult.skippedRows.length} row{uploadResult.skippedRows.length !== 1 ? 's' : ''} skipped (invalid values):
@@ -1168,6 +1394,63 @@ export default function InputData({ userId, layouts = [] }) {
               onSaved={handleAdherenceRecordSaved}
             />
           )}
+        </div>
+      )}
+
+      {/* ── Template tab ─────────────────────────────────────────────────────── */}
+      {activeTab === 'template' && (
+        <div className="template-panel">
+          <div className="template-header">
+            <FileDown size={22} className="template-header-icon" />
+            <div>
+              <h2 className="panel-title">Download Templates</h2>
+              <p className="panel-subtitle">Download a pre-formatted CSV with the correct column headers. Fill your data and upload via the Upload tab.</p>
+            </div>
+          </div>
+
+          <div className="template-cards">
+            {Object.entries(TEMPLATE_DEFS).map(([key, def]) => (
+              <div key={key} className="template-card">
+                <div className="template-card-header">
+                  <span className="template-card-title">{def.label}</span>
+                  <button
+                    className="template-download-btn"
+                    onClick={() => downloadTemplate(key)}
+                    title="Download blank template CSV"
+                  >
+                    <Download size={13} /> Download Template
+                  </button>
+                </div>
+                <p className="template-card-desc">{def.desc}</p>
+
+                {/* Inline column reference table — always visible */}
+                <div className="template-col-table-wrap">
+                  <table className="template-col-table">
+                    <thead>
+                      <tr>
+                        <th className="tcol-num">#</th>
+                        <th>Column Name</th>
+                        <th>Allowed / Format</th>
+                        <th>Example</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {def.columns.map((col, i) => (
+                        <tr key={i}>
+                          <td className="tcol-num">{i + 1}</td>
+                          <td className="tcol-name">{col.name}</td>
+                          <td className="tcol-hint">{col.hint}</td>
+                          <td className="tcol-example">
+                            {col.example || <span className="tcol-empty">—</span>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -1317,6 +1600,52 @@ export default function InputData({ userId, layouts = [] }) {
           layoutId={selectedLayoutId}
           layoutStageIds={layoutStageIds}
         />
+      )}
+
+      <HelpGuide {...INPUT_HELP} />
+
+      {/* ── Template preview modal ─────────────────────────────────────────── */}
+      {templatePreviewModal && createPortal(
+        <div className="template-modal-overlay" onClick={() => setTemplatePreviewModal(null)}>
+          <div className="template-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="template-modal-header">
+              <span className="template-modal-title">
+                {TEMPLATE_DEFS[templatePreviewModal]?.label} — Column Reference
+              </span>
+              <button className="template-modal-close" onClick={() => setTemplatePreviewModal(null)}>
+                <X size={15} />
+              </button>
+            </div>
+
+            <div className="template-modal-body">
+              <table className="template-col-table">
+                <thead>
+                  <tr><th>#</th><th>Column Name</th><th>Allowed / Format</th><th>Example</th></tr>
+                </thead>
+                <tbody>
+                  {(TEMPLATE_DEFS[templatePreviewModal]?.columns || []).map((col, i) => (
+                    <tr key={i}>
+                      <td className="tcol-num">{i + 1}</td>
+                      <td className="tcol-name">{col.name}</td>
+                      <td className="tcol-hint">{col.hint}</td>
+                      <td className="tcol-example">{col.example || <span className="tcol-empty">—</span>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="template-modal-footer">
+              <button className="template-modal-dl-btn" onClick={() => downloadTemplate(templatePreviewModal)}>
+                <Download size={13} /> Download Template
+              </button>
+              <button className="template-modal-cancel-btn" onClick={() => setTemplatePreviewModal(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
