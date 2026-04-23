@@ -1,0 +1,11 @@
+VIN No,Audit Date,Plant Name,Model Code,Variant Name,Fuel Type,BuildPhase Name,Body No,Part Name,Defect Name,Location Name,Concern Type Name,Pointer,Attribution,4M,4M Analysis Name,Root Cause,ICA,PCA,Responsibility,Target Date,Status,Frequency,New and repeat,Remark
+MA1NS2NP1S2F71402,2025-06-07,Nashik,THAR ROXX,MX3  MT 2WD,Gasoline,SOP,NGS50862QK,2nd row center & passenger knee,Customer perceived quality,RR,,5.0,Design,,,,,,,,R,181.0,Repeat,AC effectiveness more
+MA1NS2NP1S2F71402,2025-06-07,Nashik,THAR ROXX,MX3  MT 2WD,Gasoline,SOP,NGS50862QK,D pillar,Wavy,BH,,10.0,CME,,,,,,,,R,181.0,Repeat,at top outer side corner
+MA1NS2NP1S2F71402,2025-06-07,Nashik,THAR ROXX,MX3  MT 2WD,Gasoline,SOP,NGS50862QK,Door outer handle,Colour mis match,BH RR,,5.0,Design,,,,,,,,R,181.0,Repeat,with front door handle
+MA1NS2NP1S2F71402,2025-06-07,Nashik,THAR ROXX,MX3  MT 2WD,Gasoline,SOP,NGS50862QK,HMSL,DISTORTION MARK,RR,,5.0,CDMM,,,,,,,,R,181.0,Repeat,multiple
+MA1NS2NP1S2F71402,2025-06-07,Nashik,THAR ROXX,MX3  MT 2WD,Gasoline,SOP,NGS50862QK,IP switch bank,Customer perceived quality,RH FT,,5.0,Design,,,,,,,,R,181.0,Repeat,BLIND ZONE FOR DRIVER
+MA1NS2NP1S2F71402,2025-06-07,Nashik,THAR ROXX,MX3  MT 2WD,Gasoline,SOP,NGS50862QK,Tail lamp,DISTORTION MARK,BH,,5.0,CDMM,,,,,,,,R,181.0,Repeat,Inner rectangular black bezel
+MA1UN2JV2S2G18199,2025-07-29,Nashik,THAR ROXX,MX1  MT 2WD,Gasoline,SOP,NVS64785XJ,2nd row center & passenger knee,Customer perceived quality,RR,,5.0,Design,,,,,,,,R,181.0,Repeat,AC effectiveness more
+MA1UN2JV2S2G18199,2025-07-29,Nashik,THAR ROXX,MX1  MT 2WD,Gasoline,SOP,NVS64785XJ,D pillar,Wavy,BH,,10.0,CME,,,,,,,,R,181.0,Repeat,at top outer side corner
+MA1UN2JV2S2G18199,2025-07-29,Nashik,THAR ROXX,MX1  MT 2WD,Gasoline,SOP,NVS64785XJ,Door outer handle,Colour mis match,BH RR,,5.0,Design,,,,,,,,R,181.0,Repeat,with front door handle
+MA1UN2JV2S2G18199,2025-07-29,Nashik,THAR ROXX,MX1  MT 2WD,Gasoline,SOP,NVS64785XJ,HMSL,DISTORTION MARK,RR,,5.0,CDMM,,,,,,,,R,181.0,Repeat,multiple
