@@ -3,8 +3,8 @@ import Draggable from 'react-draggable';
 import { Check, X, RotateCw } from 'lucide-react';
 import './CanvasArrow.css';
 
-const MIN_W = 50;
-const MIN_H = 28;
+const MIN_W = 36;
+const MIN_H = 16;
 
 const DIRECTIONS = ['right', 'down', 'left', 'up'];
 const DIR_DEG = { right: 0, down: 90, left: 180, up: 270 };
@@ -21,16 +21,25 @@ export default function CanvasArrow({
   onLabelChange,
   onDelete,
   canvasScale,
+  autoSelect,
 }) {
   const [pos,       setPos      ] = useState(parentPos   || { x: 80, y: 80 });
   const [size,      setSize     ] = useState(parentSize  || { w: 120, h: 50 });
   const [direction, setDir      ] = useState(parentDir);
   const [label,     setLabel    ] = useState(parentLabel);
   const [selected,  setSelected ] = useState(false);
+  // isNew stays true until the user explicitly confirms (OK / click-away)
+  const [isNew,     setIsNew    ] = useState(!!autoSelect);
 
   const wrapRef    = useRef(null);
-  const iRef       = useRef(null);   // active resize interaction
-  const didDragRef = useRef(false);  // distinguish drag from click
+  const iRef       = useRef(null);
+  const didDragRef = useRef(false);
+
+  // Auto-select freshly-placed arrows
+  useEffect(() => {
+    if (autoSelect) setSelected(true);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* ── Sync from parent ─────────────────────────────────────────────────── */
   useEffect(() => {
@@ -50,6 +59,7 @@ export default function CanvasArrow({
     const h = (e) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target)) {
         setSelected(false);
+        setIsNew(false);
         onLabelChange?.(id, label);
       }
     };
@@ -57,7 +67,7 @@ export default function CanvasArrow({
     return () => document.removeEventListener('mousedown', h, true);
   }, [selected, id, label, onLabelChange]);
 
-  /* ── Resize (custom; Draggable cancel prevents its own drag on handles) ─ */
+  /* ── Resize ─────────────────────────────────────────────────────────── */
   const onResizeMove = useCallback((e) => {
     const d = iRef.current;
     if (!d) return;
@@ -108,13 +118,21 @@ export default function CanvasArrow({
   const rotate = (e) => {
     e.stopPropagation();
     const next = DIRECTIONS[(DIRECTIONS.indexOf(direction) + 1) % 4];
+    const wasVertical = direction === 'up' || direction === 'down';
+    const isVertical  = next     === 'up' || next     === 'down';
     setDir(next);
     onDirectionChange?.(id, next);
+    if (wasVertical !== isVertical) {
+      const swapped = { w: size.h, h: size.w };
+      setSize(swapped);
+      onSizeChange?.(id, swapped);
+    }
   };
 
   const handleOk = (e) => {
     e.stopPropagation();
     setSelected(false);
+    setIsNew(false);
     onLabelChange?.(id, label);
   };
 
@@ -123,6 +141,8 @@ export default function CanvasArrow({
     e:  'ew-resize',   se:'nwse-resize', s:  'ns-resize',
     sw: 'nesw-resize', w: 'ew-resize',
   };
+
+  const alertClass = isNew && selected ? ' ca-wrap--new' : '';
 
   return (
     <Draggable
@@ -138,7 +158,7 @@ export default function CanvasArrow({
     >
       <div
         ref={wrapRef}
-        className={`ca-wrap${selected ? ' ca-wrap--sel' : ''}`}
+        className={`ca-wrap${selected ? ' ca-wrap--sel' : ''}${alertClass}`}
         style={{ width: size.w, height: size.h }}
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => { e.stopPropagation(); if (!didDragRef.current) setSelected(true); }}

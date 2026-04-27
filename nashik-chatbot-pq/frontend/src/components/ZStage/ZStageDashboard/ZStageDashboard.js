@@ -20,6 +20,8 @@ const DASHBOARD_HELP = {
         { icon: '🔵', label: 'Station Names Row',   desc: 'The blue row shows the station names defined in the Layout editor below each station ID.' },
         { icon: '💎', label: 'Buyoff / Bypass',     desc: 'Diamond-shaped icons on the canvas represent buyoff or bypass points defined in the layout.' },
         { icon: '➡️', label: 'Connection Arrows',   desc: 'Arrows between boxes show the flow connections drawn in the Layout editor.' },
+        { icon: '🔤', label: 'Text Labels',          desc: 'Free-text annotations placed in the Layout editor appear here as read-only overlays with a dashed border.' },
+        { icon: '⬛', label: 'Canvas Arrows',        desc: 'Broad directional arrows placed in the Layout editor appear here as read-only green arrow shapes.' },
       ],
     },
     {
@@ -60,8 +62,8 @@ const DASHBOARD_HELP = {
       heading: 'Toolbar',
       items: [
         { icon: '🎨', label: 'Colour Legend',      desc: 'The top bar shows colour chips: red Z = active issues, green Z = no issues, M/P/D/U chips = attribution colour codes.' },
-        { icon: '📂', label: 'Layout Dropdown',    desc: 'Switch between saved layouts using the "Layout:" dropdown in the top-right toolbar.' },
-        { icon: '↻',  label: 'Refresh',            desc: 'Reloads all records and recalculates station colours with the latest data.' },
+        { icon: '📂', label: 'Layout Dropdown',    desc: 'Switch between saved layouts using the "Layout:" dropdown in the top-right toolbar. The dashboard automatically selects whichever layout is currently open in the Layout editor.' },
+        { icon: '↻',  label: 'Refresh',            desc: 'Reloads all records and recalculates station colours with the latest data. The dashboard also auto-refreshes whenever the Layout editor saves a change.' },
       ],
     },
   ],
@@ -1025,11 +1027,14 @@ function parseLayout(apiLayout) {
   } catch { textLabels = []; }
 
   let canvasArrows = [];
+  let drawnPaths   = [];
   try {
-    canvasArrows = apiLayout.canvas_arrows ? JSON.parse(apiLayout.canvas_arrows) : [];
-  } catch { canvasArrows = []; }
+    const all = apiLayout.canvas_arrows ? JSON.parse(apiLayout.canvas_arrows) : [];
+    canvasArrows = all.filter((a) => a.type !== 'drawn_path');
+    drawnPaths   = all.filter((a) => a.type === 'drawn_path');
+  } catch { canvasArrows = []; drawnPaths = []; }
 
-  return { boxes: shiftedBoxes, buyoffIcons: shiftedBuyoff, connections, textLabels, canvasArrows };
+  return { boxes: shiftedBoxes, buyoffIcons: shiftedBuyoff, connections, textLabels, canvasArrows, drawnPaths };
 }
 
 // ── Compute display data for one station ──────────────────────────────────────
@@ -1224,7 +1229,7 @@ function LegendBox({ legendData, position, transformScale, onDragEnd }) {
 }
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
-function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0 }) {
+function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, isActive = true }) {
   const [layouts, setLayouts]         = useState([]);
   const [selectedId, setSelectedId]   = useState(null);
   const [boxes, setBoxes]             = useState([]);
@@ -1232,6 +1237,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0 }) {
   const [connections, setConnections] = useState([]);
   const [textLabels, setTextLabels]   = useState([]);
   const [canvasArrows, setCanvasArrows] = useState([]);
+  const [drawnPaths,   setDrawnPaths  ] = useState([]);
   const [records, setRecords]         = useState([]);
   const [auditRecords, setAuditRecords]       = useState([]);
   const [adherenceRecords, setAdherenceRecords] = useState([]);
@@ -1267,8 +1273,8 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0 }) {
     loadedBuyoffIcons.forEach((icon) => {
       minX = Math.min(minX, icon.position.x);
       minY = Math.min(minY, icon.position.y);
-      maxX = Math.max(maxX, icon.position.x + 62);
-      maxY = Math.max(maxY, icon.position.y + 62);
+      maxX = Math.max(maxX, icon.position.x + 80);
+      maxY = Math.max(maxY, icon.position.y + 80);
     });
 
     const el = canvasRef.current;
@@ -1338,6 +1344,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0 }) {
         setConnections(state.connections);
         setTextLabels(state.textLabels || []);
         setCanvasArrows(state.canvasArrows || []);
+        setDrawnPaths(state.drawnPaths || []);
         setRecords(Array.isArray(recordsRes.data) ? recordsRes.data : []);
         setAuditRecords(Array.isArray(auditRes.data) ? auditRes.data : []);
         setAdherenceRecords(Array.isArray(adherenceRes.data) ? adherenceRes.data : []);
@@ -1378,6 +1385,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0 }) {
           setConnections(state.connections);
           setTextLabels(state.textLabels || []);
           setCanvasArrows(state.canvasArrows || []);
+        setDrawnPaths(state.drawnPaths || []);
         })
       );
     }
@@ -1522,11 +1530,12 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0 }) {
                           className="dash-buyoff"
                           style={{ position: 'absolute', left: icon.position.x, top: icon.position.y }}
                         >
-                          {/* Invisible Xarrow anchor points for each direction */}
-                          <div id={`${icon.id}__top`}    style={{ position:'absolute', top:0,    left:'50%', width:1, height:1, pointerEvents:'none' }} />
-                          <div id={`${icon.id}__bottom`} style={{ position:'absolute', bottom:0, left:'50%', width:1, height:1, pointerEvents:'none' }} />
-                          <div id={`${icon.id}__left`}   style={{ position:'absolute', top:'50%', left:0,   width:1, height:1, pointerEvents:'none' }} />
-                          <div id={`${icon.id}__right`}  style={{ position:'absolute', top:'50%', right:0,  width:1, height:1, pointerEvents:'none' }} />
+                          {/* Invisible anchor points — match routeArrow.js tip offsets for 80×80 diamond.
+                              top(40,0)  bottom(40,80)  left(0,40)  right(80,40) */}
+                          <div id={`${icon.id}__top`}    style={{ position:'absolute', top:0,   left:40, width:1, height:1, pointerEvents:'none' }} />
+                          <div id={`${icon.id}__bottom`} style={{ position:'absolute', top:80,  left:40, width:1, height:1, pointerEvents:'none' }} />
+                          <div id={`${icon.id}__left`}   style={{ position:'absolute', top:40,  left:0,  width:1, height:1, pointerEvents:'none' }} />
+                          <div id={`${icon.id}__right`}  style={{ position:'absolute', top:40,  left:80, width:1, height:1, pointerEvents:'none' }} />
                           <div className="dash-buyoff-diamond">
                             <GitBranch size={14} />
                           </div>
@@ -1534,33 +1543,43 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0 }) {
                       ))}
 
                       {/* Text labels — read-only mirror of layout editor */}
-                      {textLabels.map((tl) => (
-                        tl.text ? (
+                      {textLabels.map((tl) => {
+                        const w  = tl.w || 60;
+                        const h  = tl.h || 14;
+                        const fs = w <= 80 ? 7 : w <= 140 ? 12 : 16;
+                        return (
                           <div
                             key={tl.id}
                             style={{
                               position: 'absolute',
                               left: tl.x,
                               top: tl.y,
-                              width: tl.w || 160,
-                              height: tl.h || 56,
-                              fontSize: Math.max(7, Math.round((tl.h || 56) * 0.22)),
-                              padding: '4px 6px',
+                              width: w,
+                              height: h,
+                              fontSize: fs,
+                              padding: '1px 0',
                               boxSizing: 'border-box',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
                               whiteSpace: 'pre-wrap',
                               wordBreak: 'break-word',
+                              overflow: 'hidden',
                               pointerEvents: 'none',
-                              background: 'transparent',
+                              background: 'rgba(255,255,255,0.85)',
+                              border: '1.5px dashed #9ca3af',
                               borderRadius: 4,
-                              color: '#2c3e50',
-                              fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                              color: '#1a202c',
+                              fontFamily: 'inherit',
+                              fontWeight: 700,
                               lineHeight: 1.4,
+                              textAlign: 'center',
                             }}
                           >
                             {tl.text}
                           </div>
-                        ) : null
-                      ))}
+                        );
+                      })}
 
                       {/* Canvas arrows — read-only mirror of layout editor */}
                       {canvasArrows.map((arrow) => {
@@ -1595,6 +1614,30 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0 }) {
                           </div>
                         );
                       })}
+
+                      {/* Drawn paths — read-only SVG polylines from Draw Path tool */}
+                      {drawnPaths.length > 0 && (
+                        <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', overflow: 'visible', pointerEvents: 'none' }}>
+                          <defs>
+                            {drawnPaths.map((p) => (
+                              <marker key={p.id} id={`dash-dp-${p.id}`} markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto" markerUnits="userSpaceOnUse">
+                                <polygon points="0 0, 8 3, 0 6" fill={p.color || '#2563eb'} />
+                              </marker>
+                            ))}
+                          </defs>
+                          {drawnPaths.map((p) => (
+                            <polyline
+                              key={p.id}
+                              points={p.pts.map(([x, y]) => `${x},${y}`).join(' ')}
+                              stroke={p.color || '#2563eb'}
+                              strokeWidth={p.width || 2}
+                              fill="none"
+                              strokeLinejoin="round"
+                              markerEnd={`url(#dash-dp-${p.id})`}
+                            />
+                          ))}
+                        </svg>
+                      )}
 
                       {/* Legend box – draggable, scales with canvas zoom */}
                       {legendPos && (
@@ -1805,7 +1848,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0 }) {
         />
       )}
     </Xwrapper>
-    <HelpGuide {...DASHBOARD_HELP} />
+    <HelpGuide {...DASHBOARD_HELP} active={isActive} />
     </>
   );
 }
