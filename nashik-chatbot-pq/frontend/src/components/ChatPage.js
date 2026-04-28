@@ -13,6 +13,7 @@ function ChatPage() {
   // Map landing-page feature key → backend agent_type
   const getAgentType = (feat) => {
     if (feat === "guideline") return "standards_guidelines";
+    if (feat === "qlense") return "qlense";
     return "analyst";
   };
 
@@ -49,6 +50,7 @@ function ChatPage() {
       "quality-assistant": "Qlense Quality Assistant",
       guideline: "Qlense Guideline Bot",
       diagnostic: "Diagnostic Support Bot",
+      qlense: "QLense Assistant",
     };
     return featureNames[feature] || "Quality Assistant Bot";
   };
@@ -93,6 +95,8 @@ function ChatPage() {
           "Welcome to Qlense Guidelines! Ask me about quality standards and guidelines.",
         diagnostic:
           "Welcome to Diagnostic Support! I can assist you with diagnostic tools for quality control.",
+        qlense:
+          "Welcome to QLense Assistant! Tell me which part or component you want to investigate — I'll find all quality issues from the database. If you'd like a solution for any issue, just ask and I'll search our solved-problems knowledge base.",
       };
 
       if (welcomeMessages[feature]) {

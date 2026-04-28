@@ -107,6 +107,50 @@ def create_embeddings(ctx):
 
 
 @task
+def ingest_problem_solved(ctx):
+    """
+    Ingest Problem_Solved PDFs into OpenSearch for the QLense Agent knowledge base.
+
+    Scans data_qlense/Problem_Solved/, registers new files in scraped_docs,
+    then embeds them into OpenSearch so search_standards can retrieve solutions.
+
+    Usage: invoke ingest-problem-solved
+    """
+    logger.info("=" * 80)
+    logger.info("Ingesting Problem_Solved PDFs for QLense Agent…")
+    logger.info("=" * 80)
+    from pathlib import Path
+    from dataloader.scraper.file_system_scraper import FileScraper
+    from app.connectors.state_db_connector import StateDBConnector
+
+    root = Path(__file__).resolve().parent
+    problem_solved_dir = root.parent / "data_qlense" / "Problem_Solved"
+    setting = get_settings()
+    index_name = setting.OPENSEARCH_INDEX_NAME
+
+    logger.info(f"Source: {problem_solved_dir}")
+    logger.info(f"Index : {index_name}")
+
+    db = StateDBConnector()
+    scraper = FileScraper(db, index_name)
+    scrape_stats = scraper.scrape_directory(problem_solved_dir)
+    db.close()
+
+    logger.info(f"Scraped — new: {scrape_stats['new']}, existing: {scrape_stats['existing']}, errors: {scrape_stats['errors']}")
+
+    dep = DocumentEmbeddingProcessor()
+    embed_stats = dep.run()
+    dep.close()
+
+    logger.info("=" * 80)
+    logger.info(f"  Completed : {embed_stats['documents_completed']}/{embed_stats['documents_processed']}")
+    logger.info(f"  Chunks    : {embed_stats['total_chunks_created']} created, {embed_stats['total_chunks_skipped']} skipped")
+    if embed_stats["total_errors"]:
+        logger.warning(f"  Errors    : {embed_stats['total_errors']}")
+    logger.info("=" * 80)
+
+
+@task
 def process_warranty_data(ctx):
     """
     Process warranty CSV and load it into raw_warranty_data database table

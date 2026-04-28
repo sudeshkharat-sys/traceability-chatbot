@@ -10,7 +10,7 @@ import json
 import hashlib
 import logging
 import os
-import signal
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from pathlib import Path
 from typing import Dict, Any, Optional, List
 from datetime import datetime
@@ -32,32 +32,6 @@ PDF_CONVERSION_TIMEOUT = int(os.environ.get('PDF_CONVERSION_TIMEOUT', '300'))
 class TimeoutError(Exception):
     """Raised when PDF conversion times out"""
     pass
-
-
-def timeout_handler(signum, frame):
-    """Signal handler for timeout"""
-    raise TimeoutError("PDF conversion timed out")
-
-
-def with_timeout(timeout_seconds):
-    """
-    Decorator to add timeout to a function.
-    Only works on Unix-like systems (Linux, macOS).
-    """
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            # Set the signal handler and alarm
-            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(timeout_seconds)
-            try:
-                result = func(*args, **kwargs)
-            finally:
-                # Cancel the alarm and restore old handler
-                signal.alarm(0)
-                signal.signal(signal.SIGALRM, old_handler)
-            return result
-        return wrapper
-    return decorator
 
 
 class EmbeddingProcessor:
@@ -197,7 +171,7 @@ class EmbeddingProcessor:
                 metadatas=chunk_metadatas,
                 ids=chunk_ids,
             )
-            logger.info(f"✓ OpenSearch batch upsert completed in {time.time() - batch_start:.2f}s")
+            logger.info(f"[OK] OpenSearch batch upsert completed in {time.time() - batch_start:.2f}s")
             stats["chunks_processed"] += len(chunk_texts)
 
             # Upsert chunk metadata to Postgres
@@ -215,7 +189,7 @@ class EmbeddingProcessor:
                 except Exception as e:
                     logger.error(f"Error updating Postgres for chunk {chunk_info['index']}: {e}")
                     stats["errors"] += 1
-            logger.info(f"✓ Postgres batch upsert completed in {time.time() - db_start:.2f}s")
+            logger.info(f"[OK] Postgres batch upsert completed in {time.time() - db_start:.2f}s")
 
         except Exception as e:
             logger.error(f"Error during OpenSearch batch processing: {e}")
@@ -264,24 +238,25 @@ class EmbeddingProcessor:
             conv_start = time.time()
 
             try:
-                # Set timeout alarm
-                old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-                signal.alarm(PDF_CONVERSION_TIMEOUT)
-                conv_res = self.doc_converter.convert(doc_path)
-                signal.alarm(0)  # Cancel alarm on success
-                signal.signal(signal.SIGALRM, old_handler)  # Restore old handler
-                logger.info(f"  ✓ Conversion completed in {time.time() - conv_start:.2f}s")
-            except TimeoutError:
-                signal.alarm(0)  # Cancel alarm
-                signal.signal(signal.SIGALRM, old_handler)  # Restore old handler
-                logger.error(f"  ✗ PDF conversion timed out after {PDF_CONVERSION_TIMEOUT}s")
-                logger.error(f"  Skipping document {doc['doc_name']} due to timeout")
-                stats["errors"] += 1
-                return stats
+                # ThreadPoolExecutor timeout works on both Windows and Linux.
+                # We deliberately avoid the `with` context manager so that
+                # shutdown(wait=False) is used on timeout — otherwise the `with`
+                # block would call shutdown(wait=True) and block until the stuck
+                # thread finally finishes, defeating the purpose of the timeout.
+                _exe = ThreadPoolExecutor(max_workers=1)
+                future = _exe.submit(self.doc_converter.convert, doc_path)
+                try:
+                    conv_res = future.result(timeout=PDF_CONVERSION_TIMEOUT)
+                    _exe.shutdown(wait=False)
+                except FuturesTimeoutError:
+                    _exe.shutdown(wait=False)  # abandon the stuck thread, don't block
+                    logger.error(f"  [FAIL] PDF conversion timed out after {PDF_CONVERSION_TIMEOUT}s")
+                    logger.error(f"  Skipping document {doc['doc_name']} due to timeout")
+                    stats["errors"] += 1
+                    return stats
+                logger.info(f"  [OK] Conversion completed in {time.time() - conv_start:.2f}s")
             except Exception as e:
-                signal.alarm(0)  # Cancel alarm
-                signal.signal(signal.SIGALRM, old_handler)  # Restore old handler
-                logger.error(f"  ✗ PDF conversion failed: {str(e)}")
+                logger.error(f"  [FAIL] PDF conversion failed: {str(e)}")
                 raise  # Re-raise to be caught by outer try-except
 
             # Chunk document
@@ -289,7 +264,7 @@ class EmbeddingProcessor:
             chunk_start = time.time()
             chunk_iter = self.chunker.chunk(dl_doc=conv_res.document)
             chunks = list(chunk_iter)
-            logger.info(f"  ✓ Chunking completed in {time.time() - chunk_start:.2f}s - {len(chunks)} chunks created")
+            logger.info(f"  [OK] Chunking completed in {time.time() - chunk_start:.2f}s - {len(chunks)} chunks created")
 
             # Free the heavy conversion result now that chunking is done
             del conv_res
@@ -359,14 +334,14 @@ class EmbeddingProcessor:
 
             # Flush remaining chunks
             self._flush_batch(doc, batch_texts, batch_metadatas, batch_ids, batch_data, stats)
-            logger.info(f"  ✓ Embedding phase completed in {time.time() - embed_start:.2f}s")
+            logger.info(f"  [OK] Embedding phase completed in {time.time() - embed_start:.2f}s")
 
             # Mark as successful if no errors or only skipped chunks
             stats["success"] = stats["errors"] == 0
 
             total_time = time.time() - doc_start_time
             logger.info(
-                f"✓ Document processed in {total_time:.2f}s: "
+                f"[OK] Document processed in {total_time:.2f}s: "
                 f"{stats['chunks_processed']} processed, "
                 f"{stats['chunks_created']} created, {stats['chunks_updated']} updated, "
                 f"{stats['chunks_skipped']} skipped, {stats['errors']} errors"

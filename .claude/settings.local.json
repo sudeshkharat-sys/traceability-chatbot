@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx react-scripts *)",
+      "Bash(node_modules/.bin/eslint src/components/ZStage/LayoutPreparation/LayoutPreparation.js src/components/ZStage/ZStageDashboard/ZStageDashboard.js src/components/ZStage/Sidebar/Sidebar.js src/components/ZStage/ZStage.js --max-warnings=0)",
+      "Bash(node_modules/.bin/eslint src/components/ZStage/LayoutPreparation/LayoutPreparation.js src/components/ZStage/ZStageDashboard/ZStageDashboard.js src/components/ZStage/Sidebar/Sidebar.js src/components/ZStage/ZStage.js)",
+      "Bash(node -e ' *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(xargs grep *)",
+      "Bash(grep -E \"\\\\.\\(tsx|jsx|ts|js\\)$\")",
+      "Bash(python -c ' *)",
+      "Bash(python scripts/ingest_problem_solved.py)",
+      "Bash(pip show *)",
+      "Bash(pip list *)",
+      "Bash(grep -v \"^\\\\.$\")",
+      "Bash(xargs du *)",
+      "Bash(git remote *)",
+      "Bash(git pull *)",
+      "Bash(git checkout *)",
+      "Bash(git commit *)"
+    ]
+  }
+}

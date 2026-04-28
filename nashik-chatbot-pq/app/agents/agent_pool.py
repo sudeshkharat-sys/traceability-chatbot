@@ -94,6 +94,14 @@ class AgentPool:
                     thread_id=thread_id,
                     checkpointer=self.checkpointer,
                 )
+            elif agent_type == "qlense":
+                from app.agents.qlense_agent import QLenseAgent
+
+                thread_id = f"conv_{conversation_id}"
+                agent = QLenseAgent(
+                    thread_id=thread_id,
+                    checkpointer=self.checkpointer,
+                )
             else:
                 raise ValueError(f"Unknown agent type: {agent_type}")
 
@@ -134,6 +142,15 @@ class AgentPool:
         from app.agents.standards_guidelines_agent import StandardsGuidelinesAgent
 
         return StandardsGuidelinesAgent(
+            thread_id=thread_id,
+            checkpointer=self.checkpointer,
+        )
+
+    def get_qlense_agent(self, thread_id: str = "default"):
+        """Get a standalone QLense agent instance."""
+        from app.agents.qlense_agent import QLenseAgent
+
+        return QLenseAgent(
             thread_id=thread_id,
             checkpointer=self.checkpointer,
         )
