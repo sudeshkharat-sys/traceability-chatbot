@@ -72,6 +72,9 @@ Thumbs.db
 *.xlsx
 # Allow official Z-Stage templates in public folder
 !nashik-chatbot-pq/frontend/public/templates/*.xlsx
+# Allow QLense data folder Excel files
+!data_qlense/**/*.xlsx
+!data_qlense/*.xlsx
 csv_output/
 excel_part_labeler_csv/
 thar_csv/
