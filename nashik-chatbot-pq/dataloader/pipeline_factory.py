@@ -8,7 +8,6 @@ from docling.datamodel.pipeline_options import (
     TableFormerMode,
     PictureDescriptionVlmOptions,
     TableStructureOptions,
-    RapidOcrOptions,
     AcceleratorOptions,
     AcceleratorDevice
 )
@@ -58,14 +57,9 @@ def get_pipeline_options():
         device=AcceleratorDevice.AUTO  # Auto-select best device
     )
 
-    # 1. OCR Settings - Handle both text and scanned PDFs
-    # Docling automatically skips OCR for text PDFs, runs OCR for scanned PDFs
-    pipeline_options.do_ocr = True
-    pipeline_options.ocr_options = RapidOcrOptions()
-
-    # Use hybrid mode (default): OCR only when needed
-    # Set force_full_page_ocr=True only if layout extraction fails
-    pipeline_options.ocr_options.force_full_page_ocr = False
+    # 1. OCR disabled — Problem_Solved PDFs are text-based, no OCR needed.
+    # Avoids downloading RapidOCR ONNX models (fails on corporate SSL networks).
+    pipeline_options.do_ocr = False
 
     # 2. Table Settings (EXPENSIVE - second most costly after OCR)
     # Can disable via ENABLE_TABLES=false if tables aren't needed
