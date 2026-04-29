@@ -3,14 +3,6 @@ import sys
 from pathlib import Path
 import tiktoken
 from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import (
-    PdfPipelineOptions,
-    TableFormerMode,
-    PictureDescriptionVlmOptions,
-    TableStructureOptions,
-    AcceleratorOptions,
-    AcceleratorDevice
-)
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
 from docling_core.transforms.chunker.tokenizer.openai import OpenAITokenizer
@@ -38,82 +30,61 @@ if ARTIFACTS_PATH is not None:
 # Configuration flags (override via environment variables)
 ENABLE_VLM = os.environ.get('ENABLE_VLM', 'false').lower() == 'true'
 ENABLE_TABLES = os.environ.get('ENABLE_TABLES', 'true').lower() == 'true'
-NUM_THREADS = int(os.environ.get('DOCLING_NUM_THREADS', '8'))  # Use all 8 logical cores by default
+NUM_THREADS = int(os.environ.get('DOCLING_NUM_THREADS', '8'))
 
 # Module-level cache for converter and chunker (singleton pattern)
 # Prevents memory leak from recreating Docling models on every processor reload
 _converter_instance = None
 _chunker_instance = None
 
-def get_pipeline_options():
-    # artifacts_path=None tells Docling to use its default HuggingFace cache
-    pipeline_options = PdfPipelineOptions(artifacts_path=ARTIFACTS_PATH)
 
-    # 0. Accelerator Settings - Configure FIRST for optimal performance
-    # Use AUTO to automatically select best device (CUDA/MPS/CPU)
-    # For 8-core VM: use all logical cores for maximum throughput
-    pipeline_options.accelerator_options = AcceleratorOptions(
-        num_threads=NUM_THREADS,  # Default: 8 (all logical cores)
-        device=AcceleratorDevice.AUTO  # Auto-select best device
-    )
+def _try_simple_pipeline_options():
+    """
+    Try to build SimplePdfPipelineOptions (no ML model downloads).
+    Falls back to standard PdfPipelineOptions with all heavy features disabled
+    if SimplePdfPipelineOptions is not available in the installed docling version.
+    """
+    try:
+        from docling.datamodel.pipeline_options import SimplePdfPipelineOptions
+        opts = SimplePdfPipelineOptions()
+        print("[*] Using SimplePdfPipelineOptions (no model downloads)")
+        return opts, True
+    except ImportError:
+        pass
 
-    # 1. OCR disabled — Problem_Solved PDFs are text-based, no OCR needed.
-    # Avoids downloading RapidOCR ONNX models (fails on corporate SSL networks).
-    pipeline_options.do_ocr = False
+    # Fallback: standard options with everything that causes downloads disabled
+    from docling.datamodel.pipeline_options import PdfPipelineOptions
+    opts = PdfPipelineOptions(artifacts_path=ARTIFACTS_PATH)
+    opts.do_ocr = False
+    opts.do_table_structure = False
+    opts.do_picture_description = False
+    opts.generate_page_images = False
+    opts.generate_picture_images = False
+    opts.generate_table_images = False
+    print("[*] SimplePdfPipelineOptions not available — using minimal PdfPipelineOptions")
+    return opts, False
 
-    # 2. Table Settings (EXPENSIVE - second most costly after OCR)
-    # Can disable via ENABLE_TABLES=false if tables aren't needed
-    pipeline_options.do_table_structure = ENABLE_TABLES
-    if ENABLE_TABLES:
-        pipeline_options.table_structure_options = TableStructureOptions(
-            mode=TableFormerMode.FAST,  # FAST mode for better performance
-            do_cell_matching=False  # Disable for speed (can enable if needed)
-        )
-
-    # 3. VLM / Picture Description Settings
-    # PERFORMANCE NOTE: Even with SmolDocling-256M on CPU, transformers library
-    # is slow (13-31s per image). Disable for production speed unless critical.
-    # Re-enable via ENABLE_VLM=true if picture descriptions are required.
-    pipeline_options.do_picture_description = ENABLE_VLM
-
-    if ENABLE_VLM:
-        vlm_repo_id = str(VLM_MODEL_FOLDER)
-        if vlm_repo_id.startswith("/") or "--" in vlm_repo_id:
-            if "SmolDocling" in vlm_repo_id:
-                vlm_repo_id = "ds4sd/SmolDocling-256M-preview"
-
-        pipeline_options.picture_description_options = PictureDescriptionVlmOptions(
-            repo_id=vlm_repo_id
-        )
-
-    # 4. Image Generation Settings
-    pipeline_options.images_scale = 2.0
-    pipeline_options.generate_page_images = False
-    pipeline_options.generate_picture_images = True
-    pipeline_options.generate_table_images = True
-
-    return pipeline_options
 
 def get_converter():
     """
     Get DocumentConverter instance using singleton pattern.
-    Creates converter only once to prevent memory leak from reloading ML models.
-
-    CRITICAL: Docling loads ~1-2GB of models (OCR, tables, layout).
-    Recreating converter on every processor reload caused 32GB memory leak!
+    Uses SimplePdfPipelineOptions to avoid downloading HuggingFace layout models,
+    which fail on corporate networks that block the XetHub CDN.
     """
     global _converter_instance
 
     if _converter_instance is None:
-        print("[*] Creating DocumentConverter (loading Docling models ~1-2GB)...")
+        print("[*] Creating DocumentConverter (simple pipeline — no model downloads)...")
+        pipeline_options, is_simple = _try_simple_pipeline_options()
         _converter_instance = DocumentConverter(
             format_options={
-                InputFormat.PDF: PdfFormatOption(pipeline_options=get_pipeline_options())
+                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
             }
         )
         print("[OK] DocumentConverter created and cached (will be reused)")
 
     return _converter_instance
+
 
 def get_chunker():
     """
