@@ -32,17 +32,80 @@ ENABLE_VLM = os.environ.get('ENABLE_VLM', 'false').lower() == 'true'
 ENABLE_TABLES = os.environ.get('ENABLE_TABLES', 'true').lower() == 'true'
 NUM_THREADS = int(os.environ.get('DOCLING_NUM_THREADS', '8'))
 # Set DOCLING_SIMPLE_PIPELINE=true on local dev machines where HuggingFace
-# model downloads are blocked. On deployed servers (where models are cached)
-# leave unset to use the full StandardPipeline for best extraction quality.
+# model downloads are blocked (e.g. corporate networks blocking XetHub CDN).
+# Leave false on deployed servers — uses full StandardPipeline for best quality.
 USE_SIMPLE_PIPELINE = os.environ.get('DOCLING_SIMPLE_PIPELINE', 'false').lower() == 'true'
 
-# Module-level cache for converter and chunker (singleton pattern)
-# Prevents memory leak from recreating Docling models on every processor reload
+# Module-level cache — prevents memory leak from reloading ML models
 _converter_instance = None
 _chunker_instance = None
 
 
-def _get_standard_pipeline_options():
+def _build_simple_converter():
+    """
+    Build a DocumentConverter that uses SimplePipeline directly —
+    zero HuggingFace model downloads, uses only docling_parse.
+    Tries three approaches in order of preference.
+    """
+    # Approach 1: pipeline_cls= param (docling ≥ 2.x clean API)
+    try:
+        from docling.pipeline.simple_pipeline import SimplePipeline
+        from docling.datamodel.pipeline_options import PdfPipelineOptions
+        opts = PdfPipelineOptions()
+        opts.do_ocr = False
+        opts.do_table_structure = False
+        opts.do_picture_description = False
+        opts.generate_page_images = False
+        opts.generate_picture_images = False
+        opts.generate_table_images = False
+        converter = DocumentConverter(
+            format_options={
+                InputFormat.PDF: PdfFormatOption(
+                    pipeline_cls=SimplePipeline,
+                    pipeline_options=opts,
+                )
+            }
+        )
+        print("[*] Simple pipeline active via pipeline_cls=SimplePipeline")
+        return converter
+    except (ImportError, TypeError):
+        pass
+
+    # Approach 2: SimplePdfPipelineOptions (some docling 2.x builds)
+    try:
+        from docling.datamodel.pipeline_options import SimplePdfPipelineOptions
+        converter = DocumentConverter(
+            format_options={
+                InputFormat.PDF: PdfFormatOption(
+                    pipeline_options=SimplePdfPipelineOptions()
+                )
+            }
+        )
+        print("[*] Simple pipeline active via SimplePdfPipelineOptions")
+        return converter
+    except (ImportError, Exception):
+        pass
+
+    # Approach 3: Disable XetHub so HuggingFace falls back to regular CDN
+    # This still downloads the model but avoids the blocked XetHub domain.
+    print("[!] SimplePipeline not available — disabling XetHub CDN as fallback")
+    os.environ["HF_HUB_DISABLE_XET"] = "1"
+    from docling.datamodel.pipeline_options import PdfPipelineOptions
+    opts = PdfPipelineOptions(artifacts_path=ARTIFACTS_PATH)
+    opts.do_ocr = False
+    opts.do_table_structure = False
+    opts.do_picture_description = False
+    opts.generate_page_images = False
+    opts.generate_picture_images = False
+    opts.generate_table_images = False
+    return DocumentConverter(
+        format_options={
+            InputFormat.PDF: PdfFormatOption(pipeline_options=opts)
+        }
+    )
+
+
+def _build_standard_converter():
     """Full pipeline with HuggingFace layout model — use on deployed servers."""
     from docling.datamodel.pipeline_options import (
         PdfPipelineOptions, TableFormerMode, PictureDescriptionVlmOptions,
@@ -68,34 +131,16 @@ def _get_standard_pipeline_options():
     opts.generate_page_images = False
     opts.generate_picture_images = True
     opts.generate_table_images = True
-    return opts
-
-
-def _get_simple_pipeline_options():
-    """
-    Simple pipeline — no HuggingFace model downloads.
-    Uses docling_parse only. For local dev where XetHub CDN is blocked.
-    """
-    try:
-        from docling.datamodel.pipeline_options import SimplePdfPipelineOptions
-        print("[*] Using SimplePdfPipelineOptions (no model downloads)")
-        return SimplePdfPipelineOptions()
-    except ImportError:
-        from docling.datamodel.pipeline_options import PdfPipelineOptions
-        opts = PdfPipelineOptions(artifacts_path=ARTIFACTS_PATH)
-        opts.do_ocr = False
-        opts.do_table_structure = False
-        opts.do_picture_description = False
-        opts.generate_page_images = False
-        opts.generate_picture_images = False
-        opts.generate_table_images = False
-        print("[*] SimplePdfPipelineOptions unavailable — using minimal PdfPipelineOptions")
-        return opts
+    return DocumentConverter(
+        format_options={
+            InputFormat.PDF: PdfFormatOption(pipeline_options=opts)
+        }
+    )
 
 
 def get_converter():
     """
-    Get DocumentConverter instance using singleton pattern.
+    Get DocumentConverter — singleton pattern to avoid reloading ML models.
 
     DOCLING_SIMPLE_PIPELINE=true  → local dev, no HuggingFace downloads
     DOCLING_SIMPLE_PIPELINE=false → deployed server, full quality pipeline
@@ -103,32 +148,24 @@ def get_converter():
     global _converter_instance
 
     if _converter_instance is None:
+        print(f"[*] DOCLING_SIMPLE_PIPELINE={'true' if USE_SIMPLE_PIPELINE else 'false'}")
         if USE_SIMPLE_PIPELINE:
             print("[*] Creating DocumentConverter (simple pipeline — no model downloads)...")
-            pipeline_options = _get_simple_pipeline_options()
+            _converter_instance = _build_simple_converter()
         else:
             print("[*] Creating DocumentConverter (standard pipeline — HuggingFace models)...")
-            pipeline_options = _get_standard_pipeline_options()
-
-        _converter_instance = DocumentConverter(
-            format_options={
-                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
-            }
-        )
-        print("[OK] DocumentConverter created and cached (will be reused)")
+            _converter_instance = _build_standard_converter()
+        print("[OK] DocumentConverter created and cached")
 
     return _converter_instance
 
 
 def get_chunker():
-    """
-    Get HybridChunker instance using singleton pattern.
-    Reuses tokenizer and chunker to prevent memory overhead.
-    """
+    """Get HybridChunker — singleton pattern."""
     global _chunker_instance
 
     if _chunker_instance is None:
-        print("[*] Creating HybridChunker (loading tiktoken encoder)...")
+        print("[*] Creating HybridChunker...")
         tokenizer = OpenAITokenizer(
             tokenizer=tiktoken.get_encoding("cl100k_base"),
             max_tokens=8191,
@@ -137,6 +174,6 @@ def get_chunker():
             tokenizer=tokenizer,
             serializer_provider=CustomSerializerProvider(),
         )
-        print("[OK] HybridChunker created and cached (will be reused)")
+        print("[OK] HybridChunker created and cached")
 
     return _chunker_instance
