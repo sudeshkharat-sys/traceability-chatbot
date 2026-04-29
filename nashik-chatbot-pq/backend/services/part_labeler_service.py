@@ -332,6 +332,25 @@ class PartLabelerService:
     # DATA SOURCE DISPATCHER METHODS
     # =====================================================
 
+    def get_data_status(self, user_id: int) -> dict:
+        """Return which of the 5 data sources have rows uploaded for this user."""
+        sources = {
+            "warranty": "raw_warranty_data",
+            "rpt":      "raw_rpt_data",
+            "gnovac":   "raw_gnovac_data",
+            "rfi":      "raw_rfi_data",
+            "esqa":     "raw_esqa_data",
+        }
+        status = {}
+        for key, table in sources.items():
+            rows = self.db.execute_query(
+                f"SELECT COUNT(*) FROM {table} WHERE user_id = :user_id",
+                {"user_id": user_id},
+            )
+            count = rows[0][0] if rows else 0
+            status[key] = {"uploaded": count > 0, "row_count": count}
+        return status
+
     def process_data_for_source(self, file_path: str, mapping: Dict[str, str], user_id: int, data_source: str) -> int:
         """Dispatch file processing to the correct ingestion method based on data_source."""
         if data_source == 'rpt':

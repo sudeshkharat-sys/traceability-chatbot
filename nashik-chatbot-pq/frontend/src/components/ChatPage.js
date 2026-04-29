@@ -4,7 +4,9 @@ import "./ChatPage.css";
 import Sidebar from "./Sidebar";
 import ChatArea from "./ChatArea";
 import PdfViewerModal from "./PdfViewerModal";
+import QlenseDataGate from "./QlenseDataGate";
 import { conversationService } from "../services/api";
+import { CURRENT_USER_ID } from "../services/api/config";
 
 function ChatPage() {
   const [searchParams] = useSearchParams();
@@ -16,6 +18,8 @@ function ChatPage() {
     if (feat === "qlense") return "qlense";
     return "analyst";
   };
+
+  const [qlenseReady, setQlenseReady] = useState(feature !== "qlense");
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -671,6 +675,15 @@ function ChatPage() {
       alert("Failed to delete chat. Please try again.");
     }
   };
+
+  if (feature === "qlense" && !qlenseReady) {
+    return (
+      <QlenseDataGate
+        userId={CURRENT_USER_ID}
+        onReady={() => setQlenseReady(true)}
+      />
+    );
+  }
 
   return (
     <div className="app">

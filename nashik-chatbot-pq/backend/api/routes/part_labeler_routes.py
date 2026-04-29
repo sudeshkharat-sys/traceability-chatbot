@@ -205,6 +205,15 @@ async def get_labels(image_id: int, userId: int = Query(...)):
         logger.error(f"Get labels error: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch labels")
 
+@router.get("/data-status")
+async def get_data_status(userId: int = Query(...)):
+    """Check which data sources have been uploaded for a given user."""
+    try:
+        return get_service().get_data_status(userId)
+    except Exception as e:
+        logger.error(f"Data status error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch data status")
+
 @router.get("/dashboard-data")
 async def get_dashboard_data(
     userId: int = Query(...),
