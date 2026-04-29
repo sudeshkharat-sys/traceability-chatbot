@@ -4,7 +4,6 @@ import "./LandingPage.css";
 import traceabilityIcon from "../assests/traceability.png";
 import qualityIcon from "../assests/quality.png";
 import guidelineIcon from "../assests/guideline.png";
-import supportIcon from "../assests/support.png";
 import dashboardIcon from "../assests/dashboard.png";
 import utilityLogo from "../assests/image.png";
 import mahindraRiseLogo from "../assests/mahindra_rise_logo.png";
@@ -87,13 +86,6 @@ function LandingPage() {
       icon: qualityIcon,
       description: "Discover part quality issues from DB and get solutions from solved-problems knowledge base",
       route: "/chat?feature=qlense",
-    },
-    {
-      id: "diagnostic",
-      title: "Diagnostic support system",
-      icon: supportIcon,
-      description: "Advanced diagnostic tools for quality control",
-      route: "/chat?feature=diagnostic",
     },
   ];
 
