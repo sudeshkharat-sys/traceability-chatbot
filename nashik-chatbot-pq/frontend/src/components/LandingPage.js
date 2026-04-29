@@ -89,13 +89,6 @@ function LandingPage() {
       route: "/chat?feature=qlense",
     },
     {
-      id: "quality-assistant",
-      title: "Qlense Quality assistant",
-      icon: qualityIcon,
-      description: "AI-powered quality analysis and insights",
-      route: "/chat?feature=quality-assistant",
-    },
-    {
       id: "diagnostic",
       title: "Diagnostic support system",
       icon: supportIcon,
