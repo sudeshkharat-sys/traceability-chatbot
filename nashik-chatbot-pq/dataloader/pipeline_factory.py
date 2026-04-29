@@ -31,6 +31,10 @@ if ARTIFACTS_PATH is not None:
 ENABLE_VLM = os.environ.get('ENABLE_VLM', 'false').lower() == 'true'
 ENABLE_TABLES = os.environ.get('ENABLE_TABLES', 'true').lower() == 'true'
 NUM_THREADS = int(os.environ.get('DOCLING_NUM_THREADS', '8'))
+# Set DOCLING_SIMPLE_PIPELINE=true on local dev machines where HuggingFace
+# model downloads are blocked. On deployed servers (where models are cached)
+# leave unset to use the full StandardPipeline for best extraction quality.
+USE_SIMPLE_PIPELINE = os.environ.get('DOCLING_SIMPLE_PIPELINE', 'false').lower() == 'true'
 
 # Module-level cache for converter and chunker (singleton pattern)
 # Prevents memory leak from recreating Docling models on every processor reload
@@ -38,44 +42,74 @@ _converter_instance = None
 _chunker_instance = None
 
 
-def _try_simple_pipeline_options():
+def _get_standard_pipeline_options():
+    """Full pipeline with HuggingFace layout model — use on deployed servers."""
+    from docling.datamodel.pipeline_options import (
+        PdfPipelineOptions, TableFormerMode, PictureDescriptionVlmOptions,
+        TableStructureOptions, AcceleratorOptions, AcceleratorDevice
+    )
+    opts = PdfPipelineOptions(artifacts_path=ARTIFACTS_PATH)
+    opts.accelerator_options = AcceleratorOptions(
+        num_threads=NUM_THREADS, device=AcceleratorDevice.AUTO
+    )
+    opts.do_ocr = False
+    opts.do_table_structure = ENABLE_TABLES
+    if ENABLE_TABLES:
+        opts.table_structure_options = TableStructureOptions(
+            mode=TableFormerMode.FAST, do_cell_matching=False
+        )
+    opts.do_picture_description = ENABLE_VLM
+    if ENABLE_VLM:
+        vlm_repo_id = str(VLM_MODEL_FOLDER)
+        if vlm_repo_id.startswith("/") or "--" in vlm_repo_id:
+            if "SmolDocling" in vlm_repo_id:
+                vlm_repo_id = "ds4sd/SmolDocling-256M-preview"
+        opts.picture_description_options = PictureDescriptionVlmOptions(repo_id=vlm_repo_id)
+    opts.generate_page_images = False
+    opts.generate_picture_images = True
+    opts.generate_table_images = True
+    return opts
+
+
+def _get_simple_pipeline_options():
     """
-    Try to build SimplePdfPipelineOptions (no ML model downloads).
-    Falls back to standard PdfPipelineOptions with all heavy features disabled
-    if SimplePdfPipelineOptions is not available in the installed docling version.
+    Simple pipeline — no HuggingFace model downloads.
+    Uses docling_parse only. For local dev where XetHub CDN is blocked.
     """
     try:
         from docling.datamodel.pipeline_options import SimplePdfPipelineOptions
-        opts = SimplePdfPipelineOptions()
         print("[*] Using SimplePdfPipelineOptions (no model downloads)")
-        return opts, True
+        return SimplePdfPipelineOptions()
     except ImportError:
-        pass
-
-    # Fallback: standard options with everything that causes downloads disabled
-    from docling.datamodel.pipeline_options import PdfPipelineOptions
-    opts = PdfPipelineOptions(artifacts_path=ARTIFACTS_PATH)
-    opts.do_ocr = False
-    opts.do_table_structure = False
-    opts.do_picture_description = False
-    opts.generate_page_images = False
-    opts.generate_picture_images = False
-    opts.generate_table_images = False
-    print("[*] SimplePdfPipelineOptions not available — using minimal PdfPipelineOptions")
-    return opts, False
+        from docling.datamodel.pipeline_options import PdfPipelineOptions
+        opts = PdfPipelineOptions(artifacts_path=ARTIFACTS_PATH)
+        opts.do_ocr = False
+        opts.do_table_structure = False
+        opts.do_picture_description = False
+        opts.generate_page_images = False
+        opts.generate_picture_images = False
+        opts.generate_table_images = False
+        print("[*] SimplePdfPipelineOptions unavailable — using minimal PdfPipelineOptions")
+        return opts
 
 
 def get_converter():
     """
     Get DocumentConverter instance using singleton pattern.
-    Uses SimplePdfPipelineOptions to avoid downloading HuggingFace layout models,
-    which fail on corporate networks that block the XetHub CDN.
+
+    DOCLING_SIMPLE_PIPELINE=true  → local dev, no HuggingFace downloads
+    DOCLING_SIMPLE_PIPELINE=false → deployed server, full quality pipeline
     """
     global _converter_instance
 
     if _converter_instance is None:
-        print("[*] Creating DocumentConverter (simple pipeline — no model downloads)...")
-        pipeline_options, is_simple = _try_simple_pipeline_options()
+        if USE_SIMPLE_PIPELINE:
+            print("[*] Creating DocumentConverter (simple pipeline — no model downloads)...")
+            pipeline_options = _get_simple_pipeline_options()
+        else:
+            print("[*] Creating DocumentConverter (standard pipeline — HuggingFace models)...")
+            pipeline_options = _get_standard_pipeline_options()
+
         _converter_instance = DocumentConverter(
             format_options={
                 InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
