@@ -123,9 +123,10 @@ async def qlense_ingest_pdfs():
         _ingest_state["last_result"] = None
         try:
             # Resolve Problem_Solved directory relative to this file
-            routes_dir = Path(__file__).resolve().parent          # routes/
-            project_root = routes_dir.parent.parent.parent.parent  # nashik-chatbot-pq/
-            problem_solved_dir = project_root.parent / "data_qlense" / "Problem_Solved"
+            # routes/ → api/ → backend/ → nashik-chatbot-pq/ → traceability-chatbot/
+            routes_dir = Path(__file__).resolve().parent
+            git_root = routes_dir.parent.parent.parent.parent
+            problem_solved_dir = git_root / "data_qlense" / "Problem_Solved"
 
             from app.connectors.state_db_connector import StateDBConnector
             from app.config.config import get_settings
