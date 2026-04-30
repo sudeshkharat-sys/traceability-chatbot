@@ -256,7 +256,7 @@ class EmbeddingProcessor:
                     return stats
                 logger.info(f"  [OK] Conversion completed in {time.time() - conv_start:.2f}s")
             except Exception as e:
-                logger.error(f"  [FAIL] PDF conversion failed: {str(e)}")
+                logger.error(f"  [FAIL] PDF conversion failed: {str(e)}", exc_info=True)
                 raise  # Re-raise to be caught by outer try-except
 
             # Chunk document
