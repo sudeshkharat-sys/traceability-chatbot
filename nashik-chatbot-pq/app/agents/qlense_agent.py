@@ -35,6 +35,7 @@ class QLenseAgent:
         enable_summarization: bool = True,
         summarization_trigger_tokens: int = 100000,
         keep_recent_messages: int = 20,
+        user_id: int = 1,
     ):
         from app.models.model_factory import ModelFactory
 
@@ -44,6 +45,7 @@ class QLenseAgent:
         self.enable_summarization = enable_summarization
         self.summarization_trigger_tokens = summarization_trigger_tokens
         self.keep_recent_messages = keep_recent_messages
+        self.user_id = user_id
         self.agent = None
         self._initialize_agent()
 
@@ -64,7 +66,14 @@ class QLenseAgent:
                 TodoListMiddleware,
             )
 
-            prompt = get_qlense_prompt()
+            base_prompt = get_qlense_prompt()
+            prompt = (
+                base_prompt
+                + f"\n\n---\n**ACTIVE SESSION — user_id = {self.user_id}**\n"
+                f"Every SQL query MUST include `AND user_id = {self.user_id}` "
+                f"(or `WHERE user_id = {self.user_id}` when it is the only filter). "
+                f"Never omit this filter."
+            )
 
             agent_kwargs = {
                 "model": self.llm,

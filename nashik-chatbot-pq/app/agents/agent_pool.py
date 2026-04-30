@@ -101,6 +101,7 @@ class AgentPool:
                 agent = QLenseAgent(
                     thread_id=thread_id,
                     checkpointer=self.checkpointer,
+                    user_id=kwargs.get("user_id", 1),
                 )
             else:
                 raise ValueError(f"Unknown agent type: {agent_type}")

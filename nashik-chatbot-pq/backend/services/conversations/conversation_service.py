@@ -98,7 +98,7 @@ class ConversationService:
             chart_data = None
             citations_data: list = []
 
-            with self.agent_pool.get_agent(conversation_id, agent_type) as agent:
+            with self.agent_pool.get_agent(conversation_id, agent_type, user_id=payload.user_id) as agent:
                 logger.info(
                     f"Using {agent_type} agent for conversation {conversation_id}"
                 )
