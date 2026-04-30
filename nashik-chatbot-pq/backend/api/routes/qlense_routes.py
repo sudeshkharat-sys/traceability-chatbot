@@ -18,6 +18,8 @@ available and no re-upload is needed.
 import logging
 import os
 import shutil
+import threading
+from pathlib import Path
 from typing import Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Query, UploadFile, File
@@ -46,6 +48,12 @@ class QLenseConfirmUploadRequest(BaseModel):
     mapping: Dict[str, str]
     userId: int
     dataSource: str  # "warranty" | "rpt" | "gnovac" | "rfi" | "esqa"
+
+
+# ── Endpoints ──────────────────────────────────────────────────────────────────
+
+# ── PDF ingestion state (in-process, single node) ─────────────────────────────
+_ingest_state: Dict = {"running": False, "last_result": None, "error": None}
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
@@ -95,6 +103,76 @@ async def qlense_upload(file: UploadFile = File(...)):
     except Exception as e:
         logger.error(f"QLense upload error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/ingest-pdfs")
+async def qlense_ingest_pdfs():
+    """
+    Trigger ingestion of all PDFs in data_qlense/Problem_Solved/ into OpenSearch.
+    Runs in a background thread so the request returns immediately.
+
+    - If already running: returns 409
+    - On success the PDFs are searchable by the QLense agent Phase 2
+    """
+    if _ingest_state["running"]:
+        raise HTTPException(status_code=409, detail="Ingestion already running")
+
+    def _run():
+        _ingest_state["running"] = True
+        _ingest_state["error"] = None
+        _ingest_state["last_result"] = None
+        try:
+            # Resolve Problem_Solved directory relative to this file
+            routes_dir = Path(__file__).resolve().parent          # routes/
+            project_root = routes_dir.parent.parent.parent.parent  # nashik-chatbot-pq/
+            problem_solved_dir = project_root.parent / "data_qlense" / "Problem_Solved"
+
+            from app.connectors.state_db_connector import StateDBConnector
+            from app.config.config import get_settings
+            from dataloader.scraper.file_system_scraper import FileScraper
+            from dataloader.document_embedding_processor import DocumentEmbeddingProcessor
+
+            settings = get_settings()
+            index_name = settings.OPENSEARCH_INDEX_NAME
+
+            db = StateDBConnector()
+            scraper = FileScraper(db, index_name)
+            scrape_stats = scraper.scrape_directory(problem_solved_dir)
+            db.close()
+
+            dep = DocumentEmbeddingProcessor()
+            embed_stats = dep.run()
+            dep.close()
+
+            _ingest_state["last_result"] = {
+                "scrape": scrape_stats,
+                "embed": embed_stats,
+            }
+            logger.info(
+                f"PDF ingestion complete: "
+                f"{embed_stats['documents_completed']}/{embed_stats['documents_processed']} docs, "
+                f"{embed_stats['total_chunks_created']} chunks created"
+            )
+        except Exception as e:
+            logger.error(f"PDF ingestion error: {e}", exc_info=True)
+            _ingest_state["error"] = str(e)
+        finally:
+            _ingest_state["running"] = False
+
+    threading.Thread(target=_run, daemon=True, name="qlense-pdf-ingest").start()
+    return {"started": True, "message": "PDF ingestion started in background. Poll /qlense/ingest-status for progress."}
+
+
+@router.get("/ingest-status")
+async def qlense_ingest_status():
+    """
+    Return current state of the background PDF ingestion job.
+    """
+    return {
+        "running": _ingest_state["running"],
+        "last_result": _ingest_state["last_result"],
+        "error": _ingest_state["error"],
+    }
 
 
 @router.post("/confirm-upload")

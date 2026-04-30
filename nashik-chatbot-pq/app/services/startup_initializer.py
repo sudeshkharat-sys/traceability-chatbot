@@ -91,12 +91,16 @@ class StartupInitializer:
         from app.prompts.cypher_agent_prompt import CYPHER_AGENT_PROMPT
         from app.prompts.todo_list_middleware_prompt import TODO_LIST_MIDDLEWARE_PROMPT
         from app.prompts.standards_guidelines_prompt import STANDARDS_GUIDELINES_PROMPT
+        from app.prompts.part_labeler_dashboard_prompt import PART_LABELER_DASHBOARD_PROMPT
+        from app.prompts.qlense_prompt import QLENSE_PROMPT
 
         PROMPTS = {
             "analyst_prompt": ("Quality Analyst Agent Prompt", ANALYST_PROMPT),
             "cypher_agent_prompt": ("Cypher Query Generator Prompt", CYPHER_AGENT_PROMPT),
             "todo_list_middleware_prompt": ("TodoListMiddleware System Prompt", TODO_LIST_MIDDLEWARE_PROMPT),
             "standards_guidelines_prompt": ("Standards & Guidelines Agent Prompt", STANDARDS_GUIDELINES_PROMPT),
+            "part_labeler_dashboard_prompt": ("Part Labeler Dashboard Agent Prompt", PART_LABELER_DASHBOARD_PROMPT),
+            "qlense_prompt": ("QLense Agent Prompt", QLENSE_PROMPT),
         }
 
         table_result = {"success": False, "message": ""}

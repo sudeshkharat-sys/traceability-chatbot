@@ -2,10 +2,6 @@ import logging
 import os
 import subprocess
 from invoke import task
-from dataloader.document_scrape_processor import DocumentScrapeProcessor
-from dataloader.document_embedding_processor import DocumentEmbeddingProcessor
-from app.services.startup_initializer import StartupInitializer
-from scripts.process_warranty import process_warranty_to_db
 from app.config.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -23,6 +19,7 @@ def setup(ctx):
 
     Usage: invoke full-setup
     """
+    from app.services.startup_initializer import StartupInitializer
     logger.info("=" * 80)
     logger.info("Running Full Application Setup...")
     logger.info("=" * 80)
@@ -44,6 +41,7 @@ def validate(ctx):
 
     Usage: invoke validate-connections
     """
+    from app.services.startup_initializer import StartupInitializer
     logger.info("=" * 80)
     logger.info("Validating Connections...")
     logger.info("=" * 80)
@@ -62,6 +60,7 @@ def scrape_documents(ctx):
     Usage:
         invoke scrape-documents --directory=/path/to/docs
     """
+    from dataloader.document_scrape_processor import DocumentScrapeProcessor
     logger.info("=" * 80)
     logger.info("Scraping Documents...")
     logger.info("=" * 80)
@@ -88,6 +87,7 @@ def create_embeddings(ctx):
     Usage:
         invoke create-embeddings
     """
+    from dataloader.document_embedding_processor import DocumentEmbeddingProcessor
     logger.info("=" * 80)
     logger.info("Creating Document Embeddings...")
     logger.info("=" * 80)
@@ -158,6 +158,7 @@ def process_warranty_data(ctx):
     Usage:
         invoke process-warranty-data
     """
+    from scripts.process_warranty import process_warranty_to_db
     logger.info("=" * 80)
     logger.info("Processing Warranty Data...")
     logger.info("=" * 80)
