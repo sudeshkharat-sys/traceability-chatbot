@@ -91,6 +91,14 @@ class Settings(BaseSettings):
     # Directory to scrape documents from
     DOCUMENT_INPUT_DIRECTORY: str = "/app/documents/qlense_assitant_doc"
 
+    # SSL Configuration (for ZScaler / corporate network SSL inspection)
+    # Set AZURE_OPENAI_SSL_VERIFY=false if ZScaler intercepts HTTPS and causes
+    # "certificate verify failed" errors against Azure OpenAI or HuggingFace.
+    # Alternatively, set REQUESTS_CA_BUNDLE to the path of the exported ZScaler
+    # root CA .pem file to keep verification on but trust the ZScaler CA.
+    AZURE_OPENAI_SSL_VERIFY: bool = True
+    REQUESTS_CA_BUNDLE: Optional[str] = None
+
     # Uploads Configuration
     UPLOADS_DIRECTORY: str = "uploads"
 

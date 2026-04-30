@@ -16,6 +16,17 @@ from dataloader.serializer.serializers import CustomSerializerProvider
 # Get settings once at module level
 settings = get_settings()
 
+# Apply ZScaler / corporate SSL inspection workaround for HuggingFace downloads.
+# When AZURE_OPENAI_SSL_VERIFY=false, disable HuggingFace Hub SSL verification.
+# When REQUESTS_CA_BUNDLE is set, point HuggingFace (and requests) at the ZScaler CA.
+if not settings.AZURE_OPENAI_SSL_VERIFY:
+    os.environ.setdefault("CURL_CA_BUNDLE", "")
+    os.environ.setdefault("REQUESTS_CA_BUNDLE", "")
+    os.environ.setdefault("HF_HUB_DISABLE_SSL_VERIFICATION", "1")
+elif settings.REQUESTS_CA_BUNDLE:
+    os.environ.setdefault("CURL_CA_BUNDLE", settings.REQUESTS_CA_BUNDLE)
+    os.environ.setdefault("REQUESTS_CA_BUNDLE", settings.REQUESTS_CA_BUNDLE)
+
 # Set up paths — use configured path only if it exists (Docker/Azure).
 # On Windows dev machines the container path won't exist; passing None lets
 # Docling fall back to its default HuggingFace cache (~/.cache/huggingface).
