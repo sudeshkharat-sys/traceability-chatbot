@@ -31,10 +31,11 @@ if ARTIFACTS_PATH is not None:
 ENABLE_VLM = os.environ.get('ENABLE_VLM', 'false').lower() == 'true'
 ENABLE_TABLES = os.environ.get('ENABLE_TABLES', 'true').lower() == 'true'
 NUM_THREADS = int(os.environ.get('DOCLING_NUM_THREADS', '8'))
-# Set DOCLING_SIMPLE_PIPELINE=true on local dev machines where HuggingFace
-# model downloads are blocked (e.g. corporate networks blocking XetHub CDN).
-# Leave false on deployed servers — uses full StandardPipeline for best quality.
-USE_SIMPLE_PIPELINE = os.environ.get('DOCLING_SIMPLE_PIPELINE', 'false').lower() == 'true'
+# Read from pydantic settings so .env is respected (os.environ fallback for
+# standalone use). Pydantic does not write .env values back to os.environ,
+# so os.environ.get() alone would always see 'false' on local dev machines.
+USE_SIMPLE_PIPELINE = settings.DOCLING_SIMPLE_PIPELINE or \
+    os.environ.get('DOCLING_SIMPLE_PIPELINE', 'false').lower() == 'true'
 
 # Module-level cache — prevents memory leak from reloading ML models
 _converter_instance = None

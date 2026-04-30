@@ -87,6 +87,7 @@ class Settings(BaseSettings):
     DOCLING_ARTIFACTS_PATH: str = "/app/docling_models"
     DOCLING_VLM_MODEL: str = "ds4sd/SmolDocling-256M-preview"  # Model name for VLM
     DOCLING_LAYOUT_MODEL: str = "docling-layout-heron"
+    DOCLING_SIMPLE_PIPELINE: bool = False
 
     # Directory to scrape documents from
     DOCUMENT_INPUT_DIRECTORY: str = "/app/documents/qlense_assitant_doc"
