@@ -10,8 +10,14 @@ from docling_core.transforms.chunker.tokenizer.openai import OpenAITokenizer
 # Add parent directory to path to import app config
 sys.path.append(str(Path(__file__).parent.parent))
 
-from app.config.config import get_settings
+from dotenv import load_dotenv
+from app.config.config import get_settings, ENV_FILE
 from dataloader.serializer.serializers import CustomSerializerProvider
+
+# Load .env into os.environ so os.environ.get() calls below pick up values
+# from the .env file (pydantic-settings only populates the Settings object,
+# not os.environ itself).
+load_dotenv(ENV_FILE, override=False)
 
 # Get settings once at module level
 settings = get_settings()
