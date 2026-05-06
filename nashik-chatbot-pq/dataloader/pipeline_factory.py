@@ -27,19 +27,6 @@ VLM_MODEL_FOLDER = settings.DOCLING_VLM_MODEL
 if ARTIFACTS_PATH is not None:
     os.environ["DOCLING_ARTIFACTS_PATH"] = str(ARTIFACTS_PATH)
 
-# Corporate proxy / Zscaler SSL fix:
-# Point requests, urllib3, and the HuggingFace Hub client at the corporate CA
-# bundle so model downloads succeed without disabling SSL verification.
-if settings.SSL_CA_BUNDLE:
-    _bundle = settings.SSL_CA_BUNDLE
-    os.environ.setdefault("REQUESTS_CA_BUNDLE", _bundle)
-    os.environ.setdefault("SSL_CERT_FILE", _bundle)
-    os.environ.setdefault("CURL_CA_BUNDLE", _bundle)
-    # HuggingFace Hub uses requests under the hood — no extra config needed once
-    # REQUESTS_CA_BUNDLE is set, but disable XetHub CDN as an extra safety net.
-    os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
-    print(f"[*] Corporate CA bundle applied: {_bundle}")
-
 # Configuration flags (override via environment variables)
 ENABLE_VLM = os.environ.get('ENABLE_VLM', 'false').lower() == 'true'
 ENABLE_TABLES = os.environ.get('ENABLE_TABLES', 'true').lower() == 'true'
