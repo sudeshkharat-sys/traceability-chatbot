@@ -191,6 +191,21 @@ services:
       SESSION_SECRET: ${SESSION_SECRET:-change-me-in-production}
       MAX_CHAT_HISTORY: ${MAX_CHAT_HISTORY:-10}
       QUERY_TIMEOUT_SECONDS: ${QUERY_TIMEOUT_SECONDS:-30}
+
+      # Corporate Proxy / Zscaler SSL fix
+      # Export your Zscaler Root CA cert, place it at ./certs/zscaler_root_ca.crt,
+      # then set SSL_CA_BUNDLE=/app/certs/zscaler_root_ca.crt in your .env file.
+      # Leave blank if you are NOT behind an SSL-inspecting proxy.
+      SSL_CA_BUNDLE: ${SSL_CA_BUNDLE:-}
+
+      # Disable HuggingFace XetHub CDN (often blocked by Zscaler).
+      # Falls back to standard HTTPS download which respects REQUESTS_CA_BUNDLE.
+      HF_HUB_DISABLE_XET: "1"
+
+      # Use simple Docling pipeline (no HuggingFace model downloads) when the
+      # corporate network blocks huggingface.co.  Set to "true" if Docling model
+      # downloads fail; set to "false" for best PDF quality on open networks.
+      DOCLING_SIMPLE_PIPELINE: ${DOCLING_SIMPLE_PIPELINE:-false}
     ports:
       - "5000:5000"
     volumes:
@@ -200,6 +215,10 @@ services:
       - ./documents:/app/documents:ro
       - ~/.cache/docling/models:/app/docling_models:ro # Mount local models using home expansion
       - frontend-build:/app/frontend/build
+      # Mount corporate CA cert when SSL_CA_BUNDLE is set (Zscaler environments).
+      # Create ./certs/ directory and place your Zscaler Root CA .crt file there.
+      # Comment this line out if you do not have a ./certs directory.
+      # - ./certs:/app/certs:ro
     depends_on:
       postgres:
         condition: service_healthy

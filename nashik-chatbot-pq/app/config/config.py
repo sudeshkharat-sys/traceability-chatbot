@@ -101,6 +101,13 @@ class Settings(BaseSettings):
     MAX_TOKENS: int = 4096
     REASONING_EFFORT: str = "medium"
 
+    # SSL / Corporate Proxy Configuration (Zscaler, etc.)
+    # IMPORTANT: Do NOT set SSL_CA_BUNDLE to disable verification.
+    # Instead export your Zscaler root CA cert and set SSL_CA_BUNDLE to its path.
+    # This keeps HTTPS security intact while trusting your corporate proxy.
+    # Example: SSL_CA_BUNDLE=/app/certs/zscaler_root_ca.crt
+    SSL_CA_BUNDLE: Optional[str] = None  # path to corporate CA cert bundle
+
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
         env_file_encoding="utf-8",

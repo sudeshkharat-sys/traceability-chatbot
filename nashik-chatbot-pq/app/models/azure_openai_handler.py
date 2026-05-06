@@ -5,6 +5,7 @@ Manages Azure OpenAI model initialization and interaction
 
 import logging
 from typing import Optional
+import httpx
 from langchain_openai import AzureChatOpenAI
 from app.config.config import get_settings
 
@@ -19,6 +20,25 @@ class AzureOpenAIHandler:
     def __init__(self):
         """Initialize with settings"""
         self.settings = get_settings()
+
+    def _make_http_client(self) -> Optional[httpx.Client]:
+        """
+        Build an httpx.Client that trusts the corporate CA bundle (e.g. Zscaler).
+
+        When SSL_CA_BUNDLE is set the client uses that cert file as the trust
+        store — SSL verification stays ON, only the trusted CA list is extended.
+        Returns None when no custom bundle is configured (httpx uses system defaults).
+        """
+        if not self.settings.SSL_CA_BUNDLE:
+            return None
+        logger.info(f"Using custom CA bundle for Azure OpenAI: {self.settings.SSL_CA_BUNDLE}")
+        return httpx.Client(verify=self.settings.SSL_CA_BUNDLE)
+
+    def _make_async_http_client(self) -> Optional[httpx.AsyncClient]:
+        """Async variant of _make_http_client — required by streaming calls."""
+        if not self.settings.SSL_CA_BUNDLE:
+            return None
+        return httpx.AsyncClient(verify=self.settings.SSL_CA_BUNDLE)
 
     def get_chat_model(
         self, deployment: str = None, temperature: float = None, max_tokens: int = None
@@ -41,6 +61,8 @@ class AzureOpenAIHandler:
             )
             max_tokens = max_tokens or self.settings.MAX_TOKENS
 
+            http_client = self._make_http_client()
+            async_http_client = self._make_async_http_client()
             model = AzureChatOpenAI(
                 azure_endpoint=self.settings.AZURE_CHAT_ENDPOINT,
                 azure_deployment=deployment,
@@ -48,6 +70,8 @@ class AzureOpenAIHandler:
                 api_version=self.settings.AZURE_API_VERSION_CHAT,
                 temperature=temperature,
                 max_tokens=max_tokens,
+                **({"http_client": http_client} if http_client else {}),
+                **({"http_async_client": async_http_client} if async_http_client else {}),
             )
 
             logger.info(
@@ -87,6 +111,8 @@ class AzureOpenAIHandler:
             max_tokens = max_tokens or self.settings.MAX_TOKENS
             reasoning_effort = reasoning_effort or self.settings.REASONING_EFFORT
 
+            http_client = self._make_http_client()
+            async_http_client = self._make_async_http_client()
             model = AzureChatOpenAI(
                 azure_endpoint=self.settings.AZURE_GPT5_ENDPOINT,
                 azure_deployment=deployment,
@@ -94,6 +120,8 @@ class AzureOpenAIHandler:
                 api_version=self.settings.AZURE_API_VERSION_GPT5,
                 max_tokens=max_tokens,
                 reasoning_effort=reasoning_effort,
+                **({"http_client": http_client} if http_client else {}),
+                **({"http_async_client": async_http_client} if async_http_client else {}),
             )
 
             logger.info(
@@ -115,11 +143,15 @@ class AzureOpenAIHandler:
         try:
             from langchain_openai import AzureOpenAIEmbeddings
 
+            http_client = self._make_http_client()
+            async_http_client = self._make_async_http_client()
             model = AzureOpenAIEmbeddings(
                 azure_endpoint=self.settings.AZURE_EMBEDDING_ENDPOINT,
                 azure_deployment=self.settings.AZURE_EMBEDDING_DEPLOYMENT,
                 api_key=self.settings.AZURE_API_KEY,
                 api_version=self.settings.AZURE_API_VERSION_EMBED,
+                **({"http_client": http_client} if http_client else {}),
+                **({"http_async_client": async_http_client} if async_http_client else {}),
             )
 
             logger.info(

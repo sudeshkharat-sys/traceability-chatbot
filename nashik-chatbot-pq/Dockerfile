@@ -36,7 +36,19 @@ ENV PYTHONUNBUFFERED=1 \
 RUN apt-get update && apt-get install -y \
     gcc \
     postgresql-client \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# Corporate CA certificate support (Zscaler / SSL-inspection proxies)
+# To add your corporate root CA at build time:
+#   1. Place your cert file at ./certs/zscaler_root_ca.crt in the project root.
+#   2. Uncomment the three lines below.
+#   3. Rebuild the image.
+# This installs the cert into the OS trust store so pip, apt, curl, and all
+# system tools trust the corporate proxy — SSL verification stays fully ON.
+# COPY certs/zscaler_root_ca.crt /usr/local/share/ca-certificates/zscaler_root_ca.crt
+# RUN chmod 644 /usr/local/share/ca-certificates/zscaler_root_ca.crt \
+#     && update-ca-certificates
 
 # Set working directory
 WORKDIR /app
