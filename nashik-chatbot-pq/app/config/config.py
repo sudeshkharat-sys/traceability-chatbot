@@ -81,7 +81,7 @@ class Settings(BaseSettings):
     OPENSEARCH_PASSWORD: str
     OPENSEARCH_USE_SSL: bool = False
     OPENSEARCH_VERIFY_CERTS: bool = False
-    OPENSEARCH_INDEX_NAME: str = "qlense_assistant_index"
+    OPENSEARCH_INDEX_NAME: str = "standard_guidelines_index"
 
     # Document Processing Configuration (Dataloader)
     DOCLING_ARTIFACTS_PATH: str = "/app/docling_models"
