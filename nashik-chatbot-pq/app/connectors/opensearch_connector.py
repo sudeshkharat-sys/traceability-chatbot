@@ -84,6 +84,8 @@ class OpenSearchConnector:
             texts=texts,
             metadatas=metadatas,
             ids=ids,
+            bulk_size=500,
+            refresh=False,
         )
 
     def add_embeddings(
