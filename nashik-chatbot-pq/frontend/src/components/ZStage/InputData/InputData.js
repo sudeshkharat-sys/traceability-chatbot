@@ -1454,6 +1454,27 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
               <button className="add-month-btn" onClick={() => setShowAddMonth(true)}>
                 <Plus size={13} /> Add New Month
               </button>
+              <button
+                className="refresh-btn"
+                disabled={records.length === 0}
+                onClick={async () => {
+                  try {
+                    const res = await inputApi.downloadExcel(userId, selectedLayoutId);
+                    const url = URL.createObjectURL(new Blob([res.data]));
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = selectedLayoutId
+                      ? `z_stage_master_data_layout_${selectedLayoutId}.xlsx`
+                      : 'z_stage_master_data.xlsx';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch (e) {
+                    alert('Download failed. Please try again.');
+                  }
+                }}
+              >
+                <Download size={13} /> Download
+              </button>
               <button className="refresh-btn" onClick={loadRecords} disabled={loadingRecords}>
                 {loadingRecords ? <Loader size={13} className="spin" /> : '↻'} Refresh
               </button>

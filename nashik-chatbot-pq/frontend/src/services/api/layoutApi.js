@@ -59,6 +59,12 @@ export const inputApi = {
     if (layoutId != null) params.layout_id = layoutId;
     return api.post('/input/records', data, { params });
   },
+  downloadExcel: (userId, layoutId) => {
+    const params = {};
+    if (userId != null) params.user_id = userId;
+    if (layoutId != null) params.layout_id = layoutId;
+    return axios.get(`${BASE_URL}/input/download`, { params, responseType: 'blob' });
+  },
 };
 
 export const layeredAuditApi = {

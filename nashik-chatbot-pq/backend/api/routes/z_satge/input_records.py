@@ -5,7 +5,9 @@ import re
 from typing import List, Optional
 
 import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
 
 from app.connectors.state_db_connector import StateDBConnector
 from app.connectors.database import get_connector
@@ -304,3 +306,103 @@ def update_record(
     if not rows:
         raise HTTPException(status_code=500, detail="Failed to update record")
     return _row_to_dict(rows[0])
+
+
+# ── Download endpoint ─────────────────────────────────────────────────────────
+
+HEADER_ROW = [
+    "Sr.No", "Concern ID", "Concern", "Type", "Root Cause", "Action Plan",
+    "Target Date", "Closure Date", "RYG", "Attri.", "Comm", "Line", "Stage No",
+    "Z/E", "ATTRIBUTION", "Part", "Phenomena", "Total Incidences",
+    "Jan-24", "Feb-24", "Mar-24", "Apr-24", "May-24", "Jun-24",
+    "Jul-24", "Aug-24", "Sep-24", "Oct-24", "Nov-24", "Dec-24",
+    "Jan-25", "Feb-25", "Mar-25", "Apr-25", "May-25", "Jun-25",
+    "Jul-25", "Aug-25", "Sep-25", "Oct-25", "Nov-25", "Dec-25",
+    "Jan-26", "Feb-26", "Mar-26",
+    "Field defect after cut off", "Status\n(3 Month basis)",
+]
+
+
+@router.get("/download")
+def download_excel(
+    user_id: Optional[int] = Query(None),
+    layout_id: Optional[int] = Query(None),
+    connector: StateDBConnector = Depends(get_connector),
+):
+    rows = connector.execute_query(
+        InputRecordQueries.LIST_ALL,
+        {"user_id": user_id, "layout_id": layout_id},
+    )
+    records = [_row_to_dict(r) for r in rows]
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Master Data"
+
+    # Header styling
+    header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True)
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    ws.append(HEADER_ROW)
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = header_align
+    ws.row_dimensions[1].height = 30
+
+    # Data rows
+    for rec in records:
+        monthly = {}
+        if rec.get("monthly_data"):
+            try:
+                monthly = json.loads(rec["monthly_data"])
+            except (ValueError, TypeError):
+                pass
+
+        row = [
+            rec.get("sr_no"),
+            rec.get("concern_id"),
+            rec.get("concern"),
+            rec.get("type"),
+            rec.get("root_cause"),
+            rec.get("action_plan"),
+            rec.get("target_date"),
+            rec.get("closure_date"),
+            rec.get("ryg"),
+            rec.get("attri"),
+            rec.get("comm"),
+            rec.get("line"),
+            rec.get("stage_no"),
+            rec.get("z_e"),
+            rec.get("attribution"),
+            rec.get("part"),
+            rec.get("phenomena"),
+            rec.get("total_incidences"),
+        ]
+        for key in MONTHLY_KEYS:
+            row.append(monthly.get(key))
+        row.append(rec.get("field_defect_after_cutoff"))
+        row.append(rec.get("status_3m"))
+        ws.append(row)
+
+    # Auto-fit column widths (approximate)
+    col_widths = [8, 16, 40, 8, 35, 35, 14, 14, 7, 20, 16, 18, 12, 7, 14, 22, 22, 10]
+    col_widths += [8] * 27  # monthly columns
+    col_widths += [22, 14]
+    for i, width in enumerate(col_widths, start=1):
+        ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = width
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    filename = "z_stage_master_data.xlsx"
+    if layout_id is not None:
+        filename = f"z_stage_master_data_layout_{layout_id}.xlsx"
+
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
