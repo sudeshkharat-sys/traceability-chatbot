@@ -56,6 +56,7 @@ def _validate_row(rec: dict) -> str | None:
 
 
 # Month keys expected in the Excel (Jan 2024 → Mar 2026)
+# Used only for the download endpoint header; upload detects months dynamically.
 MONTHLY_KEYS = [
     "2024-01", "2024-02", "2024-03", "2024-04", "2024-05", "2024-06",
     "2024-07", "2024-08", "2024-09", "2024-10", "2024-11", "2024-12",
@@ -112,18 +113,36 @@ def _parse_excel(file_bytes: bytes) -> list[dict]:
     )
     ws = wb.active
 
-    records = []
-    for row_idx, row in enumerate(ws.iter_rows(values_only=True), start=1):
-        if row_idx == 1:
-            continue  # skip header
+    # ── Detect column positions from header row ───────────────────────────────
+    # Month columns are datetime objects in the header.
+    # Trailing columns are matched by header text.
+    monthly_col_map: dict[int, str] = {}   # col_index → "YYYY-MM"
+    field_defect_col: int = 45             # fallback default
+    status_3m_col: int = 46               # fallback default
 
+    rows_iter = ws.iter_rows(values_only=True)
+    first_row = next(rows_iter, None)
+    if first_row:
+        for col_idx, cell_val in enumerate(first_row):
+            if hasattr(cell_val, "year"):  # datetime → monthly column
+                key = f"{cell_val.year}-{str(cell_val.month).zfill(2)}"
+                monthly_col_map[col_idx] = key
+            elif isinstance(cell_val, str):
+                clean = cell_val.strip().lower().replace("\n", " ")
+                if "field defect" in clean:
+                    field_defect_col = col_idx
+                elif "status" in clean and "3" in clean:
+                    status_3m_col = col_idx
+
+    records = []
+    for row in rows_iter:
         if not any(v is not None for v in row):
             continue  # skip empty rows
 
-        # Monthly data: columns 19-45 (0-indexed 18-44)
+        # Monthly data: use dynamic column map from header
         monthly = {}
-        for i, key in enumerate(MONTHLY_KEYS):
-            val = row[18 + i] if len(row) > 18 + i else None
+        for col_idx, key in monthly_col_map.items():
+            val = row[col_idx] if len(row) > col_idx else None
             if val is not None:
                 try:
                     monthly[key] = int(val)
@@ -137,27 +156,27 @@ def _parse_excel(file_bytes: bytes) -> list[dict]:
         ) else sum(monthly.values())
 
         records.append({
-            "sr_no":                    len(records) + 1,   # auto-sequential (1-based)
-            "concern_id":               _safe_str(row[1] if len(row) > 1 else None),
-            "concern":                  _safe_str(row[2] if len(row) > 2 else None),
-            "type":                     _safe_str(row[3] if len(row) > 3 else None),
-            "root_cause":               _safe_str(row[4] if len(row) > 4 else None),
-            "action_plan":              _safe_str(row[5] if len(row) > 5 else None),
-            "target_date":              _safe_date(row[6] if len(row) > 6 else None),
-            "closure_date":             _safe_date(row[7] if len(row) > 7 else None),
-            "ryg":                      _safe_str(row[8] if len(row) > 8 else None),
-            "attri":                    _normalise_attri(_safe_str(row[9] if len(row) > 9 else None)),
-            "comm":                     _safe_str(row[10] if len(row) > 10 else None),
-            "line":                     _safe_str(row[11] if len(row) > 11 else None),
-            "stage_no":                 _safe_str(row[12] if len(row) > 12 else None),
-            "z_e":                      _safe_str(row[13] if len(row) > 13 else None),
-            "attribution":              _safe_str(row[14] if len(row) > 14 else None),
-            "part":                     _safe_str(row[15] if len(row) > 15 else None),
-            "phenomena":                _safe_str(row[16] if len(row) > 16 else None),
-            "total_incidences":         total,
-            "monthly_data":             json.dumps(monthly) if monthly else None,
-            "field_defect_after_cutoff": _safe_int(row[45] if len(row) > 45 else None),
-            "status_3m":                _safe_str(row[46] if len(row) > 46 else None),
+            "sr_no":                     len(records) + 1,
+            "concern_id":                _safe_str(row[1] if len(row) > 1 else None),
+            "concern":                   _safe_str(row[2] if len(row) > 2 else None),
+            "type":                      _safe_str(row[3] if len(row) > 3 else None),
+            "root_cause":                _safe_str(row[4] if len(row) > 4 else None),
+            "action_plan":               _safe_str(row[5] if len(row) > 5 else None),
+            "target_date":               _safe_date(row[6] if len(row) > 6 else None),
+            "closure_date":              _safe_date(row[7] if len(row) > 7 else None),
+            "ryg":                       _safe_str(row[8] if len(row) > 8 else None),
+            "attri":                     _normalise_attri(_safe_str(row[9] if len(row) > 9 else None)),
+            "comm":                      _safe_str(row[10] if len(row) > 10 else None),
+            "line":                      _safe_str(row[11] if len(row) > 11 else None),
+            "stage_no":                  _safe_str(row[12] if len(row) > 12 else None),
+            "z_e":                       _safe_str(row[13] if len(row) > 13 else None),
+            "attribution":               _safe_str(row[14] if len(row) > 14 else None),
+            "part":                      _safe_str(row[15] if len(row) > 15 else None),
+            "phenomena":                 _safe_str(row[16] if len(row) > 16 else None),
+            "total_incidences":          total,
+            "monthly_data":              json.dumps(monthly) if monthly else None,
+            "field_defect_after_cutoff": _safe_int(row[field_defect_col] if len(row) > field_defect_col else None),
+            "status_3m":                 _safe_str(row[status_3m_col] if len(row) > status_3m_col else None),
         })
 
     return records
@@ -335,6 +354,35 @@ def download_excel(
     )
     records = [_row_to_dict(r) for r in rows]
 
+    # Collect all month keys present in the data, sorted chronologically
+    all_monthly_keys: list[str] = []
+    all_monthly_set: set[str] = set()
+    for rec in records:
+        if rec.get("monthly_data"):
+            try:
+                m = json.loads(rec["monthly_data"])
+                all_monthly_set.update(m.keys())
+            except (ValueError, TypeError):
+                pass
+    # Merge hardcoded base keys + any extra keys from data, keep sorted
+    all_monthly_keys = sorted(all_monthly_set | set(MONTHLY_KEYS))
+
+    # Build dynamic header row
+    month_labels = []
+    for key in all_monthly_keys:
+        year, month = key.split("-")
+        month_labels.append(
+            f"{['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][int(month)-1]}-{year[2:]}"
+        )
+
+    dynamic_header = [
+        "Sr.No", "Concern ID", "Concern", "Type", "Root Cause", "Action Plan",
+        "Target Date", "Closure Date", "RYG", "Attri.", "Comm", "Line", "Stage No",
+        "Z/E", "ATTRIBUTION", "Part", "Phenomena", "Total Incidences",
+        *month_labels,
+        "Field defect after cut off", "Status\n(3 Month basis)",
+    ]
+
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "Master Data"
@@ -344,7 +392,7 @@ def download_excel(
     header_font = Font(color="FFFFFF", bold=True)
     header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
-    ws.append(HEADER_ROW)
+    ws.append(dynamic_header)
     for cell in ws[1]:
         cell.fill = header_fill
         cell.font = header_font
@@ -380,15 +428,15 @@ def download_excel(
             rec.get("phenomena"),
             rec.get("total_incidences"),
         ]
-        for key in MONTHLY_KEYS:
+        for key in all_monthly_keys:
             row.append(monthly.get(key))
         row.append(rec.get("field_defect_after_cutoff"))
         row.append(rec.get("status_3m"))
         ws.append(row)
 
-    # Auto-fit column widths (approximate)
+    # Auto-fit column widths
     col_widths = [8, 16, 40, 8, 35, 35, 14, 14, 7, 20, 16, 18, 12, 7, 14, 22, 22, 10]
-    col_widths += [8] * 27  # monthly columns
+    col_widths += [8] * len(all_monthly_keys)
     col_widths += [22, 14]
     for i, width in enumerate(col_widths, start=1):
         ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = width
