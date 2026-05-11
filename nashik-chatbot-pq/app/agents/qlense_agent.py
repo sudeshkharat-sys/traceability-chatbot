@@ -48,33 +48,26 @@ class QLenseAgent:
         self._initialize_agent()
 
     def _initialize_agent(self):
-        """Initialize the LangChain agent with DB, vector-search, and think tools."""
+        """Initialize the LangGraph react agent with DB, vector-search, and think tools."""
         try:
             from app.tools.pg_schema_tool import get_part_labeler_schema
             from app.tools.pg_query_tool import execute_read_query
             from app.tools.vector_db_tool import search_standards
             from app.tools.think_tool import think
-            from app.services.prompt_manager import (
-                get_qlense_prompt,
-                get_todo_list_middleware_prompt,
-            )
-            from langchain.agents import create_agent
-            from langchain.agents.middleware import (
-                SummarizationMiddleware,
-                TodoListMiddleware,
-            )
+            from app.services.prompt_manager import get_qlense_prompt
+            from langgraph.prebuilt import create_react_agent
 
             prompt = get_qlense_prompt()
 
-            agent_kwargs = {
-                "model": self.llm,
-                "tools": [get_part_labeler_schema, execute_read_query, think, search_standards],
-                "system_prompt": prompt,
-                "name": "qlense_agent",
-            }
+            self.agent = create_react_agent(
+                model=self.llm,
+                tools=[get_part_labeler_schema, execute_read_query, think, search_standards],
+                state_modifier=prompt,
+                checkpointer=self.checkpointer,
+                name="qlense_agent",
+            )
 
             if self.checkpointer is not None:
-                agent_kwargs["checkpointer"] = self.checkpointer
                 logger.info(
                     f"✅ QLense agent initialized with PostgreSQL memory "
                     f"(thread_id: {self.thread_id})"
@@ -85,33 +78,6 @@ class QLenseAgent:
                     "Conversation history will not persist across sessions."
                 )
 
-            middleware = []
-
-            todo_middleware_prompt = get_todo_list_middleware_prompt()
-            middleware.append(TodoListMiddleware(system_prompt=todo_middleware_prompt))
-            logger.info("✅ TodoListMiddleware enabled for QLense agent")
-
-            if self.enable_summarization:
-                from app.models.model_factory import ModelFactory
-
-                summarization_model = ModelFactory.get_default_chat_model()
-                middleware.append(
-                    SummarizationMiddleware(
-                        model=summarization_model,
-                        trigger=("tokens", self.summarization_trigger_tokens),
-                        keep=("messages", self.keep_recent_messages),
-                        trim_tokens_to_summarize=4000,
-                    )
-                )
-                logger.info(
-                    f"🔄 Summarization enabled: triggers at {self.summarization_trigger_tokens} tokens, "
-                    f"keeps {self.keep_recent_messages} recent messages"
-                )
-
-            if middleware:
-                agent_kwargs["middleware"] = middleware
-
-            self.agent = create_agent(**agent_kwargs)
             logger.info("✅ QLense agent initialized successfully")
 
         except Exception as e:
@@ -139,7 +105,7 @@ class QLenseAgent:
             inputs = {"messages": [{"role": "user", "content": user_question}]}
             config = {"configurable": {"thread_id": self.thread_id}}
 
-            RESPONSE_NODES = {"qlense_agent", "assistant", "model", "__end__"}
+            RESPONSE_NODES = {"qlense_agent", "agent", "assistant", "model", "__end__"}
             THINKING_NODES = {"tools", "agent:edges"}
             FILTERED_NODES = {"tools:edges"}
 
