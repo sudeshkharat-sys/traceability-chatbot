@@ -197,6 +197,103 @@ class EmbeddingProcessor:
             traceback.print_exc()
             stats["errors"] += len(chunk_texts)
 
+    def _process_chunks_and_embed(
+        self,
+        doc: Dict[str, Any],
+        chunks_with_text: List[Dict],
+        stats: Dict[str, Any],
+    ) -> None:
+        """Shared batch-embed logic for both Docling and pypdf fallback paths."""
+        batch_texts: List[str] = []
+        batch_metadatas: List[Dict] = []
+        batch_ids: List[str] = []
+        batch_data: List[Dict] = []
+
+        for item in chunks_with_text:
+            i = item["index"]
+            chunk_text = item["text"]
+            chunk_metadata = item["metadata"]
+            chunk_hash = self.calculate_chunk_hash(chunk_text, chunk_metadata)
+            opensearch_id = f"{doc['id']}_{i}"
+
+            exists_db, _, _ = self.chunk_exists_in_db(chunk_hash)
+            exists_os, hash_matches_os, _ = self.opensearch.check_document_exists(opensearch_id, chunk_hash)
+
+            if exists_db and exists_os and hash_matches_os:
+                logger.debug(f"Chunk {i} unchanged in DB and OpenSearch, skipping")
+                stats["chunks_skipped"] += 1
+                continue
+
+            if exists_os:
+                stats["chunks_updated"] += 1
+            else:
+                stats["chunks_created"] += 1
+
+            enriched_metadata = {
+                **chunk_metadata,
+                "doc_name": doc["doc_name"],
+                "doc_id": doc["id"],
+                "chunk_hash": chunk_hash,
+            }
+            batch_texts.append(chunk_text)
+            batch_metadatas.append(enriched_metadata)
+            batch_ids.append(opensearch_id)
+            batch_data.append({
+                "index": i,
+                "text": chunk_text,
+                "metadata": chunk_metadata,
+                "hash": chunk_hash,
+                "opensearch_id": opensearch_id,
+            })
+
+            if len(batch_texts) >= self.CHUNK_BATCH_SIZE:
+                self._flush_batch(doc, batch_texts, batch_metadatas, batch_ids, batch_data, stats)
+                batch_texts.clear()
+                batch_metadatas.clear()
+                batch_ids.clear()
+                batch_data.clear()
+
+        self._flush_batch(doc, batch_texts, batch_metadatas, batch_ids, batch_data, stats)
+
+    def _extract_chunks_via_pypdf(self, doc_path: Path, doc_name: str) -> List[Dict]:
+        """
+        Pure-Python PDF fallback using pypdf + LangChain text splitter.
+        Returns a list of {index, text, metadata} dicts — same shape as the
+        Docling path so _process_chunks_and_embed() can handle both.
+        """
+        try:
+            import pypdf
+        except ImportError:
+            raise RuntimeError("pypdf is not installed. Run: pip install pypdf")
+
+        from langchain.text_splitter import RecursiveCharacterTextSplitter
+
+        logger.info("  [FALLBACK] Extracting text with pypdf...")
+        pages_text: List[str] = []
+        with open(doc_path, "rb") as f:
+            reader = pypdf.PdfReader(f)
+            for page_num, page in enumerate(reader.pages):
+                page_text = (page.extract_text() or "").strip()
+                if page_text:
+                    pages_text.append(f"[Page {page_num + 1}]\n{page_text}")
+
+        if not pages_text:
+            raise RuntimeError(f"pypdf extracted no text from {doc_name}")
+
+        full_text = "\n\n".join(pages_text)
+        splitter = RecursiveCharacterTextSplitter(chunk_size=2000, chunk_overlap=200)
+        raw_chunks = splitter.split_text(full_text)
+        logger.info(f"  [FALLBACK] pypdf produced {len(raw_chunks)} chunks")
+
+        return [
+            {
+                "index": i,
+                "text": chunk_text,
+                "metadata": {"doc_name": doc_name, "source": "pypdf_fallback"},
+            }
+            for i, chunk_text in enumerate(raw_chunks)
+        ]
+
     def process_document(self, doc: Dict[str, Any]) -> Dict[str, Any]:
         """
         Process a single document: convert, chunk, embed, and upsert.
@@ -233,9 +330,10 @@ class EmbeddingProcessor:
             logger.info(f"Processing document: {doc['doc_name']}")
             doc_start_time = time.time()
 
-            # Convert document using Docling with timeout protection
+            # ── Phase 1: Convert with Docling ─────────────────────────────
             logger.info(f"  [1/3] Converting PDF with Docling (timeout: {PDF_CONVERSION_TIMEOUT}s)...")
             conv_start = time.time()
+            docling_ok = False
 
             try:
                 # ThreadPoolExecutor timeout works on both Windows and Linux.
@@ -249,94 +347,58 @@ class EmbeddingProcessor:
                     conv_res = future.result(timeout=PDF_CONVERSION_TIMEOUT)
                     _exe.shutdown(wait=False)
                 except FuturesTimeoutError:
-                    _exe.shutdown(wait=False)  # abandon the stuck thread, don't block
-                    logger.error(f"  [FAIL] PDF conversion timed out after {PDF_CONVERSION_TIMEOUT}s")
-                    logger.error(f"  Skipping document {doc['doc_name']} due to timeout")
+                    _exe.shutdown(wait=False)
+                    logger.error(f"  [FAIL] PDF conversion timed out after {PDF_CONVERSION_TIMEOUT}s — trying pypdf fallback")
+                logger.info(f"  [OK] Docling conversion completed in {time.time() - conv_start:.2f}s")
+                docling_ok = conv_res is not None
+            except Exception as docling_err:
+                logger.warning(f"  [WARN] Docling conversion failed: {docling_err} — trying pypdf fallback")
+
+            # ── Phase 2: Chunk ─────────────────────────────────────────────
+            chunks_for_embed: List[Dict] = []
+
+            if docling_ok:
+                logger.info("  [2/3] Chunking document with HybridChunker (Docling)...")
+                chunk_start = time.time()
+                chunk_iter = self.chunker.chunk(dl_doc=conv_res.document)
+                docling_chunks = list(chunk_iter)
+
+                # Free the heavy conversion result immediately
+                del conv_res
+                conv_res = None
+                gc.collect()
+
+                for i, chunk in enumerate(docling_chunks):
+                    chunk_text = self.chunker.contextualize(chunk=chunk)
+                    chunk_metadata = chunk.meta.export_json_dict()
+                    # Fix for OpenSearch long overflow: convert binary_hash to string
+                    if "origin" in chunk_metadata and "binary_hash" in chunk_metadata["origin"]:
+                        chunk_metadata["origin"]["binary_hash"] = str(chunk_metadata["origin"]["binary_hash"])
+                    chunks_for_embed.append({"index": i, "text": chunk_text, "metadata": chunk_metadata})
+
+                logger.info(
+                    f"  [OK] Chunking completed in {time.time() - chunk_start:.2f}s — "
+                    f"{len(chunks_for_embed)} chunks"
+                )
+            else:
+                # Docling failed — fall back to pypdf + simple text splitter
+                logger.info("  [2/3] Chunking document with pypdf fallback...")
+                try:
+                    chunks_for_embed = self._extract_chunks_via_pypdf(doc_path, doc["doc_name"])
+                except Exception as pypdf_err:
+                    logger.error(f"  [FAIL] pypdf fallback also failed: {pypdf_err}")
                     stats["errors"] += 1
                     return stats
-                logger.info(f"  [OK] Conversion completed in {time.time() - conv_start:.2f}s")
-            except Exception as e:
-                logger.error(f"  [FAIL] PDF conversion failed: {str(e)}")
-                raise  # Re-raise to be caught by outer try-except
 
-            # Chunk document
-            logger.info("  [2/3] Chunking document...")
-            chunk_start = time.time()
-            chunk_iter = self.chunker.chunk(dl_doc=conv_res.document)
-            chunks = list(chunk_iter)
-            logger.info(f"  [OK] Chunking completed in {time.time() - chunk_start:.2f}s - {len(chunks)} chunks created")
-
-            # Free the heavy conversion result now that chunking is done
-            del conv_res
-            conv_res = None
-            gc.collect()
-
-            # Process chunks in batches to limit memory
-            logger.info(f"  [3/3] Embedding and upserting {len(chunks)} chunks to OpenSearch & Postgres...")
+            # ── Phase 3: Embed & upsert ────────────────────────────────────
+            logger.info(
+                f"  [3/3] Embedding and upserting {len(chunks_for_embed)} chunks "
+                f"to OpenSearch & Postgres..."
+            )
             embed_start = time.time()
-            batch_texts: List[str] = []
-            batch_metadatas: List[Dict] = []
-            batch_ids: List[str] = []
-            batch_data: List[Dict] = []
-
-            for i, chunk in enumerate(chunks):
-                chunk_text = self.chunker.contextualize(chunk=chunk)
-                chunk_metadata = chunk.meta.export_json_dict()
-
-                # Fix for OpenSearch long overflow: convert binary_hash to string
-                if "origin" in chunk_metadata and "binary_hash" in chunk_metadata["origin"]:
-                    chunk_metadata["origin"]["binary_hash"] = str(chunk_metadata["origin"]["binary_hash"])
-
-                chunk_hash = self.calculate_chunk_hash(chunk_text, chunk_metadata)
-                opensearch_id = f"{doc['id']}_{i}"
-
-                exists_db, _, _ = self.chunk_exists_in_db(chunk_hash)
-                exists_os, hash_matches_os, _ = self.opensearch.check_document_exists(
-                    opensearch_id, chunk_hash
-                )
-
-                # Both DB and OpenSearch already have this exact hash – nothing to do
-                if exists_db and exists_os and hash_matches_os:
-                    logger.debug(f"Chunk {i} unchanged in DB and OpenSearch, skipping")
-                    stats["chunks_skipped"] += 1
-                    continue
-
-                # Track whether this will be a create or update in OpenSearch
-                if exists_os:
-                    stats["chunks_updated"] += 1
-                else:
-                    stats["chunks_created"] += 1
-
-                enriched_metadata = {
-                    **chunk_metadata,
-                    "doc_name": doc["doc_name"],
-                    "doc_id": doc["id"],
-                    "chunk_hash": chunk_hash,
-                }
-                batch_texts.append(chunk_text)
-                batch_metadatas.append(enriched_metadata)
-                batch_ids.append(opensearch_id)
-                batch_data.append({
-                    "index": i,
-                    "text": chunk_text,
-                    "metadata": chunk_metadata,
-                    "hash": chunk_hash,
-                    "opensearch_id": opensearch_id,
-                })
-
-                # Flush batch when it reaches the limit
-                if len(batch_texts) >= self.CHUNK_BATCH_SIZE:
-                    self._flush_batch(doc, batch_texts, batch_metadatas, batch_ids, batch_data, stats)
-                    batch_texts.clear()
-                    batch_metadatas.clear()
-                    batch_ids.clear()
-                    batch_data.clear()
-
-            # Flush remaining chunks
-            self._flush_batch(doc, batch_texts, batch_metadatas, batch_ids, batch_data, stats)
+            self._process_chunks_and_embed(doc, chunks_for_embed, stats)
             logger.info(f"  [OK] Embedding phase completed in {time.time() - embed_start:.2f}s")
 
-            # Mark as successful if no errors or only skipped chunks
             stats["success"] = stats["errors"] == 0
 
             total_time = time.time() - doc_start_time

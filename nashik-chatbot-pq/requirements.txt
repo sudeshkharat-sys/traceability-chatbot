@@ -47,3 +47,4 @@ docling-parse
 tiktoken
 rapidocr-onnxruntime
 easyocr
+pypdf
