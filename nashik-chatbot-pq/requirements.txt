@@ -48,3 +48,4 @@ tiktoken
 rapidocr-onnxruntime
 easyocr
 pypdf
+langchain-text-splitters

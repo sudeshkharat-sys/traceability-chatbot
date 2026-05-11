@@ -266,7 +266,10 @@ class EmbeddingProcessor:
         except ImportError:
             raise RuntimeError("pypdf is not installed. Run: pip install pypdf")
 
-        from langchain.text_splitter import RecursiveCharacterTextSplitter
+        try:
+            from langchain_text_splitters import RecursiveCharacterTextSplitter
+        except ImportError:
+            from langchain.text_splitter import RecursiveCharacterTextSplitter
 
         logger.info("  [FALLBACK] Extracting text with pypdf...")
         pages_text: List[str] = []
