@@ -1254,6 +1254,9 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
 
   const canvasRef   = useRef(null);
   const transformRef = useRef(null);
+  // Track the activeLayoutId value from the last time savedLayouts synced,
+  // so we can detect when it changed (e.g. a new layout was just created).
+  const prevActiveLayoutIdRef = useRef(activeLayoutId);
 
   const fitView = useCallback((loadedBoxes, loadedBuyoffIcons) => {
     if (!transformRef.current) return;
@@ -1336,11 +1339,15 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
       return;
     }
     setError(null);
+    // Detect if activeLayoutId changed since last sync (signals a new layout was created)
+    const activeChanged = activeLayoutId !== prevActiveLayoutIdRef.current;
+    prevActiveLayoutIdRef.current = activeLayoutId;
     setSelectedId((prev) => {
+      const preferred = activeLayoutId && list.find((l) => l.id === activeLayoutId);
+      // If the editor just switched to a new layout, prefer it over the current selection
+      if (activeChanged && preferred) return preferred.id;
       // Keep current selection if it still exists
       if (prev && list.find((l) => l.id === prev)) return prev;
-      // Prefer the layout open in the editor
-      const preferred = activeLayoutId && list.find((l) => l.id === activeLayoutId);
       return preferred ? preferred.id : list[0].id;
     });
   }, [savedLayouts]); // eslint-disable-line
