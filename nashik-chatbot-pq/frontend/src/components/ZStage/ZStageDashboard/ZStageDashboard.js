@@ -1283,6 +1283,8 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
     const el = canvasRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    // Canvas is hidden (display:none) — bail out to avoid setting scale to 0
+    if (rect.width === 0 || rect.height === 0) return;
 
     const PAD = 80;
     const contentW = maxX - minX + PAD * 2;
@@ -1395,6 +1397,15 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
       .catch(() => setError('Failed to load layout'))
       .finally(() => setLoading(false));
   }, [selectedId, userId, fitView]);
+
+  // When the dashboard tab becomes visible, re-run fitView — the canvas was
+  // hidden (display:none) during the initial load so getBoundingClientRect()
+  // returned 0 and the transform was not applied correctly.
+  useEffect(() => {
+    if (!isActive) return;
+    if (boxes.length === 0 && buyoffIcons.length === 0) return;
+    setTimeout(() => fitView(boxes, buyoffIcons), 50);
+  }, [isActive]); // eslint-disable-line
 
   const handleRefresh = () => {
     setRefreshing(true);
