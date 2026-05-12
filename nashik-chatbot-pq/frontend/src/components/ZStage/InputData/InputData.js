@@ -977,12 +977,21 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
       .catch(() => setLayoutStageIds([]));
   }, [selectedLayoutId]);
 
-  // Auto-select first layout
+  // Auto-select layout: pick newest on first load; switch to newly created layout
+  const prevLayoutsRef = useRef(null);
   useEffect(() => {
-    if (layouts.length > 0 && selectedLayoutId === null) {
+    if (layouts.length === 0) return;
+    const prevList = prevLayoutsRef.current;
+    prevLayoutsRef.current = layouts;
+    if (selectedLayoutId === null) {
+      setSelectedLayoutId(layouts[0].id);
+      return;
+    }
+    // If a brand-new layout appeared at position 0, switch to it
+    if (prevList && layouts[0] && !prevList.find((l) => l.id === layouts[0].id)) {
       setSelectedLayoutId(layouts[0].id);
     }
-  }, [layouts, selectedLayoutId]);
+  }, [layouts]); // eslint-disable-line
 
   // ── Master Data load ────────────────────────────────────────────────────────
   const loadRecords = useCallback(async () => {

@@ -1326,9 +1326,12 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
   }, [userId]); // eslint-disable-line
 
   // Keep layout list in sync when parent updates savedLayouts (create / delete)
+  const prevSavedLayoutsRef = useRef(null);
   useEffect(() => {
     if (savedLayouts === null) return;
     const list = Array.isArray(savedLayouts) ? savedLayouts : [];
+    const prevList = prevSavedLayoutsRef.current;
+    prevSavedLayoutsRef.current = list;
     setLayouts(list);
     if (list.length === 0) {
       setSelectedId(null);
@@ -1337,6 +1340,10 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
     }
     setError(null);
     setSelectedId((prev) => {
+      // If a brand-new layout appeared at position 0, switch to it
+      if (list[0] && prevList && !prevList.find((l) => l.id === list[0].id)) {
+        return list[0].id;
+      }
       // Keep current selection if it still exists
       if (prev && list.find((l) => l.id === prev)) return prev;
       // Prefer the layout open in the editor
