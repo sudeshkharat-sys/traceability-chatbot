@@ -240,11 +240,11 @@ const LONG_TEXT_FIELDS = new Set(['concern', 'root_cause', 'action_plan', 'comm'
 // saveFn defaults to the master-data API; pass a different fn for audit tables
 function EditableCell({ recordId, fieldKey, value, type, options, onSaved, saveFn }) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value ?? '');
+  const [draft, setDraft] = useState(value != null ? String(value) : '');
   const [saving, setSaving] = useState(false);
   const inputRef = useRef(null);
 
-  useEffect(() => { setDraft(value ?? ''); }, [value]);
+  useEffect(() => { setDraft(value != null ? String(value) : ''); }, [value]);
   useEffect(() => { if (editing && inputRef.current) inputRef.current.focus(); }, [editing]);
 
   const commit = useCallback(async (overrideVal) => {

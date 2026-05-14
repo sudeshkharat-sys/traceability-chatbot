@@ -124,11 +124,11 @@ function EditableCell({ recordId, fieldKey, value, type, onSaved, stickyLeft }) 
     ? { position: 'sticky', left: stickyLeft, zIndex: 1, backgroundColor: 'inherit' }
     : {};
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft]     = useState(value ?? '');
+  const [draft, setDraft]     = useState(value != null ? String(value) : '');
   const [saving, setSaving]   = useState(false);
   const inputRef = useRef(null);
 
-  useEffect(() => { setDraft(value ?? ''); }, [value]);
+  useEffect(() => { setDraft(value != null ? String(value) : ''); }, [value]);
   useEffect(() => { if (editing && inputRef.current) inputRef.current.focus(); }, [editing]);
 
   const commit = useCallback(async () => {
@@ -1280,6 +1280,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
     const el = canvasRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return; // hidden container — skip
 
     const PAD = 80;
     const contentW = maxX - minX + PAD * 2;
@@ -1442,6 +1443,17 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
     prevSignalRef.current = refreshSignal;
     if (selectedId) handleRefreshRef.current?.();
   }, [refreshSignal, selectedId]);
+
+  // Re-fit when the dashboard tab becomes visible (was hidden via display:none)
+  const prevIsActiveRef = useRef(isActive);
+  useEffect(() => {
+    const wasInactive = !prevIsActiveRef.current;
+    prevIsActiveRef.current = isActive;
+    if (!isActive || !wasInactive) return;
+    if (boxes.length === 0 && buyoffIcons.length === 0) return;
+    const tid = setTimeout(() => fitView(boxes, buyoffIcons), 80);
+    return () => clearTimeout(tid);
+  }, [isActive, boxes, buyoffIcons, fitView]);
 
   // Drag callback: update position live; auto-save to DB on commit
   const handleLegendDrag = useCallback((newPos, commit) => {
