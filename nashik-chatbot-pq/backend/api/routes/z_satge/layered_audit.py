@@ -154,56 +154,72 @@ _LA_UPDATE_FIELDS = [
 _LAA_UPDATE_FIELDS = ["stage_name", "auditor", "audit_date"]
 
 
+def _is_empty(val) -> bool:
+    if val is None:
+        return True
+    if isinstance(val, str) and val.strip() == '':
+        return True
+    if isinstance(val, (int, float)) and val == 0:
+        return True
+    return False
+
+
 def _merge_layered_audit(records, existing_rows, user_id, layout_id, connector):
-    """Merge by sr_no. Returns (updated, inserted)."""
+    """Fill gaps in existing rows by sr_no. Only writes fields where existing is null/empty."""
     existing_map = {r.get("sr_no"): dict(r) for r in existing_rows if r.get("sr_no")}
-    updated = inserted = 0
+    filled = inserted = 0
     for rec in records:
         key = rec.get("sr_no")
         existing = existing_map.get(key) if key else None
         if existing:
-            update_data = {k: rec[k] for k in _LA_UPDATE_FIELDS if rec.get(k) is not None}
+            update_data = {
+                k: rec[k] for k in _LA_UPDATE_FIELDS
+                if rec.get(k) is not None and _is_empty(existing.get(k))
+            }
             if update_data:
                 set_clause = ", ".join(f"{col} = :{col}" for col in update_data)
                 connector.execute_query(
                     f"UPDATE layered_audit SET {set_clause}, updated_at = NOW() WHERE id = :record_id",
                     {**update_data, "record_id": existing["id"]},
                 )
-            updated += 1
+            filled += 1
         else:
             rec["user_id"] = user_id
             rec["layout_id"] = layout_id
             connector.execute_query(LayeredAuditQueries.CREATE, rec)
             inserted += 1
-    return updated, inserted
+    return filled, inserted
 
 
 def _merge_adherence(records, existing_rows, user_id, layout_id, connector):
-    """Merge by stage_no + audit_date. Returns (updated, inserted)."""
+    """Fill gaps in existing rows by stage_no + audit_date. Only writes null/empty fields."""
     existing_map = {
         f"{r.get('stage_no')}|{r.get('audit_date')}": dict(r)
         for r in existing_rows
         if r.get("stage_no") and r.get("audit_date")
     }
-    updated = inserted = 0
+    filled = inserted = 0
     for rec in records:
         key = f"{rec.get('stage_no')}|{rec.get('audit_date')}"
         existing = existing_map.get(key)
         if existing:
-            update_data = {k: rec[k] for k in _LAA_UPDATE_FIELDS if rec.get(k) is not None}
+            update_data = {
+                k: rec[k] for k in _LAA_UPDATE_FIELDS
+                if rec.get(k) is not None and _is_empty(existing.get(k))
+            }
             if update_data:
                 set_clause = ", ".join(f"{col} = :{col}" for col in update_data)
                 connector.execute_query(
                     f"UPDATE layered_audit_adherence SET {set_clause}, updated_at = NOW() WHERE id = :record_id",
                     {**update_data, "record_id": existing["id"]},
                 )
-            updated += 1
+            filled += 1
         else:
             rec["user_id"] = user_id
             rec["layout_id"] = layout_id
             connector.execute_query(LayeredAuditAdherenceQueries.CREATE, rec)
             inserted += 1
-    return updated, inserted
+    return filled, inserted
 
 
 @router.post("/upload", response_model=schemas.UploadResponse, status_code=201)
@@ -232,11 +248,11 @@ async def upload_layered_audit(
             LayeredAuditQueries.LIST_ALL, {"user_id": user_id, "layout_id": layout_id}
         )
         existing_rows = [dict(r._mapping) for r in existing_rows]
-        updated, inserted = _merge_layered_audit(records, existing_rows, user_id, layout_id, connector)
+        filled, inserted = _merge_layered_audit(records, existing_rows, user_id, layout_id, connector)
         return {
-            "message": f"Smart merge complete — {updated} updated, {inserted} inserted",
+            "message": f"Additional data added — {filled} existing rows filled, {inserted} new rows inserted",
             "rows_imported": inserted,
-            "rows_updated": updated,
+            "rows_updated": filled,
         }
 
     connector.execute_update(
@@ -350,11 +366,11 @@ async def upload_layered_audit_adherence(
             LayeredAuditAdherenceQueries.LIST_ALL, {"user_id": user_id, "layout_id": layout_id}
         )
         existing_rows = [dict(r._mapping) for r in existing_rows]
-        updated, inserted = _merge_adherence(records, existing_rows, user_id, layout_id, connector)
+        filled, inserted = _merge_adherence(records, existing_rows, user_id, layout_id, connector)
         return {
-            "message": f"Smart merge complete — {updated} updated, {inserted} inserted",
+            "message": f"Additional data added — {filled} existing rows filled, {inserted} new rows inserted",
             "rows_imported": inserted,
-            "rows_updated": updated,
+            "rows_updated": filled,
         }
 
     connector.execute_update(

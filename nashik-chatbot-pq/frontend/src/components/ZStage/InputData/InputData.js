@@ -1304,8 +1304,8 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
                   />
                   <span className="upload-mode-dot" />
                   <span>
-                    <strong>Smart Merge</strong>
-                    <small>Update matched rows · keep unmatched · add new</small>
+                    <strong>Add / Fill Data</strong>
+                    <small>Fill empty fields · insert new rows · never overwrite existing data</small>
                   </span>
                 </label>
               </div>
@@ -1325,7 +1325,7 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
                 <p>{uploadResult.message}</p>
                 {uploadResult.success && uploadResult.rowsUpdated != null && (
                   <p>
-                    {uploadResult.rowsUpdated} row{uploadResult.rowsUpdated !== 1 ? 's' : ''} updated
+                    {uploadResult.rowsUpdated} existing row{uploadResult.rowsUpdated !== 1 ? 's' : ''} filled
                     · {uploadResult.rowsImported} new row{uploadResult.rowsImported !== 1 ? 's' : ''} inserted.{' '}
                     <button className="link-btn" onClick={() => setActiveTab(uploadResult.viewTab)}>View Data →</button>
                   </p>

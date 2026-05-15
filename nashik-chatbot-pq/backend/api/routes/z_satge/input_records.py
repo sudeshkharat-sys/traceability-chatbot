@@ -178,46 +178,69 @@ _IR_RETURNING_FULL = (
 )
 
 
-def _merge_master(valid_records, existing_rows, user_id, layout_id, connector):
-    """Merge new records into existing ones by concern_id. Returns (updated, inserted)."""
-    # Build lookup: concern_id → existing row dict
-    existing_map = {}
-    for row in existing_rows:
-        cid = row.get("concern_id")
-        if cid:
-            existing_map[cid] = dict(row)
+def _is_empty(val) -> bool:
+    """True when a DB value is considered blank — can be filled by new data."""
+    if val is None:
+        return True
+    if isinstance(val, str) and val.strip() == '':
+        return True
+    if isinstance(val, (int, float)) and val == 0:
+        return True
+    return False
 
+
+def _merge_master(valid_records, existing_rows, user_id, layout_id, connector):
+    """Fill gaps in existing records from new data.
+    Rule: only write a field when the EXISTING value is null/empty/zero
+    AND the new Excel provides a non-null value.  Existing non-empty
+    values are never overwritten.  New concern_ids are inserted.
+    Returns (filled_count, inserted_count)."""
+    existing_map = {r.get("concern_id"): r for r in existing_rows if r.get("concern_id")}
     max_sr = max((r.get("sr_no") or 0 for r in existing_rows), default=0)
-    updated = inserted = 0
+    filled = inserted = 0
 
     for rec in valid_records:
         cid = rec.get("concern_id")
         existing = existing_map.get(cid) if cid else None
 
         if existing:
-            # Merge monthly data: keep old months not in new file, add/overwrite new months
+            update_data = {}
+
+            # Text / number fields: fill only if existing slot is blank
+            for k in _IR_UPDATE_FIELDS:
+                if k == "monthly_data":
+                    continue  # handled separately below
+                new_val = rec.get(k)
+                if new_val is None:
+                    continue  # new file has nothing for this column
+                if _is_empty(existing.get(k)):
+                    update_data[k] = new_val
+
+            # Monthly data: fill only months that are absent or zero in existing
             new_monthly_raw = rec.get("monthly_data")
             if new_monthly_raw:
                 try:
                     old_m = json.loads(existing.get("monthly_data") or "{}")
                     new_m = json.loads(new_monthly_raw)
-                    merged = {**old_m, **new_m}
-                    rec["monthly_data"] = json.dumps(merged)
-                    rec["total_incidences"] = sum(merged.values())
+                    merged = dict(old_m)
+                    changed = False
+                    for month, new_val in new_m.items():
+                        if _is_empty(old_m.get(month)):
+                            merged[month] = new_val
+                            changed = True
+                    if changed:
+                        update_data["monthly_data"] = json.dumps(merged)
+                        update_data["total_incidences"] = sum(merged.values())
                 except (json.JSONDecodeError, TypeError):
                     pass
 
-            # Update only non-None fields (null = column absent from new file → keep existing)
-            update_data = {k: rec[k] for k in _IR_UPDATE_FIELDS if rec.get(k) is not None}
             if update_data:
                 set_clause = ", ".join(f"{col} = :{col}" for col in update_data)
-                query = (
-                    f"UPDATE input_records SET {set_clause}, updated_at = NOW() "
-                    f"WHERE id = :record_id"
+                connector.execute_query(
+                    f"UPDATE input_records SET {set_clause}, updated_at = NOW() WHERE id = :record_id",
+                    {**update_data, "record_id": existing["id"]},
                 )
-                update_data["record_id"] = existing["id"]
-                connector.execute_query(query, update_data)
-            updated += 1
+            filled += 1
         else:
             max_sr += 1
             rec["sr_no"] = max_sr
@@ -226,7 +249,7 @@ def _merge_master(valid_records, existing_rows, user_id, layout_id, connector):
             connector.execute_query(InputRecordQueries.CREATE, rec)
             inserted += 1
 
-    return updated, inserted
+    return filled, inserted
 
 
 @router.post("/upload", response_model=schemas.UploadResponse, status_code=201)
@@ -274,11 +297,11 @@ async def upload_excel(
             {"user_id": user_id, "layout_id": layout_id},
         )
         existing_rows = [dict(r._mapping) for r in existing_rows]
-        updated, inserted = _merge_master(valid_records, existing_rows, user_id, layout_id, connector)
+        filled, inserted = _merge_master(valid_records, existing_rows, user_id, layout_id, connector)
         return {
-            "message": f"Smart merge complete — {updated} updated, {inserted} inserted",
+            "message": f"Additional data added — {filled} existing rows filled, {inserted} new rows inserted",
             "rows_imported": inserted,
-            "rows_updated": updated,
+            "rows_updated": filled,
             "skipped_rows": skipped_out if skipped_out else None,
         }
 
