@@ -163,11 +163,78 @@ def _parse_excel(file_bytes: bytes) -> list[dict]:
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
+_IR_UPDATE_FIELDS = [
+    "concern", "type", "root_cause", "action_plan", "target_date",
+    "closure_date", "ryg", "attri", "comm", "line", "stage_no",
+    "z_e", "attribution", "part", "phenomena", "total_incidences",
+    "monthly_data", "field_defect_after_cutoff", "status_3m",
+]
+
+_IR_RETURNING_FULL = (
+    "id, user_id, layout_id, sr_no, concern_id, concern, type, root_cause, action_plan, "
+    "target_date, closure_date, ryg, attri, comm, line, stage_no, z_e, attribution, "
+    "part, phenomena, total_incidences, monthly_data, field_defect_after_cutoff, "
+    "status_3m, created_at, updated_at"
+)
+
+
+def _merge_master(valid_records, existing_rows, user_id, layout_id, connector):
+    """Merge new records into existing ones by concern_id. Returns (updated, inserted)."""
+    # Build lookup: concern_id → existing row dict
+    existing_map = {}
+    for row in existing_rows:
+        cid = row.get("concern_id")
+        if cid:
+            existing_map[cid] = dict(row)
+
+    max_sr = max((r.get("sr_no") or 0 for r in existing_rows), default=0)
+    updated = inserted = 0
+
+    for rec in valid_records:
+        cid = rec.get("concern_id")
+        existing = existing_map.get(cid) if cid else None
+
+        if existing:
+            # Merge monthly data: keep old months not in new file, add/overwrite new months
+            new_monthly_raw = rec.get("monthly_data")
+            if new_monthly_raw:
+                try:
+                    old_m = json.loads(existing.get("monthly_data") or "{}")
+                    new_m = json.loads(new_monthly_raw)
+                    merged = {**old_m, **new_m}
+                    rec["monthly_data"] = json.dumps(merged)
+                    rec["total_incidences"] = sum(merged.values())
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
+            # Update only non-None fields (null = column absent from new file → keep existing)
+            update_data = {k: rec[k] for k in _IR_UPDATE_FIELDS if rec.get(k) is not None}
+            if update_data:
+                set_clause = ", ".join(f"{col} = :{col}" for col in update_data)
+                query = (
+                    f"UPDATE input_records SET {set_clause}, updated_at = NOW() "
+                    f"WHERE id = :record_id"
+                )
+                update_data["record_id"] = existing["id"]
+                connector.execute_query(query, update_data)
+            updated += 1
+        else:
+            max_sr += 1
+            rec["sr_no"] = max_sr
+            rec["user_id"] = user_id
+            rec["layout_id"] = layout_id
+            connector.execute_query(InputRecordQueries.CREATE, rec)
+            inserted += 1
+
+    return updated, inserted
+
+
 @router.post("/upload", response_model=schemas.UploadResponse, status_code=201)
 async def upload_excel(
     file: UploadFile = File(...),
     user_id: Optional[int] = Form(None),
     layout_id: Optional[int] = Form(None),
+    mode: str = Form("replace"),
     connector: StateDBConnector = Depends(get_connector),
 ):
     if not file.filename.endswith((".xlsx", ".xls")):
@@ -186,7 +253,7 @@ async def upload_excel(
     # Validate each row — skip invalid ones and collect skipped info
     valid_records = []
     skipped = []
-    for i, rec in enumerate(records, start=2):  # row 1 is header, data starts at row 2
+    for i, rec in enumerate(records, start=2):
         reason = _validate_row(rec)
         if reason:
             skipped.append({"row_number": i, "reason": reason})
@@ -196,21 +263,35 @@ async def upload_excel(
     if not valid_records:
         raise HTTPException(
             status_code=422,
-            detail=f"All rows were invalid and skipped. No records imported.",
+            detail="All rows were invalid and skipped. No records imported.",
         )
 
-    # Full replace for this user+layout scope, then insert fresh ones
+    skipped_out = [{"row_number": s["row_number"], "reason": s["reason"]} for s in skipped]
+
+    if mode == "merge":
+        existing_rows = connector.execute_query(
+            InputRecordQueries.LIST_ALL,
+            {"user_id": user_id, "layout_id": layout_id},
+        )
+        existing_rows = [dict(r._mapping) for r in existing_rows]
+        updated, inserted = _merge_master(valid_records, existing_rows, user_id, layout_id, connector)
+        return {
+            "message": f"Smart merge complete — {updated} updated, {inserted} inserted",
+            "rows_imported": inserted,
+            "rows_updated": updated,
+            "skipped_rows": skipped_out if skipped_out else None,
+        }
+
+    # Default: replace all
     connector.execute_update(
         InputRecordQueries.DELETE_ALL,
         {"user_id": user_id, "layout_id": layout_id},
     )
-
     for rec in valid_records:
         rec["user_id"] = user_id
         rec["layout_id"] = layout_id
         connector.execute_query(InputRecordQueries.CREATE, rec)
 
-    skipped_out = [{"row_number": s["row_number"], "reason": s["reason"]} for s in skipped]
     return {
         "message": "Upload successful",
         "rows_imported": len(valid_records),

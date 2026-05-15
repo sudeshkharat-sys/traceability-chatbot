@@ -241,6 +241,7 @@ class SkippedRow(BaseModel):
 class UploadResponse(BaseModel):
     message: str
     rows_imported: int
+    rows_updated: Optional[int] = None   # set only in merge mode
     skipped_rows: Optional[List[SkippedRow]] = None
 
 

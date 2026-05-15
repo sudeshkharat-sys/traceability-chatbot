@@ -37,11 +37,12 @@ export const buyoffIconApi = {
 export const bypassIconApi = buyoffIconApi;
 
 export const inputApi = {
-  uploadExcel: (file, userId, layoutId) => {
+  uploadExcel: (file, userId, layoutId, mode = 'replace') => {
     const formData = new FormData();
     formData.append('file', file);
     if (userId != null) formData.append('user_id', userId);
     if (layoutId != null) formData.append('layout_id', layoutId);
+    formData.append('mode', mode);
     return axios.post(`${BASE_URL}/input/upload`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -62,11 +63,12 @@ export const inputApi = {
 };
 
 export const layeredAuditApi = {
-  uploadAudit: (file, userId, layoutId) => {
+  uploadAudit: (file, userId, layoutId, mode = 'replace') => {
     const formData = new FormData();
     formData.append('file', file);
     if (userId != null) formData.append('user_id', userId);
     if (layoutId != null) formData.append('layout_id', layoutId);
+    formData.append('mode', mode);
     return axios.post(`${BASE_URL}/layered-audit/upload`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -77,11 +79,12 @@ export const layeredAuditApi = {
     if (layoutId != null) params.layout_id = layoutId;
     return api.get('/layered-audit/records', { params });
   },
-  uploadAdherence: (file, userId, layoutId) => {
+  uploadAdherence: (file, userId, layoutId, mode = 'replace') => {
     const formData = new FormData();
     formData.append('file', file);
     if (userId != null) formData.append('user_id', userId);
     if (layoutId != null) formData.append('layout_id', layoutId);
+    formData.append('mode', mode);
     return axios.post(`${BASE_URL}/layered-audit/adherence/upload`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });

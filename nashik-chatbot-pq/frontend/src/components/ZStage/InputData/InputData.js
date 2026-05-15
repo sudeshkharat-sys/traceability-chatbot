@@ -918,6 +918,7 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
   const [activeTab, setActiveTab] = useState('upload');
   // upload tab state
   const [uploadType, setUploadType] = useState('master');
+  const [uploadMode, setUploadMode] = useState('replace'); // 'replace' | 'merge'
   const [dragging, setDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -1111,17 +1112,18 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
     try {
       let res;
       if (uploadType === 'master') {
-        res = await inputApi.uploadExcel(selectedFile, userId, selectedLayoutId);
+        res = await inputApi.uploadExcel(selectedFile, userId, selectedLayoutId, uploadMode);
       } else if (uploadType === 'layered-audit') {
-        res = await layeredAuditApi.uploadAudit(selectedFile, userId, selectedLayoutId);
+        res = await layeredAuditApi.uploadAudit(selectedFile, userId, selectedLayoutId, uploadMode);
       } else {
-        res = await layeredAuditApi.uploadAdherence(selectedFile, userId, selectedLayoutId);
+        res = await layeredAuditApi.uploadAdherence(selectedFile, userId, selectedLayoutId, uploadMode);
       }
       const viewTab = UPLOAD_TYPES.find((t) => t.value === uploadType)?.viewTab || 'master';
       setUploadResult({
         success: true,
         message: res.data.message,
         rowsImported: res.data.rows_imported,
+        rowsUpdated: res.data.rows_updated ?? null,
         skippedRows: res.data.skipped_rows || null,
         viewTab,
       });
@@ -1276,6 +1278,38 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
                 )}
               </div>
 
+              {/* Merge / Replace toggle */}
+              <div className="upload-mode-toggle">
+                <label className={`upload-mode-opt${uploadMode === 'replace' ? ' upload-mode-opt--active' : ''}`}>
+                  <input
+                    type="radio"
+                    name="uploadMode"
+                    value="replace"
+                    checked={uploadMode === 'replace'}
+                    onChange={() => setUploadMode('replace')}
+                  />
+                  <span className="upload-mode-dot" />
+                  <span>
+                    <strong>Replace all</strong>
+                    <small>Delete existing data and import fresh</small>
+                  </span>
+                </label>
+                <label className={`upload-mode-opt${uploadMode === 'merge' ? ' upload-mode-opt--active' : ''}`}>
+                  <input
+                    type="radio"
+                    name="uploadMode"
+                    value="merge"
+                    checked={uploadMode === 'merge'}
+                    onChange={() => setUploadMode('merge')}
+                  />
+                  <span className="upload-mode-dot" />
+                  <span>
+                    <strong>Smart Merge</strong>
+                    <small>Update matched rows · keep unmatched · add new</small>
+                  </span>
+                </label>
+              </div>
+
               <button className="upload-btn" disabled={!selectedFile || uploading} onClick={handleUpload}>
                 {uploading ? <><Loader size={15} className="spin" /> Uploading…</> : <><Upload size={15} /> Upload File</>}
               </button>
@@ -1289,7 +1323,14 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
               <div>
                 <strong>{uploadResult.success ? 'Success' : 'Error'}</strong>
                 <p>{uploadResult.message}</p>
-                {uploadResult.success && (
+                {uploadResult.success && uploadResult.rowsUpdated != null && (
+                  <p>
+                    {uploadResult.rowsUpdated} row{uploadResult.rowsUpdated !== 1 ? 's' : ''} updated
+                    · {uploadResult.rowsImported} new row{uploadResult.rowsImported !== 1 ? 's' : ''} inserted.{' '}
+                    <button className="link-btn" onClick={() => setActiveTab(uploadResult.viewTab)}>View Data →</button>
+                  </p>
+                )}
+                {uploadResult.success && uploadResult.rowsUpdated == null && (
                   <p>{uploadResult.rowsImported} rows imported.{' '}
                     <button className="link-btn" onClick={() => setActiveTab(uploadResult.viewTab)}>View Data →</button>
                   </p>

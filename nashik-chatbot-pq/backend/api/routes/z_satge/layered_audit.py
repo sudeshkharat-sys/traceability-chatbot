@@ -146,11 +146,72 @@ def create_layered_audit(
     return _row_to_dict(rows[0])
 
 
+_LA_UPDATE_FIELDS = [
+    "model", "date_col", "station_id", "workstation", "auditor",
+    "ncs", "action_plan", "four_m", "responsibility", "target_date", "status",
+]
+
+_LAA_UPDATE_FIELDS = ["stage_name", "auditor", "audit_date"]
+
+
+def _merge_layered_audit(records, existing_rows, user_id, layout_id, connector):
+    """Merge by sr_no. Returns (updated, inserted)."""
+    existing_map = {r.get("sr_no"): dict(r) for r in existing_rows if r.get("sr_no")}
+    updated = inserted = 0
+    for rec in records:
+        key = rec.get("sr_no")
+        existing = existing_map.get(key) if key else None
+        if existing:
+            update_data = {k: rec[k] for k in _LA_UPDATE_FIELDS if rec.get(k) is not None}
+            if update_data:
+                set_clause = ", ".join(f"{col} = :{col}" for col in update_data)
+                connector.execute_query(
+                    f"UPDATE layered_audit SET {set_clause}, updated_at = NOW() WHERE id = :record_id",
+                    {**update_data, "record_id": existing["id"]},
+                )
+            updated += 1
+        else:
+            rec["user_id"] = user_id
+            rec["layout_id"] = layout_id
+            connector.execute_query(LayeredAuditQueries.CREATE, rec)
+            inserted += 1
+    return updated, inserted
+
+
+def _merge_adherence(records, existing_rows, user_id, layout_id, connector):
+    """Merge by stage_no + audit_date. Returns (updated, inserted)."""
+    existing_map = {
+        f"{r.get('stage_no')}|{r.get('audit_date')}": dict(r)
+        for r in existing_rows
+        if r.get("stage_no") and r.get("audit_date")
+    }
+    updated = inserted = 0
+    for rec in records:
+        key = f"{rec.get('stage_no')}|{rec.get('audit_date')}"
+        existing = existing_map.get(key)
+        if existing:
+            update_data = {k: rec[k] for k in _LAA_UPDATE_FIELDS if rec.get(k) is not None}
+            if update_data:
+                set_clause = ", ".join(f"{col} = :{col}" for col in update_data)
+                connector.execute_query(
+                    f"UPDATE layered_audit_adherence SET {set_clause}, updated_at = NOW() WHERE id = :record_id",
+                    {**update_data, "record_id": existing["id"]},
+                )
+            updated += 1
+        else:
+            rec["user_id"] = user_id
+            rec["layout_id"] = layout_id
+            connector.execute_query(LayeredAuditAdherenceQueries.CREATE, rec)
+            inserted += 1
+    return updated, inserted
+
+
 @router.post("/upload", response_model=schemas.UploadResponse, status_code=201)
 async def upload_layered_audit(
     file: UploadFile = File(...),
     user_id: Optional[int] = Form(None),
     layout_id: Optional[int] = Form(None),
+    mode: str = Form("replace"),
     connector: StateDBConnector = Depends(get_connector),
 ):
     if not file.filename.endswith((".xlsx", ".xls")):
@@ -165,6 +226,18 @@ async def upload_layered_audit(
 
     if not records:
         raise HTTPException(status_code=422, detail="No data rows found in the uploaded file")
+
+    if mode == "merge":
+        existing_rows = connector.execute_query(
+            LayeredAuditQueries.LIST_ALL, {"user_id": user_id, "layout_id": layout_id}
+        )
+        existing_rows = [dict(r._mapping) for r in existing_rows]
+        updated, inserted = _merge_layered_audit(records, existing_rows, user_id, layout_id, connector)
+        return {
+            "message": f"Smart merge complete — {updated} updated, {inserted} inserted",
+            "rows_imported": inserted,
+            "rows_updated": updated,
+        }
 
     connector.execute_update(
         LayeredAuditQueries.DELETE_ALL,
@@ -256,6 +329,7 @@ async def upload_layered_audit_adherence(
     file: UploadFile = File(...),
     user_id: Optional[int] = Form(None),
     layout_id: Optional[int] = Form(None),
+    mode: str = Form("replace"),
     connector: StateDBConnector = Depends(get_connector),
 ):
     if not file.filename.endswith((".xlsx", ".xls")):
@@ -270,6 +344,18 @@ async def upload_layered_audit_adherence(
 
     if not records:
         raise HTTPException(status_code=422, detail="No data rows found in the uploaded file")
+
+    if mode == "merge":
+        existing_rows = connector.execute_query(
+            LayeredAuditAdherenceQueries.LIST_ALL, {"user_id": user_id, "layout_id": layout_id}
+        )
+        existing_rows = [dict(r._mapping) for r in existing_rows]
+        updated, inserted = _merge_adherence(records, existing_rows, user_id, layout_id, connector)
+        return {
+            "message": f"Smart merge complete — {updated} updated, {inserted} inserted",
+            "rows_imported": inserted,
+            "rows_updated": updated,
+        }
 
     connector.execute_update(
         LayeredAuditAdherenceQueries.DELETE_ALL,
