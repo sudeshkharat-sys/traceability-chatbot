@@ -292,9 +292,9 @@
   table-layout: fixed;
 }
 
-/* Station ID header — 40px wide per station (2 sub-cols × 20px) */
+/* Station ID header — 56px wide per station (2 sub-cols × 28px) */
 .dash-grid-th {
-  width: 40px;
+  width: 56px;
   padding: 3px 2px;
   text-align: center;
   font-size: 10px;
@@ -313,7 +313,7 @@
 
 /* Station names row — mirrors StationBox station-grid-sname-cell */
 .dash-grid-sname {
-  height: 18px;
+  height: 28px;
   padding: 1px 3px;
   font-size: 9px;
   font-weight: 600;
@@ -325,8 +325,9 @@
   vertical-align: middle;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 40px;
+  white-space: normal;
+  word-break: break-word;
+  max-width: 56px;
 }
 
 .dash-grid-sname:last-child {
@@ -343,6 +344,12 @@
 .dash-grid-th--red {
     background-color: #f70707;
     border-right-color: #9b2c2c;
+}
+/* Station header turns yellow when Z/E is in-progress */
+.dash-grid-th--yellow {
+  background-color: #d97706;
+  border-right-color: #92400e;
+  color: #ffffff;
 }
 /* Station header turns green when Z/E is clean */
 .dash-grid-th--green {
@@ -361,7 +368,7 @@
 
 /* Z / E row — spans both sub-cols per station */
 .dash-grid-ze {
-  width: 40px;
+  width: 56px;
   height: 20px;
   text-align: center;
   vertical-align: middle;
@@ -377,6 +384,13 @@
 .dash-ze--red {
     background-color: transparent;
     color: red;
+    font-weight: 800;
+}
+
+/* Z/E in-progress (Yellow status) */
+.dash-ze--yellow {
+    background-color: transparent;
+    color: #d97706;
     font-weight: 800;
 }
 
@@ -424,8 +438,8 @@
 
 /* Value sub-column */
 .dash-grid-value {
-  width: 26px;
-  min-width: 26px;
+  width: 42px;
+  min-width: 42px;
   height: 20px;
   text-align: center;
   vertical-align: middle;

@@ -73,7 +73,7 @@ const DASHBOARD_HELP = {
 const GRID = 40;
 const CANVAS_SIZE = 5000;
 
-const boxWidth = (stationCount) => Math.max(2, stationCount) * 40 + 4;
+const boxWidth = (stationCount) => Math.max(2, stationCount) * 56 + 4;
 
 // ── Column definitions (mirror InputData) ─────────────────────────────────────
 const MONTHLY_KEYS = [
@@ -327,7 +327,7 @@ const ALLOWED = {
   attri:       ['M&M Design', 'M&M process', 'Supplier Design', 'Supplier Process', 'Under Analysis'],
   z_e:         ['Z', 'E'],
   attribution: ['M', 'P', 'D', 'U'],
-  status_3m:   ['R', 'G'],
+  status_3m:   ['R', 'Y', 'G'],
 };
 
 // Helper: returns current month + last 3 months (4 keys total, oldest first)
@@ -387,7 +387,7 @@ function AddRecordModal({ type, stationId, onClose, onSaved, userId, layoutId, s
 
   // Auto-map: Attri. → Attribution
   const ATTRI_MAP = {
-    'M&M Design': 'D', 'M&M process': 'P',
+    'M&M Design': 'D', 'M&M process': 'M',
     'Supplier Design': 'D', 'Supplier Process': 'P', 'Under Analysis': 'U',
   };
   const handleAttriChange = (val) => {
@@ -1053,15 +1053,29 @@ function computeStationData(records, stationId) {
   if (eRecs.length > 0) {
     ze = 'E';
     const eRecsR = eRecs.filter((r) => r.status_3m === 'R');
-    zeStatus = eRecsR.some((r) => (r.total_incidences || 0) > 0) ? 'red' : 'green';
+    const eRecsY = eRecs.filter((r) => r.status_3m === 'Y');
+    if (eRecsR.some((r) => (r.total_incidences || 0) > 0)) {
+      zeStatus = 'red';
+    } else if (eRecsY.some((r) => (r.total_incidences || 0) > 0)) {
+      zeStatus = 'yellow';
+    } else {
+      zeStatus = 'green';
+    }
   } else if (zRecs.length > 0) {
     ze = 'Z';
     const zRecsR = zRecs.filter((r) => r.status_3m === 'R');
-    zeStatus = zRecsR.some((r) => (r.total_incidences || 0) > 0) ? 'red' : 'green';
+    const zRecsY = zRecs.filter((r) => r.status_3m === 'Y');
+    if (zRecsR.some((r) => (r.total_incidences || 0) > 0)) {
+      zeStatus = 'red';
+    } else if (zRecsY.some((r) => (r.total_incidences || 0) > 0)) {
+      zeStatus = 'yellow';
+    } else {
+      zeStatus = 'green';
+    }
   }
 
-  // Only count records where status_3m is 'R' for MPDU values
-  const srFiltered = sr.filter((r) => r.status_3m === 'R');
+  // Count records where status_3m is 'R' or 'Y' (active/in-progress) for MPDU values
+  const srFiltered = sr.filter((r) => r.status_3m === 'R' || r.status_3m === 'Y');
 
   const attrs = {};
   for (const attr of ['P', 'M', 'D', 'U']) {
@@ -1693,8 +1707,8 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                             {/* Invisible Xarrow anchor points — mirror the layout editor dot positions */}
                             {box.stationIds.map((sid, i) => (
                               <React.Fragment key={sid}>
-                                <div id={`${box.id}__${sid}`}    style={{ position:'absolute', top:0,    left: 17+i*40, width:1, height:1, pointerEvents:'none' }} />
-                                <div id={`${box.id}__${sid}__b`} style={{ position:'absolute', bottom:0, left: 17+i*40, width:1, height:1, pointerEvents:'none' }} />
+                                <div id={`${box.id}__${sid}`}    style={{ position:'absolute', top:0,    left: 25+i*56, width:1, height:1, pointerEvents:'none' }} />
+                                <div id={`${box.id}__${sid}__b`} style={{ position:'absolute', bottom:0, left: 25+i*56, width:1, height:1, pointerEvents:'none' }} />
                               </React.Fragment>
                             ))}
                             <div id={`${box.id}__left`}  style={{ position:'absolute', left:0,  top:'50%', width:1, height:1, pointerEvents:'none' }} />
@@ -1714,12 +1728,16 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                                 <thead>
                                   <tr>
                                     {box.stationIds.map((sid) => {
-                                      const { ze } = stationData[sid];
+                                      const { ze, zeStatus } = stationData[sid];
+                                      const thClass = zeStatus === 'red' ? ' dash-grid-th--red'
+                                        : zeStatus === 'yellow' ? ' dash-grid-th--yellow'
+                                        : zeStatus === 'green' ? ' dash-grid-th--green'
+                                        : '';
                                       return (
                                         <th
                                           key={sid}
                                           colSpan={2}
-                                          className={`dash-grid-th dash-grid-th--clickable${ze ? ' dash-grid-th--red' : ''}`}
+                                          className={`dash-grid-th dash-grid-th--clickable${thClass}`}
                                           title={`Click to view records for ${sid}`}
                                           onClick={() => setPopupStation(sid)}
                                         >

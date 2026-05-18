@@ -75,13 +75,13 @@ const STRICT_VALUES = {
   attri:       ['M&M Design', 'M&M process', 'Supplier Design', 'Supplier Process', 'Under Analysis'],
   z_e:         ['Z', 'E'],
   attribution: ['M', 'P', 'D', 'U'],
-  status_3m:   ['R', 'G'],
+  status_3m:   ['R', 'Y', 'G'],
 };
 
 // Auto-mapping: selecting Attri. pre-fills Attribution
 const ATTRI_TO_ATTRIBUTION = {
   'M&M Design':      'D',
-  'M&M process':     'P',
+  'M&M process':     'M',
   'Supplier Design': 'D',
   'Supplier Process':'P',
   'Under Analysis':  'U',
