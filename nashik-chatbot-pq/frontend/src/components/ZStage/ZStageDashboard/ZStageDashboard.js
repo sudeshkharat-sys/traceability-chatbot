@@ -73,7 +73,7 @@ const DASHBOARD_HELP = {
 const GRID = 40;
 const CANVAS_SIZE = 5000;
 
-const boxWidth = (stationCount) => stationCount * 56 + 4;
+const boxWidth = (stationCount) => Math.max(2, stationCount) * 40 + 4;
 
 // Shows first 3 + '..' + last 3 chars for names longer than 8 chars
 // e.g. "DAC-UB-_01" → "DAC.._01",  "Welding" → "Welding"
@@ -1276,8 +1276,11 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
   const canvasRef   = useRef(null);
   const transformRef = useRef(null);
 
-  const fitView = useCallback((loadedBoxes, loadedBuyoffIcons) => {
-    if (!transformRef.current) return;
+  const fitView = useCallback((loadedBoxes, loadedBuyoffIcons, _retries = 4) => {
+    if (!transformRef.current) {
+      if (_retries > 0) setTimeout(() => fitView(loadedBoxes, loadedBuyoffIcons, _retries - 1), 100);
+      return;
+    }
     if (loadedBoxes.length === 0 && loadedBuyoffIcons.length === 0) return;
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -1358,13 +1361,17 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
     }
     setError(null);
     setSelectedId((prev) => {
+      // If the active layout changed to something new, follow it
+      if (activeLayoutId && prev !== activeLayoutId && list.find((l) => l.id === activeLayoutId)) {
+        return activeLayoutId;
+      }
       // Keep current selection if it still exists
       if (prev && list.find((l) => l.id === prev)) return prev;
       // Prefer the layout open in the editor
       const preferred = activeLayoutId && list.find((l) => l.id === activeLayoutId);
       return preferred ? preferred.id : list[0].id;
     });
-  }, [savedLayouts]); // eslint-disable-line
+  }, [savedLayouts, activeLayoutId]); // eslint-disable-line
 
   // Load layout + records when selection changes
   useEffect(() => {
@@ -1714,8 +1721,8 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                             {/* Invisible Xarrow anchor points — mirror the layout editor dot positions */}
                             {box.stationIds.map((sid, i) => (
                               <React.Fragment key={sid}>
-                                <div id={`${box.id}__${sid}`}    style={{ position:'absolute', top:0,    left: 25+i*56, width:1, height:1, pointerEvents:'none' }} />
-                                <div id={`${box.id}__${sid}__b`} style={{ position:'absolute', bottom:0, left: 25+i*56, width:1, height:1, pointerEvents:'none' }} />
+                                <div id={`${box.id}__${sid}`}    style={{ position:'absolute', top:0,    left: 17+i*40, width:1, height:1, pointerEvents:'none' }} />
+                                <div id={`${box.id}__${sid}__b`} style={{ position:'absolute', bottom:0, left: 17+i*40, width:1, height:1, pointerEvents:'none' }} />
                               </React.Fragment>
                             ))}
                             <div id={`${box.id}__left`}  style={{ position:'absolute', left:0,  top:'50%', width:1, height:1, pointerEvents:'none' }} />
@@ -1838,12 +1845,11 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
           ct + positionY + cy * scale,
         ];
 
-        const COL_WIDTH = 56;
-        const obstacles = buildObstacles(boxes, 0, COL_WIDTH);
+        const obstacles = buildObstacles(boxes, 0);
 
         const arrows = connections.map((conn) => {
-          const sp  = getPortCanvasPos(conn.fromId, boxes, buyoffIcons, COL_WIDTH);
-          const ep  = getPortCanvasPos(conn.toId,   boxes, buyoffIcons, COL_WIDTH);
+          const sp  = getPortCanvasPos(conn.fromId, boxes, buyoffIcons);
+          const ep  = getPortCanvasPos(conn.toId,   boxes, buyoffIcons);
           const pts = routePath(sp, ep, obstacles);
           if (!pts || pts.length < 2) return null;
 

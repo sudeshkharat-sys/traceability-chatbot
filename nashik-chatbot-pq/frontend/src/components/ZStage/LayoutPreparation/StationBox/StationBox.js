@@ -4,6 +4,13 @@ import { useXarrow } from 'react-xarrows';
 import { X } from 'lucide-react';
 import './StationBox.css';
 
+// Shows start + '..' + end for names longer than 8 chars
+// e.g. "DAC-UB-_01" → "DAC.._01",  "Welding" → "Welding"
+function smartTrimName(name) {
+  if (!name || name.length <= 8) return name;
+  return name.slice(0, 3) + '..' + name.slice(-3);
+}
+
 // Each station column is 40px wide; box has a 2px border (box-sizing: border-box).
 // Dot center for station i: border(2) + i*40 + 20 = 22 + i*40 px from left edge.
 // Dot is 10px wide, so left edge offset: 22 + i*40 - 5 = 17 + i*40
@@ -332,7 +339,7 @@ function StationBox({
                       }}
                     >
                       {sname
-                        ? <span className="station-grid-sname-text">{sname}</span>
+                        ? <span className="station-grid-sname-text" title={sname}>{smartTrimName(sname)}</span>
                         : <span className="station-sname-placeholder">+</span>
                       }
                     </td>
