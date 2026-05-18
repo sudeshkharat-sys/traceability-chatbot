@@ -242,14 +242,24 @@ function EditableCell({ recordId, fieldKey, value, type, options, onSaved, saveF
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value != null ? String(value) : '');
   const [saving, setSaving] = useState(false);
-  const inputRef = useRef(null);
+  const inputRef   = useRef(null);
+  const isDirtyRef = useRef(false);
 
-  useEffect(() => { setDraft(value != null ? String(value) : ''); }, [value]);
+  // Only sync from prop when not actively editing (prevents mid-edit draft reset)
+  useEffect(() => {
+    if (!editing) {
+      setDraft(value != null ? String(value) : '');
+      isDirtyRef.current = false;
+    }
+  }, [value, editing]);
   useEffect(() => { if (editing && inputRef.current) inputRef.current.focus(); }, [editing]);
 
   const commit = useCallback(async (overrideVal) => {
+    const calledFromSelect = overrideVal !== undefined;
+    if (!calledFromSelect && !isDirtyRef.current) { setEditing(false); return; }
     setEditing(false);
-    const raw = overrideVal !== undefined ? overrideVal : draft;
+    isDirtyRef.current = false;
+    const raw = calledFromSelect ? overrideVal : draft;
     const trimmed = raw != null ? String(raw).trim() : '';
     const original = String(value ?? '');
     if (trimmed === original) return;
@@ -276,7 +286,7 @@ function EditableCell({ recordId, fieldKey, value, type, options, onSaved, saveF
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') commit();
-    if (e.key === 'Escape') { setDraft(value != null ? String(value) : ''); setEditing(false); }
+    if (e.key === 'Escape') { isDirtyRef.current = false; setDraft(value != null ? String(value) : ''); setEditing(false); }
   };
 
   if (saving) return <td className="cell-saving"><Loader size={12} className="spin" /></td>;
@@ -289,9 +299,9 @@ function EditableCell({ recordId, fieldKey, value, type, options, onSaved, saveF
           <textarea
             ref={inputRef}
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => { isDirtyRef.current = true; setDraft(e.target.value); }}
             onBlur={commit}
-            onKeyDown={(e) => { if (e.key === 'Escape') { setDraft(value != null ? String(value) : ''); setEditing(false); } }}
+            onKeyDown={(e) => { if (e.key === 'Escape') { isDirtyRef.current = false; setDraft(value != null ? String(value) : ''); setEditing(false); } }}
             rows={3}
             className="cell-textarea"
           />
@@ -299,7 +309,7 @@ function EditableCell({ recordId, fieldKey, value, type, options, onSaved, saveF
           <select
             ref={inputRef}
             value={draft}
-            onChange={(e) => { const v = e.target.value; setDraft(v); commit(v); }}
+            onChange={(e) => { isDirtyRef.current = true; const v = e.target.value; setDraft(v); commit(v); }}
             onBlur={() => setEditing(false)}
             className="cell-input cell-select"
           >
@@ -311,7 +321,7 @@ function EditableCell({ recordId, fieldKey, value, type, options, onSaved, saveF
             ref={inputRef}
             type="date"
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => { isDirtyRef.current = true; setDraft(e.target.value); }}
             onBlur={commit}
             onKeyDown={handleKeyDown}
             className="cell-input"
@@ -321,7 +331,7 @@ function EditableCell({ recordId, fieldKey, value, type, options, onSaved, saveF
             ref={inputRef}
             type={type === 'number' ? 'number' : 'text'}
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => { isDirtyRef.current = true; setDraft(e.target.value); }}
             onBlur={commit}
             onKeyDown={handleKeyDown}
             className="cell-input"
