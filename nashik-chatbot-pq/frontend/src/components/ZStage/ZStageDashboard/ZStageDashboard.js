@@ -1748,7 +1748,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                                           title={`Click to view records for ${sid}`}
                                           onClick={() => setPopupStation(sid)}
                                         >
-                                          {sid}
+                                          {smartTrimName(sid)}
                                         </th>
                                       );
                                     })}

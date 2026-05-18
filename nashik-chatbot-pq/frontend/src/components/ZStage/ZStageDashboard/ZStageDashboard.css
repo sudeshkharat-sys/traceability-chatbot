@@ -281,7 +281,8 @@
 }
 
 .dash-box-body {
-  overflow: hidden;
+  overflow-x: visible;
+  overflow-y: hidden;
   flex: 1;
 }
 
