@@ -75,6 +75,13 @@ const CANVAS_SIZE = 5000;
 
 const boxWidth = (stationCount) => stationCount * 56 + 4;
 
+// Shows first 3 + '..' + last 3 chars for names longer than 8 chars
+// e.g. "DAC-UB-_01" → "DAC.._01",  "Welding" → "Welding"
+function smartTrimName(name) {
+  if (!name || name.length <= 8) return name;
+  return name.slice(0, 3) + '..' + name.slice(-3);
+}
+
 // ── Column definitions (mirror InputData) ─────────────────────────────────────
 const MONTHLY_KEYS = [
   '2024-01','2024-02','2024-03','2024-04','2024-05','2024-06',
@@ -1757,7 +1764,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                                           className={`dash-grid-sname${!sname ? ' dash-grid-sname--empty' : ''}`}
                                           title={sname || sid}
                                         >
-                                          {sname || '—'}
+                                          {sname ? smartTrimName(sname) : '—'}
                                         </td>
                                       );
                                     })}
