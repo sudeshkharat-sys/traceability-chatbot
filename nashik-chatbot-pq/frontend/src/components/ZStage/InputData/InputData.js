@@ -300,7 +300,7 @@ function EditableCell({ recordId, fieldKey, value, type, options, onSaved, saveF
             ref={inputRef}
             value={draft}
             onChange={(e) => { isDirtyRef.current = true; setDraft(e.target.value); }}
-            onBlur={commit}
+            onBlur={() => commit()}
             onKeyDown={(e) => { if (e.key === 'Escape') { isDirtyRef.current = false; setDraft(value != null ? String(value) : ''); setEditing(false); } }}
             rows={3}
             className="cell-textarea"
@@ -322,7 +322,7 @@ function EditableCell({ recordId, fieldKey, value, type, options, onSaved, saveF
             type="date"
             value={draft}
             onChange={(e) => { isDirtyRef.current = true; setDraft(e.target.value); }}
-            onBlur={commit}
+            onBlur={() => commit()}
             onKeyDown={handleKeyDown}
             className="cell-input"
           />
@@ -332,7 +332,7 @@ function EditableCell({ recordId, fieldKey, value, type, options, onSaved, saveF
             type={type === 'number' ? 'number' : 'text'}
             value={draft}
             onChange={(e) => { isDirtyRef.current = true; setDraft(e.target.value); }}
-            onBlur={commit}
+            onBlur={() => commit()}
             onKeyDown={handleKeyDown}
             className="cell-input"
           />
