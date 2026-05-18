@@ -73,7 +73,7 @@ const DASHBOARD_HELP = {
 const GRID = 40;
 const CANVAS_SIZE = 5000;
 
-const boxWidth = (stationCount) => Math.max(2, stationCount) * 40 + 4;
+const boxWidth = (stationCount) => stationCount * 56 + 4;
 
 // Shows first 3 + '..' + last 3 chars for names longer than 8 chars
 // e.g. "DAC-UB-_01" → "DAC.._01",  "Welding" → "Welding"
@@ -1714,8 +1714,8 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                             {/* Invisible Xarrow anchor points — mirror the layout editor dot positions */}
                             {box.stationIds.map((sid, i) => (
                               <React.Fragment key={sid}>
-                                <div id={`${box.id}__${sid}`}    style={{ position:'absolute', top:0,    left: 17+i*40, width:1, height:1, pointerEvents:'none' }} />
-                                <div id={`${box.id}__${sid}__b`} style={{ position:'absolute', bottom:0, left: 17+i*40, width:1, height:1, pointerEvents:'none' }} />
+                                <div id={`${box.id}__${sid}`}    style={{ position:'absolute', top:0,    left: 25+i*56, width:1, height:1, pointerEvents:'none' }} />
+                                <div id={`${box.id}__${sid}__b`} style={{ position:'absolute', bottom:0, left: 25+i*56, width:1, height:1, pointerEvents:'none' }} />
                               </React.Fragment>
                             ))}
                             <div id={`${box.id}__left`}  style={{ position:'absolute', left:0,  top:'50%', width:1, height:1, pointerEvents:'none' }} />
