@@ -73,7 +73,7 @@ const DASHBOARD_HELP = {
 const GRID = 40;
 const CANVAS_SIZE = 5000;
 
-const boxWidth = (stationCount) => Math.max(2, stationCount) * 40 + 4;
+const boxWidth = (stationCount) => Math.max(2, stationCount) * 56 + 4;
 
 // Shows first 3 + '..' + last 3 chars for names longer than 8 chars
 // e.g. "DAC-UB-_01" → "DAC.._01",  "Welding" → "Welding"
@@ -131,16 +131,16 @@ function EditableCell({ recordId, fieldKey, value, type, onSaved, stickyLeft }) 
     ? { position: 'sticky', left: stickyLeft, zIndex: 1, backgroundColor: 'inherit' }
     : {};
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft]     = useState(value ?? '');
+  const [draft, setDraft]     = useState(value != null ? String(value) : '');
   const [saving, setSaving]   = useState(false);
   const inputRef = useRef(null);
 
-  useEffect(() => { setDraft(value ?? ''); }, [value]);
+  useEffect(() => { setDraft(value != null ? String(value) : ''); }, [value]);
   useEffect(() => { if (editing && inputRef.current) inputRef.current.focus(); }, [editing]);
 
   const commit = useCallback(async () => {
     setEditing(false);
-    const trimmed  = draft.trim();
+    const trimmed  = String(draft != null ? draft : '').trim();
     const original = String(value ?? '');
     if (trimmed === original) return;
     setSaving(true);
@@ -153,7 +153,7 @@ function EditableCell({ recordId, fieldKey, value, type, onSaved, stickyLeft }) 
       const res = await inputApi.updateRecord(recordId, payload);
       onSaved(recordId, res.data);
     } catch {
-      setDraft(value ?? '');
+      setDraft(value != null ? String(value) : '');
     } finally {
       setSaving(false);
     }
@@ -161,7 +161,7 @@ function EditableCell({ recordId, fieldKey, value, type, onSaved, stickyLeft }) 
 
   const onKeyDown = (e) => {
     if (e.key === 'Enter')  commit();
-    if (e.key === 'Escape') { setDraft(value ?? ''); setEditing(false); }
+    if (e.key === 'Escape') { setDraft(value != null ? String(value) : ''); setEditing(false); }
   };
 
   if (saving) return <td className="sdm-cell-saving" style={stickyStyle}><Loader size={12} className="sdm-spin" /></td>;
@@ -175,7 +175,7 @@ function EditableCell({ recordId, fieldKey, value, type, onSaved, stickyLeft }) 
             className="sdm-cell-textarea"
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commit}
-            onKeyDown={(e) => { if (e.key === 'Escape') { setDraft(value ?? ''); setEditing(false); } }}
+            onKeyDown={(e) => { if (e.key === 'Escape') { setDraft(value != null ? String(value) : ''); setEditing(false); } }}
           />
         ) : (
           <input
@@ -1304,6 +1304,10 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
     const el = canvasRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) {
+      if (_retries > 0) setTimeout(() => fitView(loadedBoxes, loadedBuyoffIcons, _retries - 1), 100);
+      return;
+    }
 
     const PAD = 80;
     const contentW = maxX - minX + PAD * 2;
@@ -1542,8 +1546,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
           {loading && <div className="dash-overlay-msg">Loading layout…</div>}
           {error   && <div className="dash-overlay-msg dash-overlay-msg--error">{error}</div>}
 
-          {!loading && !error && (
-            <TransformWrapper
+          <TransformWrapper
               ref={transformRef}
               limitToBounds={false}
               minScale={0.15}
@@ -1721,8 +1724,8 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                             {/* Invisible Xarrow anchor points — mirror the layout editor dot positions */}
                             {box.stationIds.map((sid, i) => (
                               <React.Fragment key={sid}>
-                                <div id={`${box.id}__${sid}`}    style={{ position:'absolute', top:0,    left: 17+i*40, width:1, height:1, pointerEvents:'none' }} />
-                                <div id={`${box.id}__${sid}__b`} style={{ position:'absolute', bottom:0, left: 17+i*40, width:1, height:1, pointerEvents:'none' }} />
+                                <div id={`${box.id}__${sid}`}    style={{ position:'absolute', top:0,    left: 25+i*56, width:1, height:1, pointerEvents:'none' }} />
+                                <div id={`${box.id}__${sid}__b`} style={{ position:'absolute', bottom:0, left: 25+i*56, width:1, height:1, pointerEvents:'none' }} />
                               </React.Fragment>
                             ))}
                             <div id={`${box.id}__left`}  style={{ position:'absolute', left:0,  top:'50%', width:1, height:1, pointerEvents:'none' }} />
@@ -1771,7 +1774,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                                           className={`dash-grid-sname${!sname ? ' dash-grid-sname--empty' : ''}`}
                                           title={sname || sid}
                                         >
-                                          {sname ? smartTrimName(sname) : '—'}
+                                          {sname || '—'}
                                         </td>
                                       );
                                     })}
@@ -1828,8 +1831,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                   </div>
                 </>
               )}
-            </TransformWrapper>
-          )}
+          </TransformWrapper>
         </div>
       </div>
 
@@ -1845,11 +1847,11 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
           ct + positionY + cy * scale,
         ];
 
-        const obstacles = buildObstacles(boxes, 0);
+        const obstacles = buildObstacles(boxes, 0, 56);
 
         const arrows = connections.map((conn) => {
-          const sp  = getPortCanvasPos(conn.fromId, boxes, buyoffIcons);
-          const ep  = getPortCanvasPos(conn.toId,   boxes, buyoffIcons);
+          const sp  = getPortCanvasPos(conn.fromId, boxes, buyoffIcons, 56);
+          const ep  = getPortCanvasPos(conn.toId,   boxes, buyoffIcons, 56);
           const pts = routePath(sp, ep, obstacles);
           if (!pts || pts.length < 2) return null;
 

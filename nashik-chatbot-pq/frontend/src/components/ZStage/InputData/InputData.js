@@ -250,7 +250,7 @@ function EditableCell({ recordId, fieldKey, value, type, options, onSaved, saveF
   const commit = useCallback(async (overrideVal) => {
     setEditing(false);
     const raw = overrideVal !== undefined ? overrideVal : draft;
-    const trimmed = typeof raw === 'string' ? raw.trim() : '';
+    const trimmed = raw != null ? String(raw).trim() : '';
     const original = String(value ?? '');
     if (trimmed === original) return;
 
@@ -268,7 +268,7 @@ function EditableCell({ recordId, fieldKey, value, type, options, onSaved, saveF
       onSaved(recordId, res.data);
     } catch (err) {
       console.error('Save failed', err);
-      setDraft(value ?? '');
+      setDraft(value != null ? String(value) : '');
     } finally {
       setSaving(false);
     }
@@ -276,7 +276,7 @@ function EditableCell({ recordId, fieldKey, value, type, options, onSaved, saveF
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter') commit();
-    if (e.key === 'Escape') { setDraft(value ?? ''); setEditing(false); }
+    if (e.key === 'Escape') { setDraft(value != null ? String(value) : ''); setEditing(false); }
   };
 
   if (saving) return <td className="cell-saving"><Loader size={12} className="spin" /></td>;
@@ -291,7 +291,7 @@ function EditableCell({ recordId, fieldKey, value, type, options, onSaved, saveF
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commit}
-            onKeyDown={(e) => { if (e.key === 'Escape') { setDraft(value ?? ''); setEditing(false); } }}
+            onKeyDown={(e) => { if (e.key === 'Escape') { setDraft(value != null ? String(value) : ''); setEditing(false); } }}
             rows={3}
             className="cell-textarea"
           />
