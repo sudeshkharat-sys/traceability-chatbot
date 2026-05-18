@@ -30,6 +30,7 @@ pyyaml
 invoke
 
 # Utilities
+openpyxl
 aiofiles
 python-json-logger
 

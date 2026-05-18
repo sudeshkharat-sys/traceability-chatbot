@@ -153,8 +153,8 @@ async def upload_layered_audit(
     layout_id: Optional[int] = Form(None),
     connector: StateDBConnector = Depends(get_connector),
 ):
-    if not file.filename.endswith((".xlsx", ".xls")):
-        raise HTTPException(status_code=400, detail="Only .xlsx / .xls files are accepted")
+    if not file.filename.endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="Only .xlsx files are accepted. Please open your file in Excel and save it as 'Excel Workbook (.xlsx)' before uploading.")
 
     file_bytes = await file.read()
     try:
@@ -258,8 +258,8 @@ async def upload_layered_audit_adherence(
     layout_id: Optional[int] = Form(None),
     connector: StateDBConnector = Depends(get_connector),
 ):
-    if not file.filename.endswith((".xlsx", ".xls")):
-        raise HTTPException(status_code=400, detail="Only .xlsx / .xls files are accepted")
+    if not file.filename.endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="Only .xlsx files are accepted. Please open your file in Excel and save it as 'Excel Workbook (.xlsx)' before uploading.")
 
     file_bytes = await file.read()
     try:
