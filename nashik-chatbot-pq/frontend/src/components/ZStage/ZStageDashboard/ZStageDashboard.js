@@ -1727,7 +1727,8 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                               position: 'absolute',
                               left: box.position.x,
                               top: box.position.y,
-                              width: w,
+                              width: 'max-content',
+                              minWidth: w,
                             }}
                           >
                             {/* Invisible Xarrow anchor points — mirror the layout editor dot positions */}

@@ -289,12 +289,11 @@
 .dash-grid {
   border-collapse: collapse;
   width: max-content;
-  table-layout: fixed;
 }
 
-/* Station ID header — 40px wide per station (label 14px + value 26px) */
+/* Station ID header — minimum 40px; column grows if station name is wider */
 .dash-grid-th {
-  width: 40px;
+  min-width: 40px;
   padding: 3px 2px;
   text-align: center;
   font-size: 10px;
@@ -365,7 +364,7 @@
 
 /* Z / E row — spans both sub-cols per station */
 .dash-grid-ze {
-  width: 40px;
+  min-width: 40px;
   height: 20px;
   text-align: center;
   vertical-align: middle;
