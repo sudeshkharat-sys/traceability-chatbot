@@ -1284,6 +1284,9 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
 
   const canvasRef   = useRef(null);
   const transformRef = useRef(null);
+  // Track the activeLayoutId value from the last time savedLayouts synced,
+  // so we can detect when it changed (e.g. a new layout was just created).
+  const prevActiveLayoutIdRef = useRef(activeLayoutId);
 
   const fitView = useCallback((loadedBoxes, loadedBuyoffIcons, _retries = 4) => {
     if (!transformRef.current) {
@@ -1313,6 +1316,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
     const el = canvasRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
+    // Canvas is hidden (display:none) when tab is not active — retry until it becomes visible
     if (rect.width === 0 || rect.height === 0) {
       if (_retries > 0) setTimeout(() => fitView(loadedBoxes, loadedBuyoffIcons, _retries - 1), 100);
       return;
@@ -1373,15 +1377,15 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
       return;
     }
     setError(null);
+    // Detect if activeLayoutId changed since last sync (signals a new layout was created)
+    const activeChanged = activeLayoutId !== prevActiveLayoutIdRef.current;
+    prevActiveLayoutIdRef.current = activeLayoutId;
     setSelectedId((prev) => {
-      // If the active layout changed to something new, follow it
-      if (activeLayoutId && prev !== activeLayoutId && list.find((l) => l.id === activeLayoutId)) {
-        return activeLayoutId;
-      }
+      const preferred = activeLayoutId && list.find((l) => l.id === activeLayoutId);
+      // If the editor just switched to a new/different layout, follow it
+      if (activeChanged && preferred) return preferred.id;
       // Keep current selection if it still exists
       if (prev && list.find((l) => l.id === prev)) return prev;
-      // Prefer the layout open in the editor
-      const preferred = activeLayoutId && list.find((l) => l.id === activeLayoutId);
       return preferred ? preferred.id : list[0].id;
     });
   }, [savedLayouts, activeLayoutId]); // eslint-disable-line
@@ -1429,6 +1433,15 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
       .catch(() => setError('Failed to load layout'))
       .finally(() => setLoading(false));
   }, [selectedId, userId, fitView]);
+
+  // When the dashboard tab becomes visible, re-run fitView — the canvas was
+  // hidden (display:none) during the initial load so getBoundingClientRect()
+  // returned 0 and the transform was not applied correctly.
+  useEffect(() => {
+    if (!isActive) return;
+    if (boxes.length === 0 && buyoffIcons.length === 0) return;
+    setTimeout(() => fitView(boxes, buyoffIcons), 50);
+  }, [isActive]); // eslint-disable-line
 
   const handleRefresh = () => {
     setRefreshing(true);

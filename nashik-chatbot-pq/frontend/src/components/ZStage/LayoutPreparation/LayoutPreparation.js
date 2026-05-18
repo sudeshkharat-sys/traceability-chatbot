@@ -304,6 +304,7 @@ function LayoutPreparation({
   onLoadLayout,
   onCopyLayout,
   onSaved,
+  onNewLayoutCreated,
   savedLayouts = [],
   userId,
   isActive = true,
@@ -364,6 +365,8 @@ function LayoutPreparation({
   const onSavedRef = useRef(onSaved);
   useEffect(() => { onSavedRef.current = onSaved; }, [onSaved]);
   useEffect(() => { if (autoSaveStatus === 'saved') onSavedRef.current?.(); }, [autoSaveStatus]);
+  const onNewLayoutCreatedRef = useRef(onNewLayoutCreated);
+  useEffect(() => { onNewLayoutCreatedRef.current = onNewLayoutCreated; }, [onNewLayoutCreated]);
 
   // Call BEFORE any mutation to snapshot the current state
   const connWaypointsRef = useRef({});
@@ -1236,6 +1239,7 @@ function LayoutPreparation({
       const saved = response.data;
       isLoadingRef.current = true;
       setCurrentLayoutId(saved.id);
+      onNewLayoutCreatedRef.current?.(saved.id);
       const rebuilt = stateFromApi(saved);
       setBoxes(rebuilt.boxes);
       setBuyoffIcons(rebuilt.buyoffIcons);
