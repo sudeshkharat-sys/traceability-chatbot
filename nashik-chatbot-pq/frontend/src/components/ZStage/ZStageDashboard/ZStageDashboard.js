@@ -1877,6 +1877,9 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
 
         const obstacles = buildObstacles(boxes, 0);
 
+        const strokeW = Math.max(0.5, Math.min(3, 2 * scale));
+        const markerScale = strokeW / 2;
+
         const arrows = connections.map((conn) => {
           const sp  = getPortCanvasPos(conn.fromId, boxes, buyoffIcons);
           const ep  = getPortCanvasPos(conn.toId,   boxes, buyoffIcons);
@@ -1888,7 +1891,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
 
           return (
             <path key={conn.id} d={d}
-                  stroke="#1a2744" strokeWidth={2} fill="none"
+                  stroke="#1a2744" strokeWidth={strokeW} fill="none"
                   markerEnd="url(#dash-arrow-head)" />
           );
         });
@@ -1903,9 +1906,11 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
             }}
           >
             <defs>
-              <marker id="dash-arrow-head" markerWidth="8" markerHeight="6"
-                      refX="7" refY="3" orient="auto">
-                <polygon points="0 0, 8 3, 0 6" fill="#1a2744" />
+              <marker id="dash-arrow-head"
+                      markerWidth={8 * markerScale} markerHeight={6 * markerScale}
+                      refX={7 * markerScale} refY={3 * markerScale}
+                      orient="auto" markerUnits="userSpaceOnUse">
+                <polygon points={`0 0, ${8 * markerScale} ${3 * markerScale}, 0 ${6 * markerScale}`} fill="#1a2744" />
               </marker>
             </defs>
             {arrows}
