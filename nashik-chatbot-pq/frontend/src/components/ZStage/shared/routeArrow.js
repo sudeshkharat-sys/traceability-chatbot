@@ -27,7 +27,7 @@ const DIR_DELTA = {
 
 // ─── Port position helpers ────────────────────────────────────────────────────
 
-export function getPortCanvasPos(portId, boxes, buyoffIcons) {
+export function getPortCanvasPos(portId, boxes, buyoffIcons, colWidth = GRID) {
   if (!portId) return null;
 
   // No separator → legacy bare buyoff id (dir='auto' is handled in routePath)
@@ -44,23 +44,25 @@ export function getPortCanvasPos(portId, boxes, buyoffIcons) {
   // ── Box port ────────────────────────────────────────────────────────────────
   const box = boxes.find((b) => b.id === elemId);
   if (box) {
-    const cols = box.stationIds?.length ?? 2;
-    const w    = Math.max(2, cols) * GRID + 4;
-    const h    = BOX_HEIGHT;
+    const cols     = box.stationIds?.length ?? 2;
+    const w        = Math.max(2, cols) * colWidth + 4;
+    const h        = BOX_HEIGHT;
     const { x: bx, y: by } = box.position;
+    // Port centre per column: half column width + 2px border offset
+    const portInset = colWidth / 2 + 2;
 
     // 3*GRID (120 px) keeps port-y on a GRID multiple → aligns with snapBypass
     if (suffix === 'left')  return { x: bx,     y: by + 3 * GRID, dir: 'left'  };
     if (suffix === 'right') return { x: bx + w, y: by + 3 * GRID, dir: 'right' };
 
-    // Station dot centre: 17 px left-inset + 5 px dot-radius = 22 px
+    // Station dot centre: border(2) + col_center + idx * colWidth
     if (suffix.endsWith('__b')) {
       const sid = suffix.slice(0, -3);
       const idx = box.stationIds?.indexOf(sid) ?? -1;
-      if (idx >= 0) return { x: bx + 22 + idx * GRID, y: by + h, dir: 'bottom' };
+      if (idx >= 0) return { x: bx + portInset + idx * colWidth, y: by + h, dir: 'bottom' };
     }
     const idx = box.stationIds?.indexOf(suffix) ?? -1;
-    if (idx >= 0) return { x: bx + 22 + idx * GRID, y: by, dir: 'top' };
+    if (idx >= 0) return { x: bx + portInset + idx * colWidth, y: by, dir: 'top' };
   }
 
   // ── Buyoff port ─────────────────────────────────────────────────────────────
@@ -80,11 +82,11 @@ export function getPortCanvasPos(portId, boxes, buyoffIcons) {
 
 // ─── Obstacle builder ─────────────────────────────────────────────────────────
 
-export function buildObstacles(boxes, marginCells = 0) {
+export function buildObstacles(boxes, marginCells = 0, colWidth = GRID) {
   const occ = new Set();
   for (const box of boxes) {
     const cols = box.stationIds?.length ?? 2;
-    const w    = Math.max(2, cols) * GRID + 4;
+    const w    = Math.max(2, cols) * colWidth + 4;
     const h    = BOX_HEIGHT;
     const x1   = Math.floor(box.position.x / GRID)          - marginCells;
     const y1   = Math.floor(box.position.y / GRID)          - marginCells;

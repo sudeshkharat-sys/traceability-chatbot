@@ -1838,11 +1838,12 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
           ct + positionY + cy * scale,
         ];
 
-        const obstacles = buildObstacles(boxes, 0);
+        const COL_WIDTH = 56;
+        const obstacles = buildObstacles(boxes, 0, COL_WIDTH);
 
         const arrows = connections.map((conn) => {
-          const sp  = getPortCanvasPos(conn.fromId, boxes, buyoffIcons);
-          const ep  = getPortCanvasPos(conn.toId,   boxes, buyoffIcons);
+          const sp  = getPortCanvasPos(conn.fromId, boxes, buyoffIcons, COL_WIDTH);
+          const ep  = getPortCanvasPos(conn.toId,   boxes, buyoffIcons, COL_WIDTH);
           const pts = routePath(sp, ep, obstacles);
           if (!pts || pts.length < 2) return null;
 
