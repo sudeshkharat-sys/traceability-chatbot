@@ -1878,7 +1878,9 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
         const obstacles = buildObstacles(boxes, 0);
 
         const strokeW = Math.max(0.5, Math.min(3, 2 * scale));
-        const markerScale = strokeW / 2;
+        // Arrowhead: minimum 10×8px so it's always readable; scales up when zoomed in
+        const mw = Math.max(10, 10 * scale);
+        const mh = Math.max(8,   8 * scale);
 
         const arrows = connections.map((conn) => {
           const sp  = getPortCanvasPos(conn.fromId, boxes, buyoffIcons);
@@ -1907,10 +1909,10 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
           >
             <defs>
               <marker id="dash-arrow-head"
-                      markerWidth={8 * markerScale} markerHeight={6 * markerScale}
-                      refX={7 * markerScale} refY={3 * markerScale}
+                      markerWidth={mw} markerHeight={mh}
+                      refX={mw - 1} refY={mh / 2}
                       orient="auto" markerUnits="userSpaceOnUse">
-                <polygon points={`0 0, ${8 * markerScale} ${3 * markerScale}, 0 ${6 * markerScale}`} fill="#1a2744" />
+                <polygon points={`0 0, ${mw} ${mh / 2}, 0 ${mh}`} fill="#1a2744" />
               </marker>
             </defs>
             {arrows}
