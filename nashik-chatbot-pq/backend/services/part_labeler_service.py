@@ -161,8 +161,13 @@ class PartLabelerService:
                 # Normalize manufac_yr_mon to 'Mon-YYYY' format (e.g. "Jan-2025")
                 # Excel date columns come in as datetime strings like "2025-01-27 00:00:00"
                 # which break TO_DATE(manufac_yr_mon, 'Mon-YYYY') in SQL queries
-                if record.get('manufac_yr_mon'):
-                    record['manufac_yr_mon'] = format_mfg_month_warranty(record['manufac_yr_mon'])
+                raw_mfg = record.get('manufac_yr_mon', '')
+                if raw_mfg:
+                    record['manufac_yr_mon'] = format_mfg_month_warranty(raw_mfg)
+
+                # Auto-derive new_manufacturing_quater from mfg date if not mapped
+                if not record.get('new_manufacturing_quater') and raw_mfg:
+                    record['new_manufacturing_quater'] = derive_mfg_quarter(raw_mfg)
 
                 # Special handling: if failure_date is not mapped but claim_date is,
                 # use claim_date as failure_date fallback for the trend logic

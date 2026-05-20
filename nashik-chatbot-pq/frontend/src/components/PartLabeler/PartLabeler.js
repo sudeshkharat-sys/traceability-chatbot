@@ -76,7 +76,7 @@ const DATA_SOURCES = {
       { key: 'complaint_code_desc', label: 'Complaint Code Desc', mandatory: true, group: 'Required' },
       { key: 'material_description', label: 'Material Description', mandatory: true, group: 'Required' },
       { key: 'manufac_yr_mon', label: 'Manufac_Yr_Mon', mandatory: true, group: 'Required' },
-      { key: 'new_manufacturing_quater', label: 'New Manufacturing Quater', mandatory: true, group: 'Required' },
+      { key: 'new_manufacturing_quater', label: 'New Manufacturing Quater', group: 'Required' },
       { key: 'mis_bucket', label: 'MIS_BUCKET', mandatory: true, group: 'Required' },
       { key: 'base_model', label: 'BASE MODEL', mandatory: true, group: 'Required' },
       { key: 'claim_date', label: 'Claim Date', mandatory: true, group: 'Required' },
