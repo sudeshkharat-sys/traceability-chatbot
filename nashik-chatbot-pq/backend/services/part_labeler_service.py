@@ -51,17 +51,29 @@ def format_mfg_month_warranty(val: str) -> str:
     return val
 
 def derive_mfg_quarter(date_val: str) -> str:
-    """Convert a date string to quarter label e.g. 'Jan26-Mar26'."""
+    """Convert a date/month value to quarter label e.g. 'Jan25-Mar25'."""
     if not date_val or str(date_val).strip().lower() in ('nan', '', 'none', 'nat'):
         return ''
-    try:
-        date_str = str(date_val).split(' ')[0].strip()
-        dt = datetime.strptime(date_str, '%Y-%m-%d')
-        start_mon, end_mon = QUARTER_MONTH_MAP[dt.month]
-        yy = dt.strftime('%y')
-        return f"{start_mon}{yy}-{end_mon}{yy}"
-    except Exception:
+    date_val = str(date_val).strip()
+    dt = None
+    for fmt in ('%Y-%m-%d', '%d-%m-%Y', '%m/%d/%Y', '%d/%m/%Y'):
+        try:
+            dt = datetime.strptime(date_val.split(' ')[0], fmt)
+            break
+        except ValueError:
+            pass
+    if dt is None:
+        for fmt in ('%b-%Y', '%b-%y'):
+            try:
+                dt = datetime.strptime(date_val, fmt)
+                break
+            except ValueError:
+                pass
+    if dt is None:
         return ''
+    start_mon, end_mon = QUARTER_MONTH_MAP[dt.month]
+    yy = dt.strftime('%y')
+    return f"{start_mon}{yy}-{end_mon}{yy}"
 
 def safe_str(val) -> str:
     """Convert value to string, treating NaN/None as empty."""
