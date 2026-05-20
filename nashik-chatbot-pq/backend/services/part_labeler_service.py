@@ -30,6 +30,26 @@ def derive_mfg_month(date_val: str) -> str:
     except Exception:
         return ''
 
+def format_mfg_month_warranty(val: str) -> str:
+    """Convert any date/month value to 'Mon-YYYY' format required by warranty SQL queries."""
+    if not val or str(val).strip().lower() in ('nan', '', 'none', 'nat'):
+        return ''
+    val = str(val).strip()
+    # Already in Mon-YYYY or Mon-YY format — normalize to Mon-YYYY
+    for fmt in ('%b-%Y', '%b-%y'):
+        try:
+            return datetime.strptime(val, fmt).strftime('%b-%Y')
+        except ValueError:
+            pass
+    # Date string like "2025-01-27 00:00:00" or "2025-01-27"
+    date_str = val.split(' ')[0].strip()
+    for fmt in ('%Y-%m-%d', '%d-%m-%Y', '%m/%d/%Y', '%d/%m/%Y'):
+        try:
+            return datetime.strptime(date_str, fmt).strftime('%b-%Y')
+        except ValueError:
+            pass
+    return val
+
 def derive_mfg_quarter(date_val: str) -> str:
     """Convert a date string to quarter label e.g. 'Jan26-Mar26'."""
     if not date_val or str(date_val).strip().lower() in ('nan', '', 'none', 'nat'):
@@ -138,7 +158,13 @@ class PartLabelerService:
                         if val.lower() == 'nan': val = ''
                         record[db_col] = val.strip()
                 
-                # Special handling: if failure_date is not mapped but claim_date is, 
+                # Normalize manufac_yr_mon to 'Mon-YYYY' format (e.g. "Jan-2025")
+                # Excel date columns come in as datetime strings like "2025-01-27 00:00:00"
+                # which break TO_DATE(manufac_yr_mon, 'Mon-YYYY') in SQL queries
+                if record.get('manufac_yr_mon'):
+                    record['manufac_yr_mon'] = format_mfg_month_warranty(record['manufac_yr_mon'])
+
+                # Special handling: if failure_date is not mapped but claim_date is,
                 # use claim_date as failure_date fallback for the trend logic
                 if not record.get('failure_date') and record.get('claim_date'):
                     record['failure_date'] = record['claim_date']
