@@ -588,8 +588,50 @@ class AnalystAgent:
                 self.current_chart_data = None
 
         except Exception as e:
+            error_msg = str(e)
+            # Broken checkpoint: a previous tool call was saved but its result was never stored.
+            # Clear the thread's checkpoint and retry once from a clean state.
+            if "tool_calls" in error_msg and "tool messages" in error_msg:
+                logger.warning(
+                    f"[thread={self.thread_id}] Broken checkpoint detected (orphaned tool call). "
+                    "Clearing checkpoint state and retrying."
+                )
+                self._clear_thread_checkpoint()
+                try:
+                    inputs = {"messages": [{"role": "user", "content": user_question}]}
+                    config = {"configurable": {"thread_id": self.thread_id}}
+                    for stream_mode, chunk in self.agent.stream(
+                        inputs, config, stream_mode=["custom", "messages", "updates"]
+                    ):
+                        pass  # minimal re-stream — just drain to unblock; real retry is in conversation_service
+                except Exception:
+                    pass
+                yield {
+                    "type": "error",
+                    "content": "The previous response was interrupted. Your conversation has been reset — please resend your message.",
+                }
+                return
             logger.error(f"Error in streaming: {e}", exc_info=True)
             yield {"type": "error", "content": str(e)}
+
+    def _clear_thread_checkpoint(self):
+        """Delete all checkpoint rows for this thread so the next call starts clean."""
+        if self.checkpointer is None:
+            return
+        try:
+            conn = getattr(self.checkpointer, "conn", None)
+            if conn is None:
+                return
+            with conn.cursor() as cur:
+                for table in ("checkpoint_writes", "checkpoint_blobs", "checkpoints"):
+                    try:
+                        cur.execute(f"DELETE FROM {table} WHERE thread_id = %s", (self.thread_id,))
+                    except Exception:
+                        pass
+            conn.commit()
+            logger.info(f"[thread={self.thread_id}] Checkpoint cleared successfully.")
+        except Exception as ex:
+            logger.warning(f"[thread={self.thread_id}] Could not clear checkpoint: {ex}")
 
     def get_current_state(self) -> Any:
         """
