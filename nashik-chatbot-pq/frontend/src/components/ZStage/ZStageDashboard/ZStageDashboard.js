@@ -1726,12 +1726,12 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                                 <thead>
                                   <tr>
                                     {box.stationIds.map((sid) => {
-                                      const { ze } = stationData[sid];
+                                      const { ze, zeStatus } = stationData[sid];
                                       return (
                                         <th
                                           key={sid}
                                           colSpan={2}
-                                          className={`dash-grid-th dash-grid-th--clickable${ze ? ' dash-grid-th--red' : ''}`}
+                                          className={`dash-grid-th dash-grid-th--clickable${zeStatus === 'red' ? ' dash-grid-th--red' : zeStatus === 'green' ? ' dash-grid-th--green' : ''}`}
                                           title={`Click to view records for ${sid}`}
                                           onClick={() => setPopupStation(sid)}
                                         >
