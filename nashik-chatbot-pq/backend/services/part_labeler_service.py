@@ -51,29 +51,17 @@ def format_mfg_month_warranty(val: str) -> str:
     return val
 
 def derive_mfg_quarter(date_val: str) -> str:
-    """Convert a date/month value to quarter label e.g. 'Jan25-Mar25'."""
+    """Convert a date string to quarter label e.g. 'Jan26-Mar26'."""
     if not date_val or str(date_val).strip().lower() in ('nan', '', 'none', 'nat'):
         return ''
-    date_val = str(date_val).strip()
-    dt = None
-    for fmt in ('%Y-%m-%d', '%d-%m-%Y', '%m/%d/%Y', '%d/%m/%Y'):
-        try:
-            dt = datetime.strptime(date_val.split(' ')[0], fmt)
-            break
-        except ValueError:
-            pass
-    if dt is None:
-        for fmt in ('%b-%Y', '%b-%y'):
-            try:
-                dt = datetime.strptime(date_val, fmt)
-                break
-            except ValueError:
-                pass
-    if dt is None:
+    try:
+        date_str = str(date_val).split(' ')[0].strip()
+        dt = datetime.strptime(date_str, '%Y-%m-%d')
+        start_mon, end_mon = QUARTER_MONTH_MAP[dt.month]
+        yy = dt.strftime('%y')
+        return f"{start_mon}{yy}-{end_mon}{yy}"
+    except Exception:
         return ''
-    start_mon, end_mon = QUARTER_MONTH_MAP[dt.month]
-    yy = dt.strftime('%y')
-    return f"{start_mon}{yy}-{end_mon}{yy}"
 
 def safe_str(val) -> str:
     """Convert value to string, treating NaN/None as empty."""
@@ -173,13 +161,8 @@ class PartLabelerService:
                 # Normalize manufac_yr_mon to 'Mon-YYYY' format (e.g. "Jan-2025")
                 # Excel date columns come in as datetime strings like "2025-01-27 00:00:00"
                 # which break TO_DATE(manufac_yr_mon, 'Mon-YYYY') in SQL queries
-                raw_mfg = record.get('manufac_yr_mon', '')
-                if raw_mfg:
-                    record['manufac_yr_mon'] = format_mfg_month_warranty(raw_mfg)
-
-                # Auto-derive new_manufacturing_quater from mfg date if not mapped
-                if not record.get('new_manufacturing_quater') and raw_mfg:
-                    record['new_manufacturing_quater'] = derive_mfg_quarter(raw_mfg)
+                if record.get('manufac_yr_mon'):
+                    record['manufac_yr_mon'] = format_mfg_month_warranty(record['manufac_yr_mon'])
 
                 # Special handling: if failure_date is not mapped but claim_date is,
                 # use claim_date as failure_date fallback for the trend logic
