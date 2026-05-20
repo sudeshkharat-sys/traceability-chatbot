@@ -1774,10 +1774,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                                   <tr>
                                     {box.stationIds.map((sid) => {
                                       const { ze, zeStatus } = stationData[sid];
-                                      const thClass = zeStatus === 'red' ? ' dash-grid-th--red'
-                                        : zeStatus === 'yellow' ? ' dash-grid-th--yellow'
-                                        : zeStatus === 'green' ? ' dash-grid-th--green'
-                                        : '';
+                                      const thClass = ze ? ' dash-grid-th--red' : '';
                                       return (
                                         <th
                                           key={sid}
