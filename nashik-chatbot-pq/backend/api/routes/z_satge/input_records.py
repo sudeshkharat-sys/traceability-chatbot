@@ -107,39 +107,69 @@ def _safe_date(value) -> str | None:
     return s
 
 
+_MASTER_COL_MAP = {
+    "concern id":                   "concern_id",
+    "concern":                      "concern",
+    "type":                         "type",
+    "root cause":                   "root_cause",
+    "action plan":                  "action_plan",
+    "target date":                  "target_date",
+    "closure date":                 "closure_date",
+    "ryg":                          "ryg",
+    "attri.":                       "attri",
+    "attri":                        "attri",
+    "comm":                         "comm",
+    "commodity":                    "comm",
+    "line":                         "line",
+    "stage no":                     "stage_no",
+    "z/e":                          "z_e",
+    "attribution":                  "attribution",
+    "part":                         "part",
+    "phenomena":                    "phenomena",
+    "total incidences":             "total_incidences",
+    "total incidenes":              "total_incidences",   # typo in older templates
+    "field defect after cut off":   "field_defect_after_cutoff",
+    "field defect after cutoff":    "field_defect_after_cutoff",
+    "status (3 month basis)":       "status_3m",
+    "status (3m)":                  "status_3m",
+    "status 3m":                    "status_3m",
+}
+
+
 def _parse_excel(file_bytes: bytes) -> list[dict]:
     wb = openpyxl.load_workbook(
         io.BytesIO(file_bytes), data_only=True, read_only=True
     )
     ws = wb.active
 
-    # ── Detect column positions from header row ───────────────────────────────
-    # Month columns are datetime objects in the header.
-    # Trailing columns are matched by header text.
-    monthly_col_map: dict[int, str] = {}   # col_index → "YYYY-MM"
-    field_defect_col: int = 45             # fallback default
-    status_3m_col: int = 46               # fallback default
-
     rows_iter = ws.iter_rows(values_only=True)
     first_row = next(rows_iter, None)
-    if first_row:
-        for col_idx, cell_val in enumerate(first_row):
-            if hasattr(cell_val, "year"):  # datetime → monthly column
-                key = f"{cell_val.year}-{str(cell_val.month).zfill(2)}"
-                monthly_col_map[col_idx] = key
-            elif isinstance(cell_val, str):
-                clean = cell_val.strip().lower().replace("\n", " ")
-                if "field defect" in clean:
-                    field_defect_col = col_idx
-                elif "status" in clean and "3" in clean:
-                    status_3m_col = col_idx
+    if not first_row:
+        return []
+
+    # Build col_index → field_name map from header row
+    field_col: dict[str, int] = {}   # field_name → col_index
+    monthly_col_map: dict[int, str] = {}  # col_index → "YYYY-MM"
+
+    for col_idx, cell_val in enumerate(first_row):
+        if hasattr(cell_val, "year"):  # datetime → monthly column
+            key = f"{cell_val.year}-{str(cell_val.month).zfill(2)}"
+            monthly_col_map[col_idx] = key
+        elif isinstance(cell_val, str):
+            clean = cell_val.strip().lower().replace("\n", " ").replace("  ", " ")
+            field = _MASTER_COL_MAP.get(clean)
+            if field and field not in field_col:
+                field_col[field] = col_idx
+
+    def _col(row, field):
+        idx = field_col.get(field)
+        return row[idx] if idx is not None and len(row) > idx else None
 
     records = []
     for row in rows_iter:
         if not any(v is not None for v in row):
-            continue  # skip empty rows
+            continue
 
-        # Monthly data: use dynamic column map from header
         monthly = {}
         for col_idx, key in monthly_col_map.items():
             val = row[col_idx] if len(row) > col_idx else None
@@ -149,34 +179,33 @@ def _parse_excel(file_bytes: bytes) -> list[dict]:
                 except (ValueError, TypeError):
                     pass
 
-        # Compute total from parsed monthly values if Excel formula was used
-        total_raw = row[17] if len(row) > 17 else None
+        total_raw = _col(row, "total_incidences")
         total = _safe_int(total_raw) if not (
             total_raw and str(total_raw).startswith("=")
         ) else sum(monthly.values())
 
         records.append({
             "sr_no":                     len(records) + 1,
-            "concern_id":                _safe_str(row[1] if len(row) > 1 else None),
-            "concern":                   _safe_str(row[2] if len(row) > 2 else None),
-            "type":                      _safe_str(row[3] if len(row) > 3 else None),
-            "root_cause":                _safe_str(row[4] if len(row) > 4 else None),
-            "action_plan":               _safe_str(row[5] if len(row) > 5 else None),
-            "target_date":               _safe_date(row[6] if len(row) > 6 else None),
-            "closure_date":              _safe_date(row[7] if len(row) > 7 else None),
-            "ryg":                       _safe_str(row[8] if len(row) > 8 else None),
-            "attri":                     _normalise_attri(_safe_str(row[9] if len(row) > 9 else None)),
-            "comm":                      _safe_str(row[10] if len(row) > 10 else None),
-            "line":                      _safe_str(row[11] if len(row) > 11 else None),
-            "stage_no":                  _safe_str(row[12] if len(row) > 12 else None),
-            "z_e":                       _safe_str(row[13] if len(row) > 13 else None),
-            "attribution":               _safe_str(row[14] if len(row) > 14 else None),
-            "part":                      _safe_str(row[15] if len(row) > 15 else None),
-            "phenomena":                 _safe_str(row[16] if len(row) > 16 else None),
+            "concern_id":                _safe_str(_col(row, "concern_id")),
+            "concern":                   _safe_str(_col(row, "concern")),
+            "type":                      _safe_str(_col(row, "type")),
+            "root_cause":                _safe_str(_col(row, "root_cause")),
+            "action_plan":               _safe_str(_col(row, "action_plan")),
+            "target_date":               _safe_date(_col(row, "target_date")),
+            "closure_date":              _safe_date(_col(row, "closure_date")),
+            "ryg":                       _safe_str(_col(row, "ryg")),
+            "attri":                     _normalise_attri(_safe_str(_col(row, "attri"))),
+            "comm":                      _safe_str(_col(row, "comm")),
+            "line":                      _safe_str(_col(row, "line")),
+            "stage_no":                  _safe_str(_col(row, "stage_no")),
+            "z_e":                       _safe_str(_col(row, "z_e")),
+            "attribution":               _safe_str(_col(row, "attribution")),
+            "part":                      _safe_str(_col(row, "part")),
+            "phenomena":                 _safe_str(_col(row, "phenomena")),
             "total_incidences":          total,
             "monthly_data":              json.dumps(monthly) if monthly else None,
-            "field_defect_after_cutoff": _safe_int(row[field_defect_col] if len(row) > field_defect_col else None),
-            "status_3m":                 _safe_str(row[status_3m_col] if len(row) > status_3m_col else None),
+            "field_defect_after_cutoff": _safe_int(_col(row, "field_defect_after_cutoff")),
+            "status_3m":                 _safe_str(_col(row, "status_3m")),
         })
 
     return records

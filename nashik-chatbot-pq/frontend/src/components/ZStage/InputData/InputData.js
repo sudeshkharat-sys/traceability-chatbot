@@ -586,9 +586,11 @@ function AuditTable({ columns, records, saveFn, onSaved, selectedIds, onToggleSe
 
   if (records.length === 0) return null;
 
+  const hasSelection = showCheckboxes && selectedIds && selectedIds.size > 0;
+
   return (
     <div className="table-wrapper">
-      <table className="master-table">
+      <table className={`master-table${hasSelection ? ' has-selection' : ''}`}>
         <thead>
           <tr>
             {showCheckboxes && (
@@ -1880,7 +1882,7 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
             const allFilteredSelected = filteredIds.length > 0 && filteredIds.every((id) => masterSelectedIds.has(id));
             return (
               <div className="table-wrapper">
-                <table className="master-table">
+                <table className={`master-table${masterSelectedIds.size > 0 ? ' has-selection' : ''}`}>
                   <thead>
                     <tr>
                       <th className="col-checkbox">

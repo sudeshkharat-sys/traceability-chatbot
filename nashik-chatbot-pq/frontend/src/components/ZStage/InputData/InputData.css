@@ -1514,7 +1514,21 @@
   height: 14px;
   cursor: pointer;
   accent-color: #2563eb;
+  opacity: 0;
+  transition: opacity 0.1s;
 }
+
+/* Show on row hover */
+tr:hover .row-checkbox { opacity: 1; }
+
+/* Show all once any row is selected (class added to table element via JS) */
+.has-selection .row-checkbox { opacity: 1; }
+
+/* Always show a checked checkbox */
+.row-checkbox:checked { opacity: 1; }
+
+/* Header select-all checkbox always visible */
+thead .row-checkbox { opacity: 1; }
 
 .row-selected td {
   background: #eff6ff !important;
