@@ -1568,3 +1568,98 @@
   background: #dc2626 !important;
   border-color: #dc2626 !important;
 }
+
+/* ── Append Data button ──────────────────────────────────────────────────── */
+.append-data-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 6px;
+  border: 1.5px solid #2563eb;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.append-data-btn:hover:not(:disabled) {
+  background: #2563eb;
+  color: #fff;
+}
+
+.append-data-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Append status inline badge ──────────────────────────────────────────── */
+.append-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.append-status--loading {
+  background: #f0f9ff;
+  color: #0369a1;
+}
+
+.append-status--ok {
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.append-status--error {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+/* ── Undo banner ─────────────────────────────────────────────────────────── */
+.undo-banner {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #1f2937;
+  color: #f9fafb;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  z-index: 10000;
+  animation: slideUp 0.2s ease;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.undo-banner-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.undo-banner-btn:hover:not(:disabled) { background: #2563eb; }
+.undo-banner-btn:disabled { opacity: 0.6; cursor: not-allowed; }
