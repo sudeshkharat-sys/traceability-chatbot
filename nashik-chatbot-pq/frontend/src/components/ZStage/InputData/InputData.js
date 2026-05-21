@@ -990,6 +990,11 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
   const [uploadResult, setUploadResult] = useState(null);
   const fileInputRef = useRef(null);
 
+  // Append-from-tab state
+  const appendFileInputRef = useRef(null);
+  const [appendContext, setAppendContext] = useState(null); // 'master' | 'layered-audit' | 'audit-adherence'
+  const [appendStatus, setAppendStatus] = useState(null);  // null | { loading, message, error }
+
   // shared layout selector
   const [selectedLayoutId, setSelectedLayoutId] = useState(null);
 
@@ -1026,6 +1031,11 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
   // Delete confirmation modal state
   const [deleteTarget, setDeleteTarget] = useState(null); // null | { tab, ids }
   const [deleting, setDeleting] = useState(false);
+
+  // Undo buffer — holds deleted rows for 8 seconds
+  const [undoBuffer, setUndoBuffer] = useState(null); // null | { tab, rows }
+  const [undoing, setUndoing] = useState(false);
+  const undoTimerRef = useRef(null);
 
   // Template preview modal — null means closed, otherwise the key ('master' | 'layered-audit' | 'audit-adherence')
   const [templatePreviewModal, setTemplatePreviewModal] = useState(null);
@@ -1163,6 +1173,13 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
   const handleDeleteSelected = useCallback(async () => {
     if (!deleteTarget) return;
     const { tab, ids } = deleteTarget;
+
+    // Capture full row objects before deleting — needed for undo
+    let capturedRows;
+    if (tab === 'master') capturedRows = records.filter((r) => ids.has(r.id));
+    else if (tab === 'layered-audit') capturedRows = auditRecords.filter((r) => ids.has(r.id));
+    else capturedRows = adherenceRecords.filter((r) => ids.has(r.id));
+
     setDeleting(true);
     try {
       await Promise.all(
@@ -1182,13 +1199,97 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
         setAdherenceRecords((p) => p.filter((r) => !ids.has(r.id)));
         setAdherenceSelectedIds(new Set());
       }
+
+      // Start undo window (8 seconds)
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+      setUndoBuffer({ tab, rows: capturedRows });
+      undoTimerRef.current = setTimeout(() => setUndoBuffer(null), 8000);
     } catch (err) {
       console.error('Delete failed', err);
     } finally {
       setDeleting(false);
       setDeleteTarget(null);
     }
-  }, [deleteTarget]);
+  }, [deleteTarget, records, auditRecords, adherenceRecords]);
+
+  // Undo: re-insert the captured rows
+  const handleUndo = useCallback(async () => {
+    if (!undoBuffer) return;
+    const { tab, rows } = undoBuffer;
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setUndoBuffer(null);
+    setUndoing(true);
+    try {
+      const restored = [];
+      for (const row of rows) {
+        let res;
+        if (tab === 'master') {
+          const payload = {
+            concern_id: row.concern_id, concern: row.concern, type: row.type,
+            root_cause: row.root_cause, action_plan: row.action_plan,
+            target_date: row.target_date, closure_date: row.closure_date,
+            ryg: row.ryg, attri: row.attri, comm: row.comm, line: row.line,
+            stage_no: row.stage_no, z_e: row.z_e, attribution: row.attribution,
+            part: row.part, phenomena: row.phenomena,
+            total_incidences: row.total_incidences, monthly_data: row.monthly_data,
+            field_defect_after_cutoff: row.field_defect_after_cutoff, status_3m: row.status_3m,
+          };
+          res = await inputApi.createRecord(payload, userId, selectedLayoutId);
+        } else if (tab === 'layered-audit') {
+          const payload = {
+            model: row.model, sr_no: row.sr_no, date_col: row.date_col,
+            station_id: row.station_id, workstation: row.workstation, auditor: row.auditor,
+            ncs: row.ncs, action_plan: row.action_plan, four_m: row.four_m,
+            responsibility: row.responsibility, target_date: row.target_date, status: row.status,
+          };
+          res = await layeredAuditApi.createAuditRecord(payload, userId, selectedLayoutId);
+        } else {
+          const payload = {
+            stage_no: row.stage_no, stage_name: row.stage_name,
+            auditor: row.auditor, audit_date: row.audit_date,
+          };
+          res = await layeredAuditApi.createAdherenceRecord(payload, userId, selectedLayoutId);
+        }
+        restored.push(res.data);
+      }
+      if (tab === 'master') setRecords((p) => [...p, ...restored]);
+      else if (tab === 'layered-audit') setAuditRecords((p) => [...p, ...restored]);
+      else setAdherenceRecords((p) => [...p, ...restored]);
+    } catch (err) {
+      console.error('Undo failed', err);
+    } finally {
+      setUndoing(false);
+    }
+  }, [undoBuffer, userId, selectedLayoutId]);
+
+  // Append from tab header — triggered when file is selected via the hidden input
+  const handleAppendFile = useCallback(async (e) => {
+    const file = e.target.files[0];
+    if (!file || !appendContext) return;
+    e.target.value = ''; // reset so same file can be re-selected
+    setAppendStatus({ loading: true, message: 'Appending rows…', error: false });
+    try {
+      let res;
+      if (appendContext === 'master') {
+        res = await inputApi.uploadExcel(file, userId, selectedLayoutId, 'append');
+      } else if (appendContext === 'layered-audit') {
+        res = await layeredAuditApi.uploadAudit(file, userId, selectedLayoutId, 'append');
+      } else {
+        res = await layeredAuditApi.uploadAdherence(file, userId, selectedLayoutId, 'append');
+      }
+      const n = res.data.rows_imported;
+      setAppendStatus({ loading: false, message: `${n} row${n !== 1 ? 's' : ''} appended`, error: false });
+      // Reload the table data so new rows appear immediately
+      if (appendContext === 'master') await loadRecords();
+      else if (appendContext === 'layered-audit') await loadAuditRecords();
+      else await loadAdherenceRecords();
+      setTimeout(() => setAppendStatus(null), 4000);
+    } catch (err) {
+      const detail = err.response?.data?.detail || 'Append failed. Check the file and try again.';
+      setAppendStatus({ loading: false, message: detail, error: true });
+      setTimeout(() => setAppendStatus(null), 6000);
+    }
+  }, [appendContext, userId, selectedLayoutId, loadRecords, loadAuditRecords, loadAdherenceRecords]);
 
   const allMonths = React.useMemo(() => {
     const set = new Set(MONTHLY_KEYS);
@@ -1479,6 +1580,12 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
             </div>
             <div className="master-actions">
               <span className="record-count">{auditRecords.length} record{auditRecords.length !== 1 ? 's' : ''}</span>
+              {appendStatus && appendContext === 'layered-audit' && (
+                <span className={`append-status ${appendStatus.error ? 'append-status--error' : appendStatus.loading ? 'append-status--loading' : 'append-status--ok'}`}>
+                  {appendStatus.loading && <Loader size={12} className="spin" />}
+                  {appendStatus.message}
+                </span>
+              )}
               {auditSelectedIds.size > 0 && (
                 <button
                   className="delete-selected-btn"
@@ -1487,6 +1594,14 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
                   <Trash2 size={13} /> Delete Selected ({auditSelectedIds.size})
                 </button>
               )}
+              <button
+                className="append-data-btn"
+                onClick={() => { setAppendContext('layered-audit'); appendFileInputRef.current?.click(); }}
+                disabled={appendStatus?.loading && appendContext === 'layered-audit'}
+                title="Append rows from an Excel file without replacing existing data"
+              >
+                <Plus size={13} /> Append Data
+              </button>
               <button className="add-record-btn" onClick={() => setShowAddRecord('layered-audit')}>
                 <Plus size={13} /> Add Record
               </button>
@@ -1528,6 +1643,12 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
             </div>
             <div className="master-actions">
               <span className="record-count">{adherenceRecords.length} record{adherenceRecords.length !== 1 ? 's' : ''}</span>
+              {appendStatus && appendContext === 'audit-adherence' && (
+                <span className={`append-status ${appendStatus.error ? 'append-status--error' : appendStatus.loading ? 'append-status--loading' : 'append-status--ok'}`}>
+                  {appendStatus.loading && <Loader size={12} className="spin" />}
+                  {appendStatus.message}
+                </span>
+              )}
               {adherenceSelectedIds.size > 0 && (
                 <button
                   className="delete-selected-btn"
@@ -1536,6 +1657,14 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
                   <Trash2 size={13} /> Delete Selected ({adherenceSelectedIds.size})
                 </button>
               )}
+              <button
+                className="append-data-btn"
+                onClick={() => { setAppendContext('audit-adherence'); appendFileInputRef.current?.click(); }}
+                disabled={appendStatus?.loading && appendContext === 'audit-adherence'}
+                title="Append rows from an Excel file without replacing existing data"
+              >
+                <Plus size={13} /> Append Data
+              </button>
               <button className="add-record-btn" onClick={() => setShowAddRecord('audit-adherence')}>
                 <Plus size={13} /> Add Record
               </button>
@@ -1627,6 +1756,12 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
             <h2 className="panel-title">Master Data</h2>
             <div className="master-actions">
               <span className="record-count">{records.length} record{records.length !== 1 ? 's' : ''}</span>
+              {appendStatus && appendContext === 'master' && (
+                <span className={`append-status ${appendStatus.error ? 'append-status--error' : appendStatus.loading ? 'append-status--loading' : 'append-status--ok'}`}>
+                  {appendStatus.loading && <Loader size={12} className="spin" />}
+                  {appendStatus.message}
+                </span>
+              )}
               {masterSelectedIds.size > 0 && (
                 <button
                   className="delete-selected-btn"
@@ -1635,6 +1770,14 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
                   <Trash2 size={13} /> Delete Selected ({masterSelectedIds.size})
                 </button>
               )}
+              <button
+                className="append-data-btn"
+                onClick={() => { setAppendContext('master'); appendFileInputRef.current?.click(); }}
+                disabled={appendStatus?.loading && appendContext === 'master'}
+                title="Append rows from an Excel file without replacing existing data"
+              >
+                <Plus size={13} /> Append Data
+              </button>
               <button className="add-record-btn" onClick={() => setShowAddRecord('master')}>
                 <Plus size={13} /> Add Record
               </button>
@@ -1825,6 +1968,25 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
           onClose={() => setDeleteTarget(null)}
           deleting={deleting}
         />
+      )}
+
+      {/* Hidden file input for append-from-tab */}
+      <input
+        ref={appendFileInputRef}
+        type="file"
+        accept=".xlsx"
+        className="file-input-hidden"
+        onChange={handleAppendFile}
+      />
+
+      {/* Undo banner */}
+      {undoBuffer && (
+        <div className="undo-banner">
+          <span>{undoBuffer.rows.length} row{undoBuffer.rows.length !== 1 ? 's' : ''} deleted</span>
+          <button className="undo-banner-btn" onClick={handleUndo} disabled={undoing}>
+            {undoing ? <><Loader size={12} className="spin" /> Restoring…</> : '↩ Undo'}
+          </button>
+        </div>
       )}
 
       <HelpGuide {...INPUT_HELP} active={isActive} />
