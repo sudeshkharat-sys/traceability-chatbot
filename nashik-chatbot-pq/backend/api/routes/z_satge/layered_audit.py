@@ -97,6 +97,34 @@ _LA_COL_MAP = {
 
 
 def _parse_layered_audit(file_bytes: bytes) -> list[dict]:
+    """Original positional parser — used for Replace All uploads (full template expected)."""
+    wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
+    ws = wb.active
+    rows_iter = ws.iter_rows(values_only=True)
+    next(rows_iter, None)  # skip header
+    records = []
+    for row in rows_iter:
+        if not any(v is not None for v in row):
+            continue
+        records.append({
+            "model":          _safe_str(row[0] if len(row) > 0 else None),
+            "sr_no":          _safe_str(row[1] if len(row) > 1 else None),
+            "date_col":       _safe_date(row[2] if len(row) > 2 else None),
+            "station_id":     _safe_str(row[3] if len(row) > 3 else None),
+            "workstation":    _safe_str(row[4] if len(row) > 4 else None),
+            "auditor":        _safe_str(row[5] if len(row) > 5 else None),
+            "ncs":            _safe_str(row[6] if len(row) > 6 else None),
+            "action_plan":    _safe_str(row[7] if len(row) > 7 else None),
+            "four_m":         _safe_str(row[8] if len(row) > 8 else None),
+            "responsibility": _safe_str(row[9] if len(row) > 9 else None),
+            "target_date":    _safe_date(row[10] if len(row) > 10 else None),
+            "status":         _safe_str(row[11] if len(row) > 11 else None),
+        })
+    return records
+
+
+def _parse_layered_audit_append(file_bytes: bytes) -> list[dict]:
+    """Header-name-based parser — used for Append mode (columns may be missing/reordered)."""
     wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
     ws = wb.active
     rows_iter = ws.iter_rows(values_only=True)
@@ -150,6 +178,26 @@ _LAA_COL_MAP = {
 
 
 def _parse_layered_audit_adherence(file_bytes: bytes) -> list[dict]:
+    """Original positional parser — used for Replace All uploads (full template expected)."""
+    wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
+    ws = wb.active
+    rows_iter = ws.iter_rows(values_only=True)
+    next(rows_iter, None)  # skip header
+    records = []
+    for row in rows_iter:
+        if not any(v is not None for v in row):
+            continue
+        records.append({
+            "stage_no":   _safe_str(row[0] if len(row) > 0 else None),
+            "stage_name": _safe_str(row[1] if len(row) > 1 else None),
+            "auditor":    _safe_str(row[2] if len(row) > 2 else None),
+            "audit_date": _strict_date(row[3] if len(row) > 3 else None),
+        })
+    return records
+
+
+def _parse_layered_audit_adherence_append(file_bytes: bytes) -> list[dict]:
+    """Header-name-based parser — used for Append mode (columns may be missing/reordered)."""
     wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
     ws = wb.active
     rows_iter = ws.iter_rows(values_only=True)
@@ -216,7 +264,7 @@ async def upload_layered_audit(
 
     file_bytes = await file.read()
     try:
-        records = _parse_layered_audit(file_bytes)
+        records = _parse_layered_audit_append(file_bytes) if mode == "append" else _parse_layered_audit(file_bytes)
     except Exception as exc:
         logger.error(f"Layered Audit parse error: {exc}")
         raise HTTPException(status_code=422, detail=f"Failed to parse Excel: {exc}")
@@ -338,7 +386,7 @@ async def upload_layered_audit_adherence(
 
     file_bytes = await file.read()
     try:
-        records = _parse_layered_audit_adherence(file_bytes)
+        records = _parse_layered_audit_adherence_append(file_bytes) if mode == "append" else _parse_layered_audit_adherence(file_bytes)
     except Exception as exc:
         logger.error(f"Layered Audit Adherence parse error: {exc}")
         raise HTTPException(status_code=422, detail=f"Failed to parse Excel: {exc}")
