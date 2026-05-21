@@ -78,28 +78,61 @@ def _strict_date(value) -> str | None:
 #  1=Model, 2=Sr.No, 3=Date, 4=Station ID, 5=Workstation, 6=Auditor,
 #  7=NC's, 8=Action Plan, 9=4M, 10=Responsibility, 11=target Date, 12=Status
 
+_LA_COL_MAP = {
+    "model":          "model",
+    "sr.no":          "sr_no",
+    "sr no":          "sr_no",
+    "date":           "date_col",
+    "station id":     "station_id",
+    "workstation":    "workstation",
+    "auditor":        "auditor",
+    "nc's":           "ncs",
+    "ncs":            "ncs",
+    "action plan":    "action_plan",
+    "4m":             "four_m",
+    "responsibility": "responsibility",
+    "target date":    "target_date",
+    "status":         "status",
+}
+
+
 def _parse_layered_audit(file_bytes: bytes) -> list[dict]:
     wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
     ws = wb.active
+    rows_iter = ws.iter_rows(values_only=True)
+    header = next(rows_iter, None)
+    if not header:
+        return []
+
+    field_col: dict[str, int] = {}
+    for col_idx, cell_val in enumerate(header):
+        if isinstance(cell_val, str):
+            clean = cell_val.strip().lower().replace("\n", " ").replace("  ", " ")
+            field = _LA_COL_MAP.get(clean)
+            if field and field not in field_col:
+                field_col[field] = col_idx
+
+    def _col(row, field):
+        idx = field_col.get(field)
+        return row[idx] if idx is not None and len(row) > idx else None
+
     records = []
-    for row_idx, row in enumerate(ws.iter_rows(values_only=True), start=1):
-        if row_idx == 1:
-            continue  # skip header
+    for row in rows_iter:
         if not any(v is not None for v in row):
-            continue  # skip empty rows
+            continue
         records.append({
-            "model":          _safe_str(row[0] if len(row) > 0 else None),
-            "sr_no":          _safe_str(row[1] if len(row) > 1 else None),
-            "date_col":       _safe_date(row[2] if len(row) > 2 else None),
-            "station_id":     _safe_str(row[3] if len(row) > 3 else None),
-            "workstation":    _safe_str(row[4] if len(row) > 4 else None),
-            "auditor":        _safe_str(row[5] if len(row) > 5 else None),
-            "ncs":            _safe_str(row[6] if len(row) > 6 else None),
-            "action_plan":    _safe_str(row[7] if len(row) > 7 else None),
-            "four_m":         _safe_str(row[8] if len(row) > 8 else None),
-            "responsibility": _safe_str(row[9] if len(row) > 9 else None),
-            "target_date":    _safe_date(row[10] if len(row) > 10 else None),
-            "status":         _safe_str(row[11] if len(row) > 11 else None),
+            "model":          _safe_str(_col(row, "model")),
+            "sr_no":          _safe_str(_col(row, "sr_no")),
+            "date_col":       _safe_date(_col(row, "date_col")),
+            "station_id":     _safe_str(_col(row, "station_id")),
+            "workstation":    _safe_str(_col(row, "workstation")),
+            "auditor":        _safe_str(_col(row, "auditor")),
+            "ncs":            _safe_str(_col(row, "ncs")),
+            "action_plan":    _safe_str(_col(row, "action_plan")),
+            "four_m":         _safe_str(_col(row, "four_m")),
+            "responsibility": _safe_str(_col(row, "responsibility")),
+            "target_date":    _safe_date(_col(row, "target_date")),
+            "status":         _safe_str(_col(row, "status")),
         })
     return records
 
@@ -108,20 +141,43 @@ def _parse_layered_audit(file_bytes: bytes) -> list[dict]:
 # Expected columns (1-indexed):
 #  1=Stage No, 2=Stage Name, 3=Auditor, 4=Audit Date
 
+_LAA_COL_MAP = {
+    "stage no":   "stage_no",
+    "stage name": "stage_name",
+    "auditor":    "auditor",
+    "audit date": "audit_date",
+}
+
+
 def _parse_layered_audit_adherence(file_bytes: bytes) -> list[dict]:
     wb = openpyxl.load_workbook(io.BytesIO(file_bytes), data_only=True, read_only=True)
     ws = wb.active
+    rows_iter = ws.iter_rows(values_only=True)
+    header = next(rows_iter, None)
+    if not header:
+        return []
+
+    field_col: dict[str, int] = {}
+    for col_idx, cell_val in enumerate(header):
+        if isinstance(cell_val, str):
+            clean = cell_val.strip().lower().replace("\n", " ").replace("  ", " ")
+            field = _LAA_COL_MAP.get(clean)
+            if field and field not in field_col:
+                field_col[field] = col_idx
+
+    def _col(row, field):
+        idx = field_col.get(field)
+        return row[idx] if idx is not None and len(row) > idx else None
+
     records = []
-    for row_idx, row in enumerate(ws.iter_rows(values_only=True), start=1):
-        if row_idx == 1:
-            continue  # skip header
+    for row in rows_iter:
         if not any(v is not None for v in row):
-            continue  # skip empty rows
+            continue
         records.append({
-            "stage_no":   _safe_str(row[0] if len(row) > 0 else None),
-            "stage_name": _safe_str(row[1] if len(row) > 1 else None),
-            "auditor":    _safe_str(row[2] if len(row) > 2 else None),
-            "audit_date": _strict_date(row[3] if len(row) > 3 else None),
+            "stage_no":   _safe_str(_col(row, "stage_no")),
+            "stage_name": _safe_str(_col(row, "stage_name")),
+            "auditor":    _safe_str(_col(row, "auditor")),
+            "audit_date": _strict_date(_col(row, "audit_date")),
         })
     return records
 
