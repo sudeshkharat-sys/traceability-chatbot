@@ -47,8 +47,13 @@ const LAYOUT_HELP = {
     {
       heading: 'Connections (Arrows)',
       items: [
-        { icon: '🔴', label: 'Draw Arrow',       desc: 'Hover over a box to reveal the red port dots on each edge. Drag from one dot to another box\'s dot to create a connection arrow.' },
-        { icon: '🖱️', label: 'Delete Arrow',     desc: 'Click an existing arrow to select it, then click the red × that appears on it to delete.' },
+        { icon: '🔴', label: 'Draw Arrow',        desc: 'Hover over a box to reveal the red port dots on each edge. Drag from one dot to another box\'s dot to create a connection arrow.' },
+        { icon: '🖱️', label: 'Delete Arrow',      desc: 'Click an existing arrow to select it, then click the red × that appears on it to delete.' },
+        { icon: '📐', label: 'Auto-routing',      desc: 'Arrows route automatically with 90° turns only — no diagonals. When the direct path is clear, you get a clean straight line or a single-corner L-shape. When another box is in the way, the path bends around it.' },
+        { icon: '↙️', label: 'L-shape path',      desc: 'Two boxes connected on different sides (e.g. right port → top port) produce an L-shaped path — one horizontal segment, one turn, one vertical segment.' },
+        { icon: '↔️', label: 'U-shape path',      desc: 'When both ports face the same direction (e.g. both right, or both top), the path wraps around in a U to avoid doubling back through the boxes.' },
+        { icon: '🔀', label: 'Obstacle detour',   desc: 'If a third box sits between the two connected boxes, the arrow automatically finds a route around it. Moving the blocking box straightens the path.' },
+        { icon: '⚠️', label: 'Extra corners',     desc: 'Occasionally a path may take one extra turn than expected — this can happen when boxes are placed at non-grid positions or when two routes of equal length are available. Moving the box slightly to snap it cleanly to the grid usually resolves it.' },
       ],
     },
     {
