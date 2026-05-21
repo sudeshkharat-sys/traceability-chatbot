@@ -104,8 +104,20 @@ export const layeredAuditApi = {
   },
   updateAuditRecord:       (id, data) => api.put(`/layered-audit/records/${id}`, data),
   deleteAuditRecord:       (id) => api.delete(`/layered-audit/records/${id}`),
+  downloadAudit: (userId, layoutId) => {
+    const params = {};
+    if (userId != null) params.user_id = userId;
+    if (layoutId != null) params.layout_id = layoutId;
+    return axios.get(`${BASE_URL}/layered-audit/download`, { params, responseType: 'blob' });
+  },
   updateAdherenceRecord:   (id, data) => api.put(`/layered-audit/adherence/records/${id}`, data),
   deleteAdherenceRecord:   (id) => api.delete(`/layered-audit/adherence/records/${id}`),
+  downloadAdherence: (userId, layoutId) => {
+    const params = {};
+    if (userId != null) params.user_id = userId;
+    if (layoutId != null) params.layout_id = layoutId;
+    return axios.get(`${BASE_URL}/layered-audit/adherence/download`, { params, responseType: 'blob' });
+  },
   createAuditRecord: (data, userId, layoutId) => {
     const params = {};
     if (userId != null) params.user_id = userId;

@@ -1605,6 +1605,23 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
               <button className="add-record-btn" onClick={() => setShowAddRecord('layered-audit')}>
                 <Plus size={13} /> Add Record
               </button>
+              <button
+                className="refresh-btn"
+                disabled={auditRecords.length === 0}
+                onClick={async () => {
+                  try {
+                    const res = await layeredAuditApi.downloadAudit(userId, selectedLayoutId);
+                    const url = URL.createObjectURL(new Blob([res.data]));
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = selectedLayoutId ? `layered_audit_layout_${selectedLayoutId}.xlsx` : 'layered_audit.xlsx';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch { alert('Download failed. Please try again.'); }
+                }}
+              >
+                <Download size={13} /> Download
+              </button>
               <button className="refresh-btn" onClick={loadAuditRecords} disabled={loadingAudit}>
                 {loadingAudit ? <Loader size={13} className="spin" /> : '↻'} Refresh
               </button>
@@ -1667,6 +1684,23 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
               </button>
               <button className="add-record-btn" onClick={() => setShowAddRecord('audit-adherence')}>
                 <Plus size={13} /> Add Record
+              </button>
+              <button
+                className="refresh-btn"
+                disabled={adherenceRecords.length === 0}
+                onClick={async () => {
+                  try {
+                    const res = await layeredAuditApi.downloadAdherence(userId, selectedLayoutId);
+                    const url = URL.createObjectURL(new Blob([res.data]));
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = selectedLayoutId ? `audit_adherence_layout_${selectedLayoutId}.xlsx` : 'audit_adherence.xlsx';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch { alert('Download failed. Please try again.'); }
+                }}
+              >
+                <Download size={13} /> Download
               </button>
               <button className="refresh-btn" onClick={loadAdherenceRecords} disabled={loadingAdherence}>
                 {loadingAdherence ? <Loader size={13} className="spin" /> : '↻'} Refresh
