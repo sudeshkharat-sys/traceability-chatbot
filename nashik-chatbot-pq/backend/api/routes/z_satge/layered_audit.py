@@ -6,6 +6,7 @@ from typing import List, Optional
 
 import openpyxl
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
 
 from app.connectors.state_db_connector import StateDBConnector
 from app.connectors.database import get_connector
@@ -366,3 +367,76 @@ def update_layered_audit_adherence(
     if not rows:
         raise HTTPException(status_code=500, detail="Failed to update record")
     return _row_to_dict(rows[0])
+
+
+# ── Download endpoints ────────────────────────────────────────────────────────
+
+_LA_HEADER = ["Model", "Sr.No", "Date", "Station ID", "Workstation", "Auditor",
+               "NC's", "Action Plan", "4M", "Responsibility", "Target Date", "Status"]
+_LA_FIELDS = ["model", "sr_no", "date_col", "station_id", "workstation", "auditor",
+               "ncs", "action_plan", "four_m", "responsibility", "target_date", "status"]
+
+_LAA_HEADER = ["Stage No", "Stage Name", "Auditor", "Audit Date"]
+_LAA_FIELDS = ["stage_no", "stage_name", "auditor", "audit_date"]
+
+
+def _make_excel(header: list, fields: list, records: list, sheet_title: str) -> io.BytesIO:
+    from openpyxl.styles import Font, PatternFill, Alignment
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = sheet_title
+    header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True)
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    ws.append(header)
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = header_align
+    ws.row_dimensions[1].height = 28
+    for rec in records:
+        ws.append([rec.get(f) for f in fields])
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf
+
+
+@router.get("/download")
+def download_layered_audit(
+    user_id: Optional[int] = Query(None),
+    layout_id: Optional[int] = Query(None),
+    connector: StateDBConnector = Depends(get_connector),
+):
+    rows = connector.execute_query(
+        LayeredAuditQueries.LIST_ALL,
+        {"user_id": user_id, "layout_id": layout_id},
+    )
+    records = [_row_to_dict(r) for r in rows]
+    buf = _make_excel(_LA_HEADER, _LA_FIELDS, records, "Layered Audit")
+    filename = f"layered_audit_layout_{layout_id}.xlsx" if layout_id else "layered_audit.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/adherence/download")
+def download_layered_audit_adherence(
+    user_id: Optional[int] = Query(None),
+    layout_id: Optional[int] = Query(None),
+    connector: StateDBConnector = Depends(get_connector),
+):
+    rows = connector.execute_query(
+        LayeredAuditAdherenceQueries.LIST_ALL,
+        {"user_id": user_id, "layout_id": layout_id},
+    )
+    records = [_row_to_dict(r) for r in rows]
+    buf = _make_excel(_LAA_HEADER, _LAA_FIELDS, records, "Audit Adherence")
+    filename = f"audit_adherence_layout_{layout_id}.xlsx" if layout_id else "audit_adherence.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
