@@ -151,6 +151,7 @@ async def upload_layered_audit(
     file: UploadFile = File(...),
     user_id: Optional[int] = Form(None),
     layout_id: Optional[int] = Form(None),
+    mode: str = Form("replace"),
     connector: StateDBConnector = Depends(get_connector),
 ):
     if not file.filename.endswith(".xlsx"):
@@ -166,16 +167,19 @@ async def upload_layered_audit(
     if not records:
         raise HTTPException(status_code=422, detail="No data rows found in the uploaded file")
 
-    connector.execute_update(
-        LayeredAuditQueries.DELETE_ALL,
-        {"user_id": user_id, "layout_id": layout_id},
-    )
+    if mode != "append":
+        connector.execute_update(
+            LayeredAuditQueries.DELETE_ALL,
+            {"user_id": user_id, "layout_id": layout_id},
+        )
+
     for rec in records:
         rec["user_id"] = user_id
         rec["layout_id"] = layout_id
         connector.execute_query(LayeredAuditQueries.CREATE, rec)
 
-    return {"message": "Layered Audit upload successful", "rows_imported": len(records)}
+    action_word = "appended" if mode == "append" else "imported"
+    return {"message": f"Layered Audit upload successful — {len(records)} rows {action_word}", "rows_imported": len(records)}
 
 
 @router.get("/records", response_model=List[schemas.LayeredAuditOut])
@@ -189,6 +193,19 @@ def list_layered_audit(
         {"user_id": user_id, "layout_id": layout_id},
     )
     return [_row_to_dict(r) for r in rows]
+
+
+@router.delete("/records/{record_id}", status_code=204)
+def delete_layered_audit(
+    record_id: int,
+    connector: StateDBConnector = Depends(get_connector),
+):
+    exists = connector.execute_query(
+        LayeredAuditQueries.CHECK_EXISTS, {"record_id": record_id}
+    )
+    if not exists:
+        raise HTTPException(status_code=404, detail="Record not found")
+    connector.execute_update(LayeredAuditQueries.DELETE_BY_ID, {"record_id": record_id})
 
 
 _LA_RETURNING = (
@@ -256,6 +273,7 @@ async def upload_layered_audit_adherence(
     file: UploadFile = File(...),
     user_id: Optional[int] = Form(None),
     layout_id: Optional[int] = Form(None),
+    mode: str = Form("replace"),
     connector: StateDBConnector = Depends(get_connector),
 ):
     if not file.filename.endswith(".xlsx"):
@@ -271,16 +289,19 @@ async def upload_layered_audit_adherence(
     if not records:
         raise HTTPException(status_code=422, detail="No data rows found in the uploaded file")
 
-    connector.execute_update(
-        LayeredAuditAdherenceQueries.DELETE_ALL,
-        {"user_id": user_id, "layout_id": layout_id},
-    )
+    if mode != "append":
+        connector.execute_update(
+            LayeredAuditAdherenceQueries.DELETE_ALL,
+            {"user_id": user_id, "layout_id": layout_id},
+        )
+
     for rec in records:
         rec["user_id"] = user_id
         rec["layout_id"] = layout_id
         connector.execute_query(LayeredAuditAdherenceQueries.CREATE, rec)
 
-    return {"message": "Layered Audit Adherence upload successful", "rows_imported": len(records)}
+    action_word = "appended" if mode == "append" else "imported"
+    return {"message": f"Layered Audit Adherence upload successful — {len(records)} rows {action_word}", "rows_imported": len(records)}
 
 
 @router.get("/adherence/records", response_model=List[schemas.LayeredAuditAdherenceOut])
@@ -294,6 +315,19 @@ def list_layered_audit_adherence(
         {"user_id": user_id, "layout_id": layout_id},
     )
     return [_row_to_dict(r) for r in rows]
+
+
+@router.delete("/adherence/records/{record_id}", status_code=204)
+def delete_layered_audit_adherence(
+    record_id: int,
+    connector: StateDBConnector = Depends(get_connector),
+):
+    exists = connector.execute_query(
+        LayeredAuditAdherenceQueries.CHECK_EXISTS, {"record_id": record_id}
+    )
+    if not exists:
+        raise HTTPException(status_code=404, detail="Record not found")
+    connector.execute_update(LayeredAuditAdherenceQueries.DELETE_BY_ID, {"record_id": record_id})
 
 
 _LAA_RETURNING = (

@@ -189,6 +189,7 @@ async def upload_excel(
     file: UploadFile = File(...),
     user_id: Optional[int] = Form(None),
     layout_id: Optional[int] = Form(None),
+    mode: str = Form("replace"),
     connector: StateDBConnector = Depends(get_connector),
 ):
     if not file.filename.endswith(".xlsx"):
@@ -220,20 +221,34 @@ async def upload_excel(
             detail=f"All rows were invalid and skipped. No records imported.",
         )
 
-    # Full replace for this user+layout scope, then insert fresh ones
-    connector.execute_update(
-        InputRecordQueries.DELETE_ALL,
-        {"user_id": user_id, "layout_id": layout_id},
-    )
-
-    for rec in valid_records:
-        rec["user_id"] = user_id
-        rec["layout_id"] = layout_id
-        connector.execute_query(InputRecordQueries.CREATE, rec)
+    if mode == "append":
+        # Keep existing rows; re-number new rows starting after the current max sr_no
+        max_rows = connector.execute_query(
+            InputRecordQueries.GET_MAX_SR_NO,
+            {"user_id": user_id, "layout_id": layout_id},
+        )
+        offset = int(max_rows[0][0]) if max_rows else 0
+        for idx, rec in enumerate(valid_records, start=1):
+            rec["sr_no"] = offset + idx
+            rec["user_id"] = user_id
+            rec["layout_id"] = layout_id
+            connector.execute_query(InputRecordQueries.CREATE, rec)
+        action_word = "appended"
+    else:
+        # Full replace for this user+layout scope, then insert fresh ones
+        connector.execute_update(
+            InputRecordQueries.DELETE_ALL,
+            {"user_id": user_id, "layout_id": layout_id},
+        )
+        for rec in valid_records:
+            rec["user_id"] = user_id
+            rec["layout_id"] = layout_id
+            connector.execute_query(InputRecordQueries.CREATE, rec)
+        action_word = "imported"
 
     skipped_out = [{"row_number": s["row_number"], "reason": s["reason"]} for s in skipped]
     return {
-        "message": "Upload successful",
+        "message": f"Upload successful — {len(valid_records)} rows {action_word}",
         "rows_imported": len(valid_records),
         "skipped_rows": skipped_out if skipped_out else None,
     }
@@ -325,6 +340,19 @@ def update_record(
     if not rows:
         raise HTTPException(status_code=500, detail="Failed to update record")
     return _row_to_dict(rows[0])
+
+
+@router.delete("/records/{record_id}", status_code=204)
+def delete_record(
+    record_id: int,
+    connector: StateDBConnector = Depends(get_connector),
+):
+    exists = connector.execute_query(
+        InputRecordQueries.CHECK_EXISTS, {"record_id": record_id}
+    )
+    if not exists:
+        raise HTTPException(status_code=404, detail="Record not found")
+    connector.execute_update(InputRecordQueries.DELETE_BY_ID, {"record_id": record_id})
 
 
 # ── Download endpoint ─────────────────────────────────────────────────────────

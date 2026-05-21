@@ -282,6 +282,8 @@ class InputRecordQueries:
 
     DELETE_ALL = "DELETE FROM input_records WHERE (:user_id IS NULL OR user_id = :user_id) AND (:layout_id IS NULL OR layout_id = :layout_id)"
 
+    DELETE_BY_ID = "DELETE FROM input_records WHERE id = :record_id"
+
     CHECK_EXISTS = "SELECT id FROM input_records WHERE id = :record_id"
 
     GET_MAX_SR_NO = """
@@ -343,6 +345,8 @@ class LayeredAuditQueries:
 
     CHECK_EXISTS = "SELECT id FROM layered_audit WHERE id = :record_id"
 
+    DELETE_BY_ID = "DELETE FROM layered_audit WHERE id = :record_id"
+
     DELETE_ALL = """
         DELETE FROM layered_audit
         WHERE (:user_id IS NULL OR user_id = :user_id)
@@ -387,6 +391,8 @@ class LayeredAuditAdherenceQueries:
     """
 
     CHECK_EXISTS = "SELECT id FROM layered_audit_adherence WHERE id = :record_id"
+
+    DELETE_BY_ID = "DELETE FROM layered_audit_adherence WHERE id = :record_id"
 
     DELETE_ALL = """
         DELETE FROM layered_audit_adherence

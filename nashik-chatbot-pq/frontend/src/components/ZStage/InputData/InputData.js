@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Upload, Database, CheckCircle, AlertCircle, Loader, Plus, X, ClipboardList, CalendarCheck, FileWarning, FileDown, Download } from 'lucide-react';
+import { Upload, Database, CheckCircle, AlertCircle, Loader, Plus, X, ClipboardList, CalendarCheck, FileWarning, FileDown, Download, Trash2 } from 'lucide-react';
 import { inputApi, layeredAuditApi, layoutApi } from '../../../services/api/layoutApi';
 import HelpGuide from '../shared/HelpGuide/HelpGuide';
 import './InputData.css';
@@ -546,7 +546,12 @@ function ColumnFilterDropdown({ colKey, allValues, selectedValues, onChange }) {
 // ── Editable table with per-column dropdown filters ───────────────────────────
 // saveFn(id, payload) → Promise<{data: updatedRecord}>
 // onSaved(recordId, updatedRecord) — called on successful save
-function AuditTable({ columns, records, saveFn, onSaved }) {
+// selectedIds — Set of selected row ids (optional)
+// onToggleSelect(id) — toggle selection of a row (optional)
+// onToggleAll(filteredIds) — select/deselect all visible rows (optional)
+function AuditTable({ columns, records, saveFn, onSaved, selectedIds, onToggleSelect, onToggleAll }) {
+  const showCheckboxes = Boolean(onToggleSelect);
+
   // filters: { [colKey]: null | string[] }  null = no filter (all shown)
   const [filters, setFilters] = useState({});
 
@@ -576,6 +581,9 @@ function AuditTable({ columns, records, saveFn, onSaved }) {
     [records, filters, columns]
   );
 
+  const filteredIds = filteredRecords.map((r) => r.id);
+  const allFilteredSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedIds?.has(id));
+
   if (records.length === 0) return null;
 
   return (
@@ -583,6 +591,17 @@ function AuditTable({ columns, records, saveFn, onSaved }) {
       <table className="master-table">
         <thead>
           <tr>
+            {showCheckboxes && (
+              <th className="col-checkbox">
+                <input
+                  type="checkbox"
+                  className="row-checkbox"
+                  checked={allFilteredSelected}
+                  onChange={() => onToggleAll(filteredIds)}
+                  title={allFilteredSelected ? 'Deselect all visible' : 'Select all visible'}
+                />
+              </th>
+            )}
             {columns.map((col) => (
               <th key={col.key} style={{ minWidth: col.width }}>
                 <div className="col-header-wrap">
@@ -600,7 +619,17 @@ function AuditTable({ columns, records, saveFn, onSaved }) {
         </thead>
         <tbody>
           {filteredRecords.map((rec) => (
-            <tr key={rec.id}>
+            <tr key={rec.id} className={selectedIds?.has(rec.id) ? 'row-selected' : ''}>
+              {showCheckboxes && (
+                <td className="col-checkbox">
+                  <input
+                    type="checkbox"
+                    className="row-checkbox"
+                    checked={selectedIds?.has(rec.id) ?? false}
+                    onChange={() => onToggleSelect(rec.id)}
+                  />
+                </td>
+              )}
               {columns.map((col) => (
                 <EditableCell
                   key={col.key}
@@ -617,7 +646,7 @@ function AuditTable({ columns, records, saveFn, onSaved }) {
           ))}
           {filteredRecords.length === 0 && (
             <tr>
-              <td colSpan={columns.length} className="filter-no-results">
+              <td colSpan={columns.length + (showCheckboxes ? 1 : 0)} className="filter-no-results">
                 No records match the current filter.
               </td>
             </tr>
@@ -917,6 +946,32 @@ function AddRecordModal({ type, onClose, onSaved, userId, layoutId, layoutStageI
   );
 }
 
+// ── Delete confirmation modal ─────────────────────────────────────────────────
+function DeleteConfirmModal({ count, onConfirm, onClose, deleting }) {
+  return createPortal(
+    <div className="modal-overlay">
+      <div className="delete-confirm-modal">
+        <div className="modal-header">
+          <span className="modal-title">Delete {count} row{count !== 1 ? 's' : ''}?</span>
+          <button className="modal-close" onClick={onClose} disabled={deleting}><X size={16} /></button>
+        </div>
+        <div className="modal-body">
+          <p className="delete-confirm-text">
+            This will permanently delete {count} selected row{count !== 1 ? 's' : ''} from the database. This cannot be undone.
+          </p>
+        </div>
+        <div className="modal-footer">
+          <button className="modal-cancel" onClick={onClose} disabled={deleting}>Cancel</button>
+          <button className="modal-confirm modal-confirm--danger" onClick={onConfirm} disabled={deleting}>
+            {deleting ? <><Loader size={13} className="spin" /> Deleting…</> : <><Trash2 size={13} /> Delete</>}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // Upload data-type options
 const UPLOAD_TYPES = [
   { value: 'master',          label: 'Master Data',      desc: 'Concern records & monthly incidences', viewTab: 'master'          },
@@ -928,6 +983,7 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
   const [activeTab, setActiveTab] = useState('upload');
   // upload tab state
   const [uploadType, setUploadType] = useState('master');
+  const [uploadMode, setUploadMode] = useState('replace');
   const [dragging, setDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -961,6 +1017,15 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
   const handleMasterFilterChange = useCallback((key, val) => {
     setMasterFilters((prev) => ({ ...prev, [key]: val }));
   }, []);
+
+  // Row selection state for all 3 tabs
+  const [masterSelectedIds, setMasterSelectedIds] = useState(new Set());
+  const [auditSelectedIds, setAuditSelectedIds] = useState(new Set());
+  const [adherenceSelectedIds, setAdherenceSelectedIds] = useState(new Set());
+
+  // Delete confirmation modal state
+  const [deleteTarget, setDeleteTarget] = useState(null); // null | { tab, ids }
+  const [deleting, setDeleting] = useState(false);
 
   // Template preview modal — null means closed, otherwise the key ('master' | 'layered-audit' | 'audit-adherence')
   const [templatePreviewModal, setTemplatePreviewModal] = useState(null);
@@ -1075,6 +1140,56 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
     else if (tabType === 'audit-adherence') setAdherenceRecords((p) => [...p, newRec]);
   }, []);
 
+  // Selection toggle helpers
+  const toggleSelect = useCallback((setFn, id) => {
+    setFn((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleAll = useCallback((setFn, filteredIds) => {
+    setFn((prev) => {
+      const allSelected = filteredIds.every((id) => prev.has(id));
+      const next = new Set(prev);
+      if (allSelected) { filteredIds.forEach((id) => next.delete(id)); }
+      else { filteredIds.forEach((id) => next.add(id)); }
+      return next;
+    });
+  }, []);
+
+  // Delete selected rows
+  const handleDeleteSelected = useCallback(async () => {
+    if (!deleteTarget) return;
+    const { tab, ids } = deleteTarget;
+    setDeleting(true);
+    try {
+      await Promise.all(
+        [...ids].map((id) => {
+          if (tab === 'master') return inputApi.deleteRecord(id);
+          if (tab === 'layered-audit') return layeredAuditApi.deleteAuditRecord(id);
+          return layeredAuditApi.deleteAdherenceRecord(id);
+        })
+      );
+      if (tab === 'master') {
+        setRecords((p) => p.filter((r) => !ids.has(r.id)));
+        setMasterSelectedIds(new Set());
+      } else if (tab === 'layered-audit') {
+        setAuditRecords((p) => p.filter((r) => !ids.has(r.id)));
+        setAuditSelectedIds(new Set());
+      } else {
+        setAdherenceRecords((p) => p.filter((r) => !ids.has(r.id)));
+        setAdherenceSelectedIds(new Set());
+      }
+    } catch (err) {
+      console.error('Delete failed', err);
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
+  }, [deleteTarget]);
+
   const allMonths = React.useMemo(() => {
     const set = new Set(MONTHLY_KEYS);
     records.forEach((rec) => {
@@ -1130,11 +1245,11 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
     try {
       let res;
       if (uploadType === 'master') {
-        res = await inputApi.uploadExcel(selectedFile, userId, selectedLayoutId);
+        res = await inputApi.uploadExcel(selectedFile, userId, selectedLayoutId, uploadMode);
       } else if (uploadType === 'layered-audit') {
-        res = await layeredAuditApi.uploadAudit(selectedFile, userId, selectedLayoutId);
+        res = await layeredAuditApi.uploadAudit(selectedFile, userId, selectedLayoutId, uploadMode);
       } else {
-        res = await layeredAuditApi.uploadAdherence(selectedFile, userId, selectedLayoutId);
+        res = await layeredAuditApi.uploadAdherence(selectedFile, userId, selectedLayoutId, uploadMode);
       }
       const viewTab = UPLOAD_TYPES.find((t) => t.value === uploadType)?.viewTab || 'master';
       setUploadResult({
@@ -1295,6 +1410,29 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
                 )}
               </div>
 
+              <div className="upload-mode-toggle">
+                <span className="upload-mode-label">Upload mode:</span>
+                <label className={`upload-mode-option ${uploadMode === 'replace' ? 'active' : ''}`}>
+                  <input
+                    type="radio"
+                    name="uploadMode"
+                    value="replace"
+                    checked={uploadMode === 'replace'}
+                    onChange={() => setUploadMode('replace')}
+                  />
+                  Replace All
+                </label>
+                <label className={`upload-mode-option ${uploadMode === 'append' ? 'active' : ''}`}>
+                  <input
+                    type="radio"
+                    name="uploadMode"
+                    value="append"
+                    checked={uploadMode === 'append'}
+                    onChange={() => setUploadMode('append')}
+                  />
+                  Append Rows
+                </label>
+              </div>
               <button className="upload-btn" disabled={!selectedFile || uploading} onClick={handleUpload}>
                 {uploading ? <><Loader size={15} className="spin" /> Uploading…</> : <><Upload size={15} /> Upload File</>}
               </button>
@@ -1341,6 +1479,14 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
             </div>
             <div className="master-actions">
               <span className="record-count">{auditRecords.length} record{auditRecords.length !== 1 ? 's' : ''}</span>
+              {auditSelectedIds.size > 0 && (
+                <button
+                  className="delete-selected-btn"
+                  onClick={() => setDeleteTarget({ tab: 'layered-audit', ids: auditSelectedIds })}
+                >
+                  <Trash2 size={13} /> Delete Selected ({auditSelectedIds.size})
+                </button>
+              )}
               <button className="add-record-btn" onClick={() => setShowAddRecord('layered-audit')}>
                 <Plus size={13} /> Add Record
               </button>
@@ -1364,6 +1510,9 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
               records={auditRecords}
               saveFn={layeredAuditApi.updateAuditRecord}
               onSaved={handleAuditRecordSaved}
+              selectedIds={auditSelectedIds}
+              onToggleSelect={(id) => toggleSelect(setAuditSelectedIds, id)}
+              onToggleAll={(ids) => toggleAll(setAuditSelectedIds, ids)}
             />
           )}
         </div>
@@ -1379,6 +1528,14 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
             </div>
             <div className="master-actions">
               <span className="record-count">{adherenceRecords.length} record{adherenceRecords.length !== 1 ? 's' : ''}</span>
+              {adherenceSelectedIds.size > 0 && (
+                <button
+                  className="delete-selected-btn"
+                  onClick={() => setDeleteTarget({ tab: 'audit-adherence', ids: adherenceSelectedIds })}
+                >
+                  <Trash2 size={13} /> Delete Selected ({adherenceSelectedIds.size})
+                </button>
+              )}
               <button className="add-record-btn" onClick={() => setShowAddRecord('audit-adherence')}>
                 <Plus size={13} /> Add Record
               </button>
@@ -1402,6 +1559,9 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
               records={adherenceRecords}
               saveFn={layeredAuditApi.updateAdherenceRecord}
               onSaved={handleAdherenceRecordSaved}
+              selectedIds={adherenceSelectedIds}
+              onToggleSelect={(id) => toggleSelect(setAdherenceSelectedIds, id)}
+              onToggleAll={(ids) => toggleAll(setAdherenceSelectedIds, ids)}
             />
           )}
         </div>
@@ -1467,6 +1627,14 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
             <h2 className="panel-title">Master Data</h2>
             <div className="master-actions">
               <span className="record-count">{records.length} record{records.length !== 1 ? 's' : ''}</span>
+              {masterSelectedIds.size > 0 && (
+                <button
+                  className="delete-selected-btn"
+                  onClick={() => setDeleteTarget({ tab: 'master', ids: masterSelectedIds })}
+                >
+                  <Trash2 size={13} /> Delete Selected ({masterSelectedIds.size})
+                </button>
+              )}
               <button className="add-record-btn" onClick={() => setShowAddRecord('master')}>
                 <Plus size={13} /> Add Record
               </button>
@@ -1530,90 +1698,111 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
             </div>
           )}
 
-          {!loadingRecords && records.length > 0 && (
-            <div className="table-wrapper">
-              <table className="master-table">
-                <thead>
-                  <tr>
-                    {FIXED_COLUMNS.map((col) => (
-                      <th key={col.key} style={{ minWidth: col.width }}>
-                        <div className="col-header-wrap">
-                          <span className="col-header-label">{col.label}</span>
-                          <ColumnFilterDropdown
-                            colKey={col.key}
-                            allValues={masterUniqueValues[col.key] || []}
-                            selectedValues={masterFilters[col.key] ?? null}
-                            onChange={handleMasterFilterChange}
-                          />
-                        </div>
-                      </th>
-                    ))}
-                    {allMonths.map((key) => (
-                      <th key={key} className="month-header">{formatMonthLabel(key)}</th>
-                    ))}
-                    {TRAILING_COLUMNS.map((col) => (
-                      <th key={col.key} style={{ minWidth: col.width }}>
-                        <div className="col-header-wrap">
-                          <span className="col-header-label">{col.label}</span>
-                          <ColumnFilterDropdown
-                            colKey={col.key}
-                            allValues={masterUniqueValues[col.key] || []}
-                            selectedValues={masterFilters[col.key] ?? null}
-                            onChange={handleMasterFilterChange}
-                          />
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredMasterRecords.map((rec) => (
-                    <tr key={rec.id}>
-                      {FIXED_COLUMNS.map((col) => (
-                        <EditableCell
-                          key={col.key}
-                          recordId={rec.id}
-                          fieldKey={col.key}
-                          value={rec[col.key]}
-                          type={col.type}
-                          onSaved={handleRecordSaved}
+          {!loadingRecords && records.length > 0 && (() => {
+            const filteredIds = filteredMasterRecords.map((r) => r.id);
+            const allFilteredSelected = filteredIds.length > 0 && filteredIds.every((id) => masterSelectedIds.has(id));
+            return (
+              <div className="table-wrapper">
+                <table className="master-table">
+                  <thead>
+                    <tr>
+                      <th className="col-checkbox">
+                        <input
+                          type="checkbox"
+                          className="row-checkbox"
+                          checked={allFilteredSelected}
+                          onChange={() => toggleAll(setMasterSelectedIds, filteredIds)}
+                          title={allFilteredSelected ? 'Deselect all visible' : 'Select all visible'}
                         />
+                      </th>
+                      {FIXED_COLUMNS.map((col) => (
+                        <th key={col.key} style={{ minWidth: col.width }}>
+                          <div className="col-header-wrap">
+                            <span className="col-header-label">{col.label}</span>
+                            <ColumnFilterDropdown
+                              colKey={col.key}
+                              allValues={masterUniqueValues[col.key] || []}
+                              selectedValues={masterFilters[col.key] ?? null}
+                              onChange={handleMasterFilterChange}
+                            />
+                          </div>
+                        </th>
                       ))}
                       {allMonths.map((key) => (
-                        <MonthlyCell
-                          key={key}
-                          recordId={rec.id}
-                          monthKey={key}
-                          monthlyData={rec.monthly_data}
-                          onSaved={handleRecordSaved}
-                        />
+                        <th key={key} className="month-header">{formatMonthLabel(key)}</th>
                       ))}
                       {TRAILING_COLUMNS.map((col) => (
-                        <EditableCell
-                          key={col.key}
-                          recordId={rec.id}
-                          fieldKey={col.key}
-                          value={rec[col.key]}
-                          type={col.type}
-                          onSaved={handleRecordSaved}
-                        />
+                        <th key={col.key} style={{ minWidth: col.width }}>
+                          <div className="col-header-wrap">
+                            <span className="col-header-label">{col.label}</span>
+                            <ColumnFilterDropdown
+                              colKey={col.key}
+                              allValues={masterUniqueValues[col.key] || []}
+                              selectedValues={masterFilters[col.key] ?? null}
+                              onChange={handleMasterFilterChange}
+                            />
+                          </div>
+                        </th>
                       ))}
                     </tr>
-                  ))}
-                  {filteredMasterRecords.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={FIXED_COLUMNS.length + allMonths.length + TRAILING_COLUMNS.length}
-                        className="filter-no-results"
-                      >
-                        No records match the current filter.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {filteredMasterRecords.map((rec) => (
+                      <tr key={rec.id} className={masterSelectedIds.has(rec.id) ? 'row-selected' : ''}>
+                        <td className="col-checkbox">
+                          <input
+                            type="checkbox"
+                            className="row-checkbox"
+                            checked={masterSelectedIds.has(rec.id)}
+                            onChange={() => toggleSelect(setMasterSelectedIds, rec.id)}
+                          />
+                        </td>
+                        {FIXED_COLUMNS.map((col) => (
+                          <EditableCell
+                            key={col.key}
+                            recordId={rec.id}
+                            fieldKey={col.key}
+                            value={rec[col.key]}
+                            type={col.type}
+                            onSaved={handleRecordSaved}
+                          />
+                        ))}
+                        {allMonths.map((key) => (
+                          <MonthlyCell
+                            key={key}
+                            recordId={rec.id}
+                            monthKey={key}
+                            monthlyData={rec.monthly_data}
+                            onSaved={handleRecordSaved}
+                          />
+                        ))}
+                        {TRAILING_COLUMNS.map((col) => (
+                          <EditableCell
+                            key={col.key}
+                            recordId={rec.id}
+                            fieldKey={col.key}
+                            value={rec[col.key]}
+                            type={col.type}
+                            onSaved={handleRecordSaved}
+                          />
+                        ))}
+                      </tr>
+                    ))}
+                    {filteredMasterRecords.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={FIXED_COLUMNS.length + allMonths.length + TRAILING_COLUMNS.length + 1}
+                          className="filter-no-results"
+                        >
+                          No records match the current filter.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -1626,6 +1815,15 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
           userId={userId}
           layoutId={selectedLayoutId}
           layoutStageIds={layoutStageIds}
+        />
+      )}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          count={deleteTarget.ids.size}
+          onConfirm={handleDeleteSelected}
+          onClose={() => setDeleteTarget(null)}
+          deleting={deleting}
         />
       )}
 
