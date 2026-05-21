@@ -11,7 +11,7 @@ const INPUT_HELP = {
     {
       heading: 'Tabs Overview',
       items: [
-        { icon: '📤', label: 'Upload',           desc: 'Two-step wizard to import Excel data. Step 1: pick the data type. Step 2: drag-and-drop (or browse) your .xlsx file and click Upload.' },
+        { icon: '📤', label: 'Upload',           desc: 'Two-step wizard to import Excel data. Step 1: pick the data type. Step 2: choose Replace All or Append Rows, drag-and-drop your .xlsx, and click Upload.' },
         { icon: '🗄️', label: 'Master Data',       desc: 'View and edit Z-Stage concern records with all fixed columns and monthly incidence counts.' },
         { icon: '📋', label: 'Layered Audit',     desc: 'View and edit layered audit observations per station (NC\'s, action plan, 4M, status, etc.).' },
         { icon: '📅', label: 'Audit Adherence',   desc: 'View and edit stage-wise audit adherence records — stage, auditor, and audit date.' },
@@ -25,7 +25,9 @@ const INPUT_HELP = {
         { icon: '👁️', label: 'View Template',      desc: 'Each type card has a "View" button that opens a column-reference popup so you can check the expected format without leaving the upload screen.' },
         { icon: '⬇️', label: 'Download Template',  desc: 'Each type card also has a "Download" button to get a blank CSV with the correct headers, a hints row, and an example row.' },
         { icon: '📂', label: 'Choose File',        desc: 'Drag-and-drop your .xlsx file onto the right-side drop zone, or click it to browse. Only Excel files are accepted.' },
-        { icon: '✅', label: 'Upload',             desc: 'Click "Upload File" to process. A banner confirms how many rows were imported and lists any skipped rows with the reason.' },
+        { icon: '🔁', label: 'Replace All',        desc: 'Default mode — deletes all existing rows for this layout and imports the full file fresh. Use when replacing the entire dataset.' },
+        { icon: '➕', label: 'Append Rows',        desc: 'Adds the new rows below the existing data without touching current records. Works even if your file has fewer columns — columns are matched by header name.' },
+        { icon: '✅', label: 'Upload',             desc: 'Click "Upload File" to process. A banner confirms how many rows were imported/appended and lists any skipped rows with the reason.' },
       ],
     },
     {
@@ -33,6 +35,10 @@ const INPUT_HELP = {
       items: [
         { icon: '✏️', label: 'Edit a Cell',        desc: 'Click any cell to edit it inline. Constrained fields (Type, RYG, Z/E, Attribution, Attri., Status 3M) show a dropdown. Press Enter to save or Escape to cancel.' },
         { icon: '➕', label: 'Add Record',          desc: 'Click "Add Record" to open a form for a new row. Selecting Attri. auto-fills Attribution; entering Stage No auto-fills Line.' },
+        { icon: '📎', label: 'Append Data',        desc: 'Click "Append Data" in the tab header to pick an .xlsx file and add its rows below the existing data — no full re-upload needed. Columns are matched by name.' },
+        { icon: '☑️', label: 'Select & Delete',    desc: 'Hover over any row to reveal its checkbox. Check one or more rows, then click "Delete Selected" (red button in the header). Applies to all selected rows at once.' },
+        { icon: '↩',  label: 'Undo Delete',        desc: 'After deleting rows, an undo banner appears at the bottom for 8 seconds. Click "↩ Undo" to restore the deleted rows before the timer expires.' },
+        { icon: '⬇️', label: 'Download',           desc: 'Click the download icon in the tab header to export the current Master Data as a styled .xlsx file.' },
         { icon: '🔍', label: 'Filter Columns',     desc: 'Click the filter badge (▾) in any column header to show/hide rows by value. Badge turns blue when a filter is active.' },
         { icon: '📅', label: 'Add New Month',      desc: 'Click "+ Add New Month" to add a monthly incidence column for any year/month not already shown.' },
         { icon: '↻',  label: 'Refresh',            desc: 'Reloads the latest records from the server.' },
@@ -43,6 +49,10 @@ const INPUT_HELP = {
       items: [
         { icon: '✏️', label: 'Edit a Cell',        desc: 'Click any cell to edit. Long-text fields (NC\'s, Action Plan) open a resizable text area. Date fields use a date picker.' },
         { icon: '➕', label: 'Add Record',          desc: 'Click "Add Record" to open a form and manually add a new audit or adherence row.' },
+        { icon: '📎', label: 'Append Data',        desc: 'Click "Append Data" in the tab header to pick an .xlsx and add rows below existing data. Columns matched by name — safe to use partial/edited exports.' },
+        { icon: '☑️', label: 'Select & Delete',    desc: 'Hover over any row to reveal its checkbox. Check rows and click "Delete Selected" to remove them. Works independently in each tab.' },
+        { icon: '↩',  label: 'Undo Delete',        desc: '8-second undo banner appears after a delete. Click "↩ Undo" to restore the rows immediately.' },
+        { icon: '⬇️', label: 'Download',           desc: 'Click the download icon in the tab header to export Layered Audit or Audit Adherence data as a styled .xlsx file.' },
         { icon: '🔍', label: 'Filter Columns',     desc: 'Same per-column filter as Master Data — click ▾ in any header to filter by value.' },
         { icon: '↻',  label: 'Refresh',            desc: 'Reloads the latest records from the server.' },
       ],
@@ -60,6 +70,7 @@ const INPUT_HELP = {
         { icon: '💡', label: 'Layout Filter',      desc: 'Use the Layout dropdown (top-right of the tabs bar) to scope data to a specific layout. Only records for that layout are shown and saved.' },
         { icon: '⚠️', label: 'Allowed Values',     desc: 'Type (WH/USV), RYG (R/Y/G), Z/E (Z/E), Attribution (M/P/D/U), Status 3M (R/G) must match exactly. Invalid rows are skipped on upload with a reason shown in the result banner.' },
         { icon: '🔄', label: 'Clear a Cell',       desc: 'To remove a value you set earlier, click the cell and clear the text / select the blank option, then press Enter. The field will be saved as empty.' },
+        { icon: '📋', label: 'Append vs Replace',  desc: 'Use "Replace All" when uploading a clean fresh dataset. Use "Append Rows" (or the Append Data button in each tab) when adding new rows to existing data — e.g. a monthly update file.' },
       ],
     },
   ],
