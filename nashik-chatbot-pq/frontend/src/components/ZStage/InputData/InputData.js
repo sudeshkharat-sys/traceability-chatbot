@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Upload, Database, CheckCircle, AlertCircle, Loader, Plus, X, ClipboardList, CalendarCheck, FileWarning, FileDown, Download } from 'lucide-react';
+import { Upload, Database, CheckCircle, AlertCircle, Loader, Plus, X, ClipboardList, CalendarCheck, FileWarning, FileDown, Download, Trash2 } from 'lucide-react';
 import { inputApi, layeredAuditApi, layoutApi } from '../../../services/api/layoutApi';
 import HelpGuide from '../shared/HelpGuide/HelpGuide';
 import './InputData.css';
@@ -546,7 +546,12 @@ function ColumnFilterDropdown({ colKey, allValues, selectedValues, onChange }) {
 // ── Editable table with per-column dropdown filters ───────────────────────────
 // saveFn(id, payload) → Promise<{data: updatedRecord}>
 // onSaved(recordId, updatedRecord) — called on successful save
-function AuditTable({ columns, records, saveFn, onSaved }) {
+// selectedIds — Set of selected row ids (optional)
+// onToggleSelect(id) — toggle selection of a row (optional)
+// onToggleAll(filteredIds) — select/deselect all visible rows (optional)
+function AuditTable({ columns, records, saveFn, onSaved, selectedIds, onToggleSelect, onToggleAll }) {
+  const showCheckboxes = Boolean(onToggleSelect);
+
   // filters: { [colKey]: null | string[] }  null = no filter (all shown)
   const [filters, setFilters] = useState({});
 
@@ -576,13 +581,29 @@ function AuditTable({ columns, records, saveFn, onSaved }) {
     [records, filters, columns]
   );
 
+  const filteredIds = filteredRecords.map((r) => r.id);
+  const allFilteredSelected = filteredIds.length > 0 && filteredIds.every((id) => selectedIds?.has(id));
+
   if (records.length === 0) return null;
+
+  const hasSelection = showCheckboxes && selectedIds && selectedIds.size > 0;
 
   return (
     <div className="table-wrapper">
-      <table className="master-table">
+      <table className={`master-table${hasSelection ? ' has-selection' : ''}`}>
         <thead>
           <tr>
+            {showCheckboxes && (
+              <th className="col-checkbox">
+                <input
+                  type="checkbox"
+                  className="row-checkbox"
+                  checked={allFilteredSelected}
+                  onChange={() => onToggleAll(filteredIds)}
+                  title={allFilteredSelected ? 'Deselect all visible' : 'Select all visible'}
+                />
+              </th>
+            )}
             {columns.map((col) => (
               <th key={col.key} style={{ minWidth: col.width }}>
                 <div className="col-header-wrap">
@@ -600,7 +621,17 @@ function AuditTable({ columns, records, saveFn, onSaved }) {
         </thead>
         <tbody>
           {filteredRecords.map((rec) => (
-            <tr key={rec.id}>
+            <tr key={rec.id} className={selectedIds?.has(rec.id) ? 'row-selected' : ''}>
+              {showCheckboxes && (
+                <td className="col-checkbox">
+                  <input
+                    type="checkbox"
+                    className="row-checkbox"
+                    checked={selectedIds?.has(rec.id) ?? false}
+                    onChange={() => onToggleSelect(rec.id)}
+                  />
+                </td>
+              )}
               {columns.map((col) => (
                 <EditableCell
                   key={col.key}
@@ -617,7 +648,7 @@ function AuditTable({ columns, records, saveFn, onSaved }) {
           ))}
           {filteredRecords.length === 0 && (
             <tr>
-              <td colSpan={columns.length} className="filter-no-results">
+              <td colSpan={columns.length + (showCheckboxes ? 1 : 0)} className="filter-no-results">
                 No records match the current filter.
               </td>
             </tr>
@@ -917,6 +948,32 @@ function AddRecordModal({ type, onClose, onSaved, userId, layoutId, layoutStageI
   );
 }
 
+// ── Delete confirmation modal ─────────────────────────────────────────────────
+function DeleteConfirmModal({ count, onConfirm, onClose, deleting }) {
+  return createPortal(
+    <div className="modal-overlay">
+      <div className="delete-confirm-modal">
+        <div className="modal-header">
+          <span className="modal-title">Delete {count} row{count !== 1 ? 's' : ''}?</span>
+          <button className="modal-close" onClick={onClose} disabled={deleting}><X size={16} /></button>
+        </div>
+        <div className="modal-body">
+          <p className="delete-confirm-text">
+            This will permanently delete {count} selected row{count !== 1 ? 's' : ''} from the database. This cannot be undone.
+          </p>
+        </div>
+        <div className="modal-footer">
+          <button className="modal-cancel" onClick={onClose} disabled={deleting}>Cancel</button>
+          <button className="modal-confirm modal-confirm--danger" onClick={onConfirm} disabled={deleting}>
+            {deleting ? <><Loader size={13} className="spin" /> Deleting…</> : <><Trash2 size={13} /> Delete</>}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // Upload data-type options
 const UPLOAD_TYPES = [
   { value: 'master',          label: 'Master Data',      desc: 'Concern records & monthly incidences', viewTab: 'master'          },
@@ -928,11 +985,17 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
   const [activeTab, setActiveTab] = useState('upload');
   // upload tab state
   const [uploadType, setUploadType] = useState('master');
+  const [uploadMode, setUploadMode] = useState('replace');
   const [dragging, setDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
   const fileInputRef = useRef(null);
+
+  // Append-from-tab state
+  const appendFileInputRef = useRef(null);
+  const [appendContext, setAppendContext] = useState(null); // 'master' | 'layered-audit' | 'audit-adherence'
+  const [appendStatus, setAppendStatus] = useState(null);  // null | { loading, message, error }
 
   // shared layout selector
   const [selectedLayoutId, setSelectedLayoutId] = useState(null);
@@ -961,6 +1024,20 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
   const handleMasterFilterChange = useCallback((key, val) => {
     setMasterFilters((prev) => ({ ...prev, [key]: val }));
   }, []);
+
+  // Row selection state for all 3 tabs
+  const [masterSelectedIds, setMasterSelectedIds] = useState(new Set());
+  const [auditSelectedIds, setAuditSelectedIds] = useState(new Set());
+  const [adherenceSelectedIds, setAdherenceSelectedIds] = useState(new Set());
+
+  // Delete confirmation modal state
+  const [deleteTarget, setDeleteTarget] = useState(null); // null | { tab, ids }
+  const [deleting, setDeleting] = useState(false);
+
+  // Undo buffer — holds deleted rows for 8 seconds
+  const [undoBuffer, setUndoBuffer] = useState(null); // null | { tab, rows }
+  const [undoing, setUndoing] = useState(false);
+  const undoTimerRef = useRef(null);
 
   // Template preview modal — null means closed, otherwise the key ('master' | 'layered-audit' | 'audit-adherence')
   const [templatePreviewModal, setTemplatePreviewModal] = useState(null);
@@ -1075,6 +1152,147 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
     else if (tabType === 'audit-adherence') setAdherenceRecords((p) => [...p, newRec]);
   }, []);
 
+  // Selection toggle helpers
+  const toggleSelect = useCallback((setFn, id) => {
+    setFn((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleAll = useCallback((setFn, filteredIds) => {
+    setFn((prev) => {
+      const allSelected = filteredIds.every((id) => prev.has(id));
+      const next = new Set(prev);
+      if (allSelected) { filteredIds.forEach((id) => next.delete(id)); }
+      else { filteredIds.forEach((id) => next.add(id)); }
+      return next;
+    });
+  }, []);
+
+  // Delete selected rows
+  const handleDeleteSelected = useCallback(async () => {
+    if (!deleteTarget) return;
+    const { tab, ids } = deleteTarget;
+
+    // Capture full row objects before deleting — needed for undo
+    let capturedRows;
+    if (tab === 'master') capturedRows = records.filter((r) => ids.has(r.id));
+    else if (tab === 'layered-audit') capturedRows = auditRecords.filter((r) => ids.has(r.id));
+    else capturedRows = adherenceRecords.filter((r) => ids.has(r.id));
+
+    setDeleting(true);
+    try {
+      await Promise.all(
+        [...ids].map((id) => {
+          if (tab === 'master') return inputApi.deleteRecord(id);
+          if (tab === 'layered-audit') return layeredAuditApi.deleteAuditRecord(id);
+          return layeredAuditApi.deleteAdherenceRecord(id);
+        })
+      );
+      if (tab === 'master') {
+        setRecords((p) => p.filter((r) => !ids.has(r.id)));
+        setMasterSelectedIds(new Set());
+      } else if (tab === 'layered-audit') {
+        setAuditRecords((p) => p.filter((r) => !ids.has(r.id)));
+        setAuditSelectedIds(new Set());
+      } else {
+        setAdherenceRecords((p) => p.filter((r) => !ids.has(r.id)));
+        setAdherenceSelectedIds(new Set());
+      }
+
+      // Start undo window (8 seconds)
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+      setUndoBuffer({ tab, rows: capturedRows });
+      undoTimerRef.current = setTimeout(() => setUndoBuffer(null), 8000);
+    } catch (err) {
+      console.error('Delete failed', err);
+    } finally {
+      setDeleting(false);
+      setDeleteTarget(null);
+    }
+  }, [deleteTarget, records, auditRecords, adherenceRecords]);
+
+  // Undo: re-insert the captured rows
+  const handleUndo = useCallback(async () => {
+    if (!undoBuffer) return;
+    const { tab, rows } = undoBuffer;
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setUndoBuffer(null);
+    setUndoing(true);
+    try {
+      const restored = [];
+      for (const row of rows) {
+        let res;
+        if (tab === 'master') {
+          const payload = {
+            concern_id: row.concern_id, concern: row.concern, type: row.type,
+            root_cause: row.root_cause, action_plan: row.action_plan,
+            target_date: row.target_date, closure_date: row.closure_date,
+            ryg: row.ryg, attri: row.attri, comm: row.comm, line: row.line,
+            stage_no: row.stage_no, z_e: row.z_e, attribution: row.attribution,
+            part: row.part, phenomena: row.phenomena,
+            total_incidences: row.total_incidences, monthly_data: row.monthly_data,
+            field_defect_after_cutoff: row.field_defect_after_cutoff, status_3m: row.status_3m,
+          };
+          res = await inputApi.createRecord(payload, userId, selectedLayoutId);
+        } else if (tab === 'layered-audit') {
+          const payload = {
+            model: row.model, sr_no: row.sr_no, date_col: row.date_col,
+            station_id: row.station_id, workstation: row.workstation, auditor: row.auditor,
+            ncs: row.ncs, action_plan: row.action_plan, four_m: row.four_m,
+            responsibility: row.responsibility, target_date: row.target_date, status: row.status,
+          };
+          res = await layeredAuditApi.createAuditRecord(payload, userId, selectedLayoutId);
+        } else {
+          const payload = {
+            stage_no: row.stage_no, stage_name: row.stage_name,
+            auditor: row.auditor, audit_date: row.audit_date,
+          };
+          res = await layeredAuditApi.createAdherenceRecord(payload, userId, selectedLayoutId);
+        }
+        restored.push(res.data);
+      }
+      if (tab === 'master') setRecords((p) => [...p, ...restored]);
+      else if (tab === 'layered-audit') setAuditRecords((p) => [...p, ...restored]);
+      else setAdherenceRecords((p) => [...p, ...restored]);
+    } catch (err) {
+      console.error('Undo failed', err);
+    } finally {
+      setUndoing(false);
+    }
+  }, [undoBuffer, userId, selectedLayoutId]);
+
+  // Append from tab header — triggered when file is selected via the hidden input
+  const handleAppendFile = useCallback(async (e) => {
+    const file = e.target.files[0];
+    if (!file || !appendContext) return;
+    e.target.value = ''; // reset so same file can be re-selected
+    setAppendStatus({ loading: true, message: 'Appending rows…', error: false });
+    try {
+      let res;
+      if (appendContext === 'master') {
+        res = await inputApi.uploadExcel(file, userId, selectedLayoutId, 'append');
+      } else if (appendContext === 'layered-audit') {
+        res = await layeredAuditApi.uploadAudit(file, userId, selectedLayoutId, 'append');
+      } else {
+        res = await layeredAuditApi.uploadAdherence(file, userId, selectedLayoutId, 'append');
+      }
+      const n = res.data.rows_imported;
+      setAppendStatus({ loading: false, message: `${n} row${n !== 1 ? 's' : ''} appended`, error: false });
+      // Reload the table data so new rows appear immediately
+      if (appendContext === 'master') await loadRecords();
+      else if (appendContext === 'layered-audit') await loadAuditRecords();
+      else await loadAdherenceRecords();
+      setTimeout(() => setAppendStatus(null), 4000);
+    } catch (err) {
+      const detail = err.response?.data?.detail || 'Append failed. Check the file and try again.';
+      setAppendStatus({ loading: false, message: detail, error: true });
+      setTimeout(() => setAppendStatus(null), 6000);
+    }
+  }, [appendContext, userId, selectedLayoutId, loadRecords, loadAuditRecords, loadAdherenceRecords]);
+
   const allMonths = React.useMemo(() => {
     const set = new Set(MONTHLY_KEYS);
     records.forEach((rec) => {
@@ -1130,11 +1348,11 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
     try {
       let res;
       if (uploadType === 'master') {
-        res = await inputApi.uploadExcel(selectedFile, userId, selectedLayoutId);
+        res = await inputApi.uploadExcel(selectedFile, userId, selectedLayoutId, uploadMode);
       } else if (uploadType === 'layered-audit') {
-        res = await layeredAuditApi.uploadAudit(selectedFile, userId, selectedLayoutId);
+        res = await layeredAuditApi.uploadAudit(selectedFile, userId, selectedLayoutId, uploadMode);
       } else {
-        res = await layeredAuditApi.uploadAdherence(selectedFile, userId, selectedLayoutId);
+        res = await layeredAuditApi.uploadAdherence(selectedFile, userId, selectedLayoutId, uploadMode);
       }
       const viewTab = UPLOAD_TYPES.find((t) => t.value === uploadType)?.viewTab || 'master';
       setUploadResult({
@@ -1295,6 +1513,29 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
                 )}
               </div>
 
+              <div className="upload-mode-toggle">
+                <span className="upload-mode-label">Upload mode:</span>
+                <label className={`upload-mode-option ${uploadMode === 'replace' ? 'active' : ''}`}>
+                  <input
+                    type="radio"
+                    name="uploadMode"
+                    value="replace"
+                    checked={uploadMode === 'replace'}
+                    onChange={() => setUploadMode('replace')}
+                  />
+                  Replace All
+                </label>
+                <label className={`upload-mode-option ${uploadMode === 'append' ? 'active' : ''}`}>
+                  <input
+                    type="radio"
+                    name="uploadMode"
+                    value="append"
+                    checked={uploadMode === 'append'}
+                    onChange={() => setUploadMode('append')}
+                  />
+                  Append Rows
+                </label>
+              </div>
               <button className="upload-btn" disabled={!selectedFile || uploading} onClick={handleUpload}>
                 {uploading ? <><Loader size={15} className="spin" /> Uploading…</> : <><Upload size={15} /> Upload File</>}
               </button>
@@ -1341,8 +1582,47 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
             </div>
             <div className="master-actions">
               <span className="record-count">{auditRecords.length} record{auditRecords.length !== 1 ? 's' : ''}</span>
+              {appendStatus && appendContext === 'layered-audit' && (
+                <span className={`append-status ${appendStatus.error ? 'append-status--error' : appendStatus.loading ? 'append-status--loading' : 'append-status--ok'}`}>
+                  {appendStatus.loading && <Loader size={12} className="spin" />}
+                  {appendStatus.message}
+                </span>
+              )}
+              {auditSelectedIds.size > 0 && (
+                <button
+                  className="delete-selected-btn"
+                  onClick={() => setDeleteTarget({ tab: 'layered-audit', ids: auditSelectedIds })}
+                >
+                  <Trash2 size={13} /> Delete Selected ({auditSelectedIds.size})
+                </button>
+              )}
+              <button
+                className="append-data-btn"
+                onClick={() => { setAppendContext('layered-audit'); appendFileInputRef.current?.click(); }}
+                disabled={appendStatus?.loading && appendContext === 'layered-audit'}
+                title="Append rows from an Excel file without replacing existing data"
+              >
+                <Plus size={13} /> Append Data
+              </button>
               <button className="add-record-btn" onClick={() => setShowAddRecord('layered-audit')}>
                 <Plus size={13} /> Add Record
+              </button>
+              <button
+                className="refresh-btn"
+                disabled={auditRecords.length === 0}
+                onClick={async () => {
+                  try {
+                    const res = await layeredAuditApi.downloadAudit(userId, selectedLayoutId);
+                    const url = URL.createObjectURL(new Blob([res.data]));
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = selectedLayoutId ? `layered_audit_layout_${selectedLayoutId}.xlsx` : 'layered_audit.xlsx';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch { alert('Download failed. Please try again.'); }
+                }}
+              >
+                <Download size={13} /> Download
               </button>
               <button className="refresh-btn" onClick={loadAuditRecords} disabled={loadingAudit}>
                 {loadingAudit ? <Loader size={13} className="spin" /> : '↻'} Refresh
@@ -1364,6 +1644,9 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
               records={auditRecords}
               saveFn={layeredAuditApi.updateAuditRecord}
               onSaved={handleAuditRecordSaved}
+              selectedIds={auditSelectedIds}
+              onToggleSelect={(id) => toggleSelect(setAuditSelectedIds, id)}
+              onToggleAll={(ids) => toggleAll(setAuditSelectedIds, ids)}
             />
           )}
         </div>
@@ -1379,8 +1662,47 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
             </div>
             <div className="master-actions">
               <span className="record-count">{adherenceRecords.length} record{adherenceRecords.length !== 1 ? 's' : ''}</span>
+              {appendStatus && appendContext === 'audit-adherence' && (
+                <span className={`append-status ${appendStatus.error ? 'append-status--error' : appendStatus.loading ? 'append-status--loading' : 'append-status--ok'}`}>
+                  {appendStatus.loading && <Loader size={12} className="spin" />}
+                  {appendStatus.message}
+                </span>
+              )}
+              {adherenceSelectedIds.size > 0 && (
+                <button
+                  className="delete-selected-btn"
+                  onClick={() => setDeleteTarget({ tab: 'audit-adherence', ids: adherenceSelectedIds })}
+                >
+                  <Trash2 size={13} /> Delete Selected ({adherenceSelectedIds.size})
+                </button>
+              )}
+              <button
+                className="append-data-btn"
+                onClick={() => { setAppendContext('audit-adherence'); appendFileInputRef.current?.click(); }}
+                disabled={appendStatus?.loading && appendContext === 'audit-adherence'}
+                title="Append rows from an Excel file without replacing existing data"
+              >
+                <Plus size={13} /> Append Data
+              </button>
               <button className="add-record-btn" onClick={() => setShowAddRecord('audit-adherence')}>
                 <Plus size={13} /> Add Record
+              </button>
+              <button
+                className="refresh-btn"
+                disabled={adherenceRecords.length === 0}
+                onClick={async () => {
+                  try {
+                    const res = await layeredAuditApi.downloadAdherence(userId, selectedLayoutId);
+                    const url = URL.createObjectURL(new Blob([res.data]));
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = selectedLayoutId ? `audit_adherence_layout_${selectedLayoutId}.xlsx` : 'audit_adherence.xlsx';
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  } catch { alert('Download failed. Please try again.'); }
+                }}
+              >
+                <Download size={13} /> Download
               </button>
               <button className="refresh-btn" onClick={loadAdherenceRecords} disabled={loadingAdherence}>
                 {loadingAdherence ? <Loader size={13} className="spin" /> : '↻'} Refresh
@@ -1402,6 +1724,9 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
               records={adherenceRecords}
               saveFn={layeredAuditApi.updateAdherenceRecord}
               onSaved={handleAdherenceRecordSaved}
+              selectedIds={adherenceSelectedIds}
+              onToggleSelect={(id) => toggleSelect(setAdherenceSelectedIds, id)}
+              onToggleAll={(ids) => toggleAll(setAdherenceSelectedIds, ids)}
             />
           )}
         </div>
@@ -1467,6 +1792,28 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
             <h2 className="panel-title">Master Data</h2>
             <div className="master-actions">
               <span className="record-count">{records.length} record{records.length !== 1 ? 's' : ''}</span>
+              {appendStatus && appendContext === 'master' && (
+                <span className={`append-status ${appendStatus.error ? 'append-status--error' : appendStatus.loading ? 'append-status--loading' : 'append-status--ok'}`}>
+                  {appendStatus.loading && <Loader size={12} className="spin" />}
+                  {appendStatus.message}
+                </span>
+              )}
+              {masterSelectedIds.size > 0 && (
+                <button
+                  className="delete-selected-btn"
+                  onClick={() => setDeleteTarget({ tab: 'master', ids: masterSelectedIds })}
+                >
+                  <Trash2 size={13} /> Delete Selected ({masterSelectedIds.size})
+                </button>
+              )}
+              <button
+                className="append-data-btn"
+                onClick={() => { setAppendContext('master'); appendFileInputRef.current?.click(); }}
+                disabled={appendStatus?.loading && appendContext === 'master'}
+                title="Append rows from an Excel file without replacing existing data"
+              >
+                <Plus size={13} /> Append Data
+              </button>
               <button className="add-record-btn" onClick={() => setShowAddRecord('master')}>
                 <Plus size={13} /> Add Record
               </button>
@@ -1530,90 +1877,111 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
             </div>
           )}
 
-          {!loadingRecords && records.length > 0 && (
-            <div className="table-wrapper">
-              <table className="master-table">
-                <thead>
-                  <tr>
-                    {FIXED_COLUMNS.map((col) => (
-                      <th key={col.key} style={{ minWidth: col.width }}>
-                        <div className="col-header-wrap">
-                          <span className="col-header-label">{col.label}</span>
-                          <ColumnFilterDropdown
-                            colKey={col.key}
-                            allValues={masterUniqueValues[col.key] || []}
-                            selectedValues={masterFilters[col.key] ?? null}
-                            onChange={handleMasterFilterChange}
-                          />
-                        </div>
-                      </th>
-                    ))}
-                    {allMonths.map((key) => (
-                      <th key={key} className="month-header">{formatMonthLabel(key)}</th>
-                    ))}
-                    {TRAILING_COLUMNS.map((col) => (
-                      <th key={col.key} style={{ minWidth: col.width }}>
-                        <div className="col-header-wrap">
-                          <span className="col-header-label">{col.label}</span>
-                          <ColumnFilterDropdown
-                            colKey={col.key}
-                            allValues={masterUniqueValues[col.key] || []}
-                            selectedValues={masterFilters[col.key] ?? null}
-                            onChange={handleMasterFilterChange}
-                          />
-                        </div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredMasterRecords.map((rec) => (
-                    <tr key={rec.id}>
-                      {FIXED_COLUMNS.map((col) => (
-                        <EditableCell
-                          key={col.key}
-                          recordId={rec.id}
-                          fieldKey={col.key}
-                          value={rec[col.key]}
-                          type={col.type}
-                          onSaved={handleRecordSaved}
+          {!loadingRecords && records.length > 0 && (() => {
+            const filteredIds = filteredMasterRecords.map((r) => r.id);
+            const allFilteredSelected = filteredIds.length > 0 && filteredIds.every((id) => masterSelectedIds.has(id));
+            return (
+              <div className="table-wrapper">
+                <table className={`master-table${masterSelectedIds.size > 0 ? ' has-selection' : ''}`}>
+                  <thead>
+                    <tr>
+                      <th className="col-checkbox">
+                        <input
+                          type="checkbox"
+                          className="row-checkbox"
+                          checked={allFilteredSelected}
+                          onChange={() => toggleAll(setMasterSelectedIds, filteredIds)}
+                          title={allFilteredSelected ? 'Deselect all visible' : 'Select all visible'}
                         />
+                      </th>
+                      {FIXED_COLUMNS.map((col) => (
+                        <th key={col.key} style={{ minWidth: col.width }}>
+                          <div className="col-header-wrap">
+                            <span className="col-header-label">{col.label}</span>
+                            <ColumnFilterDropdown
+                              colKey={col.key}
+                              allValues={masterUniqueValues[col.key] || []}
+                              selectedValues={masterFilters[col.key] ?? null}
+                              onChange={handleMasterFilterChange}
+                            />
+                          </div>
+                        </th>
                       ))}
                       {allMonths.map((key) => (
-                        <MonthlyCell
-                          key={key}
-                          recordId={rec.id}
-                          monthKey={key}
-                          monthlyData={rec.monthly_data}
-                          onSaved={handleRecordSaved}
-                        />
+                        <th key={key} className="month-header">{formatMonthLabel(key)}</th>
                       ))}
                       {TRAILING_COLUMNS.map((col) => (
-                        <EditableCell
-                          key={col.key}
-                          recordId={rec.id}
-                          fieldKey={col.key}
-                          value={rec[col.key]}
-                          type={col.type}
-                          onSaved={handleRecordSaved}
-                        />
+                        <th key={col.key} style={{ minWidth: col.width }}>
+                          <div className="col-header-wrap">
+                            <span className="col-header-label">{col.label}</span>
+                            <ColumnFilterDropdown
+                              colKey={col.key}
+                              allValues={masterUniqueValues[col.key] || []}
+                              selectedValues={masterFilters[col.key] ?? null}
+                              onChange={handleMasterFilterChange}
+                            />
+                          </div>
+                        </th>
                       ))}
                     </tr>
-                  ))}
-                  {filteredMasterRecords.length === 0 && (
-                    <tr>
-                      <td
-                        colSpan={FIXED_COLUMNS.length + allMonths.length + TRAILING_COLUMNS.length}
-                        className="filter-no-results"
-                      >
-                        No records match the current filter.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {filteredMasterRecords.map((rec) => (
+                      <tr key={rec.id} className={masterSelectedIds.has(rec.id) ? 'row-selected' : ''}>
+                        <td className="col-checkbox">
+                          <input
+                            type="checkbox"
+                            className="row-checkbox"
+                            checked={masterSelectedIds.has(rec.id)}
+                            onChange={() => toggleSelect(setMasterSelectedIds, rec.id)}
+                          />
+                        </td>
+                        {FIXED_COLUMNS.map((col) => (
+                          <EditableCell
+                            key={col.key}
+                            recordId={rec.id}
+                            fieldKey={col.key}
+                            value={rec[col.key]}
+                            type={col.type}
+                            onSaved={handleRecordSaved}
+                          />
+                        ))}
+                        {allMonths.map((key) => (
+                          <MonthlyCell
+                            key={key}
+                            recordId={rec.id}
+                            monthKey={key}
+                            monthlyData={rec.monthly_data}
+                            onSaved={handleRecordSaved}
+                          />
+                        ))}
+                        {TRAILING_COLUMNS.map((col) => (
+                          <EditableCell
+                            key={col.key}
+                            recordId={rec.id}
+                            fieldKey={col.key}
+                            value={rec[col.key]}
+                            type={col.type}
+                            onSaved={handleRecordSaved}
+                          />
+                        ))}
+                      </tr>
+                    ))}
+                    {filteredMasterRecords.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={FIXED_COLUMNS.length + allMonths.length + TRAILING_COLUMNS.length + 1}
+                          className="filter-no-results"
+                        >
+                          No records match the current filter.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -1627,6 +1995,34 @@ export default function InputData({ userId, layouts = [], isActive = true }) {
           layoutId={selectedLayoutId}
           layoutStageIds={layoutStageIds}
         />
+      )}
+
+      {deleteTarget && (
+        <DeleteConfirmModal
+          count={deleteTarget.ids.size}
+          onConfirm={handleDeleteSelected}
+          onClose={() => setDeleteTarget(null)}
+          deleting={deleting}
+        />
+      )}
+
+      {/* Hidden file input for append-from-tab */}
+      <input
+        ref={appendFileInputRef}
+        type="file"
+        accept=".xlsx"
+        className="file-input-hidden"
+        onChange={handleAppendFile}
+      />
+
+      {/* Undo banner */}
+      {undoBuffer && (
+        <div className="undo-banner">
+          <span>{undoBuffer.rows.length} row{undoBuffer.rows.length !== 1 ? 's' : ''} deleted</span>
+          <button className="undo-banner-btn" onClick={handleUndo} disabled={undoing}>
+            {undoing ? <><Loader size={12} className="spin" /> Restoring…</> : '↩ Undo'}
+          </button>
+        </div>
       )}
 
       <HelpGuide {...INPUT_HELP} active={isActive} />

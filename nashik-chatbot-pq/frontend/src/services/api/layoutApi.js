@@ -37,11 +37,12 @@ export const buyoffIconApi = {
 export const bypassIconApi = buyoffIconApi;
 
 export const inputApi = {
-  uploadExcel: (file, userId, layoutId) => {
+  uploadExcel: (file, userId, layoutId, mode = 'replace') => {
     const formData = new FormData();
     formData.append('file', file);
     if (userId != null) formData.append('user_id', userId);
     if (layoutId != null) formData.append('layout_id', layoutId);
+    formData.append('mode', mode);
     return axios.post(`${BASE_URL}/input/upload`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -53,6 +54,7 @@ export const inputApi = {
     return api.get('/input/records', { params });
   },
   updateRecord: (id, data) => api.put(`/input/records/${id}`, data),
+  deleteRecord: (id) => api.delete(`/input/records/${id}`),
   createRecord: (data, userId, layoutId) => {
     const params = {};
     if (userId != null) params.user_id = userId;
@@ -68,11 +70,12 @@ export const inputApi = {
 };
 
 export const layeredAuditApi = {
-  uploadAudit: (file, userId, layoutId) => {
+  uploadAudit: (file, userId, layoutId, mode = 'replace') => {
     const formData = new FormData();
     formData.append('file', file);
     if (userId != null) formData.append('user_id', userId);
     if (layoutId != null) formData.append('layout_id', layoutId);
+    formData.append('mode', mode);
     return axios.post(`${BASE_URL}/layered-audit/upload`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -83,11 +86,12 @@ export const layeredAuditApi = {
     if (layoutId != null) params.layout_id = layoutId;
     return api.get('/layered-audit/records', { params });
   },
-  uploadAdherence: (file, userId, layoutId) => {
+  uploadAdherence: (file, userId, layoutId, mode = 'replace') => {
     const formData = new FormData();
     formData.append('file', file);
     if (userId != null) formData.append('user_id', userId);
     if (layoutId != null) formData.append('layout_id', layoutId);
+    formData.append('mode', mode);
     return axios.post(`${BASE_URL}/layered-audit/adherence/upload`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
@@ -98,8 +102,22 @@ export const layeredAuditApi = {
     if (layoutId != null) params.layout_id = layoutId;
     return api.get('/layered-audit/adherence/records', { params });
   },
-  updateAuditRecord:     (id, data) => api.put(`/layered-audit/records/${id}`, data),
-  updateAdherenceRecord: (id, data) => api.put(`/layered-audit/adherence/records/${id}`, data),
+  updateAuditRecord:       (id, data) => api.put(`/layered-audit/records/${id}`, data),
+  deleteAuditRecord:       (id) => api.delete(`/layered-audit/records/${id}`),
+  downloadAudit: (userId, layoutId) => {
+    const params = {};
+    if (userId != null) params.user_id = userId;
+    if (layoutId != null) params.layout_id = layoutId;
+    return axios.get(`${BASE_URL}/layered-audit/download`, { params, responseType: 'blob' });
+  },
+  updateAdherenceRecord:   (id, data) => api.put(`/layered-audit/adherence/records/${id}`, data),
+  deleteAdherenceRecord:   (id) => api.delete(`/layered-audit/adherence/records/${id}`),
+  downloadAdherence: (userId, layoutId) => {
+    const params = {};
+    if (userId != null) params.user_id = userId;
+    if (layoutId != null) params.layout_id = layoutId;
+    return axios.get(`${BASE_URL}/layered-audit/adherence/download`, { params, responseType: 'blob' });
+  },
   createAuditRecord: (data, userId, layoutId) => {
     const params = {};
     if (userId != null) params.user_id = userId;

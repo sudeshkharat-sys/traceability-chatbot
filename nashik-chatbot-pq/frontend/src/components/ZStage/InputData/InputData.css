@@ -1456,3 +1456,224 @@
   font-size: 12px;
   margin-top: 10px;
 }
+
+/* ── Upload mode toggle ──────────────────────────────────────────────────── */
+.upload-mode-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 8px;
+}
+
+.upload-mode-label {
+  font-size: 12px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.upload-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #374151;
+  background: #f3f4f6;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+
+.upload-mode-option input[type="radio"] {
+  display: none;
+}
+
+.upload-mode-option.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+/* ── Row checkbox column ─────────────────────────────────────────────────── */
+.col-checkbox {
+  width: 36px;
+  min-width: 36px;
+  text-align: center;
+  padding: 0 6px !important;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: inherit;
+}
+
+.row-checkbox {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: #2563eb;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+/* Show on row hover */
+tr:hover .row-checkbox { opacity: 1; }
+
+/* Show all once any row is selected (class added to table element via JS) */
+.has-selection .row-checkbox { opacity: 1; }
+
+/* Always show a checked checkbox */
+.row-checkbox:checked { opacity: 1; }
+
+/* Header select-all checkbox always visible */
+thead .row-checkbox { opacity: 1; }
+
+.row-selected td {
+  background: #eff6ff !important;
+}
+
+/* ── Delete Selected button ──────────────────────────────────────────────── */
+.delete-selected-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 6px;
+  border: 1.5px solid #ef4444;
+  background: #fff;
+  color: #ef4444;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.delete-selected-btn:hover {
+  background: #ef4444;
+  color: #fff;
+}
+
+/* ── Delete confirmation modal ───────────────────────────────────────────── */
+.delete-confirm-modal {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  width: 360px;
+  max-width: 95vw;
+  padding: 0;
+  overflow: hidden;
+}
+
+.delete-confirm-text {
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.modal-confirm--danger {
+  background: #ef4444 !important;
+  border-color: #ef4444 !important;
+}
+
+.modal-confirm--danger:hover:not(:disabled) {
+  background: #dc2626 !important;
+  border-color: #dc2626 !important;
+}
+
+/* ── Append Data button ──────────────────────────────────────────────────── */
+.append-data-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 11px;
+  border-radius: 6px;
+  border: 1.5px solid #2563eb;
+  background: #eff6ff;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.append-data-btn:hover:not(:disabled) {
+  background: #2563eb;
+  color: #fff;
+}
+
+.append-data-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Append status inline badge ──────────────────────────────────────────── */
+.append-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.append-status--loading {
+  background: #f0f9ff;
+  color: #0369a1;
+}
+
+.append-status--ok {
+  background: #f0fdf4;
+  color: #15803d;
+}
+
+.append-status--error {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+/* ── Undo banner ─────────────────────────────────────────────────────────── */
+.undo-banner {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: #1f2937;
+  color: #f9fafb;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  z-index: 10000;
+  animation: slideUp 0.2s ease;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+.undo-banner-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.undo-banner-btn:hover:not(:disabled) { background: #2563eb; }
+.undo-banner-btn:disabled { opacity: 0.6; cursor: not-allowed; }

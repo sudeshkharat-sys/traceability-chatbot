@@ -108,23 +108,21 @@ def _safe_date(value) -> str | None:
 
 
 def _parse_excel(file_bytes: bytes) -> list[dict]:
+    """Original positional parser — used for Replace All uploads (full template expected)."""
     wb = openpyxl.load_workbook(
         io.BytesIO(file_bytes), data_only=True, read_only=True
     )
     ws = wb.active
 
-    # ── Detect column positions from header row ───────────────────────────────
-    # Month columns are datetime objects in the header.
-    # Trailing columns are matched by header text.
-    monthly_col_map: dict[int, str] = {}   # col_index → "YYYY-MM"
-    field_defect_col: int = 45             # fallback default
-    status_3m_col: int = 46               # fallback default
+    monthly_col_map: dict[int, str] = {}
+    field_defect_col: int = 45
+    status_3m_col: int = 46
 
     rows_iter = ws.iter_rows(values_only=True)
     first_row = next(rows_iter, None)
     if first_row:
         for col_idx, cell_val in enumerate(first_row):
-            if hasattr(cell_val, "year"):  # datetime → monthly column
+            if hasattr(cell_val, "year"):
                 key = f"{cell_val.year}-{str(cell_val.month).zfill(2)}"
                 monthly_col_map[col_idx] = key
             elif isinstance(cell_val, str):
@@ -137,9 +135,8 @@ def _parse_excel(file_bytes: bytes) -> list[dict]:
     records = []
     for row in rows_iter:
         if not any(v is not None for v in row):
-            continue  # skip empty rows
+            continue
 
-        # Monthly data: use dynamic column map from header
         monthly = {}
         for col_idx, key in monthly_col_map.items():
             val = row[col_idx] if len(row) > col_idx else None
@@ -149,7 +146,6 @@ def _parse_excel(file_bytes: bytes) -> list[dict]:
                 except (ValueError, TypeError):
                     pass
 
-        # Compute total from parsed monthly values if Excel formula was used
         total_raw = row[17] if len(row) > 17 else None
         total = _safe_int(total_raw) if not (
             total_raw and str(total_raw).startswith("=")
@@ -182,6 +178,110 @@ def _parse_excel(file_bytes: bytes) -> list[dict]:
     return records
 
 
+_MASTER_COL_MAP = {
+    "concern id":                   "concern_id",
+    "concern":                      "concern",
+    "type":                         "type",
+    "root cause":                   "root_cause",
+    "action plan":                  "action_plan",
+    "target date":                  "target_date",
+    "closure date":                 "closure_date",
+    "ryg":                          "ryg",
+    "attri.":                       "attri",
+    "attri":                        "attri",
+    "comm":                         "comm",
+    "commodity":                    "comm",
+    "line":                         "line",
+    "stage no":                     "stage_no",
+    "z/e":                          "z_e",
+    "attribution":                  "attribution",
+    "part":                         "part",
+    "phenomena":                    "phenomena",
+    "total incidences":             "total_incidences",
+    "total incidenes":              "total_incidences",
+    "field defect after cut off":   "field_defect_after_cutoff",
+    "field defect after cutoff":    "field_defect_after_cutoff",
+    "status (3 month basis)":       "status_3m",
+    "status (3m)":                  "status_3m",
+    "status 3m":                    "status_3m",
+}
+
+
+def _parse_excel_append(file_bytes: bytes) -> list[dict]:
+    """Header-name-based parser — used for Append mode (columns may be missing/reordered)."""
+    wb = openpyxl.load_workbook(
+        io.BytesIO(file_bytes), data_only=True, read_only=True
+    )
+    ws = wb.active
+
+    rows_iter = ws.iter_rows(values_only=True)
+    first_row = next(rows_iter, None)
+    if not first_row:
+        return []
+
+    field_col: dict[str, int] = {}
+    monthly_col_map: dict[int, str] = {}
+
+    for col_idx, cell_val in enumerate(first_row):
+        if hasattr(cell_val, "year"):
+            key = f"{cell_val.year}-{str(cell_val.month).zfill(2)}"
+            monthly_col_map[col_idx] = key
+        elif isinstance(cell_val, str):
+            clean = cell_val.strip().lower().replace("\n", " ").replace("  ", " ")
+            field = _MASTER_COL_MAP.get(clean)
+            if field and field not in field_col:
+                field_col[field] = col_idx
+
+    def _col(row, field):
+        idx = field_col.get(field)
+        return row[idx] if idx is not None and len(row) > idx else None
+
+    records = []
+    for row in rows_iter:
+        if not any(v is not None for v in row):
+            continue
+
+        monthly = {}
+        for col_idx, key in monthly_col_map.items():
+            val = row[col_idx] if len(row) > col_idx else None
+            if val is not None:
+                try:
+                    monthly[key] = int(val)
+                except (ValueError, TypeError):
+                    pass
+
+        total_raw = _col(row, "total_incidences")
+        total = _safe_int(total_raw) if not (
+            total_raw and str(total_raw).startswith("=")
+        ) else sum(monthly.values())
+
+        records.append({
+            "sr_no":                     len(records) + 1,
+            "concern_id":                _safe_str(_col(row, "concern_id")),
+            "concern":                   _safe_str(_col(row, "concern")),
+            "type":                      _safe_str(_col(row, "type")),
+            "root_cause":                _safe_str(_col(row, "root_cause")),
+            "action_plan":               _safe_str(_col(row, "action_plan")),
+            "target_date":               _safe_date(_col(row, "target_date")),
+            "closure_date":              _safe_date(_col(row, "closure_date")),
+            "ryg":                       _safe_str(_col(row, "ryg")),
+            "attri":                     _normalise_attri(_safe_str(_col(row, "attri"))),
+            "comm":                      _safe_str(_col(row, "comm")),
+            "line":                      _safe_str(_col(row, "line")),
+            "stage_no":                  _safe_str(_col(row, "stage_no")),
+            "z_e":                       _safe_str(_col(row, "z_e")),
+            "attribution":               _safe_str(_col(row, "attribution")),
+            "part":                      _safe_str(_col(row, "part")),
+            "phenomena":                 _safe_str(_col(row, "phenomena")),
+            "total_incidences":          total,
+            "monthly_data":              json.dumps(monthly) if monthly else None,
+            "field_defect_after_cutoff": _safe_int(_col(row, "field_defect_after_cutoff")),
+            "status_3m":                 _safe_str(_col(row, "status_3m")),
+        })
+
+    return records
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.post("/upload", response_model=schemas.UploadResponse, status_code=201)
@@ -189,6 +289,7 @@ async def upload_excel(
     file: UploadFile = File(...),
     user_id: Optional[int] = Form(None),
     layout_id: Optional[int] = Form(None),
+    mode: str = Form("replace"),
     connector: StateDBConnector = Depends(get_connector),
 ):
     if not file.filename.endswith(".xlsx"):
@@ -196,7 +297,7 @@ async def upload_excel(
 
     file_bytes = await file.read()
     try:
-        records = _parse_excel(file_bytes)
+        records = _parse_excel_append(file_bytes) if mode == "append" else _parse_excel(file_bytes)
     except Exception as exc:
         logger.error(f"Excel parse error: {exc}")
         raise HTTPException(status_code=422, detail=f"Failed to parse Excel: {exc}")
@@ -220,20 +321,34 @@ async def upload_excel(
             detail=f"All rows were invalid and skipped. No records imported.",
         )
 
-    # Full replace for this user+layout scope, then insert fresh ones
-    connector.execute_update(
-        InputRecordQueries.DELETE_ALL,
-        {"user_id": user_id, "layout_id": layout_id},
-    )
-
-    for rec in valid_records:
-        rec["user_id"] = user_id
-        rec["layout_id"] = layout_id
-        connector.execute_query(InputRecordQueries.CREATE, rec)
+    if mode == "append":
+        # Keep existing rows; re-number new rows starting after the current max sr_no
+        max_rows = connector.execute_query(
+            InputRecordQueries.GET_MAX_SR_NO,
+            {"user_id": user_id, "layout_id": layout_id},
+        )
+        offset = int(max_rows[0][0]) if max_rows else 0
+        for idx, rec in enumerate(valid_records, start=1):
+            rec["sr_no"] = offset + idx
+            rec["user_id"] = user_id
+            rec["layout_id"] = layout_id
+            connector.execute_query(InputRecordQueries.CREATE, rec)
+        action_word = "appended"
+    else:
+        # Full replace for this user+layout scope, then insert fresh ones
+        connector.execute_update(
+            InputRecordQueries.DELETE_ALL,
+            {"user_id": user_id, "layout_id": layout_id},
+        )
+        for rec in valid_records:
+            rec["user_id"] = user_id
+            rec["layout_id"] = layout_id
+            connector.execute_query(InputRecordQueries.CREATE, rec)
+        action_word = "imported"
 
     skipped_out = [{"row_number": s["row_number"], "reason": s["reason"]} for s in skipped]
     return {
-        "message": "Upload successful",
+        "message": f"Upload successful — {len(valid_records)} rows {action_word}",
         "rows_imported": len(valid_records),
         "skipped_rows": skipped_out if skipped_out else None,
     }
@@ -325,6 +440,19 @@ def update_record(
     if not rows:
         raise HTTPException(status_code=500, detail="Failed to update record")
     return _row_to_dict(rows[0])
+
+
+@router.delete("/records/{record_id}", status_code=204)
+def delete_record(
+    record_id: int,
+    connector: StateDBConnector = Depends(get_connector),
+):
+    exists = connector.execute_query(
+        InputRecordQueries.CHECK_EXISTS, {"record_id": record_id}
+    )
+    if not exists:
+        raise HTTPException(status_code=404, detail="Record not found")
+    connector.execute_update(InputRecordQueries.DELETE_BY_ID, {"record_id": record_id})
 
 
 # ── Download endpoint ─────────────────────────────────────────────────────────
