@@ -14,11 +14,11 @@ const BASE_ENABLED = ["traceability", "guideline", "part-labeler", "part-labeler
 const PART_LABELER_ALLOWED = ["part-labeler", "part-labeler-plant", "part-labeler-ev"];
 
 const ROLE_ALLOWED = {
-  user:               ["traceability", "guideline"],
+  user:               ["part-labeler"],
   part_labeler:       ["part-labeler", "part-labeler-plant"],
   part_labeler_field: ["part-labeler"],
-  part_labeler_plant: ["part-labeler-plant"],
-  part_labeler_ev:    ["part-labeler-ev"],
+  part_labeler_plant: ["part-labeler-plant", "z-stage"],
+  part_labeler_ev:    ["part-labeler-ev", "z-stage"],
 };
 
 function LandingPage() {
