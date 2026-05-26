@@ -25,11 +25,12 @@ If the question spans multiple sources, query all relevant ones and combine the 
 
 | Table | Contains | Keywords |
 |---|---|---|
-| raw_warranty_data | Warranty claims after vehicle sale | warranty, claim, failure, field issue, customer |
+| raw_warranty_data | Warranty claims after vehicle sale (ICE) | warranty, claim, failure, field issue, customer |
 | raw_rpt_data | In-plant defects during manufacturing | RPT, in-plant, manufacturing, production, line defect |
 | raw_gnovac_data | GNOVAC audit findings + corrective actions | GNOVAC, audit, root cause, corrective action |
 | raw_rfi_data | Field defect reports with severity | RFI, field report, severity, attribution |
 | raw_esqa_data | Supplier concern + rejection quantities | eSQA, supplier, rejection, vendor concern |
+| raw_ev_data | EV warranty claims — searched by part_updated only | EV, electric vehicle, battery, motor, BRC, HV battery, PVT |
 
 ## WORKFLOW
 

@@ -10,13 +10,14 @@ import utilityLogo from "../assests/image.png";
 import mahindraRiseLogo from "../assests/mahindra_rise_logo.png";
 import { authService } from "../services/api";
 
-const BASE_ENABLED = ["traceability", "guideline", "part-labeler", "part-labeler-plant", "z-stage", "qlense"];
-const PART_LABELER_ALLOWED = ["part-labeler", "part-labeler-plant"];
+const BASE_ENABLED = ["traceability", "guideline", "part-labeler", "part-labeler-plant", "part-labeler-ev", "z-stage", "qlense"];
+const PART_LABELER_ALLOWED = ["part-labeler", "part-labeler-plant", "part-labeler-ev"];
 
 const ROLE_ALLOWED = {
-  part_labeler:       ["part-labeler", "part-labeler-plant"],
+  part_labeler:       ["part-labeler", "part-labeler-plant", "part-labeler-ev"],
   part_labeler_field: ["part-labeler"],
   part_labeler_plant: ["part-labeler-plant", "z-stage"],
+  part_labeler_ev:    ["part-labeler-ev"],
 };
 
 function LandingPage() {
@@ -73,6 +74,13 @@ function LandingPage() {
       icon: dashboardIcon,
       description: "Interactive failure trend analysis across all data sources",
       route: "/part-labeler?mode=plant",
+    },
+    {
+      id: "part-labeler-ev",
+      title: "Part Sense Visualizer EV",
+      icon: dashboardIcon,
+      description: "EV warranty failure trend analysis by part",
+      route: "/part-labeler?mode=ev",
     },
     {
       id: "z-stage",
