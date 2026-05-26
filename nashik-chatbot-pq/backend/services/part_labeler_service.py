@@ -359,13 +359,14 @@ class PartLabelerService:
     # =====================================================
 
     def get_data_status(self, user_id: int) -> dict:
-        """Return which of the 5 data sources have rows uploaded for this user."""
+        """Return which of the data sources have rows uploaded for this user."""
         sources = {
             "warranty": "raw_warranty_data",
             "rpt":      "raw_rpt_data",
             "gnovac":   "raw_gnovac_data",
             "rfi":      "raw_rfi_data",
             "esqa":     "raw_esqa_data",
+            "ev":       "raw_ev_data",
         }
         status = {}
         for key, table in sources.items():
@@ -387,6 +388,8 @@ class PartLabelerService:
             return self.process_mapped_rfi_data(file_path, mapping, user_id)
         elif data_source == 'esqa':
             return self.process_mapped_esqa_data(file_path, mapping, user_id)
+        elif data_source == 'ev':
+            return self.process_mapped_ev_data(file_path, mapping, user_id)
         else:
             return self.process_mapped_warranty_data(file_path, mapping, user_id)
 
@@ -400,10 +403,12 @@ class PartLabelerService:
             return self.get_rfi_filter_options(user_id)
         elif data_source == 'esqa':
             return self.get_esqa_filter_options(user_id)
+        elif data_source == 'ev':
+            return self.get_ev_filter_options(user_id)
         else:
             return self.get_filter_options(user_id)
 
-    def get_source_data(self, user_id: int, part_name: Optional[str], month, base_model, mis_bucket, mfg_qtr, data_source: str, buyoff_stage=None, online_offline=None, defect_type=None) -> Any:
+    def get_source_data(self, user_id: int, part_name: Optional[str], month, base_model, mis_bucket, mfg_qtr, data_source: str, buyoff_stage=None, online_offline=None, defect_type=None, battery_motor=None) -> Any:
         """Dispatch data lookup to the correct method based on data_source."""
         if data_source == 'rpt':
             return self.get_rpt_data(user_id, part_name, month, base_model, mis_bucket, mfg_qtr, buyoff_stage, online_offline)
@@ -413,10 +418,12 @@ class PartLabelerService:
             return self.get_rfi_data(user_id, part_name, month, base_model, mis_bucket, mfg_qtr, defect_type)
         elif data_source == 'esqa':
             return self.get_esqa_data(user_id, part_name, month, base_model, mis_bucket, mfg_qtr)
+        elif data_source == 'ev':
+            return self.get_ev_data(user_id, part_name, month, base_model, mis_bucket, mfg_qtr, battery_motor)
         else:
             return self.get_warranty_data(user_id, part_name, month, base_model, mis_bucket, mfg_qtr)
 
-    def get_dashboard_data_for_source(self, user_id: int, part_name, month, base_model, mis_bucket, mfg_qtr, data_source: str, buyoff_stage=None, online_offline=None, defect_type=None) -> Dict[str, Any]:
+    def get_dashboard_data_for_source(self, user_id: int, part_name, month, base_model, mis_bucket, mfg_qtr, data_source: str, buyoff_stage=None, online_offline=None, defect_type=None, battery_motor=None) -> Dict[str, Any]:
         """Dispatch dashboard data to the correct method based on data_source."""
         if data_source == 'rpt':
             return self.get_rpt_dashboard_data(user_id, part_name, month, base_model, mis_bucket, mfg_qtr, buyoff_stage, online_offline)
@@ -426,6 +433,8 @@ class PartLabelerService:
             return self.get_rfi_dashboard_data(user_id, part_name, month, base_model, mis_bucket, mfg_qtr, defect_type)
         elif data_source == 'esqa':
             return self.get_esqa_dashboard_data(user_id, part_name, month, base_model, mis_bucket, mfg_qtr)
+        elif data_source == 'ev':
+            return self.get_ev_dashboard_data(user_id, part_name, month, base_model, mis_bucket, mfg_qtr, battery_motor)
         else:
             return self.get_dashboard_data(user_id, part_name, month, base_model, mis_bucket, mfg_qtr)
 
@@ -939,3 +948,116 @@ class PartLabelerService:
         except Exception as e:
             logger.error(f"Global error fetching dashboard data: {e}")
             return result
+
+    # =====================================================
+    # EV WARRANTY METHODS
+    # =====================================================
+
+    def process_mapped_ev_data(self, file_path: str, mapping: Dict[str, str], user_id: int) -> int:
+        try:
+            df = pd.read_csv(file_path) if file_path.endswith('.csv') else pd.read_excel(file_path)
+            all_cols = [
+                'report_date', 'mfg_month', 'mfg_quarter', 'reporting_month', 'dealer_name',
+                'location', 'state', 'brc_location', 'tar_no', 'vin_number', 'model',
+                'problem_description', 'tekline_name', 'failure_category', 'rca', 'remarks_brc',
+                'warranty_insurance', 'reason_of_failure', 'battery_motor', 'pvt_id', 'pvt_sno',
+                'cause_pvt_list', 'kms', 'km_range', 'repaired_replaced', 'quality', 'repair_status',
+                'part_updated', 'retail_date', 'no_of_days', 'mis', 'failure_mode',
+            ]
+            records = []
+            for _, row in df.iterrows():
+                record = {col: '' for col in all_cols}
+                record['user_id'] = user_id
+                for db_col, user_col in mapping.items():
+                    if user_col in row:
+                        record[db_col] = safe_str(row[user_col]).strip()
+                record['mfg_month'] = derive_mfg_month(record['mfg_month'] or record['report_date'])
+                record['mfg_quarter'] = derive_mfg_quarter(record['mfg_month'])
+                record['reporting_month'] = derive_mfg_month(record['reporting_month'])
+                record['model'] = record['model'].strip()
+                records.append(record)
+                if len(records) >= 500:
+                    self._insert_batch_ev(records)
+                    records = []
+            if records:
+                self._insert_batch_ev(records)
+            return len(df)
+        except Exception as e:
+            logger.error(f"Error processing EV data: {e}")
+            raise
+
+    def _insert_batch_ev(self, records):
+        with self.db.get_session() as session:
+            session.execute(text(PartLabelerQueries.INSERT_RAW_EV), records)
+
+    def get_ev_filter_options(self, user_id: int) -> Dict[str, List[str]]:
+        params = {"user_id": user_id}
+        return {
+            "models": [r[0] for r in self.db.execute_query(PartLabelerQueries.EV_GET_UNIQUE_MODELS, params) if r[0]],
+            "mis_buckets": [r[0] for r in self.db.execute_query(PartLabelerQueries.EV_GET_UNIQUE_MIS, params)],
+            "mfg_quarters": [r[0] for r in self.db.execute_query(PartLabelerQueries.EV_GET_UNIQUE_MFG_QUARTERS, params)],
+            "mfg_months": [r[0] for r in self.db.execute_query(PartLabelerQueries.EV_GET_UNIQUE_MFG_MONTHS, params)],
+            "battery_motor_options": [r[0] for r in self.db.execute_query(PartLabelerQueries.EV_GET_UNIQUE_BATTERY_MOTOR, params)],
+        }
+
+    def get_ev_data(self, user_id: int, part_name=None, month=None, base_model=None, mis_bucket=None, mfg_qtr=None, battery_motor=None) -> Any:
+        try:
+            params = {
+                "base_model": base_model if base_model and "All" not in base_model else None,
+                "mis_bucket": mis_bucket if mis_bucket and "All" not in mis_bucket else None,
+                "mfg_qtr": mfg_qtr if mfg_qtr and "All" not in mfg_qtr else None,
+                "battery_motor": battery_motor if battery_motor and "All" not in battery_motor else None,
+                "user_id": user_id,
+            }
+            if part_name:
+                params["search_term"] = f"%{part_name.lower().replace(' ', '')}%"
+                rows = self.db.execute_query(PartLabelerQueries.EV_SEARCH_DATA, params)
+            else:
+                rows = []
+            data = [{"partName": r[0], "month": r[1], "failureCount": r[2], "description": r[3]} for r in rows]
+            if month and "All" not in month:
+                data = [d for d in data if d['month'] in month]
+            return data
+        except Exception as e:
+            logger.error(f"EV data lookup error: {e}")
+            return {"error": str(e)}
+
+    def get_ev_dashboard_data(self, user_id: int, part_name=None, month=None, base_model=None, mis_bucket=None, mfg_qtr=None, battery_motor=None) -> Dict[str, Any]:
+        result = {"mfgMonth": [], "reportingMonth": [], "kms": [], "region": []}
+        search_terms = [f"%{p.lower().replace(' ', '')}%" for p in part_name if p] if part_name else None
+        params = {
+            "user_id": user_id,
+            "month_val": month if month and "All" not in month else None,
+            "base_model": base_model if base_model and "All" not in base_model else None,
+            "mis_bucket": mis_bucket if mis_bucket and "All" not in mis_bucket else None,
+            "mfg_qtr": mfg_qtr if mfg_qtr and "All" not in mfg_qtr else None,
+            "battery_motor": battery_motor if battery_motor and "All" not in battery_motor else None,
+            "search_terms": search_terms,
+        }
+        try:
+            range_row = self.db.execute_query(
+                "SELECT MIN(TO_DATE(mfg_month, 'Mon-YY')), MAX(TO_DATE(mfg_month, 'Mon-YY')) FROM raw_ev_data WHERE user_id = :user_id AND mfg_month IS NOT NULL AND mfg_month != ''",
+                {"user_id": user_id}
+            )
+            if range_row and range_row[0][0] and range_row[0][1]:
+                min_date, max_date = range_row[0]
+                sequence = generate_month_sequence(min_date, max_date)
+                db_data = {}
+                if search_terms:
+                    db_data = {r[0]: r[1] for r in self.db.execute_query(PartLabelerQueries.EV_GET_DASHBOARD_MFG_MONTH, params)}
+                result["mfgMonth"] = [{"label": m, "value": db_data.get(m, 0)} for m in sequence]
+        except Exception as e:
+            logger.error(f"EV mfgMonth error: {e}")
+        try:
+            result["reportingMonth"] = [{"label": r[0], "value": r[1]} for r in self.db.execute_query(PartLabelerQueries.EV_GET_DASHBOARD_REPORTING_MONTH, params)]
+        except Exception as e:
+            logger.error(f"EV reportingMonth error: {e}")
+        try:
+            result["kms"] = [{"label": r[0], "value": r[1]} for r in self.db.execute_query(PartLabelerQueries.EV_GET_DASHBOARD_KM_RANGE, params)]
+        except Exception as e:
+            logger.error(f"EV km range error: {e}")
+        try:
+            result["region"] = [{"label": r[0], "value": r[1]} for r in self.db.execute_query(PartLabelerQueries.EV_GET_DASHBOARD_STATE, params)]
+        except Exception as e:
+            logger.error(f"EV state error: {e}")
+        return result

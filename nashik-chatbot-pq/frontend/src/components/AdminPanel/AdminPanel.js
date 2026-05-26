@@ -5,7 +5,7 @@ import authService from "../../services/api/authService";
 import utilityLogo from "../../assests/image.png";
 import "./AdminPanel.css";
 
-const ROLES = ["admin", "user", "part_labeler", "part_labeler_field", "part_labeler_plant"];
+const ROLES = ["admin", "user", "part_labeler", "part_labeler_field", "part_labeler_plant", "part_labeler_ev"];
 
 const EMPTY_FORM = { username: "", first_name: "", last_name: "", email: "", password: "", role: "user" };
 

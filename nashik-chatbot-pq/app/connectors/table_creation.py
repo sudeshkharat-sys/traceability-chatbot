@@ -681,6 +681,59 @@ create_dynamic_table(
     ],
 )
 
+# =====================================================
+# EV WARRANTY DATA TABLE
+# =====================================================
+ev_id_seq = Sequence("raw_ev_data_id_seq")
+create_dynamic_table(
+    "raw_ev_data",
+    [
+        Column("id", BigInteger, ev_id_seq, primary_key=True, server_default=ev_id_seq.next_value()),
+        Column("report_date", Text),          # Report Date (raw)
+        Column("mfg_month", Text),            # Derived: "Nov-24"
+        Column("mfg_quarter", Text),          # Derived: "Nov24-Jan25"
+        Column("reporting_month", Text),      # Derived: "Apr-25"
+        Column("dealer_name", Text),          # Dealer Name and address
+        Column("location", Text),             # Location
+        Column("state", Text),                # State (region chart)
+        Column("brc_location", Text),         # BRC location
+        Column("tar_no", Text),               # TAR No
+        Column("vin_number", Text),           # VIN Number
+        Column("model", Text),                # Model (model filter)
+        Column("problem_description", Text),  # Problem Description
+        Column("tekline_name", Text),         # Tekline Name
+        Column("failure_category", Text),     # Failure Category
+        Column("rca", Text),                  # RCA
+        Column("remarks_brc", Text),          # Remarks from BRC
+        Column("warranty_insurance", Text),   # Warranty/Insurance
+        Column("reason_of_failure", Text),    # Reason of failure
+        Column("battery_motor", Text),        # Battery/Motor (EV filter)
+        Column("pvt_id", Text),               # PVT ID
+        Column("pvt_sno", Text),              # PVT S. No
+        Column("cause_pvt_list", Text),       # Cause-PVT list
+        Column("kms", Text),                  # Kms (raw)
+        Column("km_range", Text),             # KM Range (km chart)
+        Column("repaired_replaced", Text),    # Repaired / Replaced
+        Column("quality", Text),              # Quality
+        Column("repair_status", Text),        # Repair Status
+        Column("part_updated", Text),         # Part Updated (failure search)
+        Column("retail_date", Text),          # Retail date
+        Column("no_of_days", Text),           # No. of Days
+        Column("mis", Text),                  # MIS (MIS filter)
+        Column("failure_mode", Text),         # Failure mode
+        Column("user_id", BigInteger, nullable=True),
+        Column("created_at", DateTime, server_default=text("CURRENT_TIMESTAMP"), nullable=False),
+    ],
+    indexes=[
+        Index("idx_raw_ev_user_id", "user_id"),
+        Index("idx_raw_ev_user_month", "user_id", "mfg_month"),
+        Index("idx_raw_ev_user_model", "user_id", "model"),
+        Index("idx_raw_ev_user_mis", "user_id", "mis"),
+        Index("idx_raw_ev_user_qtr", "user_id", "mfg_quarter"),
+        Index("idx_raw_ev_user_battery", "user_id", "battery_motor"),
+    ],
+)
+
 logger.info("All table definitions created successfully")
 
 

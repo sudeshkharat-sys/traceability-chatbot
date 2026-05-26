@@ -273,6 +273,47 @@ const DATA_SOURCES = {
       { key: 'esqa_posting_date', label: 'ESQA Posting Date', group: 'ESQA' },
     ],
   },
+  ev: {
+    key: 'ev',
+    label: 'EV Warranty Data',
+    chartTitles: {
+      mfgMonth: 'Vehicle Mfg Month Wise Data',
+      reportingMonth: 'Reporting Month Wise Data',
+      kms: 'KM Range Wise Data',
+      region: 'State Wise Distribution',
+    },
+    useMapForRegion: true,
+    targetColumns: [
+      { key: 'part_updated', label: 'Part Updated', mandatory: true, group: 'Required', hint: 'Used for failure search' },
+      { key: 'model', label: 'Model', mandatory: true, group: 'Required', hint: 'Used for Model filter' },
+      { key: 'mfg_month', label: 'Mfg Month', mandatory: true, group: 'Required', hint: 'e.g. 2025-01-01' },
+      { key: 'reporting_month', label: 'Reporting Month', mandatory: true, group: 'Required' },
+      { key: 'mis', label: 'MIS', mandatory: true, group: 'Required', hint: 'Used for MIS filter' },
+      { key: 'battery_motor', label: 'Battery/Motor', mandatory: true, group: 'Required', hint: 'Used for Battery/Motor filter' },
+      { key: 'km_range', label: 'KM Range', mandatory: true, group: 'Required', hint: 'Used for KM Range chart' },
+      { key: 'state', label: 'State', mandatory: true, group: 'Required', hint: 'Used for State chart' },
+      { key: 'report_date', label: 'Report Date', group: 'Vehicle Info' },
+      { key: 'dealer_name', label: 'Dealer Name and address', group: 'Vehicle Info' },
+      { key: 'location', label: 'Location', group: 'Vehicle Info' },
+      { key: 'brc_location', label: 'BRC location', group: 'Vehicle Info' },
+      { key: 'tar_no', label: 'TAR No', group: 'Vehicle Info' },
+      { key: 'vin_number', label: 'VIN Number', group: 'Vehicle Info' },
+      { key: 'tekline_name', label: 'Tekline Name', group: 'Details' },
+      { key: 'failure_category', label: 'Failure Category', group: 'Details' },
+      { key: 'rca', label: 'RCA', group: 'Details' },
+      { key: 'warranty_insurance', label: 'Warranty/Insurance', group: 'Details' },
+      { key: 'reason_of_failure', label: 'Reason of failure', group: 'Details' },
+      { key: 'pvt_id', label: 'PVT ID', group: 'Details' },
+      { key: 'pvt_sno', label: 'PVT S. No', group: 'Details' },
+      { key: 'cause_pvt_list', label: 'Cause-PVT list', group: 'Details' },
+      { key: 'kms', label: 'Kms', group: 'Details' },
+      { key: 'repaired_replaced', label: 'Repaired / Replaced', group: 'Details' },
+      { key: 'repair_status', label: 'Repair Status', group: 'Details' },
+      { key: 'retail_date', label: 'Retail date', group: 'Details' },
+      { key: 'no_of_days', label: 'No. of Days', group: 'Details' },
+      { key: 'failure_mode', label: 'Failure mode', group: 'Details' },
+    ],
+  },
   all: {
     key: 'all',
     label: 'All Sources',
@@ -492,6 +533,7 @@ function PartLabeler() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isPlantMode = searchParams.get('mode') === 'plant';
+  const isEvMode = searchParams.get('mode') === 'ev';
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const settingsMenuRef = useRef(null);
   const currentUsername = authService.getFullName();
@@ -501,7 +543,10 @@ function PartLabeler() {
     return id ? parseInt(id, 10) : null;
   });
 
-  const [dataSource, setDataSource] = useState('warranty');
+  const [dataSource, setDataSource] = useState(() => {
+    if (searchParams.get('mode') === 'ev') return 'ev';
+    return 'warranty';
+  });
   const [prefix] = useState(() => searchParams.get('prefix') || '');
   const [selectedImage, setSelectedImage] = useState(null);
   const [images, setImages] = useState([]);
@@ -520,7 +565,8 @@ function PartLabeler() {
   const [filterBuyoffStage, setFilterBuyoffStage] = useState(['All']);
   const [filterOnlineOffline, setFilterOnlineOffline] = useState(['All']);
   const [filterDefectType, setFilterDefectType] = useState(['All']);
-  const [filterOptions, setFilterOptions] = useState({ models: [], mis_buckets: [], mfg_quarters: [], mfg_months: [], buyoff_stages: [], online_offline_options: [], defect_types: [] });
+  const [filterBatteryMotor, setFilterBatteryMotor] = useState(['All']);
+  const [filterOptions, setFilterOptions] = useState({ models: [], mis_buckets: [], mfg_quarters: [], mfg_months: [], buyoff_stages: [], online_offline_options: [], defect_types: [], battery_motor_options: [] });
   const [openFilter, setOpenFilter] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSummaryActive, setIsSummaryActive] = useState(false);
@@ -595,6 +641,9 @@ function PartLabeler() {
       if ((src || dataSource) === 'rfi') {
         filterDefectType.forEach(m => params.append('defectType', m));
       }
+      if ((src || dataSource) === 'ev') {
+        filterBatteryMotor.forEach(m => params.append('batteryMotor', m));
+      }
 
       const res = await fetch(`${API_BASE}/dashboard-data?${params.toString()}`);
       const data = await res.json();
@@ -623,6 +672,9 @@ function PartLabeler() {
       }
       if (src === 'rfi') {
         filterDefectType.forEach(m => params.append('defectType', m));
+      }
+      if (src === 'ev') {
+        filterBatteryMotor.forEach(m => params.append('batteryMotor', m));
       }
 
       const res = await fetch(`${API_BASE}/warranty-lookup?${params.toString()}`);
@@ -1563,7 +1615,7 @@ function PartLabeler() {
       <div className="part-labeler-header">
         <div className="header-title">
           <div>
-            <h1>{isPlantMode ? 'Part Sense Visualizer Plant' : 'Part Sense Visualizer'}</h1>
+            <h1>{isPlantMode ? 'Part Sense Visualizer Plant' : isEvMode ? 'Part Sense Visualizer EV' : 'Part Sense Visualizer'}</h1>
             <p>Interactive failure trend analysis</p>
           </div>
         </div>
@@ -1667,14 +1719,12 @@ function PartLabeler() {
           <div className="workspace-header-bar">
             {isPlantMode ? (
               <DataSourceSelector current={dataSource} onChange={handleDataSourceChange} />
-            ) : (
-              prefix && (
-                <div className="prefix-filter-field">
-                  <span className="prefix-label">Prefix:</span>
-                  <span className="prefix-value">{prefix}</span>
-                </div>
-              )
-            )}
+            ) : !isEvMode && prefix ? (
+              <div className="prefix-filter-field">
+                <span className="prefix-label">Prefix:</span>
+                <span className="prefix-value">{prefix}</span>
+              </div>
+            ) : null}
             {(dataSource !== 'all' || allModeActiveSource) && ['month', 'qtr', 'model', 'mis'].map(type => {
               const label = type === 'month' ? 'Mfg Month' : type === 'qtr' ? 'Mfg Qtr' : type === 'model' ? 'Model' : 'MIS';
               const options = type === 'month' ? filterOptions.mfg_months : 
@@ -1790,6 +1840,52 @@ function PartLabeler() {
                 },
               ];
               return rptFilters.map(({ key, label, options, currentArr, setter, allLabel }) => {
+                const displayValue = currentArr.includes('All')
+                  ? allLabel
+                  : currentArr.length === 1 ? currentArr[0] : `${currentArr.length} selected`;
+                const handleToggle = (opt) => {
+                  if (opt === 'All') { setter(['All']); return; }
+                  let newArr = currentArr.filter(v => v !== 'All');
+                  if (newArr.includes(opt)) {
+                    newArr = newArr.filter(v => v !== opt);
+                    if (newArr.length === 0) newArr = ['All'];
+                  } else {
+                    newArr.push(opt);
+                  }
+                  setter(newArr);
+                };
+                return (
+                  <div key={key} className={`month-filter-compact ${openFilter === key ? 'open' : ''}`} onClick={() => setOpenFilter(openFilter === key ? null : key)}>
+                    <Layout size={16} /><span>{label}:</span><div className="selected-value">{displayValue}</div>
+                    <ChevronDown size={14} className={`chevron ${openFilter === key ? 'rotate' : ''}`} />
+                    {openFilter === key && (
+                      <div className="filter-dropdown-list" onClick={(e) => e.stopPropagation()}>
+                        <div className={`filter-option ${currentArr.includes('All') ? 'selected' : ''}`} onClick={() => handleToggle('All')}>
+                          {allLabel}
+                        </div>
+                        {options.map(opt => (
+                          <div key={opt} className={`filter-option ${currentArr.includes(opt) ? 'selected' : ''}`} onClick={() => handleToggle(opt)}>
+                            {opt}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              });
+            })()}
+            {(dataSource !== 'all' || allModeActiveSource) && (allModeActiveSource?.src || dataSource) === 'ev' && (() => {
+              const evFilters = [
+                {
+                  key: 'batteryMotor',
+                  label: 'Battery/Motor',
+                  options: filterOptions.battery_motor_options || [],
+                  currentArr: filterBatteryMotor,
+                  setter: setFilterBatteryMotor,
+                  allLabel: 'All',
+                },
+              ];
+              return evFilters.map(({ key, label, options, currentArr, setter, allLabel }) => {
                 const displayValue = currentArr.includes('All')
                   ? allLabel
                   : currentArr.length === 1 ? currentArr[0] : `${currentArr.length} selected`;

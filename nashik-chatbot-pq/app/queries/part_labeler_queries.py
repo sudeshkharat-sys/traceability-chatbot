@@ -777,3 +777,134 @@ class PartLabelerQueries:
         ORDER BY value DESC
         LIMIT 15
     """
+
+    # =====================================================
+    # EV WARRANTY QUERIES
+    # =====================================================
+
+    INSERT_RAW_EV = """
+        INSERT INTO raw_ev_data (
+            report_date, mfg_month, mfg_quarter, reporting_month, dealer_name,
+            location, state, brc_location, tar_no, vin_number, model,
+            problem_description, tekline_name, failure_category, rca, remarks_brc,
+            warranty_insurance, reason_of_failure, battery_motor, pvt_id, pvt_sno,
+            cause_pvt_list, kms, km_range, repaired_replaced, quality, repair_status,
+            part_updated, retail_date, no_of_days, mis, failure_mode, user_id
+        ) VALUES (
+            :report_date, :mfg_month, :mfg_quarter, :reporting_month, :dealer_name,
+            :location, :state, :brc_location, :tar_no, :vin_number, :model,
+            :problem_description, :tekline_name, :failure_category, :rca, :remarks_brc,
+            :warranty_insurance, :reason_of_failure, :battery_motor, :pvt_id, :pvt_sno,
+            :cause_pvt_list, :kms, :km_range, :repaired_replaced, :quality, :repair_status,
+            :part_updated, :retail_date, :no_of_days, :mis, :failure_mode, :user_id
+        )
+    """
+
+    EV_GET_UNIQUE_MODELS = """
+        SELECT DISTINCT TRIM(model) FROM raw_ev_data
+        WHERE model IS NOT NULL AND model != '' AND user_id = :user_id
+        ORDER BY 1 ASC
+    """
+
+    EV_GET_UNIQUE_MIS = """
+        SELECT DISTINCT mis FROM raw_ev_data
+        WHERE mis IS NOT NULL AND mis != '' AND user_id = :user_id
+        ORDER BY mis ASC
+    """
+
+    EV_GET_UNIQUE_MFG_MONTHS = """
+        SELECT mfg_month FROM (
+            SELECT DISTINCT mfg_month, TO_DATE(mfg_month, 'Mon-YY') AS sort_key
+            FROM raw_ev_data
+            WHERE mfg_month IS NOT NULL AND mfg_month != '' AND user_id = :user_id
+        ) sub ORDER BY sort_key DESC
+    """
+
+    EV_GET_UNIQUE_MFG_QUARTERS = """
+        SELECT DISTINCT mfg_quarter FROM raw_ev_data
+        WHERE mfg_quarter IS NOT NULL AND mfg_quarter != '' AND user_id = :user_id
+        ORDER BY mfg_quarter ASC
+    """
+
+    EV_GET_UNIQUE_BATTERY_MOTOR = """
+        SELECT DISTINCT battery_motor FROM raw_ev_data
+        WHERE battery_motor IS NOT NULL AND battery_motor != '' AND user_id = :user_id
+        ORDER BY battery_motor ASC
+    """
+
+    EV_SEARCH_DATA = """
+        SELECT
+            mode() WITHIN GROUP (ORDER BY part_updated) as "partName",
+            mfg_month as "month",
+            COUNT(*) as "failureCount",
+            mode() WITHIN GROUP (ORDER BY part_updated) as "description"
+        FROM raw_ev_data
+        WHERE LOWER(REPLACE(part_updated, ' ', '')) LIKE :search_term
+          AND mfg_month IS NOT NULL AND mfg_month != ''
+          AND (:base_model IS NULL OR TRIM(model) = ANY(:base_model))
+          AND (:mis_bucket IS NULL OR mis = ANY(:mis_bucket))
+          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (:battery_motor IS NULL OR battery_motor = ANY(:battery_motor))
+          AND user_id = :user_id
+        GROUP BY mfg_month
+        ORDER BY mfg_month DESC
+    """
+
+    EV_GET_DASHBOARD_MFG_MONTH = """
+        SELECT mfg_month as label, COUNT(*) as value
+        FROM raw_ev_data
+        WHERE user_id = :user_id AND mfg_month IS NOT NULL AND mfg_month != ''
+          AND (:search_terms IS NULL OR LOWER(REPLACE(part_updated, ' ', '')) LIKE ANY(:search_terms))
+          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
+          AND (:base_model IS NULL OR TRIM(model) = ANY(:base_model))
+          AND (:mis_bucket IS NULL OR mis = ANY(:mis_bucket))
+          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (:battery_motor IS NULL OR battery_motor = ANY(:battery_motor))
+        GROUP BY mfg_month
+        ORDER BY mfg_month ASC
+    """
+
+    EV_GET_DASHBOARD_REPORTING_MONTH = """
+        SELECT COALESCE(NULLIF(TRIM(reporting_month), ''), 'Unknown') as label, COUNT(*) as value
+        FROM raw_ev_data
+        WHERE user_id = :user_id AND reporting_month IS NOT NULL AND reporting_month != ''
+          AND (:search_terms IS NULL OR LOWER(REPLACE(part_updated, ' ', '')) LIKE ANY(:search_terms))
+          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
+          AND (:base_model IS NULL OR TRIM(model) = ANY(:base_model))
+          AND (:mis_bucket IS NULL OR mis = ANY(:mis_bucket))
+          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (:battery_motor IS NULL OR battery_motor = ANY(:battery_motor))
+        GROUP BY 1
+        ORDER BY value DESC
+        LIMIT 15
+    """
+
+    EV_GET_DASHBOARD_KM_RANGE = """
+        SELECT COALESCE(NULLIF(TRIM(km_range), ''), 'Unknown') as label, COUNT(*) as value
+        FROM raw_ev_data
+        WHERE user_id = :user_id AND km_range IS NOT NULL AND km_range != ''
+          AND (:search_terms IS NULL OR LOWER(REPLACE(part_updated, ' ', '')) LIKE ANY(:search_terms))
+          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
+          AND (:base_model IS NULL OR TRIM(model) = ANY(:base_model))
+          AND (:mis_bucket IS NULL OR mis = ANY(:mis_bucket))
+          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (:battery_motor IS NULL OR battery_motor = ANY(:battery_motor))
+        GROUP BY 1
+        ORDER BY value DESC
+        LIMIT 20
+    """
+
+    EV_GET_DASHBOARD_STATE = """
+        SELECT COALESCE(NULLIF(TRIM(state), ''), 'Unknown') as label, COUNT(*) as value
+        FROM raw_ev_data
+        WHERE user_id = :user_id AND state IS NOT NULL AND state != ''
+          AND (:search_terms IS NULL OR LOWER(REPLACE(part_updated, ' ', '')) LIKE ANY(:search_terms))
+          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
+          AND (:base_model IS NULL OR TRIM(model) = ANY(:base_model))
+          AND (:mis_bucket IS NULL OR mis = ANY(:mis_bucket))
+          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (:battery_motor IS NULL OR battery_motor = ANY(:battery_motor))
+        GROUP BY 1
+        ORDER BY value DESC
+        LIMIT 30
+    """
