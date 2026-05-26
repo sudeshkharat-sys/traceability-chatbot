@@ -15,10 +15,10 @@ const PART_LABELER_ALLOWED = ["part-labeler", "part-labeler-plant", "part-labele
 
 const ROLE_ALLOWED = {
   user:               ["traceability", "guideline"],
-  part_labeler:       ["traceability", "guideline", "part-labeler", "part-labeler-plant"],
-  part_labeler_field: ["traceability", "guideline", "part-labeler"],
-  part_labeler_plant: ["traceability", "guideline", "part-labeler-plant"],
-  part_labeler_ev:    ["traceability", "guideline", "part-labeler-ev"],
+  part_labeler:       ["part-labeler", "part-labeler-plant"],
+  part_labeler_field: ["part-labeler"],
+  part_labeler_plant: ["part-labeler-plant"],
+  part_labeler_ev:    ["part-labeler-ev"],
 };
 
 function LandingPage() {
