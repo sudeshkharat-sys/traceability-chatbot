@@ -90,6 +90,13 @@ function LandingPage() {
       route: "/z-stage",
     },
     {
+      id: "qlense",
+      title: "QLense Assistant",
+      icon: qualityIcon,
+      description: "Discover part quality issues from DB and get solutions from solved-problems knowledge base",
+      route: "/chat?feature=qlense",
+    },
+    {
       id: "diagnostic",
       title: "Diagnostic support system",
       icon: supportIcon,
