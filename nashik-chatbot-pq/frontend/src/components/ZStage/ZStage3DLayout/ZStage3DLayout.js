@@ -273,12 +273,16 @@ function buildStationShell(box, statusMap, scene) {
       group.add(lbl);
     }
 
-    // ── Nameplate on top front beam — real station name + box description ──
-    const stnName = stationNames[i] || '';
-    const plate   = makeNameplate(stnId, stnName, boxDesc, CELL_W);
-    // Sit just below the top beam on the front face
-    plate.position.set(cellCX, HEIGHT - 0.55, originZ + 0.04);
-    group.add(plate);
+    // ── Nameplates on FRONT and BACK top beams ──
+    const stnName    = stationNames[i] || '';
+    const plateFront = makeNameplate(stnId, stnName, boxDesc, CELL_W);
+    plateFront.position.set(cellCX, HEIGHT - 0.55, originZ + 0.04);
+    group.add(plateFront);
+
+    const plateBack = makeNameplate(stnId, stnName, boxDesc, CELL_W);
+    plateBack.position.set(cellCX, HEIGHT - 0.55, originZ + DEPTH - 0.04);
+    plateBack.rotation.y = Math.PI; // flip to face outward
+    group.add(plateBack);
   }
 
   // ── Floating box name above the whole structure ──
