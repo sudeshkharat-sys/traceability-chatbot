@@ -279,11 +279,11 @@ function useThreeScene(canvasRef, layout, statusMap, walkMode, onObjectsChange) 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(canvas.clientWidth, canvas.clientHeight);
-    renderer.setClearColor(0x0d1117);
+    renderer.setClearColor(0xf0f2f5);
     rendererRef.current = renderer;
 
     const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0x0d1117, 50, 200);
+    scene.fog = new THREE.Fog(0xf0f2f5, 80, 250);
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(60, canvas.clientWidth / canvas.clientHeight, 0.1, 300);
@@ -292,7 +292,7 @@ function useThreeScene(canvasRef, layout, statusMap, walkMode, onObjectsChange) 
     scene.add(new THREE.AmbientLight(0xffffff, 0.7));
     const dir = new THREE.DirectionalLight(0xffffff, 0.8);
     dir.position.set(20, 30, 20); scene.add(dir);
-    scene.add(new THREE.GridHelper(200, 100, 0x2d333b, 0x21262d));
+    scene.add(new THREE.GridHelper(200, 100, 0xb0bec5, 0xdde1e7));
 
     const boxes = layout.station_boxes || [];
     boxes.forEach(box => buildStationShell(box, statusMap, scene));

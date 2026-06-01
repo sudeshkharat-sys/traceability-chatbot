@@ -4,9 +4,290 @@
   flex: 1;
   height: 100%;
   min-height: 0;
-  background: #0d1117;
-  color: #e6edf3;
+  background: #f0f2f5;
+  color: #1a1a2e;
 }
+
+.z3d-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #ffffff;
+  border-bottom: 1px solid #d0d7de;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.z3d-toolbar-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0969da;
+  margin-right: 8px;
+}
+
+.z3d-layout-select {
+  background: #f6f8fa;
+  color: #1a1a2e;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  min-width: 180px;
+}
+
+.z3d-layout-select:focus {
+  outline: none;
+  border-color: #0969da;
+}
+
+.z3d-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.z3d-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: #57606a;
+}
+
+.z3d-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.z3d-legend-dot--r   { background: #e53935; }
+.z3d-legend-dot--y   { background: #fdd835; }
+.z3d-legend-dot--g   { background: #43a047; }
+.z3d-legend-dot--na  { background: #90a4ae; }
+.z3d-legend-dot--path { background: #fdd835; border-radius: 2px; width: 18px; height: 8px; }
+
+.z3d-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Object panel ── */
+.z3d-obj-panel {
+  width: 220px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-right: 1px solid #d0d7de;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.z3d-obj-panel-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0969da;
+  padding: 10px 12px 6px;
+  border-bottom: 1px solid #d0d7de;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.z3d-transform-group {
+  display: flex;
+  gap: 4px;
+  padding: 8px 10px 4px;
+}
+
+.z3d-transform-btn {
+  flex: 1;
+  background: #f6f8fa;
+  color: #57606a;
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  padding: 4px 0;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.z3d-transform-btn:hover { background: #e8ecf0; color: #1a1a2e; }
+.z3d-transform-btn--active { background: #dbeafe; border-color: #0969da; color: #0969da; }
+
+.z3d-rename-row {
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px;
+}
+
+.z3d-rename-input {
+  flex: 1;
+  background: #f6f8fa;
+  border: 1px solid #d0d7de;
+  border-radius: 4px;
+  color: #1a1a2e;
+  font-size: 12px;
+  padding: 4px 8px;
+}
+
+.z3d-rename-input:focus { outline: none; border-color: #0969da; }
+
+.z3d-rename-btn {
+  background: #2da44e;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.z3d-obj-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 6px;
+}
+
+.z3d-obj-empty {
+  font-size: 12px;
+  color: #57606a;
+  text-align: center;
+  padding: 16px 0;
+}
+
+.z3d-obj-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #57606a;
+  transition: background 0.1s;
+}
+
+.z3d-obj-item:hover { background: #f6f8fa; color: #1a1a2e; }
+.z3d-obj-item--active { background: #dbeafe; color: #0969da; }
+
+.z3d-obj-icon { font-size: 14px; flex-shrink: 0; }
+.z3d-obj-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.z3d-obj-del {
+  background: none;
+  border: none;
+  color: #57606a;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+.z3d-obj-del:hover { background: #ffebe9; color: #cf222e; }
+
+.z3d-upload-btn {
+  background: #2da44e;
+  color: #fff;
+  border: 1px solid #2da44e;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.z3d-upload-btn:hover { background: #218838; }
+
+.z3d-canvas-wrapper {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.z3d-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.z3d-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 12px;
+  color: #57606a;
+  font-size: 14px;
+}
+
+.z3d-placeholder-icon {
+  font-size: 48px;
+  opacity: 0.4;
+}
+
+.z3d-walk-hint {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(255,255,255,0.9);
+  border: 1px solid #d0d7de;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 11px;
+  color: #57606a;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.z3d-view-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  background: #f6f8fa;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.z3d-view-btn {
+  background: transparent;
+  color: #57606a;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  white-space: nowrap;
+}
+
+.z3d-view-btn:hover { background: #e8ecf0; color: #1a1a2e; }
+.z3d-view-btn:active { background: #dbeafe; color: #0969da; }
+
+.z3d-walk-btn {
+  background: #f6f8fa;
+  color: #1a1a2e;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.z3d-walk-btn:hover { background: #e8ecf0; border-color: #0969da; }
+.z3d-walk-btn--active { background: #dbeafe; border-color: #0969da; color: #0969da; }
+
 
 .z3d-toolbar {
   display: flex;
