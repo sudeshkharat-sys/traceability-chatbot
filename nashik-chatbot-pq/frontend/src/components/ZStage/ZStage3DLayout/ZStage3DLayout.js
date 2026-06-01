@@ -127,6 +127,52 @@ function buildZebraCrossing(x, originZ, group) {
   });
 }
 
+// ── Station nameplate (top front beam) ────────────────────────────────────────
+function makeNameplate(stnId, boxName, width) {
+  const W = 1024, H = 220;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+
+  // Background
+  ctx.fillStyle = '#1a237e';
+  ctx.fillRect(0, 0, W, H);
+
+  // Bottom highlight strip
+  ctx.fillStyle = '#ffd600';
+  ctx.fillRect(0, H - 14, W, 14);
+
+  // Top strip
+  ctx.fillStyle = '#283593';
+  ctx.fillRect(0, 0, W, 40);
+
+  // Station ID — large
+  ctx.fillStyle = '#ffd600';
+  ctx.font = 'bold 96px Arial';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(stnId, 28, H / 2 - 10);
+
+  // Box name — right side
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 52px Arial';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(boxName, W - 28, H / 2 - 10);
+
+  // Bottom label
+  ctx.fillStyle = '#90caf9';
+  ctx.font = '32px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('Z-STAGE STATION', W / 2, H - 42);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  const geo = new THREE.PlaneGeometry(width * 0.88, width * 0.88 * (H / W));
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
+  return new THREE.Mesh(geo, mat);
+}
+
 // ── Station shell ──────────────────────────────────────────────────────────────
 function buildStationShell(box, statusMap, scene) {
   const group   = new THREE.Group();
@@ -134,15 +180,29 @@ function buildStationShell(box, statusMap, scene) {
   const totalW  = count * CELL_W;
   const originX = (box.position_x || 0) * SCALE;
   const originZ = (box.position_y || 0) * SCALE;
-  const structMat = new THREE.MeshLambertMaterial({ color: 0xb0bec5 });
+  const structMat = new THREE.MeshLambertMaterial({ color: 0x78909c });
 
-  [[originX, originZ], [originX + totalW, originZ], [originX, originZ + DEPTH], [originX + totalW, originZ + DEPTH]]
+  // ── 4 corner columns ──
+  [[originX, originZ], [originX + totalW, originZ],
+   [originX, originZ + DEPTH], [originX + totalW, originZ + DEPTH]]
     .forEach(([cx, cz]) => {
       const col = makeIBeam(HEIGHT, structMat, 'vertical');
       col.position.set(cx, HEIGHT / 2, cz);
       group.add(col);
     });
 
+  // ── Middle columns on FRONT and BACK faces only (door-frame look) ──
+  // One middle column per cell boundary on front (Z=originZ) and back (Z=originZ+DEPTH)
+  for (let i = 1; i < count; i++) {
+    const mx = originX + i * CELL_W;
+    [originZ, originZ + DEPTH].forEach(cz => {
+      const col = makeIBeam(HEIGHT, structMat, 'vertical');
+      col.position.set(mx, HEIGHT / 2, cz);
+      group.add(col);
+    });
+  }
+
+  // ── Top beams ──
   [
     { orient: 'horizontal-x', pos: [originX + totalW / 2, HEIGHT, originZ],         len: totalW },
     { orient: 'horizontal-x', pos: [originX + totalW / 2, HEIGHT, originZ + DEPTH], len: totalW },
@@ -154,14 +214,17 @@ function buildStationShell(box, statusMap, scene) {
     group.add(beam);
   });
 
+  // ── Per-cell: floor + status sphere + floor label + nameplate ──
   const stationIds = (box.station_ids || '').split(',').map(s => s.trim()).filter(Boolean);
+
   for (let i = 0; i < count; i++) {
     const cellX  = originX + i * CELL_W;
     const cellCX = cellX + CELL_W / 2;
     const cellCZ = originZ + DEPTH / 2;
-    const stnId  = stationIds[i] || '';
+    const stnId  = stationIds[i] || `STN-${i + 1}`;
     const color  = STATUS_HEX[statusMap[stnId] || null] ?? STATUS_HEX.null;
 
+    // Floor tile
     const floorW = i < count - 1 ? CELL_W - ZEBRA_W : CELL_W - 0.05;
     const floor  = new THREE.Mesh(
       new THREE.PlaneGeometry(floorW, DEPTH - 0.05),
@@ -171,27 +234,32 @@ function buildStationShell(box, statusMap, scene) {
     floor.position.set(cellCX + (i < count - 1 ? -ZEBRA_W / 2 : 0), 0.01, cellCZ);
     group.add(floor);
 
+    // Green path between cells
     if (i < count - 1) buildZebraCrossing(cellX + CELL_W, originZ, group);
 
-    const sph = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 12), new THREE.MeshLambertMaterial({ color }));
-    sph.position.set(cellCX, HEIGHT + 0.4, cellCZ);
+    // Status sphere on top
+    const sph = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 12), new THREE.MeshLambertMaterial({ color }));
+    sph.position.set(cellCX, HEIGHT + 0.35, cellCZ);
     group.add(sph);
 
+    // Floor station-ID label
     if (stnId) {
-      const lbl = makeFloorLabel(stnId, CELL_W * 0.7);
+      const lbl = makeFloorLabel(stnId, CELL_W * 0.65);
       lbl.position.set(cellCX, 0.02, cellCZ);
       group.add(lbl);
     }
+
+    // ── Nameplate on top front beam (facing front, each cell) ──
+    const plate = makeNameplate(stnId, box.name || '', CELL_W);
+    // Sit just below the top beam on the front face
+    plate.position.set(cellCX, HEIGHT - 0.55, originZ + 0.04);
+    group.add(plate);
   }
 
-  const nameSprite = makeLabel(box.name || 'Box', { fontSize: 52, color: '#ffffff', bgColor: 'rgba(0,0,0,0.6)', padding: 14, scale: 3.0 });
-  nameSprite.position.set(originX + totalW / 2, HEIGHT + 1.2, originZ + DEPTH / 2);
+  // ── Floating box name above the whole structure ──
+  const nameSprite = makeLabel(box.name || 'Box', { fontSize: 52, color: '#1a237e', bgColor: 'rgba(255,255,255,0.85)', padding: 14, scale: 2.8 });
+  nameSprite.position.set(originX + totalW / 2, HEIGHT + 1.3, originZ + DEPTH / 2);
   group.add(nameSprite);
-
-  const shopPrefix = (stationIds[0] || box.name || 'SHOP').split('-')[0];
-  const board = makeShopBoard(shopPrefix);
-  board.position.set(originX + totalW / 2, 2.2, originZ - 0.05);
-  group.add(board);
 
   scene.add(group);
 }
