@@ -1,482 +1,522 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { layoutApi } from '../../../services/api/layoutApi';
 import './ZStage3DLayout.css';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-const SCALE    = 0.04;
-const CELL_W   = 3.5;   // metres per station cell
-const DEPTH    = 5.0;   // station depth
-const HEIGHT   = 4.5;   // column height
-const COL_R    = 0.12;  // column radius
-const BEAM_H   = 0.18;
-const FLOOR_T  = 0.10;
-const PATH_W   = 2.0;   // walking-path width (metres)
+const SCALE   = 0.04;   // canvas px → metres
+const CELL_W  = 5.0;    // metres per station cell width
+const DEPTH   = 20.0;   // station depth (Z axis) — long tunnel
+const HEIGHT  = 5.0;    // column / beam height
+const COL_R   = 0.12;   // column radius
+const PATH_W  = 3.0;    // walking path width
 
-const STATUS_HEX = { R: 0xe53935, Y: 0xfdd835, G: 0x43a047, null: 0x90a4ae };
+const STATUS_HEX = {
+  R: 0xe53935,
+  Y: 0xfdd835,
+  G: 0x43a047,
+  null: 0x90a4ae,
+};
 
-// ── Canvas-texture text sprite ─────────────────────────────────────────────────
-function makeLabel(text, { fontSize = 52, color = '#0d47a1', bg = null,
-                           canvasW = 512, canvasH = 96,
-                           scaleX = 3.5, scaleY = 0.65 } = {}) {
-  const canvas = document.createElement('canvas');
-  canvas.width  = canvasW;
-  canvas.height = canvasH;
-  const ctx = canvas.getContext('2d');
-  if (bg) {
-    ctx.fillStyle = bg;
-    ctx.roundRect(4, 4, canvasW - 8, canvasH - 8, 12);
+// ── Helpers ────────────────────────────────────────────────────────────────────
+function makeLabel(text, { fontSize = 48, color = '#ffffff', bgColor = null, padding = 10, scale = 1 } = {}) {
+  const canvas  = document.createElement('canvas');
+  const ctx     = canvas.getContext('2d');
+  ctx.font      = `bold ${fontSize}px Arial`;
+  const tw      = ctx.measureText(text).width;
+  canvas.width  = tw + padding * 2;
+  canvas.height = fontSize + padding * 2;
+
+  if (bgColor) {
+    ctx.fillStyle = bgColor;
+    ctx.beginPath();
+    ctx.roundRect(0, 0, canvas.width, canvas.height, 8);
     ctx.fill();
   }
-  ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+
+  ctx.font      = `bold ${fontSize}px Arial`;
   ctx.fillStyle = color;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, canvasW / 2, canvasH / 2);
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
   const tex = new THREE.CanvasTexture(canvas);
-  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
-  const sprite = new THREE.Sprite(mat);
-  sprite.scale.set(scaleX, scaleY, 1);
-  return sprite;
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+  const spr = new THREE.Sprite(mat);
+  const aspect = canvas.width / canvas.height;
+  spr.scale.set(aspect * scale, scale, 1);
+  return spr;
 }
 
-// ── Shop sign board ────────────────────────────────────────────────────────────
 function makeShopBoard(shopName) {
-  const group = new THREE.Group();
+  const W = 256, H = 80;
+  const canvas = document.createElement('canvas');
+  canvas.width  = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
 
-  // board backing
-  const board = new THREE.Mesh(
-    new THREE.BoxGeometry(2.2, 0.8, 0.08),
-    new THREE.MeshStandardMaterial({ color: 0x1565c0 })
-  );
-  board.position.set(0, 0, 0);
-  group.add(board);
+  ctx.fillStyle = '#1565C0';
+  ctx.beginPath();
+  ctx.roundRect(0, 0, W, H, 10);
+  ctx.fill();
 
-  // text label on the board
-  const lbl = makeLabel(shopName, {
-    fontSize: 56, color: '#ffffff', canvasW: 512, canvasH: 128,
-    scaleX: 2.0, scaleY: 0.7,
-  });
-  lbl.position.set(0, 0, 0.06);
-  group.add(lbl);
+  ctx.strokeStyle = '#BBDEFB';
+  ctx.lineWidth   = 3;
+  ctx.beginPath();
+  ctx.roundRect(4, 4, W - 8, H - 8, 7);
+  ctx.stroke();
 
-  return group;
+  ctx.fillStyle    = '#ffffff';
+  ctx.font         = 'bold 36px Arial';
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(shopName, W / 2, H / 2);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  const geo = new THREE.PlaneGeometry(2.0, 0.625);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
+  return new THREE.Mesh(geo, mat);
 }
 
-// ── Build one station shell ────────────────────────────────────────────────────
-function buildStationShell(box, statusMap) {
-  const ids = box.station_ids
-    ? box.station_ids.split(',').map(s => s.trim()).filter(Boolean)
-    : [];
-  const count = ids.length || box.station_count || 1;
-  const width = count * CELL_W;
+function makeFloorLabel(text, width, fontSize = 36) {
+  const canvas  = document.createElement('canvas');
+  canvas.width  = 512;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 512, 128);
+  ctx.fillStyle    = 'rgba(255,255,255,0.15)';
+  ctx.fillRect(0, 0, 512, 128);
+  ctx.fillStyle    = '#ffffff';
+  ctx.font         = `bold ${fontSize}px Arial`;
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 256, 64);
+  const tex = new THREE.CanvasTexture(canvas);
+  const geo = new THREE.PlaneGeometry(width, width * (128 / 512));
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide, depthWrite: false });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.x = -Math.PI / 2;
+  return mesh;
+}
 
-  const ox = (box.position_x || 0) * SCALE;
-  const oz = (box.position_y || 0) * SCALE;
-  const cx = ox + width / 2;
-  const cz = oz + DEPTH / 2;
+// ── Build one station "shell" (columns + beams + floor + labels) ───────────────
+function buildStationShell(box, statusMap, scene) {
+  const group    = new THREE.Group();
+  const count    = box.station_count || 1;
+  const totalW   = count * CELL_W;
+  const originX  = (box.position_x || 0) * SCALE;
+  const originZ  = (box.position_y || 0) * SCALE;
 
-  // derive shop prefix from first station id (e.g. "T1-01" → "T1")
-  const shopPrefix = ids[0] ? ids[0].split('-')[0] : (box.name || 'STA');
-
-  const group = new THREE.Group();
-  const colMat = new THREE.MeshStandardMaterial({ color: 0x455a64, metalness: 0.3, roughness: 0.6 });
-  const beamMat = new THREE.MeshStandardMaterial({ color: 0x37474f, metalness: 0.4, roughness: 0.5 });
-
-  // ── Floor slab ──
-  const floorMesh = new THREE.Mesh(
-    new THREE.BoxGeometry(width, FLOOR_T, DEPTH),
-    new THREE.MeshStandardMaterial({ color: 0xcfd8dc, roughness: 0.8 })
-  );
-  floorMesh.position.set(cx, FLOOR_T / 2, cz);
-  floorMesh.receiveShadow = true;
-  group.add(floorMesh);
-
-  // ── Columns at every cell boundary (front + back rows) ──
-  // positions along X: ox, ox+CELL_W, ox+2*CELL_W … ox+count*CELL_W  → count+1 columns per row
-  const colGeo = new THREE.CylinderGeometry(COL_R, COL_R, HEIGHT, 8);
-  for (let i = 0; i <= count; i++) {
-    const x = ox + i * CELL_W;
-    [oz, oz + DEPTH].forEach(z => {
-      const col = new THREE.Mesh(colGeo, colMat);
-      col.position.set(x, HEIGHT / 2, z);
-      col.castShadow = true;
-      group.add(col);
+  // ── Columns (cylindrical) at every cell boundary, front + back ──
+  const colMat = new THREE.MeshLambertMaterial({ color: 0xb0bec5 });
+  for (let col = 0; col <= count; col++) {
+    const cx = originX + col * CELL_W;
+    [[0], [DEPTH]].forEach(([dz]) => {
+      const geo = new THREE.CylinderGeometry(COL_R, COL_R, HEIGHT, 12);
+      const mesh = new THREE.Mesh(geo, colMat);
+      mesh.position.set(cx, HEIGHT / 2, originZ + dz);
+      group.add(mesh);
     });
   }
 
-  // ── Top beams along the length (front + back) ──
-  const frontBeam = new THREE.Mesh(
-    new THREE.BoxGeometry(width, BEAM_H, COL_R * 2),
-    beamMat
-  );
-  frontBeam.position.set(cx, HEIGHT, oz);
-  group.add(frontBeam);
+  // ── Horizontal top beams (along X) front + back ──
+  const beamMat = new THREE.MeshLambertMaterial({ color: 0x78909c });
+  [[0], [DEPTH]].forEach(([dz]) => {
+    const geo  = new THREE.BoxGeometry(totalW, 0.15, 0.15);
+    const mesh = new THREE.Mesh(geo, beamMat);
+    mesh.position.set(originX + totalW / 2, HEIGHT, originZ + dz);
+    group.add(mesh);
+  });
 
-  const backBeam = frontBeam.clone();
-  backBeam.position.set(cx, HEIGHT, oz + DEPTH);
-  group.add(backBeam);
-
-  // ── Cross beams at each column line ──
-  for (let i = 0; i <= count; i++) {
-    const x = ox + i * CELL_W;
-    const crossBeam = new THREE.Mesh(
-      new THREE.BoxGeometry(COL_R * 2, BEAM_H, DEPTH),
-      beamMat
-    );
-    crossBeam.position.set(x, HEIGHT, cz);
-    group.add(crossBeam);
+  // ── Cross beams (along Z) at each column line ──
+  for (let col = 0; col <= count; col++) {
+    const cx   = originX + col * CELL_W;
+    const geo  = new THREE.BoxGeometry(0.15, 0.15, DEPTH);
+    const mesh = new THREE.Mesh(geo, beamMat);
+    mesh.position.set(cx, HEIGHT, originZ + DEPTH / 2);
+    group.add(mesh);
   }
 
-  // ── Per-cell: floor highlight + station-ID label ──
-  ids.forEach((sid, i) => {
-    const statusKey = statusMap?.[sid] ?? null;
-    const color = STATUS_HEX[statusKey] ?? STATUS_HEX[null];
-    const cellCx = ox + (i + 0.5) * CELL_W;
+  // ── Per-cell floor tiles + status sphere + station-ID label ──
+  const stationIds = (box.station_ids || '').split(',').map(s => s.trim()).filter(Boolean);
 
-    // floor tile colour
-    const tile = new THREE.Mesh(
-      new THREE.BoxGeometry(CELL_W - 0.15, 0.012, DEPTH - 0.15),
-      new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.35 })
-    );
-    tile.position.set(cellCx, FLOOR_T + 0.007, cz);
-    group.add(tile);
+  for (let i = 0; i < count; i++) {
+    const cellX   = originX + i * CELL_W;
+    const cellCX  = cellX + CELL_W / 2;
+    const cellCZ  = originZ + DEPTH / 2;
+    const stnId   = stationIds[i] || '';
+    const status  = statusMap[stnId] || null;
+    const color   = STATUS_HEX[status] ?? STATUS_HEX.null;
 
-    // status sphere near top of column
-    const sphere = new THREE.Mesh(
-      new THREE.SphereGeometry(0.2, 16, 16),
-      new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.55 })
-    );
-    sphere.position.set(cellCx, HEIGHT - 0.4, cz);
-    group.add(sphere);
+    // Floor tile
+    const fGeo  = new THREE.PlaneGeometry(CELL_W - 0.1, DEPTH - 0.1);
+    const fMat  = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.35, side: THREE.DoubleSide });
+    const floor = new THREE.Mesh(fGeo, fMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.set(cellCX, 0.01, cellCZ);
+    group.add(floor);
 
-    // station-ID label on floor
-    const idLabel = makeLabel(sid, {
-      fontSize: 44, color: '#1a237e',
-      canvasW: 256, canvasH: 80,
-      scaleX: 1.8, scaleY: 0.55,
-    });
-    idLabel.position.set(cellCx, FLOOR_T + 0.05, cz);
-    idLabel.rotation.x = -Math.PI / 2;
-    // sprites don't rotate — use a plane instead
-    const idCanvas = document.createElement('canvas');
-    idCanvas.width = 256; idCanvas.height = 80;
-    const idCtx = idCanvas.getContext('2d');
-    idCtx.font = 'bold 40px Arial';
-    idCtx.fillStyle = '#1a237e';
-    idCtx.textAlign = 'center';
-    idCtx.textBaseline = 'middle';
-    idCtx.fillText(sid, 128, 40);
-    const idTex = new THREE.CanvasTexture(idCanvas);
-    const idPlane = new THREE.Mesh(
-      new THREE.PlaneGeometry(1.8, 0.55),
-      new THREE.MeshBasicMaterial({ map: idTex, transparent: true, depthWrite: false, side: THREE.DoubleSide })
-    );
-    idPlane.rotation.x = -Math.PI / 2;
-    idPlane.position.set(cellCx, FLOOR_T + 0.02, cz);
-    group.add(idPlane);
-  });
+    // Status sphere
+    const sGeo  = new THREE.SphereGeometry(0.22, 12, 12);
+    const sMat  = new THREE.MeshLambertMaterial({ color });
+    const sph   = new THREE.Mesh(sGeo, sMat);
+    sph.position.set(cellCX, HEIGHT + 0.35, cellCZ);
+    group.add(sph);
 
-  // ── Box name floating label (above structure) ──
-  const boxLabel = makeLabel(box.name || `Box ${box.id}`, {
-    fontSize: 52, color: '#0d47a1',
-    canvasW: 512, canvasH: 96,
-    scaleX: 3.8, scaleY: 0.7,
-  });
-  boxLabel.position.set(cx, HEIGHT + 0.9, cz);
-  group.add(boxLabel);
+    // Station ID floor label
+    if (stnId) {
+      const lbl = makeFloorLabel(stnId, CELL_W * 0.75);
+      lbl.position.set(cellCX, 0.02, cellCZ);
+      group.add(lbl);
+    }
+  }
 
-  // ── Shop sign board at entry (front face, centred) ──
+  // ── Box name floating label ──
+  const nameSprite = makeLabel(box.name || 'Box', { fontSize: 52, color: '#ffffff', bgColor: 'rgba(0,0,0,0.55)', padding: 14, scale: 2.8 });
+  nameSprite.position.set(originX + totalW / 2, HEIGHT + 1.1, originZ + DEPTH / 2);
+  group.add(nameSprite);
+
+  // ── Shop sign board at entry (front face, y ≈ 2m) ──
+  const shopPrefix = (stationIds[0] || box.name || 'SHOP').split('-')[0];
   const board = makeShopBoard(shopPrefix);
-  board.position.set(cx, HEIGHT - 1.2, oz - 0.15);
+  board.position.set(originX + totalW / 2, 2.2, originZ - 0.05);
   group.add(board);
 
-  return group;
+  scene.add(group);
 }
 
 // ── Walking path between two connected boxes ───────────────────────────────────
-function buildWalkingPath(fromBox, toBox) {
-  const fromCount = (fromBox.station_ids?.split(',').length) || fromBox.station_count || 1;
-  const fromEndX  = (fromBox.position_x || 0) * SCALE + fromCount * CELL_W;
-  const toStartX  = (toBox.position_x   || 0) * SCALE;
-  const pathLen   = toStartX - fromEndX;
-  if (pathLen <= 0.05) return null;
+function buildWalkingPath(fromBox, toBox, scene) {
+  const fW     = (fromBox.station_count || 1) * CELL_W;
+  const fEndX  = (fromBox.position_x || 0) * SCALE + fW;
+  const tStartX = (toBox.position_x || 0) * SCALE;
+  const pathLen = tStartX - fEndX;
+  if (pathLen <= 0.1) return;
 
-  const fromCZ = (fromBox.position_y || 0) * SCALE + DEPTH / 2;
-  const toCZ   = (toBox.position_y   || 0) * SCALE + DEPTH / 2;
-  const midX   = fromEndX + pathLen / 2;
-  const midZ   = (fromCZ + toCZ) / 2;
+  const pathCX  = fEndX + pathLen / 2;
+  const pathCZ  = ((fromBox.position_y || 0) * SCALE) + DEPTH / 2;
 
-  const group = new THREE.Group();
+  // Yellow path floor
+  const geo = new THREE.PlaneGeometry(pathLen, PATH_W);
+  const mat = new THREE.MeshLambertMaterial({ color: 0xfdd835, transparent: true, opacity: 0.65, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.x = -Math.PI / 2;
+  mesh.position.set(pathCX, 0.015, pathCZ);
+  scene.add(mesh);
 
-  // main path floor
-  const pathFloor = new THREE.Mesh(
-    new THREE.BoxGeometry(pathLen, FLOOR_T * 0.8, PATH_W),
-    new THREE.MeshStandardMaterial({ color: 0xfff176, roughness: 0.6 })
-  );
-  pathFloor.position.set(midX, FLOOR_T * 0.4, midZ);
-  pathFloor.receiveShadow = true;
-  group.add(pathFloor);
-
-  // yellow safety stripes
-  const stripeCount = Math.max(1, Math.floor(pathLen / 1.5));
-  for (let i = 0; i < stripeCount; i++) {
-    const sx = fromEndX + (i + 0.5) * (pathLen / stripeCount);
-    const stripe = new THREE.Mesh(
-      new THREE.BoxGeometry(0.15, FLOOR_T * 0.82, PATH_W * 0.85),
-      new THREE.MeshStandardMaterial({ color: 0xf9a825 })
-    );
-    stripe.position.set(sx, FLOOR_T * 0.41, midZ);
-    group.add(stripe);
+  // Orange stripe lines
+  const stripeCount = Math.max(1, Math.floor(pathLen / 1.2));
+  const stripeMat   = new THREE.MeshBasicMaterial({ color: 0xff6f00 });
+  for (let s = 0; s <= stripeCount; s++) {
+    const sx   = fEndX + (s / stripeCount) * pathLen;
+    const sGeo = new THREE.PlaneGeometry(0.1, PATH_W);
+    const sm   = new THREE.Mesh(sGeo, stripeMat);
+    sm.rotation.x = -Math.PI / 2;
+    sm.position.set(sx, 0.02, pathCZ);
+    scene.add(sm);
   }
 
-  // "WALKWAY" text on path
-  const walkCanvas = document.createElement('canvas');
-  walkCanvas.width = 256; walkCanvas.height = 64;
-  const wCtx = walkCanvas.getContext('2d');
-  wCtx.fillStyle = '#f57f17';
-  wCtx.font = 'bold 28px Arial';
-  wCtx.textAlign = 'center';
-  wCtx.textBaseline = 'middle';
-  wCtx.fillText('WALKWAY', 128, 32);
-  const walkPlane = new THREE.Mesh(
-    new THREE.PlaneGeometry(Math.min(pathLen * 0.8, 2.5), 0.5),
-    new THREE.MeshBasicMaterial({
-      map: new THREE.CanvasTexture(walkCanvas),
-      transparent: true, depthWrite: false, side: THREE.DoubleSide,
-    })
-  );
-  walkPlane.rotation.x = -Math.PI / 2;
-  walkPlane.position.set(midX, FLOOR_T + 0.02, midZ);
-  group.add(walkPlane);
+  // "WALKWAY" floor text
+  const wlbl = makeFloorLabel('WALKWAY', Math.min(pathLen * 0.8, 3.0), 40);
+  wlbl.position.set(pathCX, 0.025, pathCZ);
+  scene.add(wlbl);
+}
 
-  return group;
+// ── Walk mode keys ─────────────────────────────────────────────────────────────
+class WalkController {
+  constructor(camera) {
+    this.camera  = camera;
+    this.keys    = {};
+    this.speed   = 0.08;
+    this.yaw     = 0;
+    this.pitch   = 0;
+    this._onKey  = (e) => { this.keys[e.code] = e.type === 'keydown'; };
+    this._onMove = (e) => this._mouseMove(e);
+    document.addEventListener('keydown', this._onKey);
+    document.addEventListener('keyup',   this._onKey);
+  }
+  attachMouseLook(canvas) {
+    this._canvas = canvas;
+    canvas.addEventListener('mousemove', this._onMove);
+    canvas.requestPointerLock();
+  }
+  detachMouseLook() {
+    if (this._canvas) {
+      this._canvas.removeEventListener('mousemove', this._onMove);
+      this._canvas = null;
+    }
+    document.exitPointerLock();
+  }
+  _mouseMove(e) {
+    if (document.pointerLockElement !== this._canvas) return;
+    this.yaw   -= e.movementX * 0.002;
+    this.pitch -= e.movementY * 0.002;
+    this.pitch  = Math.max(-Math.PI / 2.5, Math.min(Math.PI / 2.5, this.pitch));
+  }
+  update() {
+    const { camera, keys } = this;
+    const euler = new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ');
+    camera.quaternion.setFromEuler(euler);
+
+    const dir = new THREE.Vector3();
+    const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
+    const rgt = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
+
+    if (keys['KeyW'] || keys['ArrowUp'])    dir.add(fwd);
+    if (keys['KeyS'] || keys['ArrowDown'])  dir.sub(fwd);
+    if (keys['KeyA'] || keys['ArrowLeft'])  dir.sub(rgt);
+    if (keys['KeyD'] || keys['ArrowRight']) dir.add(rgt);
+
+    if (dir.length() > 0) {
+      dir.normalize().multiplyScalar(this.speed);
+      camera.position.add(dir);
+      camera.position.y = Math.max(1.6, camera.position.y); // keep above floor
+    }
+  }
+  destroy() {
+    document.removeEventListener('keydown', this._onKey);
+    document.removeEventListener('keyup',   this._onKey);
+    this.detachMouseLook();
+  }
 }
 
 // ── Three.js scene hook ────────────────────────────────────────────────────────
-function useThreeScene(canvasRef, layout, statusMap) {
-  const frameRef = useRef(null);
+function useThreeScene(canvasRef, layout, statusMap, walkMode) {
+  const sceneRef    = useRef(null);
+  const rendererRef = useRef(null);
+  const cameraRef   = useRef(null);
+  const orbitRef    = useRef(null);
+  const walkRef     = useRef(null);
+  const rafRef      = useRef(null);
+
+  const walkModeRef = useRef(walkMode);
+  useEffect(() => { walkModeRef.current = walkMode; }, [walkMode]);
 
   useEffect(() => {
-    if (!canvasRef.current || !layout) return;
-
     const canvas = canvasRef.current;
-    const W = canvas.clientWidth  || 800;
-    const H = canvas.clientHeight || 600;
+    if (!canvas || !layout) return;
 
+    // Renderer
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    renderer.setSize(W, H, false);
     renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.shadowMap.enabled = true;
-    renderer.setClearColor(0xeceff1);
+    renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+    renderer.setClearColor(0x0d1117);
+    rendererRef.current = renderer;
 
+    // Scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xeceff1);
-    scene.fog = new THREE.Fog(0xeceff1, 80, 200);
+    scene.fog   = new THREE.Fog(0x0d1117, 50, 200);
+    sceneRef.current = scene;
 
-    const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 500);
-    camera.position.set(20, 20, 20);
+    // Camera
+    const camera = new THREE.PerspectiveCamera(60, canvas.clientWidth / canvas.clientHeight, 0.1, 300);
+    cameraRef.current = camera;
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.75));
-    const sun = new THREE.DirectionalLight(0xffffff, 1.1);
-    sun.position.set(30, 40, 20);
-    sun.castShadow = true;
-    scene.add(sun);
-    scene.add(new THREE.DirectionalLight(0xffffff, 0.35).position.set(-15, 20, -15));
+    // Lights
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+    dir.position.set(20, 30, 20);
+    scene.add(dir);
 
-    scene.add(new THREE.GridHelper(300, 300, 0xb0bec5, 0xcfd8dc));
+    // Grid
+    const grid = new THREE.GridHelper(200, 100, 0x2d333b, 0x21262d);
+    grid.position.y = -0.01;
+    scene.add(grid);
 
+    // Build station shells
     const boxes = layout.station_boxes || [];
-    const boxById = {};
-    boxes.forEach(b => { boxById[b.id] = b; });
+    boxes.forEach(box => buildStationShell(box, statusMap, scene));
 
-    // Station shells
-    boxes.forEach(b => scene.add(buildStationShell(b, statusMap)));
+    // Build walking paths
+    const connections = layout.connections || [];
+    connections.forEach(conn => {
+      const fromBox = boxes.find(b => b.id === conn.from_box_id);
+      const toBox   = boxes.find(b => b.id === conn.to_box_id);
+      if (fromBox && toBox) buildWalkingPath(fromBox, toBox, scene);
+    });
 
-    // Walking paths between connected boxes
-    const seen = new Set();
-    (layout.connections || [])
-      .filter(c => c.from_box_id != null && c.to_box_id != null)
-      .forEach(c => {
-        const key = `${c.from_box_id}-${c.to_box_id}`;
-        if (seen.has(key)) return;
-        seen.add(key);
-        const from = boxById[c.from_box_id];
-        const to   = boxById[c.to_box_id];
-        if (!from || !to) return;
-        const path = buildWalkingPath(from, to);
-        if (path) scene.add(path);
-      });
-
-    // Auto-fit camera
-    if (boxes.length > 0) {
-      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-      boxes.forEach(b => {
-        const cnt = (b.station_ids?.split(',').length) || b.station_count || 1;
-        const x0 = (b.position_x || 0) * SCALE;
-        const z0 = (b.position_y || 0) * SCALE;
-        minX = Math.min(minX, x0); maxX = Math.max(maxX, x0 + cnt * CELL_W);
-        minZ = Math.min(minZ, z0); maxZ = Math.max(maxZ, z0 + DEPTH);
-      });
+    // Camera auto-fit (overview)
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    boxes.forEach(b => {
+      const x0 = (b.position_x || 0) * SCALE;
+      const x1 = x0 + (b.station_count || 1) * CELL_W;
+      const z0 = (b.position_y || 0) * SCALE;
+      const z1 = z0 + DEPTH;
+      if (x0 < minX) minX = x0;
+      if (x1 > maxX) maxX = x1;
+      if (z0 < minZ) minZ = z0;
+      if (z1 > maxZ) maxZ = z1;
+    });
+    if (boxes.length) {
+      const cx  = (minX + maxX) / 2;
+      const cz  = (minZ + maxZ) / 2;
       const span = Math.max(maxX - minX, maxZ - minZ, 10);
-      const midX = (minX + maxX) / 2;
-      const midZ = (minZ + maxZ) / 2;
-      camera.position.set(midX + span * 0.9, span * 0.85, midZ + span * 0.9);
-      camera.lookAt(midX, 0, midZ);
+      camera.position.set(cx, span * 0.8, cz + span * 0.9);
+      camera.lookAt(cx, 0, cz);
+    } else {
+      camera.position.set(0, 20, 30);
+      camera.lookAt(0, 0, 0);
     }
 
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.07;
+    // Orbit controls
+    const orbit = new OrbitControls(camera, renderer.domElement);
+    orbit.enableDamping = true;
+    orbit.dampingFactor  = 0.08;
+    orbit.minDistance    = 2;
+    orbit.maxDistance    = 200;
+    orbitRef.current = orbit;
 
+    // Walk controller
+    const walk = new WalkController(camera);
+    walkRef.current = walk;
+
+    // Resize observer
     const ro = new ResizeObserver(() => {
-      const w = canvas.clientWidth;
-      const h = canvas.clientHeight;
-      if (w && h) {
-        renderer.setSize(w, h, false);
-        camera.aspect = w / h;
-        camera.updateProjectionMatrix();
-      }
+      if (!canvas.clientWidth || !canvas.clientHeight) return;
+      renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+      camera.aspect = canvas.clientWidth / canvas.clientHeight;
+      camera.updateProjectionMatrix();
     });
     ro.observe(canvas);
 
-    let alive = true;
+    // Animation loop
     const animate = () => {
-      if (!alive) return;
-      frameRef.current = requestAnimationFrame(animate);
-      controls.update();
+      rafRef.current = requestAnimationFrame(animate);
+      if (walkModeRef.current) {
+        walk.update();
+        orbit.enabled = false;
+      } else {
+        orbit.enabled = true;
+        orbit.update();
+      }
       renderer.render(scene, camera);
     };
     animate();
 
     return () => {
-      alive = false;
-      cancelAnimationFrame(frameRef.current);
+      cancelAnimationFrame(rafRef.current);
       ro.disconnect();
-      controls.dispose();
+      walk.destroy();
+      orbit.dispose();
       renderer.dispose();
-      scene.traverse(obj => {
-        obj.geometry?.dispose();
-        if (obj.material) {
-          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-          mats.forEach(m => { m.map?.dispose(); m.dispose(); });
-        }
-      });
     };
-  }, [layout, statusMap]); // eslint-disable-line
-}
+  }, [canvasRef, layout, statusMap]); // eslint-disable-line
 
-// ── Legend ─────────────────────────────────────────────────────────────────────
-const LEGEND = [
-  { color: '#e53935', label: 'Active concern (R)' },
-  { color: '#fdd835', label: 'Under observation (Y)' },
-  { color: '#43a047', label: 'Resolved (G)' },
-  { color: '#90a4ae', label: 'No data' },
-  { color: '#fff176', label: 'Walking path' },
-];
+  // Toggle walk mode: attach/detach pointer lock and reset camera pos
+  useEffect(() => {
+    const walk   = walkRef.current;
+    const canvas = canvasRef.current;
+    const camera = cameraRef.current;
+    if (!walk || !canvas || !camera) return;
 
-function Legend() {
-  return (
-    <div className="z3d-legend">
-      {LEGEND.map(({ color, label }) => (
-        <div key={label} className="z3d-legend-item">
-          <span className="z3d-legend-dot" style={{ background: color }} />
-          <span>{label}</span>
-        </div>
-      ))}
-    </div>
-  );
+    if (walkMode) {
+      // Position camera at eye level at centre of scene
+      walk.yaw   = 0;
+      walk.pitch = 0;
+      camera.position.y = 1.8;
+      walk.attachMouseLook(canvas);
+    } else {
+      walk.detachMouseLook();
+    }
+  }, [walkMode, canvasRef]);
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
 function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive }) {
-  const canvasRef  = useRef(null);
-  const [selectedId, setSelectedId] = useState(null);
-  const [layout,     setLayout    ] = useState(null);
-  const [statusMap,  setStatusMap ] = useState({});
-  const [loading,    setLoading   ] = useState(false);
-  const [error,      setError     ] = useState(null);
+  const canvasRef   = useRef(null);
+  const [selectedLayoutId, setSelectedLayoutId] = useState(null);
+  const [layout,    setLayout]    = useState(null);
+  const [statusMap, setStatusMap] = useState({});
+  const [walkMode,  setWalkMode]  = useState(false);
 
+  // Auto-select active layout when provided
   useEffect(() => {
-    if (activeLayoutId && !selectedId) setSelectedId(activeLayoutId);
+    if (activeLayoutId && !selectedLayoutId) {
+      setSelectedLayoutId(activeLayoutId);
+    }
   }, [activeLayoutId]); // eslint-disable-line
 
+  // Fetch layout data
   useEffect(() => {
-    if (!selectedId) { setLayout(null); return; }
-    setLoading(true);
-    setError(null);
-    layoutApi.getLayout(selectedId)
+    if (!selectedLayoutId) return;
+    layoutApi.getLayout(selectedLayoutId)
       .then(res => setLayout(res.data))
-      .catch(() => setError('Failed to load layout.'))
-      .finally(() => setLoading(false));
-  }, [selectedId]);
-
-  useEffect(() => {
-    if (!selectedId || !userId) return;
-    layoutApi.getInputRecords?.(userId, selectedId)
-      .then(res => {
-        const records = Array.isArray(res?.data) ? res.data : [];
-        const map = {};
-        records.forEach(r => {
-          if (!r.stage_no) return;
-          const sid = r.stage_no.trim();
-          const cur  = r.ryg || null;
-          const prev = map[sid];
-          if (!prev || cur === 'R' || (cur === 'Y' && prev === 'G')) map[sid] = cur;
-        });
-        setStatusMap(map);
-      })
       .catch(() => {});
-  }, [selectedId, userId]);
+  }, [selectedLayoutId]);
 
-  useThreeScene(canvasRef, layout, statusMap);
+  // Derive status map from input records (if layout has records)
+  useEffect(() => {
+    if (!layout) return;
+    const map = {};
+    (layout.station_boxes || []).forEach(box => {
+      (box.station_ids || '').split(',').forEach(id => {
+        const sid = id.trim();
+        if (!sid) return;
+        // Use station_data if available, otherwise null → grey
+        try {
+          const data = JSON.parse(box.station_data || '{}');
+          if (data[sid]) map[sid] = data[sid].status || null;
+        } catch (_) {}
+      });
+    });
+    setStatusMap(map);
+  }, [layout]);
+
+  useThreeScene(canvasRef, layout, statusMap, walkMode);
+
+  const handleLayoutChange = useCallback((e) => {
+    setSelectedLayoutId(Number(e.target.value) || null);
+    setLayout(null);
+    setWalkMode(false);
+  }, []);
 
   return (
     <div className="z3d-root">
       <div className="z3d-toolbar">
-        <div className="z3d-toolbar-left">
-          <span className="z3d-toolbar-title">🏭 Z-Stage 3D Layout</span>
-          <select
-            className="z3d-layout-select"
-            value={selectedId || ''}
-            onChange={e => setSelectedId(Number(e.target.value) || null)}
+        <span className="z3d-toolbar-title">Z-Stage 3D Layout</span>
+
+        <select className="z3d-layout-select" value={selectedLayoutId || ''} onChange={handleLayoutChange}>
+          <option value="">— Select Layout —</option>
+          {savedLayouts.map(l => (
+            <option key={l.id} value={l.id}>{l.name || `Layout ${l.id}`}</option>
+          ))}
+        </select>
+
+        {layout && (
+          <button
+            className={`z3d-walk-btn${walkMode ? ' z3d-walk-btn--active' : ''}`}
+            onClick={() => setWalkMode(v => !v)}
+            title={walkMode ? 'Exit walk mode (click to return to overview)' : 'Enter first-person walk mode'}
           >
-            <option value="">— Select a layout —</option>
-            {savedLayouts.map(l => (
-              <option key={l.id} value={l.id}>{l.name || `Layout ${l.id}`}</option>
-            ))}
-          </select>
+            {walkMode ? '🧍 Exit Walk' : '🚶 Walk Mode'}
+          </button>
+        )}
+
+        <div className="z3d-legend">
+          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--r" />Red</span>
+          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--y" />Yellow</span>
+          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--g" />Green</span>
+          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--na" />N/A</span>
+          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--path" />Walking Path</span>
         </div>
-        <div className="z3d-toolbar-right"><Legend /></div>
       </div>
 
       <div className="z3d-canvas-wrapper">
-        {!selectedId && !loading && (
+        {!layout ? (
           <div className="z3d-placeholder">
-            <div className="z3d-placeholder-icon">🏗️</div>
-            <p className="z3d-placeholder-title">Select a layout to view its 3D station shells</p>
-            <p className="z3d-placeholder-sub">Stations auto-generate with columns, shop boards, station-ID labels and walking paths.</p>
+            <span className="z3d-placeholder-icon">🏭</span>
+            <span>{savedLayouts.length === 0 ? 'No layouts saved yet' : 'Select a layout to view the 3D scene'}</span>
           </div>
-        )}
-        {loading && (
-          <div className="z3d-placeholder">
-            <div className="z3d-loading-spinner" />
-            <p>Loading 3D scene…</p>
-          </div>
-        )}
-        {error && (
-          <div className="z3d-placeholder z3d-placeholder--error"><p>{error}</p></div>
-        )}
-        <canvas
-          ref={canvasRef}
-          className="z3d-canvas"
-          style={{ display: layout && !loading ? 'block' : 'none' }}
-        />
-        {layout && !loading && (
-          <div className="z3d-controls-hint">
-            🖱️ Left-drag to orbit · Scroll to zoom · Right-drag to pan
-          </div>
+        ) : (
+          <>
+            <canvas ref={canvasRef} className="z3d-canvas" />
+            <div className="z3d-walk-hint">
+              {walkMode
+                ? 'WASD / Arrow keys to move · Mouse to look · Click canvas to capture mouse'
+                : 'Left drag to orbit · Scroll to zoom · Right drag to pan'}
+            </div>
+          </>
         )}
       </div>
     </div>
