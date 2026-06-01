@@ -330,6 +330,8 @@ function useThreeScene(canvasRef, layout, statusMap, walkMode) {
   const orbitRef    = useRef(null);
   const walkRef     = useRef(null);
   const rafRef      = useRef(null);
+  const sceneCenterRef = useRef(new THREE.Vector3(0, 0, 0));
+  const sceneSpanRef   = useRef(20);
 
   const walkModeRef = useRef(walkMode);
   useEffect(() => { walkModeRef.current = walkMode; }, [walkMode]);
@@ -390,9 +392,11 @@ function useThreeScene(canvasRef, layout, statusMap, walkMode) {
       if (z1 > maxZ) maxZ = z1;
     });
     if (boxes.length) {
-      const cx  = (minX + maxX) / 2;
-      const cz  = (minZ + maxZ) / 2;
+      const cx   = (minX + maxX) / 2;
+      const cz   = (minZ + maxZ) / 2;
       const span = Math.max(maxX - minX, maxZ - minZ, 10);
+      sceneCenterRef.current.set(cx, 0, cz);
+      sceneSpanRef.current = span;
       camera.position.set(cx, span * 0.8, cz + span * 0.9);
       camera.lookAt(cx, 0, cz);
     } else {
@@ -452,7 +456,6 @@ function useThreeScene(canvasRef, layout, statusMap, walkMode) {
     if (!walk || !canvas || !camera) return;
 
     if (walkMode) {
-      // Position camera at eye level at centre of scene
       walk.yaw   = 0;
       walk.pitch = 0;
       camera.position.y = 1.8;
@@ -461,6 +464,36 @@ function useThreeScene(canvasRef, layout, statusMap, walkMode) {
       walk.detachMouseLook();
     }
   }, [walkMode, canvasRef]);
+
+  // Snap camera to a named view preset
+  const snapView = useCallback((view) => {
+    const camera = cameraRef.current;
+    const orbit  = orbitRef.current;
+    if (!camera || !orbit) return;
+
+    const c    = sceneCenterRef.current;
+    const span = sceneSpanRef.current;
+    const d    = span * 0.9;
+
+    const presets = {
+      top:    { pos: [c.x,     d * 1.4,  c.z      ], up: [0, 0, -1] },
+      front:  { pos: [c.x,     d * 0.4,  c.z + d  ], up: [0, 1,  0] },
+      back:   { pos: [c.x,     d * 0.4,  c.z - d  ], up: [0, 1,  0] },
+      left:   { pos: [c.x - d, d * 0.4,  c.z      ], up: [0, 1,  0] },
+      right:  { pos: [c.x + d, d * 0.4,  c.z      ], up: [0, 1,  0] },
+      '3d':   { pos: [c.x + d * 0.8, d * 0.8, c.z + d * 0.9], up: [0, 1, 0] },
+    };
+    const p = presets[view];
+    if (!p) return;
+
+    camera.position.set(...p.pos);
+    camera.up.set(...p.up);
+    orbit.target.copy(c);
+    orbit.update();
+    camera.lookAt(c);
+  }, []);
+
+  return { snapView };
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -504,7 +537,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setStatusMap(map);
   }, [layout]);
 
-  useThreeScene(canvasRef, layout, statusMap, walkMode);
+  const { snapView } = useThreeScene(canvasRef, layout, statusMap, walkMode);
 
   const handleLayoutChange = useCallback((e) => {
     setSelectedLayoutId(Number(e.target.value) || null);
@@ -525,13 +558,32 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
         </select>
 
         {layout && (
-          <button
-            className={`z3d-walk-btn${walkMode ? ' z3d-walk-btn--active' : ''}`}
-            onClick={() => setWalkMode(v => !v)}
-            title={walkMode ? 'Exit walk mode (click to return to overview)' : 'Enter first-person walk mode'}
-          >
-            {walkMode ? '🧍 Exit Walk' : '🚶 Walk Mode'}
-          </button>
+          <>
+            {/* View presets */}
+            <div className="z3d-view-group">
+              {[
+                { id: '3d',    label: '3D'    },
+                { id: 'top',   label: 'Top'   },
+                { id: 'front', label: 'Front' },
+                { id: 'back',  label: 'Back'  },
+                { id: 'left',  label: 'Left'  },
+                { id: 'right', label: 'Right' },
+              ].map(v => (
+                <button key={v.id} className="z3d-view-btn" onClick={() => snapView(v.id)} title={`${v.label} view`}>
+                  {v.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Walk mode */}
+            <button
+              className={`z3d-walk-btn${walkMode ? ' z3d-walk-btn--active' : ''}`}
+              onClick={() => setWalkMode(v => !v)}
+              title={walkMode ? 'Exit walk mode' : 'Enter first-person walk mode'}
+            >
+              {walkMode ? '🧍 Exit Walk' : '🚶 Walk Mode'}
+            </button>
+          </>
         )}
 
         <div className="z3d-legend">
