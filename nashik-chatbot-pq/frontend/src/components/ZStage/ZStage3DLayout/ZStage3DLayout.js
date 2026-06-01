@@ -284,16 +284,20 @@ function buildStationShell(box, statusMap, scene) {
 
     const stnName = stationNames[i] || '';
 
-    // ── Nameplate on FRONT frame — clearly in front of beam, facing outward ──
+    // ── Nameplate on FRONT frame ──
+    // PlaneGeometry default normal = +Z → front view camera is at high-Z looking -Z
+    // so no rotation needed, texture normal (not flipped)
     const plateFront = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, false);
-    plateFront.position.set(cellCX, HEIGHT - 0.55, originZ - 0.30); // 30cm in front of beam
-    plateFront.rotation.y = Math.PI; // face toward -Z (viewer in front)
+    plateFront.position.set(cellCX, HEIGHT - 0.55, originZ - 0.30);
+    // no rotation — faces +Z toward front-view camera ✓
     group.add(plateFront);
 
-    // ── Nameplate on BACK frame — facing outward from back ──
+    // ── Nameplate on BACK frame ──
+    // Back view camera is at low-Z looking +Z, so plate must face -Z → rotation.y = PI
+    // Rotating by PI mirrors the UV → use flipped texture to keep text readable
     const plateBack = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, true);
-    plateBack.position.set(cellCX, HEIGHT - 0.55, originZ + DEPTH + 0.30); // 30cm behind back beam
-    // no rotation — default faces +Z (viewer standing behind)
+    plateBack.position.set(cellCX, HEIGHT - 0.55, originZ + DEPTH + 0.30);
+    plateBack.rotation.y = Math.PI;
     group.add(plateBack);
   }
 
