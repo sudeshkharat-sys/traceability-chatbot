@@ -5,6 +5,7 @@ import {
   LayoutGrid,
   Inbox,
   BarChart2,
+  Box,
   Plus,
   Diamond,
   Type,
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { id: 'layout',    label: 'Layout Preparation', Icon: LayoutGrid },
   { id: 'input',     label: 'Input Data',          Icon: Inbox },
   { id: 'dashboard', label: 'Z-Stage Dashboard',   Icon: BarChart2 },
+  { id: 'layout3d',  label: 'Z-Stage 3D Layout',   Icon: Box },
 ];
 
 // ── Per-layout three-dot menu ──────────────────────────────────────────────────
