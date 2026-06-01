@@ -127,33 +127,26 @@ function buildZebraCrossing(x, originZ, group) {
   });
 }
 
-// ── Station nameplate (top front beam) ────────────────────────────────────────
-function makeNameplate(stnId, stnName, boxDesc, cellWidth) {
+// ── Station nameplate ─────────────────────────────────────────────────────────
+function drawNameplateCanvas(stnId, stnName, boxDesc) {
   const W = 1024, H = 240;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
 
-  // Background
   ctx.fillStyle = '#1a237e';
   ctx.fillRect(0, 0, W, H);
-
-  // Yellow bottom strip
   ctx.fillStyle = '#ffd600';
   ctx.fillRect(0, H - 12, W, 12);
-
-  // Top accent strip
   ctx.fillStyle = '#283593';
   ctx.fillRect(0, 0, W, 36);
 
-  // Station ID — large yellow left
   ctx.fillStyle = '#ffd600';
   ctx.font = 'bold 90px Arial';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillText(stnId, 24, 44);
 
-  // Station name — white right
   if (stnName) {
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 48px Arial';
@@ -162,13 +155,11 @@ function makeNameplate(stnId, stnName, boxDesc, cellWidth) {
     ctx.fillText(stnName, W - 24, 52);
   }
 
-  // Description — light blue bottom
   if (boxDesc) {
     ctx.fillStyle = '#90caf9';
     ctx.font = '34px Arial';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'bottom';
-    // Truncate if too long
     let desc = boxDesc;
     while (ctx.measureText(desc).width > W - 48 && desc.length > 0) desc = desc.slice(0, -1);
     if (desc !== boxDesc) desc += '…';
@@ -180,11 +171,29 @@ function makeNameplate(stnId, stnName, boxDesc, cellWidth) {
     ctx.textBaseline = 'bottom';
     ctx.fillText('Z-STAGE STATION', W / 2, H - 18);
   }
+  return { canvas, W, H };
+}
 
-  const tex = new THREE.CanvasTexture(canvas);
+function makeNameplateMesh(stnId, stnName, boxDesc, cellWidth, flip = false) {
+  const { canvas, W, H } = drawNameplateCanvas(stnId, stnName, boxDesc);
+
+  let finalCanvas = canvas;
+  if (flip) {
+    // Mirror horizontally so back-face text reads correctly
+    const flipped = document.createElement('canvas');
+    flipped.width = W; flipped.height = H;
+    const ctx2 = flipped.getContext('2d');
+    ctx2.translate(W, 0);
+    ctx2.scale(-1, 1);
+    ctx2.drawImage(canvas, 0, 0);
+    finalCanvas = flipped;
+  }
+
+  const tex    = new THREE.CanvasTexture(finalCanvas);
   const plateW = cellWidth * 0.90;
-  const geo = new THREE.PlaneGeometry(plateW, plateW * (H / W));
-  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
+  const geo    = new THREE.PlaneGeometry(plateW, plateW * (H / W));
+  // FrontSide only — we create two separate meshes with correct textures
+  const mat    = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.FrontSide });
   return new THREE.Mesh(geo, mat);
 }
 
@@ -273,15 +282,18 @@ function buildStationShell(box, statusMap, scene) {
       group.add(lbl);
     }
 
-    // ── Nameplates on FRONT and BACK top beams ──
-    const stnName    = stationNames[i] || '';
-    const plateFront = makeNameplate(stnId, stnName, boxDesc, CELL_W);
+    // ── Nameplates on FRONT and BACK — each with correct readable texture ──
+    const stnName = stationNames[i] || '';
+
+    // Front plate — normal texture, faces toward -Z (viewer standing in front)
+    const plateFront = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, false);
     plateFront.position.set(cellCX, HEIGHT - 0.55, originZ + 0.04);
     group.add(plateFront);
 
-    const plateBack = makeNameplate(stnId, stnName, boxDesc, CELL_W);
+    // Back plate — mirrored texture, faces toward +Z (viewer standing behind)
+    const plateBack = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, true);
     plateBack.position.set(cellCX, HEIGHT - 0.55, originZ + DEPTH - 0.04);
-    plateBack.rotation.y = Math.PI; // flip to face outward
+    plateBack.rotation.y = Math.PI;
     group.add(plateBack);
   }
 
