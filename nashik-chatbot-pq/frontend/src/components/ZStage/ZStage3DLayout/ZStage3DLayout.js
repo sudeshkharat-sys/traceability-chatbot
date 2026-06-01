@@ -9,8 +9,10 @@ const SCALE   = 0.04;   // canvas px → metres
 const CELL_W  = 5.0;    // metres per station cell width
 const DEPTH   = 20.0;   // station depth (Z axis) — long tunnel
 const HEIGHT  = 5.0;    // column / beam height
-const COL_R   = 0.12;   // column radius
+const COL_W   = 0.30;   // column width (rectangular)
+const COL_D   = 0.30;   // column depth (rectangular)
 const PATH_W  = 3.0;    // walking path width
+const ZEBRA_W = 0.8;    // zebra stripe width between cells
 
 const STATUS_HEX = {
   R: 0xe53935,
@@ -100,84 +102,108 @@ function makeFloorLabel(text, width, fontSize = 36) {
   return mesh;
 }
 
-// ── Build one station "shell" (columns + beams + floor + labels) ───────────────
-function buildStationShell(box, statusMap, scene) {
-  const group    = new THREE.Group();
-  const count    = box.station_count || 1;
-  const totalW   = count * CELL_W;
-  const originX  = (box.position_x || 0) * SCALE;
-  const originZ  = (box.position_y || 0) * SCALE;
-
-  // ── Columns (cylindrical) at every cell boundary, front + back ──
-  const colMat = new THREE.MeshLambertMaterial({ color: 0xb0bec5 });
-  for (let col = 0; col <= count; col++) {
-    const cx = originX + col * CELL_W;
-    [[0], [DEPTH]].forEach(([dz]) => {
-      const geo = new THREE.CylinderGeometry(COL_R, COL_R, HEIGHT, 12);
-      const mesh = new THREE.Mesh(geo, colMat);
-      mesh.position.set(cx, HEIGHT / 2, originZ + dz);
-      group.add(mesh);
-    });
+// ── Zebra crossing strip between two adjacent cells ────────────────────────────
+function buildZebraCrossing(x, originZ, group) {
+  const stripeH  = DEPTH / 10;   // 10 alternating stripes along depth
+  const whiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+  const blackMat = new THREE.MeshBasicMaterial({ color: 0x222222, side: THREE.DoubleSide });
+  for (let s = 0; s < 10; s++) {
+    const mat  = s % 2 === 0 ? whiteMat : blackMat;
+    const geo  = new THREE.PlaneGeometry(ZEBRA_W, stripeH - 0.05);
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(x, 0.02, originZ + s * stripeH + stripeH / 2);
+    group.add(mesh);
   }
+}
 
-  // ── Horizontal top beams (along X) front + back ──
-  const beamMat = new THREE.MeshLambertMaterial({ color: 0x78909c });
-  [[0], [DEPTH]].forEach(([dz]) => {
-    const geo  = new THREE.BoxGeometry(totalW, 0.15, 0.15);
-    const mesh = new THREE.Mesh(geo, beamMat);
-    mesh.position.set(originX + totalW / 2, HEIGHT, originZ + dz);
+// ── Build one station "shell" (4-corner rect columns + beams + floor + labels) ──
+function buildStationShell(box, statusMap, scene) {
+  const group   = new THREE.Group();
+  const count   = box.station_count || 1;
+  const totalW  = count * CELL_W;
+  const originX = (box.position_x || 0) * SCALE;
+  const originZ = (box.position_y || 0) * SCALE;
+
+  const colMat  = new THREE.MeshLambertMaterial({ color: 0xcfd8dc });
+  const beamMat = new THREE.MeshLambertMaterial({ color: 0x90a4ae });
+
+  // ── 4 corner columns only (rectangular) ──
+  const corners = [
+    [originX,          originZ],
+    [originX + totalW, originZ],
+    [originX,          originZ + DEPTH],
+    [originX + totalW, originZ + DEPTH],
+  ];
+  corners.forEach(([cx, cz]) => {
+    const geo  = new THREE.BoxGeometry(COL_W, HEIGHT, COL_D);
+    const mesh = new THREE.Mesh(geo, colMat);
+    mesh.position.set(cx, HEIGHT / 2, cz);
     group.add(mesh);
   });
 
-  // ── Cross beams (along Z) at each column line ──
-  for (let col = 0; col <= count; col++) {
-    const cx   = originX + col * CELL_W;
-    const geo  = new THREE.BoxGeometry(0.15, 0.15, DEPTH);
+  // ── Top beams: front, back, left, right ──
+  const beams = [
+    { pos: [originX + totalW / 2, HEIGHT, originZ],          size: [totalW, 0.18, 0.18] },
+    { pos: [originX + totalW / 2, HEIGHT, originZ + DEPTH],  size: [totalW, 0.18, 0.18] },
+    { pos: [originX,          HEIGHT, originZ + DEPTH / 2],  size: [0.18, 0.18, DEPTH]  },
+    { pos: [originX + totalW, HEIGHT, originZ + DEPTH / 2],  size: [0.18, 0.18, DEPTH]  },
+  ];
+  beams.forEach(({ pos, size }) => {
+    const geo  = new THREE.BoxGeometry(...size);
     const mesh = new THREE.Mesh(geo, beamMat);
-    mesh.position.set(cx, HEIGHT, originZ + DEPTH / 2);
+    mesh.position.set(...pos);
     group.add(mesh);
-  }
+  });
 
-  // ── Per-cell floor tiles + status sphere + station-ID label ──
+  // ── Per-cell floor tiles + status sphere + station-ID label + zebra ──
   const stationIds = (box.station_ids || '').split(',').map(s => s.trim()).filter(Boolean);
 
   for (let i = 0; i < count; i++) {
-    const cellX   = originX + i * CELL_W;
-    const cellCX  = cellX + CELL_W / 2;
-    const cellCZ  = originZ + DEPTH / 2;
-    const stnId   = stationIds[i] || '';
-    const status  = statusMap[stnId] || null;
-    const color   = STATUS_HEX[status] ?? STATUS_HEX.null;
+    const cellX  = originX + i * CELL_W;
+    const cellCX = cellX + CELL_W / 2;
+    const cellCZ = originZ + DEPTH / 2;
+    const stnId  = stationIds[i] || '';
+    const status = statusMap[stnId] || null;
+    const color  = STATUS_HEX[status] ?? STATUS_HEX.null;
 
-    // Floor tile
-    const fGeo  = new THREE.PlaneGeometry(CELL_W - 0.1, DEPTH - 0.1);
-    const fMat  = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.35, side: THREE.DoubleSide });
-    const floor = new THREE.Mesh(fGeo, fMat);
+    // Floor tile (slight gap for zebra crossing between cells)
+    const floorW = i < count - 1 ? CELL_W - ZEBRA_W : CELL_W - 0.05;
+    const fGeo   = new THREE.PlaneGeometry(floorW, DEPTH - 0.05);
+    const fMat   = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.38, side: THREE.DoubleSide });
+    const floor  = new THREE.Mesh(fGeo, fMat);
     floor.rotation.x = -Math.PI / 2;
-    floor.position.set(cellCX, 0.01, cellCZ);
+    // Shift left slightly so gap is at right edge of cell
+    const floorOffsetX = i < count - 1 ? -ZEBRA_W / 2 : 0;
+    floor.position.set(cellCX + floorOffsetX, 0.01, cellCZ);
     group.add(floor);
 
-    // Status sphere
-    const sGeo  = new THREE.SphereGeometry(0.22, 12, 12);
-    const sMat  = new THREE.MeshLambertMaterial({ color });
-    const sph   = new THREE.Mesh(sGeo, sMat);
-    sph.position.set(cellCX, HEIGHT + 0.35, cellCZ);
+    // Zebra crossing at right boundary between this cell and next
+    if (i < count - 1) {
+      buildZebraCrossing(cellX + CELL_W, originZ, group);
+    }
+
+    // Status sphere above cell
+    const sGeo = new THREE.SphereGeometry(0.25, 12, 12);
+    const sMat = new THREE.MeshLambertMaterial({ color });
+    const sph  = new THREE.Mesh(sGeo, sMat);
+    sph.position.set(cellCX, HEIGHT + 0.4, cellCZ);
     group.add(sph);
 
     // Station ID floor label
     if (stnId) {
-      const lbl = makeFloorLabel(stnId, CELL_W * 0.75);
+      const lbl = makeFloorLabel(stnId, CELL_W * 0.7);
       lbl.position.set(cellCX, 0.02, cellCZ);
       group.add(lbl);
     }
   }
 
   // ── Box name floating label ──
-  const nameSprite = makeLabel(box.name || 'Box', { fontSize: 52, color: '#ffffff', bgColor: 'rgba(0,0,0,0.55)', padding: 14, scale: 2.8 });
-  nameSprite.position.set(originX + totalW / 2, HEIGHT + 1.1, originZ + DEPTH / 2);
+  const nameSprite = makeLabel(box.name || 'Box', { fontSize: 52, color: '#ffffff', bgColor: 'rgba(0,0,0,0.6)', padding: 14, scale: 3.0 });
+  nameSprite.position.set(originX + totalW / 2, HEIGHT + 1.2, originZ + DEPTH / 2);
   group.add(nameSprite);
 
-  // ── Shop sign board at entry (front face, y ≈ 2m) ──
+  // ── Shop sign board at entry ──
   const shopPrefix = (stationIds[0] || box.name || 'SHOP').split('-')[0];
   const board = makeShopBoard(shopPrefix);
   board.position.set(originX + totalW / 2, 2.2, originZ - 0.05);
