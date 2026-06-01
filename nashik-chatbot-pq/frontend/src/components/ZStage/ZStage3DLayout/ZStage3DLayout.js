@@ -314,16 +314,16 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     const stnId  = stationIds[i] || `STN-${i + 1}`;
     const color  = STATUS_HEX[statusMap[stnId] || null] ?? STATUS_HEX.null;
 
-    // Floor tile — full cell width; zebra crossing sits on top
+    // Gray floor — full cell width
     const floor  = new THREE.Mesh(
       new THREE.BoxGeometry(CELL_W - 0.05, 0.18, DEPTH - 0.05),
-      new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.72 })
+      new THREE.MeshLambertMaterial({ color: 0xb0bec5, transparent: true, opacity: 0.80 })
     );
     floor.position.set(cellCX, 0.09, cellCZ);
     group.add(floor);
 
-    // Green path between cells
-    if (i < count - 1) buildZebraCrossing(cellX + CELL_W, originZ, group);
+    // Green center path strip running through middle of this station
+    buildZebraCrossing(cellCX, originZ, group);
 
     // Status sphere on top
     const sph = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 12), new THREE.MeshLambertMaterial({ color }));
