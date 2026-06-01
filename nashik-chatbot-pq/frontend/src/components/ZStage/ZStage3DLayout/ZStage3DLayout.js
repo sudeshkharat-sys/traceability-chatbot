@@ -110,15 +110,15 @@ function buildZebraCrossing(x, originZ, group) {
   const fillMat = new THREE.MeshBasicMaterial({ color: 0xa5d6a7, transparent: true, opacity: 0.7, side: THREE.DoubleSide });
   const fill = new THREE.Mesh(fillGeo, fillMat);
   fill.rotation.x = -Math.PI / 2;
-  fill.position.set(x, 0.02, originZ + DEPTH / 2);
+  fill.position.set(x, 0.19, originZ + DEPTH / 2);
   group.add(fill);
   const borderMat = new THREE.MeshBasicMaterial({ color: 0x2e7d32, side: THREE.DoubleSide });
   const T = 0.08;
   [
-    { geo: new THREE.PlaneGeometry(T, DEPTH),   pos: [x - ZEBRA_W / 2 + T / 2, 0.025, originZ + DEPTH / 2] },
-    { geo: new THREE.PlaneGeometry(T, DEPTH),   pos: [x + ZEBRA_W / 2 - T / 2, 0.025, originZ + DEPTH / 2] },
-    { geo: new THREE.PlaneGeometry(ZEBRA_W, T), pos: [x, 0.025, originZ + T / 2] },
-    { geo: new THREE.PlaneGeometry(ZEBRA_W, T), pos: [x, 0.025, originZ + DEPTH - T / 2] },
+    { geo: new THREE.PlaneGeometry(T, DEPTH),   pos: [x - ZEBRA_W / 2 + T / 2, 0.20, originZ + DEPTH / 2] },
+    { geo: new THREE.PlaneGeometry(T, DEPTH),   pos: [x + ZEBRA_W / 2 - T / 2, 0.20, originZ + DEPTH / 2] },
+    { geo: new THREE.PlaneGeometry(ZEBRA_W, T), pos: [x, 0.20, originZ + T / 2] },
+    { geo: new THREE.PlaneGeometry(ZEBRA_W, T), pos: [x, 0.20, originZ + DEPTH - T / 2] },
   ].forEach(({ geo, pos }) => {
     const mesh = new THREE.Mesh(geo, borderMat);
     mesh.rotation.x = -Math.PI / 2;
@@ -314,13 +314,12 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     const stnId  = stationIds[i] || `STN-${i + 1}`;
     const color  = STATUS_HEX[statusMap[stnId] || null] ?? STATUS_HEX.null;
 
-    // Floor tile
-    const floorW = i < count - 1 ? CELL_W - ZEBRA_W : CELL_W - 0.05;
+    // Floor tile — full cell width; zebra crossing sits on top
     const floor  = new THREE.Mesh(
-      new THREE.BoxGeometry(floorW, 0.18, DEPTH - 0.05),
+      new THREE.BoxGeometry(CELL_W - 0.05, 0.18, DEPTH - 0.05),
       new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.72 })
     );
-    floor.position.set(cellCX + (i < count - 1 ? -ZEBRA_W / 2 : 0), 0.09, cellCZ);
+    floor.position.set(cellCX, 0.09, cellCZ);
     group.add(floor);
 
     // Green path between cells
