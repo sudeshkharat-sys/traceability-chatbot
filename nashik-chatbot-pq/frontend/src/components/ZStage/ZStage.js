@@ -3,6 +3,7 @@ import Sidebar from './Sidebar/Sidebar';
 import LayoutPreparation from './LayoutPreparation/LayoutPreparation';
 import InputData from './InputData/InputData';
 import ZStageDashboard from './ZStageDashboard/ZStageDashboard';
+import ZStage3DLayout from './ZStage3DLayout/ZStage3DLayout';
 import { layoutApi } from '../../services/api/layoutApi';
 import authService from '../../services/api/authService';
 import utilityLogo from '../../assests/image.png';
@@ -12,11 +13,9 @@ function ZStage() {
   const [activeSection, setActiveSection] = useState('layout');
   const userId = authService.getUserId();
 
-  // 'landing' → show Create New / Open screen; 'canvas' → show the editor
   const [layoutMode, setLayoutMode] = useState('landing');
   const [showOpenList, setShowOpenList] = useState(false);
 
-  // ── Layout Preparation state lifted to App so Sidebar can trigger it ──
   const [showAddBoxModal, setShowAddBoxModal] = useState(false);
   const [addBuyoffSignal,   setAddBuyoffSignal  ] = useState(0);
   const [addTextSignal,     setAddTextSignal    ] = useState(0);
@@ -49,7 +48,7 @@ function ZStage() {
     if (loadHandlerRef.current) {
       await loadHandlerRef.current(id);
       setActiveLayoutId(id);
-      setLayoutMode('canvas'); // open canvas once a layout is loaded
+      setLayoutMode('canvas');
     }
   };
 
@@ -140,10 +139,7 @@ function ZStage() {
           <img src={utilityLogo} alt="Mahindra Utility Logo" className="zstage-header-logo-right" />
         </div>
 
-        {/* ── Layout section ─────────────────────────────────────────────── */}
-        {/* Always mounted — state survives switching to other tabs          */}
-
-        {/* Landing screen — shown only when no layout has been started yet  */}
+        {/* Landing screen */}
         {activeSection === 'layout' && layoutMode === 'landing' && (
           <div className="zs-landing">
             <div className="zs-landing-card">
@@ -185,7 +181,7 @@ function ZStage() {
           </div>
         )}
 
-        {/* LayoutPreparation — always mounted so loadHandlerRef is always registered */}
+        {/* LayoutPreparation — always mounted */}
         <div style={{
           display: activeSection === 'layout' && layoutMode === 'canvas' ? 'flex' : 'none',
           flex: 1, flexDirection: 'column', overflow: 'hidden', minHeight: 0,
@@ -207,7 +203,7 @@ function ZStage() {
           />
         </div>
 
-        {/* InputData — always mounted so state survives tab switches        */}
+        {/* InputData — always mounted */}
         <div style={{
           display: activeSection === 'input' ? 'flex' : 'none',
           flex: 1, flexDirection: 'column', overflow: 'hidden', minHeight: 0,
@@ -215,7 +211,7 @@ function ZStage() {
           <InputData userId={userId} layouts={savedLayouts} isActive={activeSection === 'input'} />
         </div>
 
-        {/* ZStageDashboard — always mounted so state survives tab switches  */}
+        {/* ZStageDashboard — always mounted */}
         <div style={{
           display: activeSection === 'dashboard' ? 'flex' : 'none',
           flex: 1, flexDirection: 'column', overflow: 'hidden', minHeight: 0,
@@ -226,6 +222,19 @@ function ZStage() {
             refreshSignal={layoutSaveSignal}
             savedLayouts={savedLayouts}
             isActive={activeSection === 'dashboard'}
+          />
+        </div>
+
+        {/* ZStage3DLayout — always mounted */}
+        <div style={{
+          display: activeSection === 'layout3d' ? 'flex' : 'none',
+          flex: 1, flexDirection: 'column', overflow: 'hidden', minHeight: 0,
+        }}>
+          <ZStage3DLayout
+            userId={userId}
+            savedLayouts={savedLayouts}
+            activeLayoutId={activeLayoutId}
+            isActive={activeSection === 'layout3d'}
           />
         </div>
 
