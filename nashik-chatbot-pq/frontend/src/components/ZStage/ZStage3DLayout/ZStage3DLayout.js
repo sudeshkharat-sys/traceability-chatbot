@@ -317,11 +317,10 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     // Floor tile
     const floorW = i < count - 1 ? CELL_W - ZEBRA_W : CELL_W - 0.05;
     const floor  = new THREE.Mesh(
-      new THREE.PlaneGeometry(floorW, DEPTH - 0.05),
-      new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.38, side: THREE.DoubleSide })
+      new THREE.BoxGeometry(floorW, 0.18, DEPTH - 0.05),
+      new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.72 })
     );
-    floor.rotation.x = -Math.PI / 2;
-    floor.position.set(cellCX + (i < count - 1 ? -ZEBRA_W / 2 : 0), 0.01, cellCZ);
+    floor.position.set(cellCX + (i < count - 1 ? -ZEBRA_W / 2 : 0), 0.09, cellCZ);
     group.add(floor);
 
     // Green path between cells
