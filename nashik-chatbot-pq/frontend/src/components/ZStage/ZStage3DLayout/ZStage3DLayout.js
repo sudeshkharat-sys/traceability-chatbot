@@ -6,11 +6,11 @@ import './ZStage3DLayout.css';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const SCALE   = 0.04;   // canvas px → metres
-const CELL_W  = 3.5;    // metres per station cell width
-const DEPTH   = 5.0;    // station depth (Z axis)
-const HEIGHT  = 4.5;    // column / beam height
+const CELL_W  = 5.0;    // metres per station cell width
+const DEPTH   = 20.0;   // station depth (Z axis) — long tunnel
+const HEIGHT  = 5.0;    // column / beam height
 const COL_R   = 0.12;   // column radius
-const PATH_W  = 2.0;    // walking path width
+const PATH_W  = 3.0;    // walking path width
 
 const STATUS_HEX = {
   R: 0xe53935,
