@@ -128,25 +128,36 @@ function buildZebraCrossing(x, originZ, group) {
 }
 
 // ── Station nameplate ─────────────────────────────────────────────────────────
-function drawNameplateCanvas(stnId, stnName, boxDesc) {
+const ZE_PLATE_COLOR = {
+  red:    { bg: '#b71c1c', accent: '#ef9a9a', idColor: '#ffffff' },
+  yellow: { bg: '#e65100', accent: '#ffcc02', idColor: '#ffffff' },
+  green:  { bg: '#1b5e20', accent: '#a5d6a7', idColor: '#ffffff' },
+  null:   { bg: '#1a237e', accent: '#ffd600', idColor: '#ffd600' },
+};
+
+function drawNameplateCanvas(stnId, stnName, boxDesc, zeStatus = null) {
   const W = 1024, H = 240;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
 
-  ctx.fillStyle = '#1a237e';
+  const theme = ZE_PLATE_COLOR[zeStatus] || ZE_PLATE_COLOR.null;
+
+  ctx.fillStyle = theme.bg;
   ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = '#ffd600';
+  ctx.fillStyle = theme.accent;
   ctx.fillRect(0, H - 12, W, 12);
-  ctx.fillStyle = '#283593';
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
   ctx.fillRect(0, 0, W, 36);
 
-  ctx.fillStyle = '#ffd600';
+  // Station ID
+  ctx.fillStyle = theme.idColor;
   ctx.font = 'bold 90px Arial';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.fillText(stnId, 24, 44);
 
+  // Station name
   if (stnName) {
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 48px Arial';
@@ -155,34 +166,33 @@ function drawNameplateCanvas(stnId, stnName, boxDesc) {
     ctx.fillText(stnName, W - 24, 52);
   }
 
+  // Description / status label
+  const bottomText = boxDesc || 'Z-STAGE STATION';
+  ctx.fillStyle = theme.accent;
+  ctx.font = boxDesc ? '34px Arial' : '30px Arial';
+  ctx.textAlign = boxDesc ? 'left' : 'center';
+  ctx.textBaseline = 'bottom';
+  let desc = bottomText;
   if (boxDesc) {
-    ctx.fillStyle = '#90caf9';
-    ctx.font = '34px Arial';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'bottom';
-    let desc = boxDesc;
     while (ctx.measureText(desc).width > W - 48 && desc.length > 0) desc = desc.slice(0, -1);
-    if (desc !== boxDesc) desc += '…';
+    if (desc !== bottomText) desc += '…';
     ctx.fillText(desc, 24, H - 18);
   } else {
-    ctx.fillStyle = '#90caf9';
-    ctx.font = '30px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText('Z-STAGE STATION', W / 2, H - 18);
+    ctx.fillText(desc, W / 2, H - 18);
   }
+
   return { canvas, W, H };
 }
 
-function makeNameplateMesh(stnId, stnName, boxDesc, cellWidth, flip = false) {
-  const { canvas, W, H } = drawNameplateCanvas(stnId, stnName, boxDesc);
+function makeNameplateMesh(stnId, stnName, boxDesc, cellWidth, side = THREE.FrontSide, zeStatus = null) {
+  const { canvas, W, H } = drawNameplateCanvas(stnId, stnName, boxDesc, zeStatus);
 
   let finalCanvas = canvas;
-  if (flip) {
-    // Mirror horizontally so back-face text reads correctly
-    const flipped = document.createElement('canvas');
-    flipped.width = W; flipped.height = H;
-    const ctx2 = flipped.getContext('2d');
+  if (side === THREE.BackSide) {
+    // BackSide rendering mirrors the texture, so pre-mirror to cancel it out
+    const flipped  = document.createElement('canvas');
+    flipped.width  = W; flipped.height = H;
+    const ctx2     = flipped.getContext('2d');
     ctx2.translate(W, 0);
     ctx2.scale(-1, 1);
     ctx2.drawImage(canvas, 0, 0);
@@ -192,8 +202,7 @@ function makeNameplateMesh(stnId, stnName, boxDesc, cellWidth, flip = false) {
   const tex    = new THREE.CanvasTexture(finalCanvas);
   const plateW = cellWidth * 0.90;
   const geo    = new THREE.PlaneGeometry(plateW, plateW * (H / W));
-  // FrontSide only — we create two separate meshes with correct textures
-  const mat    = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.FrontSide });
+  const mat    = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side });
   return new THREE.Mesh(geo, mat);
 }
 
@@ -284,19 +293,19 @@ function buildStationShell(box, statusMap, scene) {
 
     const stnName = stationNames[i] || '';
 
-    // Front view camera sits at high-Z looking toward -Z.
-    // The face at originZ+DEPTH (high-Z) is what the front camera sees.
-    // Plate there needs no rotation (default +Z normal faces front camera).
-    const plateFront = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, false);
+    // Map R/Y/G status → zeStatus for nameplate colour theme
+    const rawStatus = statusMap[stnId] || null;
+    const zeStatus  = rawStatus === 'R' ? 'red' : rawStatus === 'Y' ? 'yellow' : rawStatus === 'G' ? 'green' : null;
+
+    // Front plate — FrontSide, no rotation, faces +Z toward front-view camera
+    const plateFront = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, THREE.FrontSide, zeStatus);
     plateFront.position.set(cellCX, HEIGHT - 0.55, originZ + DEPTH + 0.30);
     group.add(plateFront);
 
-    // Back view camera sits at low-Z looking toward +Z.
-    // The face at originZ (low-Z) is what the back camera sees.
-    // rotation.y=PI flips normal to -Z; use flipped texture so text stays readable.
-    const plateBack = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, true);
+    // Back plate — BackSide + pre-mirrored canvas, no mesh rotation
+    // BackSide renders the -Z face; pre-mirror cancels BackSide UV reversal → readable ✓
+    const plateBack = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, THREE.BackSide, zeStatus);
     plateBack.position.set(cellCX, HEIGHT - 0.55, originZ - 0.30);
-    plateBack.rotation.y = Math.PI;
     group.add(plateBack);
   }
 
