@@ -8,9 +8,11 @@ import './ZStage3DLayout.css';
 const SCALE   = 0.04;   // canvas px → metres
 const CELL_W  = 5.0;    // metres per station cell width
 const DEPTH   = 20.0;   // station depth (Z axis) — long tunnel
-const HEIGHT  = 5.0;    // column / beam height
-const COL_W   = 0.30;   // column width (rectangular)
-const COL_D   = 0.30;   // column depth (rectangular)
+const HEIGHT  = 8.0;    // column / beam height
+// I-beam section dimensions
+const IB_FLANGE = 0.40;  // flange width
+const IB_WEB    = 0.08;  // web thickness
+const IB_FT     = 0.08;  // flange thickness
 const PATH_W  = 3.0;    // walking path width
 const ZEBRA_W = 0.8;    // zebra stripe width between cells
 
@@ -102,6 +104,51 @@ function makeFloorLabel(text, width, fontSize = 36) {
   return mesh;
 }
 
+// ── I-beam / H-section helper ──────────────────────────────────────────────────
+function makeIBeam(length, mat, orientation) {
+  const group = new THREE.Group();
+
+  if (orientation === 'vertical') {
+    // Web (thin plate full height, faces Z)
+    const webGeo  = new THREE.BoxGeometry(IB_WEB, length, IB_FLANGE);
+    group.add(new THREE.Mesh(webGeo, mat));
+    // Top flange
+    const fGeo    = new THREE.BoxGeometry(IB_FLANGE, IB_FT, IB_FLANGE);
+    const tf      = new THREE.Mesh(fGeo, mat);
+    tf.position.y = length / 2 - IB_FT / 2;
+    group.add(tf);
+    // Bottom flange
+    const bf      = new THREE.Mesh(fGeo, mat);
+    bf.position.y = -(length / 2 - IB_FT / 2);
+    group.add(bf);
+
+  } else if (orientation === 'horizontal-x') {
+    // Web runs along X
+    const webGeo  = new THREE.BoxGeometry(length, IB_FLANGE, IB_WEB);
+    group.add(new THREE.Mesh(webGeo, mat));
+    const fGeo    = new THREE.BoxGeometry(length, IB_FT, IB_FLANGE);
+    const tf      = new THREE.Mesh(fGeo, mat);
+    tf.position.y = IB_FLANGE / 2 - IB_FT / 2;
+    group.add(tf);
+    const bf      = new THREE.Mesh(fGeo, mat);
+    bf.position.y = -(IB_FLANGE / 2 - IB_FT / 2);
+    group.add(bf);
+
+  } else { // horizontal-z
+    const webGeo  = new THREE.BoxGeometry(IB_WEB, IB_FLANGE, length);
+    group.add(new THREE.Mesh(webGeo, mat));
+    const fGeo    = new THREE.BoxGeometry(IB_FLANGE, IB_FT, length);
+    const tf      = new THREE.Mesh(fGeo, mat);
+    tf.position.y = IB_FLANGE / 2 - IB_FT / 2;
+    group.add(tf);
+    const bf      = new THREE.Mesh(fGeo, mat);
+    bf.position.y = -(IB_FLANGE / 2 - IB_FT / 2);
+    group.add(bf);
+  }
+
+  return group;
+}
+
 // ── Green walking path strip between two adjacent cells ───────────────────────
 function buildZebraCrossing(x, originZ, group) {
   // Light green fill
@@ -140,10 +187,9 @@ function buildStationShell(box, statusMap, scene) {
   const originX = (box.position_x || 0) * SCALE;
   const originZ = (box.position_y || 0) * SCALE;
 
-  const colMat  = new THREE.MeshLambertMaterial({ color: 0xcfd8dc });
-  const beamMat = new THREE.MeshLambertMaterial({ color: 0x90a4ae });
+  const structMat = new THREE.MeshLambertMaterial({ color: 0xb0bec5 });
 
-  // ── 4 corner columns only (rectangular) ──
+  // ── 4 corner I-beam columns ──
   const corners = [
     [originX,          originZ],
     [originX + totalW, originZ],
@@ -151,24 +197,22 @@ function buildStationShell(box, statusMap, scene) {
     [originX + totalW, originZ + DEPTH],
   ];
   corners.forEach(([cx, cz]) => {
-    const geo  = new THREE.BoxGeometry(COL_W, HEIGHT, COL_D);
-    const mesh = new THREE.Mesh(geo, colMat);
-    mesh.position.set(cx, HEIGHT / 2, cz);
-    group.add(mesh);
+    const col = makeIBeam(HEIGHT, structMat, 'vertical');
+    col.position.set(cx, HEIGHT / 2, cz);
+    group.add(col);
   });
 
-  // ── Top beams: front, back, left, right ──
-  const beams = [
-    { pos: [originX + totalW / 2, HEIGHT, originZ],          size: [totalW, 0.18, 0.18] },
-    { pos: [originX + totalW / 2, HEIGHT, originZ + DEPTH],  size: [totalW, 0.18, 0.18] },
-    { pos: [originX,          HEIGHT, originZ + DEPTH / 2],  size: [0.18, 0.18, DEPTH]  },
-    { pos: [originX + totalW, HEIGHT, originZ + DEPTH / 2],  size: [0.18, 0.18, DEPTH]  },
-  ];
-  beams.forEach(({ pos, size }) => {
-    const geo  = new THREE.BoxGeometry(...size);
-    const mesh = new THREE.Mesh(geo, beamMat);
-    mesh.position.set(...pos);
-    group.add(mesh);
+  // ── Top I-beam rails: front, back (along X) and left, right (along Z) ──
+  const railY = HEIGHT;  // sit on top of columns
+  [
+    { orient: 'horizontal-x', pos: [originX + totalW / 2, railY, originZ],         len: totalW },
+    { orient: 'horizontal-x', pos: [originX + totalW / 2, railY, originZ + DEPTH], len: totalW },
+    { orient: 'horizontal-z', pos: [originX,          railY, originZ + DEPTH / 2], len: DEPTH  },
+    { orient: 'horizontal-z', pos: [originX + totalW, railY, originZ + DEPTH / 2], len: DEPTH  },
+  ].forEach(({ orient, pos, len }) => {
+    const beam = makeIBeam(len, structMat, orient);
+    beam.position.set(...pos);
+    group.add(beam);
   });
 
   // ── Per-cell floor tiles + status sphere + station-ID label + zebra ──
