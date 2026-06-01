@@ -14,7 +14,7 @@ const BASE_ENABLED = ["traceability", "guideline", "part-labeler", "part-labeler
 const PART_LABELER_ALLOWED = ["part-labeler", "part-labeler-plant", "part-labeler-ev"];
 
 const ROLE_ALLOWED = {
-  user:               ["part-labeler", "guideline"],
+  user:               ["part-labeler", "guideline", "z-stage"],
   part_labeler:       ["part-labeler", "part-labeler-plant", "guideline"],
   part_labeler_field: ["part-labeler", "guideline"],
   part_labeler_plant: ["part-labeler-plant", "z-stage", "guideline"],
@@ -211,12 +211,9 @@ function LandingPage() {
 
       {/* ── TOP NAVBAR ── */}
       <nav className="landing-navbar">
-        {/* Left: app logo */}
         <div className="navbar-left">
           <img src={utilityLogo} alt="Mahindra Utility Logo" className="navbar-logo" />
         </div>
-
-        {/* Center: welcome + role badge (only when logged in) */}
         <div className="navbar-center">
           {isLoggedIn && (
             <span className="navbar-welcome">
@@ -225,8 +222,6 @@ function LandingPage() {
             </span>
           )}
         </div>
-
-        {/* Right: Mahindra Rise logo + Logout */}
         <div className="navbar-right">
           <img src={mahindraRiseLogo} alt="Mahindra Rise Logo" className="navbar-logo" />
           {isLoggedIn && (
@@ -240,7 +235,6 @@ function LandingPage() {
       {/* ── MAIN CONTENT ── */}
       <div className="landing-content">
 
-        {/* Left: AI text + cars */}
         <div className="left-section">
           <div className="ai-solution-text">
             <h1 className="main-heading">
@@ -255,7 +249,6 @@ function LandingPage() {
           </div>
         </div>
 
-        {/* Right: Auth form OR Feature cards */}
         {!isLoggedIn ? (
           <div className="auth-container">
             {isForgotPassword ? (
@@ -485,7 +478,6 @@ function LandingPage() {
                     );
                   })}
 
-                  {/* Admin Panel — only for admin role */}
                   {currentRole === "admin" && (
                     <div
                       className={`feature-card feature-card-admin ${justLoggedIn ? "feature-card-enter" : ""}`}
