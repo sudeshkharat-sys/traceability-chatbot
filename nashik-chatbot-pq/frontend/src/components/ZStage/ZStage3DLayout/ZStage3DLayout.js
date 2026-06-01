@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
-import { layoutApi } from '../../../services/api/layoutApi';
+import { layoutApi, inputApi } from '../../../services/api/layoutApi';
 import './ZStage3DLayout.css';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -128,30 +128,34 @@ function buildZebraCrossing(x, originZ, group) {
 }
 
 // ── Station nameplate ─────────────────────────────────────────────────────────
-const ZE_PLATE_COLOR = {
-  red:    { bg: '#b71c1c', accent: '#ef9a9a', idColor: '#ffffff' },
-  yellow: { bg: '#e65100', accent: '#ffcc02', idColor: '#ffffff' },
-  green:  { bg: '#1b5e20', accent: '#a5d6a7', idColor: '#ffffff' },
-  null:   { bg: '#1a237e', accent: '#ffd600', idColor: '#ffd600' },
+// Nameplate bg: RED when ze exists (matches dashboard station header), blue when not
+// Sign board bg: zeStatus color — matches dashboard Z/E cell color
+const ZE_SIGN_COLOR = {
+  red:    { bg: '#b71c1c', text: '#ffffff' },
+  yellow: { bg: '#d97706', text: '#ffffff' },
+  green:  { bg: '#155724', text: '#a5d6a7' },
 };
 
-function drawNameplateCanvas(stnId, stnName, boxDesc, zeStatus = null) {
+function drawNameplateCanvas(stnId, stnName, boxDesc, ze = null, zeStatus = null) {
   const W = 1024, H = 240;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
 
-  const theme = ZE_PLATE_COLOR[zeStatus] || ZE_PLATE_COLOR.null;
+  // bg: red (#f70707) when ze exists — same as dash-grid-th--red; dark blue otherwise
+  const bg      = ze ? '#c62828' : '#1a237e';
+  const accent  = ze ? '#ef9a9a' : '#ffd600';
+  const idColor = '#ffffff';
 
-  ctx.fillStyle = theme.bg;
+  ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = theme.accent;
+  ctx.fillStyle = accent;
   ctx.fillRect(0, H - 12, W, 12);
   ctx.fillStyle = 'rgba(0,0,0,0.2)';
   ctx.fillRect(0, 0, W, 36);
 
   // Station ID
-  ctx.fillStyle = theme.idColor;
+  ctx.fillStyle = idColor;
   ctx.font = 'bold 90px Arial';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
@@ -168,7 +172,7 @@ function drawNameplateCanvas(stnId, stnName, boxDesc, zeStatus = null) {
 
   // Description / status label
   const bottomText = boxDesc || 'Z-STAGE STATION';
-  ctx.fillStyle = theme.accent;
+  ctx.fillStyle = accent;
   ctx.font = boxDesc ? '34px Arial' : '30px Arial';
   ctx.textAlign = boxDesc ? 'left' : 'center';
   ctx.textBaseline = 'bottom';
@@ -184,8 +188,31 @@ function drawNameplateCanvas(stnId, stnName, boxDesc, zeStatus = null) {
   return { canvas, W, H };
 }
 
-function makeNameplateMesh(stnId, stnName, boxDesc, cellWidth, side = THREE.FrontSide, zeStatus = null) {
-  const { canvas, W, H } = drawNameplateCanvas(stnId, stnName, boxDesc, zeStatus);
+function drawZeSignCanvas(ze, zeStatus) {
+  const W = 256, H = 96;
+  const canvas = document.createElement('canvas');
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const theme = ZE_SIGN_COLOR[zeStatus] || { bg: '#37474f', text: '#ffffff' };
+
+  ctx.fillStyle = theme.bg;
+  ctx.beginPath(); ctx.roundRect(0, 0, W, H, 10); ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.roundRect(4, 4, W - 8, H - 8, 7); ctx.stroke();
+
+  ctx.fillStyle = theme.text;
+  ctx.font = 'bold 64px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(ze, W / 2, H / 2);
+
+  return { canvas, W, H };
+}
+
+function makeNameplateMesh(stnId, stnName, boxDesc, cellWidth, side = THREE.FrontSide, ze = null, zeStatus = null) {
+  const { canvas, W, H } = drawNameplateCanvas(stnId, stnName, boxDesc, ze, zeStatus);
 
   let finalCanvas = canvas;
   if (side === THREE.BackSide) {
@@ -206,8 +233,29 @@ function makeNameplateMesh(stnId, stnName, boxDesc, cellWidth, side = THREE.Fron
   return new THREE.Mesh(geo, mat);
 }
 
+function makeZeSignMesh(ze, zeStatus, side = THREE.FrontSide) {
+  const { canvas, W, H } = drawZeSignCanvas(ze, zeStatus);
+
+  let finalCanvas = canvas;
+  if (side === THREE.BackSide) {
+    const flipped = document.createElement('canvas');
+    flipped.width = W; flipped.height = H;
+    const ctx2 = flipped.getContext('2d');
+    ctx2.translate(W, 0); ctx2.scale(-1, 1);
+    ctx2.drawImage(canvas, 0, 0);
+    finalCanvas = flipped;
+  }
+
+  const tex = new THREE.CanvasTexture(finalCanvas);
+  // Sign board: 1.5m wide × proportional height
+  const sw = 1.5, sh = sw * (H / W);
+  const geo = new THREE.PlaneGeometry(sw, sh);
+  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side });
+  return new THREE.Mesh(geo, mat);
+}
+
 // ── Station shell ──────────────────────────────────────────────────────────────
-function buildStationShell(box, statusMap, scene) {
+function buildStationShell(box, statusMap, zeMap, scene) {
   const group   = new THREE.Group();
   const count   = box.station_count || 1;
   const totalW  = count * CELL_W;
@@ -293,19 +341,35 @@ function buildStationShell(box, statusMap, scene) {
 
     const stnName = stationNames[i] || '';
 
-    // Map R/Y/G status → zeStatus for nameplate colour theme
-    const rawStatus = statusMap[stnId] || null;
-    const zeStatus  = rawStatus === 'R' ? 'red' : rawStatus === 'Y' ? 'yellow' : rawStatus === 'G' ? 'green' : null;
+    // Z/E data from input records (via zeMap)
+    const { ze = null, zeStatus = null } = zeMap[stnId] || {};
 
     // Front plate — FrontSide, no rotation, faces +Z toward front-view camera
-    const plateFront = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, THREE.FrontSide, zeStatus);
+    const plateFront = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, THREE.FrontSide, ze, zeStatus);
     plateFront.position.set(cellCX, HEIGHT - 0.55, originZ + DEPTH + 0.30);
     group.add(plateFront);
 
     // Back plate — BackSide + pre-mirrored canvas, no mesh rotation
     // BackSide renders the -Z face; pre-mirror cancels BackSide UV reversal → readable ✓
-    const plateBack = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, THREE.BackSide, zeStatus);
+    const plateBack = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, THREE.BackSide, ze, zeStatus);
     plateBack.position.set(cellCX, HEIGHT - 0.55, originZ - 0.30);
+
+    // Z/E sign boards (only if ze exists)
+    if (ze) {
+      // Plate height: plateW * (H/W) = CELL_W*0.9 * (240/1024) ≈ 1.265m
+      const plateH   = CELL_W * 0.90 * (240 / 1024);
+      const signW    = 1.5, signH = signW * (96 / 256);
+      const plateBottomY = (HEIGHT - 0.55) - plateH / 2;
+      const signY = plateBottomY - 0.06 - signH / 2;
+
+      const signFront = makeZeSignMesh(ze, zeStatus, THREE.FrontSide);
+      signFront.position.set(cellCX, signY, originZ + DEPTH + 0.30);
+      group.add(signFront);
+
+      const signBack = makeZeSignMesh(ze, zeStatus, THREE.BackSide);
+      signBack.position.set(cellCX, signY, originZ - 0.30);
+      group.add(signBack);
+    }
     group.add(plateBack);
   }
 
@@ -378,7 +442,7 @@ class WalkController {
 }
 
 // ── Three.js scene hook ────────────────────────────────────────────────────────
-function useThreeScene(canvasRef, layout, statusMap, walkMode, onObjectsChange) {
+function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange) {
   const sceneRef       = useRef(null);
   const rendererRef    = useRef(null);
   const cameraRef      = useRef(null);
@@ -416,7 +480,7 @@ function useThreeScene(canvasRef, layout, statusMap, walkMode, onObjectsChange) 
     scene.add(new THREE.GridHelper(200, 100, 0xb0bec5, 0xdde1e7));
 
     const boxes = layout.station_boxes || [];
-    boxes.forEach(box => buildStationShell(box, statusMap, scene));
+    boxes.forEach(box => buildStationShell(box, statusMap, zeMap, scene));
     (layout.connections || []).forEach(conn => {
       const f = boxes.find(b => b.id === conn.from_box_id);
       const t = boxes.find(b => b.id === conn.to_box_id);
@@ -485,7 +549,7 @@ function useThreeScene(canvasRef, layout, statusMap, walkMode, onObjectsChange) 
       placedRef.current = [];
       selectedRef.current = null;
     };
-  }, [canvasRef, layout, statusMap]); // eslint-disable-line
+  }, [canvasRef, layout, statusMap, zeMap]); // eslint-disable-line
 
   // Walk mode toggle
   useEffect(() => {
@@ -665,6 +729,31 @@ function useThreeScene(canvasRef, layout, statusMap, walkMode, onObjectsChange) 
   return { snapView, setTransformMode, placeObject, handleCanvasClick, selectById, deleteById, renameById };
 }
 
+// ── Compute Z/E status per station from input records (mirrors ZStageDashboard logic) ──
+function computeZeMap(records) {
+  const stationIds = [...new Set(records.map(r => r.stage_no).filter(Boolean))];
+  const map = {};
+  for (const sid of stationIds) {
+    const sr    = records.filter(r => r.stage_no === sid);
+    const eRecs = sr.filter(r => r.z_e === 'E');
+    const zRecs = sr.filter(r => r.z_e === 'Z');
+    let ze = null, zeStatus = null;
+    if (eRecs.length > 0) {
+      ze = 'E';
+      if (eRecs.filter(r => r.status_3m === 'R').some(r => (r.total_incidences || 0) > 0)) zeStatus = 'red';
+      else if (eRecs.filter(r => r.status_3m === 'Y').some(r => (r.total_incidences || 0) > 0)) zeStatus = 'yellow';
+      else zeStatus = 'green';
+    } else if (zRecs.length > 0) {
+      ze = 'Z';
+      if (zRecs.filter(r => r.status_3m === 'R').some(r => (r.total_incidences || 0) > 0)) zeStatus = 'red';
+      else if (zRecs.filter(r => r.status_3m === 'Y').some(r => (r.total_incidences || 0) > 0)) zeStatus = 'yellow';
+      else zeStatus = 'green';
+    }
+    if (ze) map[sid] = { ze, zeStatus };
+  }
+  return map;
+}
+
 function saveToLS(layoutId) {
   // Save object metadata (name + position) — mesh can't be serialised
   // Full save would need backend; this is session persistence via localStorage
@@ -677,6 +766,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [selectedLayoutId, setSelectedLayoutId] = useState(null);
   const [layout,    setLayout]    = useState(null);
   const [statusMap, setStatusMap] = useState({});
+  const [zeMap,     setZeMap]     = useState({});
   const [walkMode,  setWalkMode]  = useState(false);
   const [placedObjects, setPlacedObjects] = useState([]);
   const [selectedId,    setSelectedId]    = useState(null);
@@ -703,14 +793,21 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
       });
     });
     setStatusMap(map);
-  }, [layout]);
+
+    // Fetch input records to compute Z/E status per station
+    if (userId && layout.id) {
+      inputApi.getRecords(userId, layout.id)
+        .then(res => setZeMap(computeZeMap(Array.isArray(res.data) ? res.data : [])))
+        .catch(() => setZeMap({}));
+    }
+  }, [layout, userId]);
 
   const onObjectsChange = useCallback((objs) => {
     setPlacedObjects(objs);
   }, []);
 
   const { snapView, setTransformMode, placeObject, handleCanvasClick, selectById, deleteById, renameById } =
-    useThreeScene(canvasRef, layout, statusMap, walkMode, onObjectsChange);
+    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange);
 
   const handleLayoutChange = useCallback((e) => {
     setSelectedLayoutId(Number(e.target.value) || null);
