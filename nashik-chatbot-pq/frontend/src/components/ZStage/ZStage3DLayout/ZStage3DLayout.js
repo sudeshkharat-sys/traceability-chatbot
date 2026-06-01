@@ -102,19 +102,34 @@ function makeFloorLabel(text, width, fontSize = 36) {
   return mesh;
 }
 
-// ── Zebra crossing strip between two adjacent cells ────────────────────────────
+// ── Green walking path strip between two adjacent cells ───────────────────────
 function buildZebraCrossing(x, originZ, group) {
-  const stripeH  = DEPTH / 10;   // 10 alternating stripes along depth
-  const whiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
-  const blackMat = new THREE.MeshBasicMaterial({ color: 0x222222, side: THREE.DoubleSide });
-  for (let s = 0; s < 10; s++) {
-    const mat  = s % 2 === 0 ? whiteMat : blackMat;
-    const geo  = new THREE.PlaneGeometry(ZEBRA_W, stripeH - 0.05);
-    const mesh = new THREE.Mesh(geo, mat);
+  // Light green fill
+  const fillGeo = new THREE.PlaneGeometry(ZEBRA_W - 0.08, DEPTH - 0.1);
+  const fillMat = new THREE.MeshBasicMaterial({ color: 0xa5d6a7, transparent: true, opacity: 0.7, side: THREE.DoubleSide });
+  const fill    = new THREE.Mesh(fillGeo, fillMat);
+  fill.rotation.x = -Math.PI / 2;
+  fill.position.set(x, 0.02, originZ + DEPTH / 2);
+  group.add(fill);
+
+  // Green border — 4 thin edge strips
+  const borderMat = new THREE.MeshBasicMaterial({ color: 0x2e7d32, side: THREE.DoubleSide });
+  const T = 0.08; // border thickness
+  [
+    // left edge
+    { geo: new THREE.PlaneGeometry(T, DEPTH),      pos: [x - ZEBRA_W / 2 + T / 2, 0.025, originZ + DEPTH / 2] },
+    // right edge
+    { geo: new THREE.PlaneGeometry(T, DEPTH),      pos: [x + ZEBRA_W / 2 - T / 2, 0.025, originZ + DEPTH / 2] },
+    // front edge
+    { geo: new THREE.PlaneGeometry(ZEBRA_W, T),    pos: [x, 0.025, originZ + T / 2] },
+    // back edge
+    { geo: new THREE.PlaneGeometry(ZEBRA_W, T),    pos: [x, 0.025, originZ + DEPTH - T / 2] },
+  ].forEach(({ geo, pos }) => {
+    const mesh = new THREE.Mesh(geo, borderMat);
     mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(x, 0.02, originZ + s * stripeH + stripeH / 2);
+    mesh.position.set(...pos);
     group.add(mesh);
-  }
+  });
 }
 
 // ── Build one station "shell" (4-corner rect columns + beams + floor + labels) ──
