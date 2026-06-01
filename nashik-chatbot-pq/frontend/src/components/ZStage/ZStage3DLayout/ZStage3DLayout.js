@@ -1,193 +1,312 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { layoutApi } from '../../../services/api/layoutApi';
 import './ZStage3DLayout.css';
 
-// ── Constants ────────────────────────────────────────────────────────────────
-const SCALE        = 0.04;   // canvas px → metres
-const CELL_W       = 3.5;    // metres per station cell
-const DEPTH        = 5.0;    // station depth (Z)
-const HEIGHT       = 4.5;    // station height (Y)
-const COL_SIZE     = 0.18;
-const BEAM_H       = 0.22;
-const FLOOR_T      = 0.12;
+// ── Constants ──────────────────────────────────────────────────────────────────
+const SCALE    = 0.04;
+const CELL_W   = 3.5;   // metres per station cell
+const DEPTH    = 5.0;   // station depth
+const HEIGHT   = 4.5;   // column height
+const COL_R    = 0.12;  // column radius
+const BEAM_H   = 0.18;
+const FLOOR_T  = 0.10;
+const PATH_W   = 2.0;   // walking-path width (metres)
 
 const STATUS_HEX = { R: 0xe53935, Y: 0xfdd835, G: 0x43a047, null: 0x90a4ae };
 
-// ── Material helpers ─────────────────────────────────────────────────────────
-const mat = (color, opacity = 1, transparent = false) =>
-  new THREE.MeshStandardMaterial({ color, opacity, transparent, side: THREE.FrontSide });
+// ── Canvas-texture text sprite ─────────────────────────────────────────────────
+function makeLabel(text, { fontSize = 52, color = '#0d47a1', bg = null,
+                           canvasW = 512, canvasH = 96,
+                           scaleX = 3.5, scaleY = 0.65 } = {}) {
+  const canvas = document.createElement('canvas');
+  canvas.width  = canvasW;
+  canvas.height = canvasH;
+  const ctx = canvas.getContext('2d');
+  if (bg) {
+    ctx.fillStyle = bg;
+    ctx.roundRect(4, 4, canvasW - 8, canvasH - 8, 12);
+    ctx.fill();
+  }
+  ctx.font = `bold ${fontSize}px Arial, sans-serif`;
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, canvasW / 2, canvasH / 2);
+  const tex = new THREE.CanvasTexture(canvas);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(scaleX, scaleY, 1);
+  return sprite;
+}
 
-// ── Build a station box mesh group ───────────────────────────────────────────
+// ── Shop sign board ────────────────────────────────────────────────────────────
+function makeShopBoard(shopName) {
+  const group = new THREE.Group();
+
+  // board backing
+  const board = new THREE.Mesh(
+    new THREE.BoxGeometry(2.2, 0.8, 0.08),
+    new THREE.MeshStandardMaterial({ color: 0x1565c0 })
+  );
+  board.position.set(0, 0, 0);
+  group.add(board);
+
+  // text label on the board
+  const lbl = makeLabel(shopName, {
+    fontSize: 56, color: '#ffffff', canvasW: 512, canvasH: 128,
+    scaleX: 2.0, scaleY: 0.7,
+  });
+  lbl.position.set(0, 0, 0.06);
+  group.add(lbl);
+
+  return group;
+}
+
+// ── Build one station shell ────────────────────────────────────────────────────
 function buildStationShell(box, statusMap) {
   const ids = box.station_ids
     ? box.station_ids.split(',').map(s => s.trim()).filter(Boolean)
     : [];
   const count = ids.length || box.station_count || 1;
   const width = count * CELL_W;
+
   const ox = (box.position_x || 0) * SCALE;
   const oz = (box.position_y || 0) * SCALE;
   const cx = ox + width / 2;
   const cz = oz + DEPTH / 2;
 
+  // derive shop prefix from first station id (e.g. "T1-01" → "T1")
+  const shopPrefix = ids[0] ? ids[0].split('-')[0] : (box.name || 'STA');
+
   const group = new THREE.Group();
+  const colMat = new THREE.MeshStandardMaterial({ color: 0x455a64, metalness: 0.3, roughness: 0.6 });
+  const beamMat = new THREE.MeshStandardMaterial({ color: 0x37474f, metalness: 0.4, roughness: 0.5 });
 
-  // Floor
-  const floor = new THREE.Mesh(
+  // ── Floor slab ──
+  const floorMesh = new THREE.Mesh(
     new THREE.BoxGeometry(width, FLOOR_T, DEPTH),
-    mat(0xcfd8dc)
+    new THREE.MeshStandardMaterial({ color: 0xcfd8dc, roughness: 0.8 })
   );
-  floor.position.set(cx, FLOOR_T / 2, cz);
-  floor.receiveShadow = true;
-  group.add(floor);
+  floorMesh.position.set(cx, FLOOR_T / 2, cz);
+  floorMesh.receiveShadow = true;
+  group.add(floorMesh);
 
-  // Ceiling (transparent)
-  const ceil = new THREE.Mesh(
-    new THREE.BoxGeometry(width, 0.12, DEPTH),
-    mat(0xb0bec5, 0.25, true)
+  // ── Columns at every cell boundary (front + back rows) ──
+  // positions along X: ox, ox+CELL_W, ox+2*CELL_W … ox+count*CELL_W  → count+1 columns per row
+  const colGeo = new THREE.CylinderGeometry(COL_R, COL_R, HEIGHT, 8);
+  for (let i = 0; i <= count; i++) {
+    const x = ox + i * CELL_W;
+    [oz, oz + DEPTH].forEach(z => {
+      const col = new THREE.Mesh(colGeo, colMat);
+      col.position.set(x, HEIGHT / 2, z);
+      col.castShadow = true;
+      group.add(col);
+    });
+  }
+
+  // ── Top beams along the length (front + back) ──
+  const frontBeam = new THREE.Mesh(
+    new THREE.BoxGeometry(width, BEAM_H, COL_R * 2),
+    beamMat
   );
-  ceil.position.set(cx, HEIGHT + BEAM_H / 2, cz);
-  group.add(ceil);
+  frontBeam.position.set(cx, HEIGHT, oz);
+  group.add(frontBeam);
 
-  // 4 corner columns
-  const corners = [
-    [ox, oz], [ox + width, oz],
-    [ox, oz + DEPTH], [ox + width, oz + DEPTH],
-  ];
-  corners.forEach(([x, z]) => {
-    const col = new THREE.Mesh(
-      new THREE.BoxGeometry(COL_SIZE, HEIGHT, COL_SIZE),
-      mat(0x546e7a)
+  const backBeam = frontBeam.clone();
+  backBeam.position.set(cx, HEIGHT, oz + DEPTH);
+  group.add(backBeam);
+
+  // ── Cross beams at each column line ──
+  for (let i = 0; i <= count; i++) {
+    const x = ox + i * CELL_W;
+    const crossBeam = new THREE.Mesh(
+      new THREE.BoxGeometry(COL_R * 2, BEAM_H, DEPTH),
+      beamMat
     );
-    col.position.set(x, HEIGHT / 2, z);
-    col.castShadow = true;
-    group.add(col);
-  });
+    crossBeam.position.set(x, HEIGHT, cz);
+    group.add(crossBeam);
+  }
 
-  // Perimeter beams
-  const beamMat = mat(0x455a64);
-  [
-    [cx, HEIGHT, oz,         width, BEAM_H, COL_SIZE],
-    [cx, HEIGHT, oz + DEPTH, width, BEAM_H, COL_SIZE],
-    [ox,         HEIGHT, cz, COL_SIZE, BEAM_H, DEPTH],
-    [ox + width, HEIGHT, cz, COL_SIZE, BEAM_H, DEPTH],
-  ].forEach(([x, y, z, w, h, d]) => {
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), beamMat);
-    beam.position.set(x, y, z);
-    beam.castShadow = true;
-    group.add(beam);
-  });
-
-  // Station cell highlights + dividers
+  // ── Per-cell: floor highlight + station-ID label ──
   ids.forEach((sid, i) => {
     const statusKey = statusMap?.[sid] ?? null;
     const color = STATUS_HEX[statusKey] ?? STATUS_HEX[null];
     const cellCx = ox + (i + 0.5) * CELL_W;
 
-    // Floor highlight
-    const highlight = new THREE.Mesh(
-      new THREE.BoxGeometry(CELL_W - 0.1, 0.015, DEPTH - 0.1),
-      mat(color, 0.4, true)
+    // floor tile colour
+    const tile = new THREE.Mesh(
+      new THREE.BoxGeometry(CELL_W - 0.15, 0.012, DEPTH - 0.15),
+      new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.35 })
     );
-    highlight.position.set(cellCx, FLOOR_T + 0.008, cz);
-    group.add(highlight);
+    tile.position.set(cellCx, FLOOR_T + 0.007, cz);
+    group.add(tile);
 
-    // Cell divider
-    if (i > 0) {
-      const div = new THREE.Mesh(
-        new THREE.BoxGeometry(0.04, HEIGHT, DEPTH),
-        mat(0x90a4ae, 0.3, true)
-      );
-      div.position.set(ox + i * CELL_W, HEIGHT / 2, cz);
-      group.add(div);
-    }
-
-    // Status sphere above station
+    // status sphere near top of column
     const sphere = new THREE.Mesh(
-      new THREE.SphereGeometry(0.22, 16, 16),
-      new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.5 })
+      new THREE.SphereGeometry(0.2, 16, 16),
+      new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.55 })
     );
-    sphere.position.set(cellCx, HEIGHT - 0.5, cz);
+    sphere.position.set(cellCx, HEIGHT - 0.4, cz);
     group.add(sphere);
+
+    // station-ID label on floor
+    const idLabel = makeLabel(sid, {
+      fontSize: 44, color: '#1a237e',
+      canvasW: 256, canvasH: 80,
+      scaleX: 1.8, scaleY: 0.55,
+    });
+    idLabel.position.set(cellCx, FLOOR_T + 0.05, cz);
+    idLabel.rotation.x = -Math.PI / 2;
+    // sprites don't rotate — use a plane instead
+    const idCanvas = document.createElement('canvas');
+    idCanvas.width = 256; idCanvas.height = 80;
+    const idCtx = idCanvas.getContext('2d');
+    idCtx.font = 'bold 40px Arial';
+    idCtx.fillStyle = '#1a237e';
+    idCtx.textAlign = 'center';
+    idCtx.textBaseline = 'middle';
+    idCtx.fillText(sid, 128, 40);
+    const idTex = new THREE.CanvasTexture(idCanvas);
+    const idPlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.8, 0.55),
+      new THREE.MeshBasicMaterial({ map: idTex, transparent: true, depthWrite: false, side: THREE.DoubleSide })
+    );
+    idPlane.rotation.x = -Math.PI / 2;
+    idPlane.position.set(cellCx, FLOOR_T + 0.02, cz);
+    group.add(idPlane);
   });
+
+  // ── Box name floating label (above structure) ──
+  const boxLabel = makeLabel(box.name || `Box ${box.id}`, {
+    fontSize: 52, color: '#0d47a1',
+    canvasW: 512, canvasH: 96,
+    scaleX: 3.8, scaleY: 0.7,
+  });
+  boxLabel.position.set(cx, HEIGHT + 0.9, cz);
+  group.add(boxLabel);
+
+  // ── Shop sign board at entry (front face, centred) ──
+  const board = makeShopBoard(shopPrefix);
+  board.position.set(cx, HEIGHT - 1.2, oz - 0.15);
+  group.add(board);
 
   return group;
 }
 
-// ── Connection beam between two boxes ────────────────────────────────────────
-function buildConnection(fromBox, toBox) {
+// ── Walking path between two connected boxes ───────────────────────────────────
+function buildWalkingPath(fromBox, toBox) {
   const fromCount = (fromBox.station_ids?.split(',').length) || fromBox.station_count || 1;
-  const fx = (fromBox.position_x || 0) * SCALE + fromCount * CELL_W;
-  const fz = (fromBox.position_y || 0) * SCALE + DEPTH / 2;
-  const tx = (toBox.position_x   || 0) * SCALE;
-  const tz = (toBox.position_y   || 0) * SCALE + DEPTH / 2;
+  const fromEndX  = (fromBox.position_x || 0) * SCALE + fromCount * CELL_W;
+  const toStartX  = (toBox.position_x   || 0) * SCALE;
+  const pathLen   = toStartX - fromEndX;
+  if (pathLen <= 0.05) return null;
 
-  const len = Math.sqrt((tx - fx) ** 2 + (tz - fz) ** 2);
-  if (len < 0.01) return null;
+  const fromCZ = (fromBox.position_y || 0) * SCALE + DEPTH / 2;
+  const toCZ   = (toBox.position_y   || 0) * SCALE + DEPTH / 2;
+  const midX   = fromEndX + pathLen / 2;
+  const midZ   = (fromCZ + toCZ) / 2;
 
-  const beam = new THREE.Mesh(
-    new THREE.BoxGeometry(len, 0.08, 0.08),
-    mat(0x1976d2, 0.7, true)
+  const group = new THREE.Group();
+
+  // main path floor
+  const pathFloor = new THREE.Mesh(
+    new THREE.BoxGeometry(pathLen, FLOOR_T * 0.8, PATH_W),
+    new THREE.MeshStandardMaterial({ color: 0xfff176, roughness: 0.6 })
   );
-  beam.position.set((fx + tx) / 2, 0.8, (fz + tz) / 2);
-  beam.rotation.y = -Math.atan2(tz - fz, tx - fx);
-  return beam;
+  pathFloor.position.set(midX, FLOOR_T * 0.4, midZ);
+  pathFloor.receiveShadow = true;
+  group.add(pathFloor);
+
+  // yellow safety stripes
+  const stripeCount = Math.max(1, Math.floor(pathLen / 1.5));
+  for (let i = 0; i < stripeCount; i++) {
+    const sx = fromEndX + (i + 0.5) * (pathLen / stripeCount);
+    const stripe = new THREE.Mesh(
+      new THREE.BoxGeometry(0.15, FLOOR_T * 0.82, PATH_W * 0.85),
+      new THREE.MeshStandardMaterial({ color: 0xf9a825 })
+    );
+    stripe.position.set(sx, FLOOR_T * 0.41, midZ);
+    group.add(stripe);
+  }
+
+  // "WALKWAY" text on path
+  const walkCanvas = document.createElement('canvas');
+  walkCanvas.width = 256; walkCanvas.height = 64;
+  const wCtx = walkCanvas.getContext('2d');
+  wCtx.fillStyle = '#f57f17';
+  wCtx.font = 'bold 28px Arial';
+  wCtx.textAlign = 'center';
+  wCtx.textBaseline = 'middle';
+  wCtx.fillText('WALKWAY', 128, 32);
+  const walkPlane = new THREE.Mesh(
+    new THREE.PlaneGeometry(Math.min(pathLen * 0.8, 2.5), 0.5),
+    new THREE.MeshBasicMaterial({
+      map: new THREE.CanvasTexture(walkCanvas),
+      transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    })
+  );
+  walkPlane.rotation.x = -Math.PI / 2;
+  walkPlane.position.set(midX, FLOOR_T + 0.02, midZ);
+  group.add(walkPlane);
+
+  return group;
 }
 
-// ── 3D Scene renderer hook ────────────────────────────────────────────────────
+// ── Three.js scene hook ────────────────────────────────────────────────────────
 function useThreeScene(canvasRef, layout, statusMap) {
-  const rendererRef = useRef(null);
-  const frameRef    = useRef(null);
+  const frameRef = useRef(null);
 
   useEffect(() => {
     if (!canvasRef.current || !layout) return;
 
     const canvas = canvasRef.current;
-    const W = canvas.clientWidth  || canvas.offsetWidth  || 800;
-    const H = canvas.clientHeight || canvas.offsetHeight || 600;
+    const W = canvas.clientWidth  || 800;
+    const H = canvas.clientHeight || 600;
 
-    // Renderer
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    renderer.setSize(W, H);
+    renderer.setSize(W, H, false);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.shadowMap.enabled = true;
-    renderer.setClearColor(0xe8f0fe);
-    rendererRef.current = renderer;
+    renderer.setClearColor(0xeceff1);
 
-    // Scene
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xe8f0fe);
-    scene.fog = new THREE.Fog(0xe8f0fe, 80, 200);
+    scene.background = new THREE.Color(0xeceff1);
+    scene.fog = new THREE.Fog(0xeceff1, 80, 200);
 
-    // Camera
     const camera = new THREE.PerspectiveCamera(50, W / H, 0.1, 500);
     camera.position.set(20, 20, 20);
 
-    // Lights
-    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
-    dirLight.position.set(30, 40, 20);
-    dirLight.castShadow = true;
-    scene.add(dirLight);
-    scene.add(new THREE.DirectionalLight(0xffffff, 0.4).position.set(-20, 20, -20));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+    const sun = new THREE.DirectionalLight(0xffffff, 1.1);
+    sun.position.set(30, 40, 20);
+    sun.castShadow = true;
+    scene.add(sun);
+    scene.add(new THREE.DirectionalLight(0xffffff, 0.35).position.set(-15, 20, -15));
 
-    // Grid
-    const grid = new THREE.GridHelper(200, 200, 0x90a4ae, 0xcfd8dc);
-    scene.add(grid);
+    scene.add(new THREE.GridHelper(300, 300, 0xb0bec5, 0xcfd8dc));
 
-    // Station shells
     const boxes = layout.station_boxes || [];
     const boxById = {};
     boxes.forEach(b => { boxById[b.id] = b; });
+
+    // Station shells
     boxes.forEach(b => scene.add(buildStationShell(b, statusMap)));
 
-    // Connections
+    // Walking paths between connected boxes
+    const seen = new Set();
     (layout.connections || [])
       .filter(c => c.from_box_id != null && c.to_box_id != null)
       .forEach(c => {
-        const conn = buildConnection(boxById[c.from_box_id], boxById[c.to_box_id]);
-        if (conn) scene.add(conn);
+        const key = `${c.from_box_id}-${c.to_box_id}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        const from = boxById[c.from_box_id];
+        const to   = boxById[c.to_box_id];
+        if (!from || !to) return;
+        const path = buildWalkingPath(from, to);
+        if (path) scene.add(path);
       });
 
     // Auto-fit camera
@@ -203,28 +322,25 @@ function useThreeScene(canvasRef, layout, statusMap) {
       const span = Math.max(maxX - minX, maxZ - minZ, 10);
       const midX = (minX + maxX) / 2;
       const midZ = (minZ + maxZ) / 2;
-      camera.position.set(midX + span * 0.9, span * 0.9, midZ + span * 0.9);
+      camera.position.set(midX + span * 0.9, span * 0.85, midZ + span * 0.9);
       camera.lookAt(midX, 0, midZ);
     }
 
-    // OrbitControls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.07;
 
-    // Resize observer
     const ro = new ResizeObserver(() => {
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
       if (w && h) {
-        renderer.setSize(w, h);
+        renderer.setSize(w, h, false);
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
       }
     });
     ro.observe(canvas);
 
-    // Render loop
     let alive = true;
     const animate = () => {
       if (!alive) return;
@@ -240,24 +356,24 @@ function useThreeScene(canvasRef, layout, statusMap) {
       ro.disconnect();
       controls.dispose();
       renderer.dispose();
-      // Dispose all scene geometries & materials
       scene.traverse(obj => {
-        if (obj.geometry) obj.geometry.dispose();
+        obj.geometry?.dispose();
         if (obj.material) {
-          if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
-          else obj.material.dispose();
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          mats.forEach(m => { m.map?.dispose(); m.dispose(); });
         }
       });
     };
   }, [layout, statusMap]); // eslint-disable-line
 }
 
-// ── Legend ────────────────────────────────────────────────────────────────────
+// ── Legend ─────────────────────────────────────────────────────────────────────
 const LEGEND = [
   { color: '#e53935', label: 'Active concern (R)' },
   { color: '#fdd835', label: 'Under observation (Y)' },
   { color: '#43a047', label: 'Resolved (G)' },
   { color: '#90a4ae', label: 'No data' },
+  { color: '#fff176', label: 'Walking path' },
 ];
 
 function Legend() {
@@ -273,21 +389,19 @@ function Legend() {
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+// ── Main component ─────────────────────────────────────────────────────────────
 function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive }) {
-  const canvasRef    = useRef(null);
+  const canvasRef  = useRef(null);
   const [selectedId, setSelectedId] = useState(null);
   const [layout,     setLayout    ] = useState(null);
   const [statusMap,  setStatusMap ] = useState({});
   const [loading,    setLoading   ] = useState(false);
   const [error,      setError     ] = useState(null);
 
-  // Pre-select activeLayoutId
   useEffect(() => {
     if (activeLayoutId && !selectedId) setSelectedId(activeLayoutId);
   }, [activeLayoutId]); // eslint-disable-line
 
-  // Fetch layout
   useEffect(() => {
     if (!selectedId) { setLayout(null); return; }
     setLoading(true);
@@ -298,7 +412,6 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
       .finally(() => setLoading(false));
   }, [selectedId]);
 
-  // Fetch status map from input records
   useEffect(() => {
     if (!selectedId || !userId) return;
     layoutApi.getInputRecords?.(userId, selectedId)
@@ -308,7 +421,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
         records.forEach(r => {
           if (!r.stage_no) return;
           const sid = r.stage_no.trim();
-          const cur = r.ryg || null;
+          const cur  = r.ryg || null;
           const prev = map[sid];
           if (!prev || cur === 'R' || (cur === 'Y' && prev === 'G')) map[sid] = cur;
         });
@@ -317,7 +430,6 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
       .catch(() => {});
   }, [selectedId, userId]);
 
-  // Render Three.js scene
   useThreeScene(canvasRef, layout, statusMap);
 
   return (
@@ -336,9 +448,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             ))}
           </select>
         </div>
-        <div className="z3d-toolbar-right">
-          <Legend />
-        </div>
+        <div className="z3d-toolbar-right"><Legend /></div>
       </div>
 
       <div className="z3d-canvas-wrapper">
@@ -346,7 +456,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
           <div className="z3d-placeholder">
             <div className="z3d-placeholder-icon">🏗️</div>
             <p className="z3d-placeholder-title">Select a layout to view its 3D station shells</p>
-            <p className="z3d-placeholder-sub">Station boxes will be auto-generated as 3D structures with columns, beams and floor slabs.</p>
+            <p className="z3d-placeholder-sub">Stations auto-generate with columns, shop boards, station-ID labels and walking paths.</p>
           </div>
         )}
         {loading && (
