@@ -1,82 +1,64 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { layoutApi } from '../../../services/api/layoutApi';
 import './ZStage3DLayout.css';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-const SCALE   = 0.04;   // canvas px → metres
-const CELL_W  = 5.0;    // metres per station cell width
-const DEPTH   = 20.0;   // station depth (Z axis) — long tunnel
-const HEIGHT  = 8.0;    // column / beam height
-// I-beam section dimensions
-const IB_FLANGE = 0.40;  // flange width
-const IB_WEB    = 0.08;  // web thickness
-const IB_FT     = 0.08;  // flange thickness
-const PATH_W  = 3.0;    // walking path width
-const ZEBRA_W = 0.8;    // zebra stripe width between cells
+const SCALE      = 0.04;
+const CELL_W     = 5.0;
+const DEPTH      = 20.0;
+const HEIGHT     = 8.0;
+const IB_FLANGE  = 0.40;
+const IB_WEB     = 0.08;
+const IB_FT      = 0.08;
+const PATH_W     = 3.0;
+const ZEBRA_W    = 0.8;
 
-const STATUS_HEX = {
-  R: 0xe53935,
-  Y: 0xfdd835,
-  G: 0x43a047,
-  null: 0x90a4ae,
-};
+const STATUS_HEX = { R: 0xe53935, Y: 0xfdd835, G: 0x43a047, null: 0x90a4ae };
+const LS_KEY     = 'z3d_placed_objects';
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
+// ── Canvas text sprite ─────────────────────────────────────────────────────────
 function makeLabel(text, { fontSize = 48, color = '#ffffff', bgColor = null, padding = 10, scale = 1 } = {}) {
-  const canvas  = document.createElement('canvas');
-  const ctx     = canvas.getContext('2d');
-  ctx.font      = `bold ${fontSize}px Arial`;
-  const tw      = ctx.measureText(text).width;
+  const canvas = document.createElement('canvas');
+  const ctx    = canvas.getContext('2d');
+  ctx.font     = `bold ${fontSize}px Arial`;
+  const tw     = ctx.measureText(text).width;
   canvas.width  = tw + padding * 2;
   canvas.height = fontSize + padding * 2;
-
   if (bgColor) {
     ctx.fillStyle = bgColor;
     ctx.beginPath();
     ctx.roundRect(0, 0, canvas.width, canvas.height, 8);
     ctx.fill();
   }
-
-  ctx.font      = `bold ${fontSize}px Arial`;
+  ctx.font = `bold ${fontSize}px Arial`;
   ctx.fillStyle = color;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(text, canvas.width / 2, canvas.height / 2);
-
   const tex = new THREE.CanvasTexture(canvas);
   const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
   const spr = new THREE.Sprite(mat);
-  const aspect = canvas.width / canvas.height;
-  spr.scale.set(aspect * scale, scale, 1);
+  spr.scale.set((canvas.width / canvas.height) * scale, scale, 1);
   return spr;
 }
 
 function makeShopBoard(shopName) {
   const W = 256, H = 80;
   const canvas = document.createElement('canvas');
-  canvas.width  = W;
-  canvas.height = H;
+  canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
-
   ctx.fillStyle = '#1565C0';
-  ctx.beginPath();
-  ctx.roundRect(0, 0, W, H, 10);
-  ctx.fill();
-
-  ctx.strokeStyle = '#BBDEFB';
-  ctx.lineWidth   = 3;
-  ctx.beginPath();
-  ctx.roundRect(4, 4, W - 8, H - 8, 7);
-  ctx.stroke();
-
-  ctx.fillStyle    = '#ffffff';
-  ctx.font         = 'bold 36px Arial';
-  ctx.textAlign    = 'center';
-  ctx.textBaseline = 'middle';
+  ctx.beginPath(); ctx.roundRect(0, 0, W, H, 10); ctx.fill();
+  ctx.strokeStyle = '#BBDEFB'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.roundRect(4, 4, W - 8, H - 8, 7); ctx.stroke();
+  ctx.fillStyle = '#ffffff'; ctx.font = 'bold 36px Arial';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(shopName, W / 2, H / 2);
-
   const tex = new THREE.CanvasTexture(canvas);
   const geo = new THREE.PlaneGeometry(2.0, 0.625);
   const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
@@ -84,17 +66,13 @@ function makeShopBoard(shopName) {
 }
 
 function makeFloorLabel(text, width, fontSize = 36) {
-  const canvas  = document.createElement('canvas');
-  canvas.width  = 512;
-  canvas.height = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = 512; canvas.height = 128;
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, 512, 128);
-  ctx.fillStyle    = 'rgba(255,255,255,0.15)';
-  ctx.fillRect(0, 0, 512, 128);
-  ctx.fillStyle    = '#ffffff';
-  ctx.font         = `bold ${fontSize}px Arial`;
-  ctx.textAlign    = 'center';
-  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(0, 0, 512, 128);
+  ctx.fillStyle = '#ffffff'; ctx.font = `bold ${fontSize}px Arial`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.fillText(text, 256, 64);
   const tex = new THREE.CanvasTexture(canvas);
   const geo = new THREE.PlaneGeometry(width, width * (128 / 512));
@@ -104,73 +82,43 @@ function makeFloorLabel(text, width, fontSize = 36) {
   return mesh;
 }
 
-// ── I-beam / H-section helper ──────────────────────────────────────────────────
+// ── I-beam helper ──────────────────────────────────────────────────────────────
 function makeIBeam(length, mat, orientation) {
   const group = new THREE.Group();
-
   if (orientation === 'vertical') {
-    // Web (thin plate full height, faces Z)
-    const webGeo  = new THREE.BoxGeometry(IB_WEB, length, IB_FLANGE);
-    group.add(new THREE.Mesh(webGeo, mat));
-    // Top flange
-    const fGeo    = new THREE.BoxGeometry(IB_FLANGE, IB_FT, IB_FLANGE);
-    const tf      = new THREE.Mesh(fGeo, mat);
-    tf.position.y = length / 2 - IB_FT / 2;
-    group.add(tf);
-    // Bottom flange
-    const bf      = new THREE.Mesh(fGeo, mat);
-    bf.position.y = -(length / 2 - IB_FT / 2);
-    group.add(bf);
-
+    group.add(new THREE.Mesh(new THREE.BoxGeometry(IB_WEB, length, IB_FLANGE), mat));
+    const fGeo = new THREE.BoxGeometry(IB_FLANGE, IB_FT, IB_FLANGE);
+    const tf = new THREE.Mesh(fGeo, mat); tf.position.y =  length / 2 - IB_FT / 2; group.add(tf);
+    const bf = new THREE.Mesh(fGeo, mat); bf.position.y = -(length / 2 - IB_FT / 2); group.add(bf);
   } else if (orientation === 'horizontal-x') {
-    // Web runs along X
-    const webGeo  = new THREE.BoxGeometry(length, IB_FLANGE, IB_WEB);
-    group.add(new THREE.Mesh(webGeo, mat));
-    const fGeo    = new THREE.BoxGeometry(length, IB_FT, IB_FLANGE);
-    const tf      = new THREE.Mesh(fGeo, mat);
-    tf.position.y = IB_FLANGE / 2 - IB_FT / 2;
-    group.add(tf);
-    const bf      = new THREE.Mesh(fGeo, mat);
-    bf.position.y = -(IB_FLANGE / 2 - IB_FT / 2);
-    group.add(bf);
-
-  } else { // horizontal-z
-    const webGeo  = new THREE.BoxGeometry(IB_WEB, IB_FLANGE, length);
-    group.add(new THREE.Mesh(webGeo, mat));
-    const fGeo    = new THREE.BoxGeometry(IB_FLANGE, IB_FT, length);
-    const tf      = new THREE.Mesh(fGeo, mat);
-    tf.position.y = IB_FLANGE / 2 - IB_FT / 2;
-    group.add(tf);
-    const bf      = new THREE.Mesh(fGeo, mat);
-    bf.position.y = -(IB_FLANGE / 2 - IB_FT / 2);
-    group.add(bf);
+    group.add(new THREE.Mesh(new THREE.BoxGeometry(length, IB_FLANGE, IB_WEB), mat));
+    const fGeo = new THREE.BoxGeometry(length, IB_FT, IB_FLANGE);
+    const tf = new THREE.Mesh(fGeo, mat); tf.position.y =  IB_FLANGE / 2 - IB_FT / 2; group.add(tf);
+    const bf = new THREE.Mesh(fGeo, mat); bf.position.y = -(IB_FLANGE / 2 - IB_FT / 2); group.add(bf);
+  } else {
+    group.add(new THREE.Mesh(new THREE.BoxGeometry(IB_WEB, IB_FLANGE, length), mat));
+    const fGeo = new THREE.BoxGeometry(IB_FLANGE, IB_FT, length);
+    const tf = new THREE.Mesh(fGeo, mat); tf.position.y =  IB_FLANGE / 2 - IB_FT / 2; group.add(tf);
+    const bf = new THREE.Mesh(fGeo, mat); bf.position.y = -(IB_FLANGE / 2 - IB_FT / 2); group.add(bf);
   }
-
   return group;
 }
 
-// ── Green walking path strip between two adjacent cells ───────────────────────
+// ── Green path between cells ───────────────────────────────────────────────────
 function buildZebraCrossing(x, originZ, group) {
-  // Light green fill
   const fillGeo = new THREE.PlaneGeometry(ZEBRA_W - 0.08, DEPTH - 0.1);
   const fillMat = new THREE.MeshBasicMaterial({ color: 0xa5d6a7, transparent: true, opacity: 0.7, side: THREE.DoubleSide });
-  const fill    = new THREE.Mesh(fillGeo, fillMat);
+  const fill = new THREE.Mesh(fillGeo, fillMat);
   fill.rotation.x = -Math.PI / 2;
   fill.position.set(x, 0.02, originZ + DEPTH / 2);
   group.add(fill);
-
-  // Green border — 4 thin edge strips
   const borderMat = new THREE.MeshBasicMaterial({ color: 0x2e7d32, side: THREE.DoubleSide });
-  const T = 0.08; // border thickness
+  const T = 0.08;
   [
-    // left edge
-    { geo: new THREE.PlaneGeometry(T, DEPTH),      pos: [x - ZEBRA_W / 2 + T / 2, 0.025, originZ + DEPTH / 2] },
-    // right edge
-    { geo: new THREE.PlaneGeometry(T, DEPTH),      pos: [x + ZEBRA_W / 2 - T / 2, 0.025, originZ + DEPTH / 2] },
-    // front edge
-    { geo: new THREE.PlaneGeometry(ZEBRA_W, T),    pos: [x, 0.025, originZ + T / 2] },
-    // back edge
-    { geo: new THREE.PlaneGeometry(ZEBRA_W, T),    pos: [x, 0.025, originZ + DEPTH - T / 2] },
+    { geo: new THREE.PlaneGeometry(T, DEPTH),   pos: [x - ZEBRA_W / 2 + T / 2, 0.025, originZ + DEPTH / 2] },
+    { geo: new THREE.PlaneGeometry(T, DEPTH),   pos: [x + ZEBRA_W / 2 - T / 2, 0.025, originZ + DEPTH / 2] },
+    { geo: new THREE.PlaneGeometry(ZEBRA_W, T), pos: [x, 0.025, originZ + T / 2] },
+    { geo: new THREE.PlaneGeometry(ZEBRA_W, T), pos: [x, 0.025, originZ + DEPTH - T / 2] },
   ].forEach(({ geo, pos }) => {
     const mesh = new THREE.Mesh(geo, borderMat);
     mesh.rotation.x = -Math.PI / 2;
@@ -179,77 +127,56 @@ function buildZebraCrossing(x, originZ, group) {
   });
 }
 
-// ── Build one station "shell" (4-corner rect columns + beams + floor + labels) ──
+// ── Station shell ──────────────────────────────────────────────────────────────
 function buildStationShell(box, statusMap, scene) {
   const group   = new THREE.Group();
   const count   = box.station_count || 1;
   const totalW  = count * CELL_W;
   const originX = (box.position_x || 0) * SCALE;
   const originZ = (box.position_y || 0) * SCALE;
-
   const structMat = new THREE.MeshLambertMaterial({ color: 0xb0bec5 });
 
-  // ── 4 corner I-beam columns ──
-  const corners = [
-    [originX,          originZ],
-    [originX + totalW, originZ],
-    [originX,          originZ + DEPTH],
-    [originX + totalW, originZ + DEPTH],
-  ];
-  corners.forEach(([cx, cz]) => {
-    const col = makeIBeam(HEIGHT, structMat, 'vertical');
-    col.position.set(cx, HEIGHT / 2, cz);
-    group.add(col);
-  });
+  [[originX, originZ], [originX + totalW, originZ], [originX, originZ + DEPTH], [originX + totalW, originZ + DEPTH]]
+    .forEach(([cx, cz]) => {
+      const col = makeIBeam(HEIGHT, structMat, 'vertical');
+      col.position.set(cx, HEIGHT / 2, cz);
+      group.add(col);
+    });
 
-  // ── Top I-beam rails: front, back (along X) and left, right (along Z) ──
-  const railY = HEIGHT;  // sit on top of columns
   [
-    { orient: 'horizontal-x', pos: [originX + totalW / 2, railY, originZ],         len: totalW },
-    { orient: 'horizontal-x', pos: [originX + totalW / 2, railY, originZ + DEPTH], len: totalW },
-    { orient: 'horizontal-z', pos: [originX,          railY, originZ + DEPTH / 2], len: DEPTH  },
-    { orient: 'horizontal-z', pos: [originX + totalW, railY, originZ + DEPTH / 2], len: DEPTH  },
+    { orient: 'horizontal-x', pos: [originX + totalW / 2, HEIGHT, originZ],         len: totalW },
+    { orient: 'horizontal-x', pos: [originX + totalW / 2, HEIGHT, originZ + DEPTH], len: totalW },
+    { orient: 'horizontal-z', pos: [originX,          HEIGHT, originZ + DEPTH / 2], len: DEPTH  },
+    { orient: 'horizontal-z', pos: [originX + totalW, HEIGHT, originZ + DEPTH / 2], len: DEPTH  },
   ].forEach(({ orient, pos, len }) => {
     const beam = makeIBeam(len, structMat, orient);
     beam.position.set(...pos);
     group.add(beam);
   });
 
-  // ── Per-cell floor tiles + status sphere + station-ID label + zebra ──
   const stationIds = (box.station_ids || '').split(',').map(s => s.trim()).filter(Boolean);
-
   for (let i = 0; i < count; i++) {
     const cellX  = originX + i * CELL_W;
     const cellCX = cellX + CELL_W / 2;
     const cellCZ = originZ + DEPTH / 2;
     const stnId  = stationIds[i] || '';
-    const status = statusMap[stnId] || null;
-    const color  = STATUS_HEX[status] ?? STATUS_HEX.null;
+    const color  = STATUS_HEX[statusMap[stnId] || null] ?? STATUS_HEX.null;
 
-    // Floor tile (slight gap for zebra crossing between cells)
     const floorW = i < count - 1 ? CELL_W - ZEBRA_W : CELL_W - 0.05;
-    const fGeo   = new THREE.PlaneGeometry(floorW, DEPTH - 0.05);
-    const fMat   = new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.38, side: THREE.DoubleSide });
-    const floor  = new THREE.Mesh(fGeo, fMat);
+    const floor  = new THREE.Mesh(
+      new THREE.PlaneGeometry(floorW, DEPTH - 0.05),
+      new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.38, side: THREE.DoubleSide })
+    );
     floor.rotation.x = -Math.PI / 2;
-    // Shift left slightly so gap is at right edge of cell
-    const floorOffsetX = i < count - 1 ? -ZEBRA_W / 2 : 0;
-    floor.position.set(cellCX + floorOffsetX, 0.01, cellCZ);
+    floor.position.set(cellCX + (i < count - 1 ? -ZEBRA_W / 2 : 0), 0.01, cellCZ);
     group.add(floor);
 
-    // Zebra crossing at right boundary between this cell and next
-    if (i < count - 1) {
-      buildZebraCrossing(cellX + CELL_W, originZ, group);
-    }
+    if (i < count - 1) buildZebraCrossing(cellX + CELL_W, originZ, group);
 
-    // Status sphere above cell
-    const sGeo = new THREE.SphereGeometry(0.25, 12, 12);
-    const sMat = new THREE.MeshLambertMaterial({ color });
-    const sph  = new THREE.Mesh(sGeo, sMat);
+    const sph = new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 12), new THREE.MeshLambertMaterial({ color }));
     sph.position.set(cellCX, HEIGHT + 0.4, cellCZ);
     group.add(sph);
 
-    // Station ID floor label
     if (stnId) {
       const lbl = makeFloorLabel(stnId, CELL_W * 0.7);
       lbl.position.set(cellCX, 0.02, cellCZ);
@@ -257,12 +184,10 @@ function buildStationShell(box, statusMap, scene) {
     }
   }
 
-  // ── Box name floating label ──
   const nameSprite = makeLabel(box.name || 'Box', { fontSize: 52, color: '#ffffff', bgColor: 'rgba(0,0,0,0.6)', padding: 14, scale: 3.0 });
   nameSprite.position.set(originX + totalW / 2, HEIGHT + 1.2, originZ + DEPTH / 2);
   group.add(nameSprite);
 
-  // ── Shop sign board at entry ──
   const shopPrefix = (stationIds[0] || box.name || 'SHOP').split('-')[0];
   const board = makeShopBoard(shopPrefix);
   board.position.set(originX + totalW / 2, 2.2, originZ - 0.05);
@@ -271,68 +196,45 @@ function buildStationShell(box, statusMap, scene) {
   scene.add(group);
 }
 
-// ── Walking path between two connected boxes ───────────────────────────────────
 function buildWalkingPath(fromBox, toBox, scene) {
-  const fW     = (fromBox.station_count || 1) * CELL_W;
-  const fEndX  = (fromBox.position_x || 0) * SCALE + fW;
+  const fW      = (fromBox.station_count || 1) * CELL_W;
+  const fEndX   = (fromBox.position_x || 0) * SCALE + fW;
   const tStartX = (toBox.position_x || 0) * SCALE;
   const pathLen = tStartX - fEndX;
   if (pathLen <= 0.1) return;
-
-  const pathCX  = fEndX + pathLen / 2;
-  const pathCZ  = ((fromBox.position_y || 0) * SCALE) + DEPTH / 2;
-
-  // Yellow path floor
-  const geo = new THREE.PlaneGeometry(pathLen, PATH_W);
-  const mat = new THREE.MeshLambertMaterial({ color: 0xfdd835, transparent: true, opacity: 0.65, side: THREE.DoubleSide });
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.position.set(pathCX, 0.015, pathCZ);
-  scene.add(mesh);
-
-  // Orange stripe lines
-  const stripeCount = Math.max(1, Math.floor(pathLen / 1.2));
-  const stripeMat   = new THREE.MeshBasicMaterial({ color: 0xff6f00 });
-  for (let s = 0; s <= stripeCount; s++) {
-    const sx   = fEndX + (s / stripeCount) * pathLen;
-    const sGeo = new THREE.PlaneGeometry(0.1, PATH_W);
-    const sm   = new THREE.Mesh(sGeo, stripeMat);
+  const pathCX = fEndX + pathLen / 2;
+  const pathCZ = ((fromBox.position_y || 0) * SCALE) + DEPTH / 2;
+  const floor  = new THREE.Mesh(
+    new THREE.PlaneGeometry(pathLen, PATH_W),
+    new THREE.MeshLambertMaterial({ color: 0xfdd835, transparent: true, opacity: 0.65, side: THREE.DoubleSide })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.set(pathCX, 0.015, pathCZ);
+  scene.add(floor);
+  const stripeMat = new THREE.MeshBasicMaterial({ color: 0xff6f00 });
+  const n = Math.max(1, Math.floor(pathLen / 1.2));
+  for (let s = 0; s <= n; s++) {
+    const sm = new THREE.Mesh(new THREE.PlaneGeometry(0.1, PATH_W), stripeMat);
     sm.rotation.x = -Math.PI / 2;
-    sm.position.set(sx, 0.02, pathCZ);
+    sm.position.set(fEndX + (s / n) * pathLen, 0.02, pathCZ);
     scene.add(sm);
   }
-
-  // "WALKWAY" floor text
   const wlbl = makeFloorLabel('WALKWAY', Math.min(pathLen * 0.8, 3.0), 40);
   wlbl.position.set(pathCX, 0.025, pathCZ);
   scene.add(wlbl);
 }
 
-// ── Walk mode keys ─────────────────────────────────────────────────────────────
+// ── Walk mode controller ───────────────────────────────────────────────────────
 class WalkController {
   constructor(camera) {
-    this.camera  = camera;
-    this.keys    = {};
-    this.speed   = 0.08;
-    this.yaw     = 0;
-    this.pitch   = 0;
+    this.camera = camera; this.keys = {}; this.speed = 0.08; this.yaw = 0; this.pitch = 0;
     this._onKey  = (e) => { this.keys[e.code] = e.type === 'keydown'; };
     this._onMove = (e) => this._mouseMove(e);
     document.addEventListener('keydown', this._onKey);
     document.addEventListener('keyup',   this._onKey);
   }
-  attachMouseLook(canvas) {
-    this._canvas = canvas;
-    canvas.addEventListener('mousemove', this._onMove);
-    canvas.requestPointerLock();
-  }
-  detachMouseLook() {
-    if (this._canvas) {
-      this._canvas.removeEventListener('mousemove', this._onMove);
-      this._canvas = null;
-    }
-    document.exitPointerLock();
-  }
+  attachMouseLook(canvas) { this._canvas = canvas; canvas.addEventListener('mousemove', this._onMove); canvas.requestPointerLock(); }
+  detachMouseLook() { if (this._canvas) { this._canvas.removeEventListener('mousemove', this._onMove); this._canvas = null; } document.exitPointerLock(); }
   _mouseMove(e) {
     if (document.pointerLockElement !== this._canvas) return;
     this.yaw   -= e.movementX * 0.002;
@@ -341,126 +243,101 @@ class WalkController {
   }
   update() {
     const { camera, keys } = this;
-    const euler = new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ');
-    camera.quaternion.setFromEuler(euler);
-
+    camera.quaternion.setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ'));
     const dir = new THREE.Vector3();
     const fwd = new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw));
-    const rgt = new THREE.Vector3(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
-
+    const rgt = new THREE.Vector3( Math.cos(this.yaw), 0, -Math.sin(this.yaw));
     if (keys['KeyW'] || keys['ArrowUp'])    dir.add(fwd);
     if (keys['KeyS'] || keys['ArrowDown'])  dir.sub(fwd);
     if (keys['KeyA'] || keys['ArrowLeft'])  dir.sub(rgt);
     if (keys['KeyD'] || keys['ArrowRight']) dir.add(rgt);
-
-    if (dir.length() > 0) {
-      dir.normalize().multiplyScalar(this.speed);
-      camera.position.add(dir);
-      camera.position.y = Math.max(1.6, camera.position.y); // keep above floor
-    }
+    if (dir.length() > 0) { dir.normalize().multiplyScalar(this.speed); camera.position.add(dir); camera.position.y = Math.max(1.6, camera.position.y); }
   }
-  destroy() {
-    document.removeEventListener('keydown', this._onKey);
-    document.removeEventListener('keyup',   this._onKey);
-    this.detachMouseLook();
-  }
+  destroy() { document.removeEventListener('keydown', this._onKey); document.removeEventListener('keyup', this._onKey); this.detachMouseLook(); }
 }
 
 // ── Three.js scene hook ────────────────────────────────────────────────────────
-function useThreeScene(canvasRef, layout, statusMap, walkMode) {
-  const sceneRef    = useRef(null);
-  const rendererRef = useRef(null);
-  const cameraRef   = useRef(null);
-  const orbitRef    = useRef(null);
-  const walkRef     = useRef(null);
-  const rafRef      = useRef(null);
+function useThreeScene(canvasRef, layout, statusMap, walkMode, onObjectsChange) {
+  const sceneRef       = useRef(null);
+  const rendererRef    = useRef(null);
+  const cameraRef      = useRef(null);
+  const orbitRef       = useRef(null);
+  const walkRef        = useRef(null);
+  const transformRef   = useRef(null);
+  const rafRef         = useRef(null);
+  const placedRef      = useRef([]);   // [{ id, mesh, labelSprite, name }]
+  const selectedRef    = useRef(null);
   const sceneCenterRef = useRef(new THREE.Vector3(0, 0, 0));
   const sceneSpanRef   = useRef(20);
-
-  const walkModeRef = useRef(walkMode);
+  const walkModeRef    = useRef(walkMode);
   useEffect(() => { walkModeRef.current = walkMode; }, [walkMode]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !layout) return;
 
-    // Renderer
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(canvas.clientWidth, canvas.clientHeight);
     renderer.setClearColor(0x0d1117);
     rendererRef.current = renderer;
 
-    // Scene
     const scene = new THREE.Scene();
-    scene.fog   = new THREE.Fog(0x0d1117, 50, 200);
+    scene.fog = new THREE.Fog(0x0d1117, 50, 200);
     sceneRef.current = scene;
 
-    // Camera
     const camera = new THREE.PerspectiveCamera(60, canvas.clientWidth / canvas.clientHeight, 0.1, 300);
     cameraRef.current = camera;
 
-    // Lights
     scene.add(new THREE.AmbientLight(0xffffff, 0.7));
     const dir = new THREE.DirectionalLight(0xffffff, 0.8);
-    dir.position.set(20, 30, 20);
-    scene.add(dir);
+    dir.position.set(20, 30, 20); scene.add(dir);
+    scene.add(new THREE.GridHelper(200, 100, 0x2d333b, 0x21262d));
 
-    // Grid
-    const grid = new THREE.GridHelper(200, 100, 0x2d333b, 0x21262d);
-    grid.position.y = -0.01;
-    scene.add(grid);
-
-    // Build station shells
     const boxes = layout.station_boxes || [];
     boxes.forEach(box => buildStationShell(box, statusMap, scene));
-
-    // Build walking paths
-    const connections = layout.connections || [];
-    connections.forEach(conn => {
-      const fromBox = boxes.find(b => b.id === conn.from_box_id);
-      const toBox   = boxes.find(b => b.id === conn.to_box_id);
-      if (fromBox && toBox) buildWalkingPath(fromBox, toBox, scene);
+    (layout.connections || []).forEach(conn => {
+      const f = boxes.find(b => b.id === conn.from_box_id);
+      const t = boxes.find(b => b.id === conn.to_box_id);
+      if (f && t) buildWalkingPath(f, t, scene);
     });
 
-    // Camera auto-fit (overview)
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
     boxes.forEach(b => {
-      const x0 = (b.position_x || 0) * SCALE;
-      const x1 = x0 + (b.station_count || 1) * CELL_W;
-      const z0 = (b.position_y || 0) * SCALE;
-      const z1 = z0 + DEPTH;
-      if (x0 < minX) minX = x0;
-      if (x1 > maxX) maxX = x1;
-      if (z0 < minZ) minZ = z0;
-      if (z1 > maxZ) maxZ = z1;
+      const x0 = (b.position_x || 0) * SCALE, x1 = x0 + (b.station_count || 1) * CELL_W;
+      const z0 = (b.position_y || 0) * SCALE, z1 = z0 + DEPTH;
+      if (x0 < minX) minX = x0; if (x1 > maxX) maxX = x1;
+      if (z0 < minZ) minZ = z0; if (z1 > maxZ) maxZ = z1;
     });
     if (boxes.length) {
-      const cx   = (minX + maxX) / 2;
-      const cz   = (minZ + maxZ) / 2;
+      const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
       const span = Math.max(maxX - minX, maxZ - minZ, 10);
       sceneCenterRef.current.set(cx, 0, cz);
       sceneSpanRef.current = span;
       camera.position.set(cx, span * 0.8, cz + span * 0.9);
       camera.lookAt(cx, 0, cz);
     } else {
-      camera.position.set(0, 20, 30);
-      camera.lookAt(0, 0, 0);
+      camera.position.set(0, 20, 30); camera.lookAt(0, 0, 0);
     }
 
-    // Orbit controls
     const orbit = new OrbitControls(camera, renderer.domElement);
-    orbit.enableDamping = true;
-    orbit.dampingFactor  = 0.08;
-    orbit.minDistance    = 2;
-    orbit.maxDistance    = 200;
+    orbit.enableDamping = true; orbit.dampingFactor = 0.08;
+    orbit.minDistance = 2; orbit.maxDistance = 200;
     orbitRef.current = orbit;
 
-    // Walk controller
+    // TransformControls
+    const tc = new TransformControls(camera, renderer.domElement);
+    tc.addEventListener('dragging-changed', (e) => { orbit.enabled = !e.value; });
+    scene.add(tc);
+    transformRef.current = tc;
+
     const walk = new WalkController(camera);
     walkRef.current = walk;
 
-    // Resize observer
+    // Restore previously placed objects from localStorage
+    const saved = JSON.parse(localStorage.getItem(LS_KEY + '_' + layout.id) || '[]');
+    // (geometry only — we can't restore loaded meshes, only positions for session)
+
     const ro = new ResizeObserver(() => {
       if (!canvas.clientWidth || !canvas.clientHeight) return;
       renderer.setSize(canvas.clientWidth, canvas.clientHeight);
@@ -469,16 +346,10 @@ function useThreeScene(canvasRef, layout, statusMap, walkMode) {
     });
     ro.observe(canvas);
 
-    // Animation loop
     const animate = () => {
       rafRef.current = requestAnimationFrame(animate);
-      if (walkModeRef.current) {
-        walk.update();
-        orbit.enabled = false;
-      } else {
-        orbit.enabled = true;
-        orbit.update();
-      }
+      if (walkModeRef.current) { walk.update(); orbit.enabled = false; }
+      else { if (!tc.dragging) orbit.enabled = true; orbit.update(); }
       renderer.render(scene, camera);
     };
     animate();
@@ -487,49 +358,36 @@ function useThreeScene(canvasRef, layout, statusMap, walkMode) {
       cancelAnimationFrame(rafRef.current);
       ro.disconnect();
       walk.destroy();
+      tc.dispose();
       orbit.dispose();
       renderer.dispose();
+      placedRef.current = [];
+      selectedRef.current = null;
     };
   }, [canvasRef, layout, statusMap]); // eslint-disable-line
 
-  // Toggle walk mode: attach/detach pointer lock and reset camera pos
+  // Walk mode toggle
   useEffect(() => {
-    const walk   = walkRef.current;
-    const canvas = canvasRef.current;
-    const camera = cameraRef.current;
+    const walk = walkRef.current, canvas = canvasRef.current, camera = cameraRef.current;
     if (!walk || !canvas || !camera) return;
-
-    if (walkMode) {
-      walk.yaw   = 0;
-      walk.pitch = 0;
-      camera.position.y = 1.8;
-      walk.attachMouseLook(canvas);
-    } else {
-      walk.detachMouseLook();
-    }
+    if (walkMode) { walk.yaw = 0; walk.pitch = 0; camera.position.y = 1.8; walk.attachMouseLook(canvas); }
+    else { walk.detachMouseLook(); }
   }, [walkMode, canvasRef]);
 
-  // Snap camera to a named view preset
+  // Snap view
   const snapView = useCallback((view) => {
-    const camera = cameraRef.current;
-    const orbit  = orbitRef.current;
+    const camera = cameraRef.current, orbit = orbitRef.current;
     if (!camera || !orbit) return;
-
-    const c    = sceneCenterRef.current;
-    const span = sceneSpanRef.current;
-    const d    = span * 0.9;
-
+    const c = sceneCenterRef.current, span = sceneSpanRef.current, d = span * 0.9;
     const presets = {
-      top:    { pos: [c.x,     d * 1.4,  c.z      ], up: [0, 0, -1] },
-      front:  { pos: [c.x,     d * 0.4,  c.z + d  ], up: [0, 1,  0] },
-      back:   { pos: [c.x,     d * 0.4,  c.z - d  ], up: [0, 1,  0] },
-      left:   { pos: [c.x - d, d * 0.4,  c.z      ], up: [0, 1,  0] },
-      right:  { pos: [c.x + d, d * 0.4,  c.z      ], up: [0, 1,  0] },
-      '3d':   { pos: [c.x + d * 0.8, d * 0.8, c.z + d * 0.9], up: [0, 1, 0] },
+      top:   { pos: [c.x,     d * 1.4, c.z      ], up: [0, 0, -1] },
+      front: { pos: [c.x,     d * 0.4, c.z + d  ], up: [0, 1,  0] },
+      back:  { pos: [c.x,     d * 0.4, c.z - d  ], up: [0, 1,  0] },
+      left:  { pos: [c.x - d, d * 0.4, c.z      ], up: [0, 1,  0] },
+      right: { pos: [c.x + d, d * 0.4, c.z      ], up: [0, 1,  0] },
+      '3d':  { pos: [c.x + d * 0.8, d * 0.8, c.z + d * 0.9], up: [0, 1, 0] },
     };
-    const p = presets[view];
-    if (!p) return;
-
+    const p = presets[view]; if (!p) return;
     camera.position.set(...p.pos);
     camera.up.set(...p.up);
     orbit.target.copy(c);
@@ -537,60 +395,219 @@ function useThreeScene(canvasRef, layout, statusMap, walkMode) {
     camera.lookAt(c);
   }, []);
 
-  return { snapView };
+  // Set transform mode (translate / rotate / scale)
+  const setTransformMode = useCallback((mode) => {
+    if (transformRef.current) transformRef.current.setMode(mode);
+  }, []);
+
+  // Load and place a 3D object file
+  const placeObject = useCallback((file, name, layoutId) => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    const url  = URL.createObjectURL(file);
+
+    const onLoaded = (obj) => {
+      URL.revokeObjectURL(url);
+      // Auto-scale to reasonable size (~2m tall)
+      const box  = new THREE.Box3().setFromObject(obj);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      const maxDim = Math.max(size.x, size.y, size.z);
+      if (maxDim > 0) obj.scale.setScalar(2.0 / maxDim);
+
+      // Place at scene center floor level
+      const c = sceneCenterRef.current;
+      obj.position.set(c.x, 0, c.z);
+      obj.userData.isPlaced = true;
+      obj.userData.objId    = Date.now().toString();
+      obj.userData.objName  = name;
+
+      // Floating name label
+      const lbl = makeLabel(name, { fontSize: 44, color: '#ffff00', bgColor: 'rgba(0,0,0,0.65)', padding: 10, scale: 2.0 });
+      lbl.userData.isLabel    = true;
+      lbl.userData.parentId   = obj.userData.objId;
+      scene.add(lbl);
+
+      scene.add(obj);
+
+      const entry = { id: obj.userData.objId, mesh: obj, label: lbl, name };
+      placedRef.current = [...placedRef.current, entry];
+
+      // Select immediately
+      if (transformRef.current) {
+        transformRef.current.attach(obj);
+        selectedRef.current = entry;
+      }
+
+      onObjectsChange([...placedRef.current]);
+      saveToLS(layoutId);
+    };
+
+    if (ext === 'glb' || ext === 'gltf') {
+      new GLTFLoader().load(url, (gltf) => onLoaded(gltf.scene));
+    } else if (ext === 'obj') {
+      new OBJLoader().load(url, onLoaded);
+    }
+  }, [onObjectsChange]); // eslint-disable-line
+
+  // Select object by click on canvas
+  const handleCanvasClick = useCallback((e) => {
+    const canvas = canvasRef.current, camera = cameraRef.current, scene = sceneRef.current;
+    if (!canvas || !camera || !scene || walkModeRef.current) return;
+    const rect   = canvas.getBoundingClientRect();
+    const mouse  = new THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width)  *  2 - 1,
+      ((e.clientY - rect.top)  / rect.height) * -2 + 1
+    );
+    const ray    = new THREE.Raycaster();
+    ray.setFromCamera(mouse, camera);
+    const placed = placedRef.current.map(p => p.mesh);
+    const hits   = ray.intersectObjects(placed, true);
+    if (hits.length > 0) {
+      let obj = hits[0].object;
+      while (obj.parent && !obj.userData.isPlaced) obj = obj.parent;
+      const entry = placedRef.current.find(p => p.mesh === obj);
+      if (entry) {
+        selectedRef.current = entry;
+        if (transformRef.current) transformRef.current.attach(obj);
+      }
+    } else {
+      // Deselect if clicked empty space
+      if (transformRef.current) transformRef.current.detach();
+      selectedRef.current = null;
+    }
+    onObjectsChange([...placedRef.current]);
+  }, [canvasRef, onObjectsChange]);
+
+  // Delete selected object
+  const deleteSelected = useCallback((layoutId) => {
+    const sel = selectedRef.current, scene = sceneRef.current;
+    if (!sel || !scene) return;
+    if (transformRef.current) transformRef.current.detach();
+    scene.remove(sel.mesh);
+    scene.remove(sel.label);
+    placedRef.current = placedRef.current.filter(p => p.id !== sel.id);
+    selectedRef.current = null;
+    onObjectsChange([...placedRef.current]);
+    saveToLS(layoutId);
+  }, [onObjectsChange]);
+
+  // Rename label of selected object
+  const renameSelected = useCallback((newName, layoutId) => {
+    const sel = selectedRef.current, scene = sceneRef.current;
+    if (!sel || !scene) return;
+    sel.name = newName;
+    sel.mesh.userData.objName = newName;
+    scene.remove(sel.label);
+    const lbl = makeLabel(newName, { fontSize: 44, color: '#ffff00', bgColor: 'rgba(0,0,0,0.65)', padding: 10, scale: 2.0 });
+    lbl.userData.isLabel  = true;
+    lbl.userData.parentId = sel.id;
+    scene.add(lbl);
+    sel.label = lbl;
+    onObjectsChange([...placedRef.current]);
+    saveToLS(layoutId);
+  }, [onObjectsChange]);
+
+  // Update floating labels to follow their parent mesh each frame
+  useEffect(() => {
+    const id = setInterval(() => {
+      placedRef.current.forEach(({ mesh, label }) => {
+        if (mesh && label) {
+          const box = new THREE.Box3().setFromObject(mesh);
+          label.position.set(
+            mesh.position.x,
+            box.max.y + 0.5,
+            mesh.position.z
+          );
+        }
+      });
+    }, 50);
+    return () => clearInterval(id);
+  }, []);
+
+  return { snapView, setTransformMode, placeObject, handleCanvasClick, deleteSelected, renameSelected };
+}
+
+function saveToLS(layoutId) {
+  // Save object metadata (name + position) — mesh can't be serialised
+  // Full save would need backend; this is session persistence via localStorage
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
 function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive }) {
-  const canvasRef   = useRef(null);
+  const canvasRef          = useRef(null);
+  const fileInputRef       = useRef(null);
   const [selectedLayoutId, setSelectedLayoutId] = useState(null);
   const [layout,    setLayout]    = useState(null);
   const [statusMap, setStatusMap] = useState({});
   const [walkMode,  setWalkMode]  = useState(false);
+  const [placedObjects, setPlacedObjects] = useState([]);
+  const [selectedId,    setSelectedId]    = useState(null);
+  const [transformMode, setTransformModeState] = useState('translate');
+  const [renameVal,     setRenameVal]     = useState('');
+  const [showObjPanel,  setShowObjPanel]  = useState(false);
 
-  // Auto-select active layout when provided
   useEffect(() => {
-    if (activeLayoutId && !selectedLayoutId) {
-      setSelectedLayoutId(activeLayoutId);
-    }
+    if (activeLayoutId && !selectedLayoutId) setSelectedLayoutId(activeLayoutId);
   }, [activeLayoutId]); // eslint-disable-line
 
-  // Fetch layout data
   useEffect(() => {
     if (!selectedLayoutId) return;
-    layoutApi.getLayout(selectedLayoutId)
-      .then(res => setLayout(res.data))
-      .catch(() => {});
+    layoutApi.getLayout(selectedLayoutId).then(res => setLayout(res.data)).catch(() => {});
   }, [selectedLayoutId]);
 
-  // Derive status map from input records (if layout has records)
   useEffect(() => {
     if (!layout) return;
     const map = {};
     (layout.station_boxes || []).forEach(box => {
       (box.station_ids || '').split(',').forEach(id => {
-        const sid = id.trim();
-        if (!sid) return;
-        // Use station_data if available, otherwise null → grey
-        try {
-          const data = JSON.parse(box.station_data || '{}');
-          if (data[sid]) map[sid] = data[sid].status || null;
-        } catch (_) {}
+        const sid = id.trim(); if (!sid) return;
+        try { const d = JSON.parse(box.station_data || '{}'); if (d[sid]) map[sid] = d[sid].status || null; } catch (_) {}
       });
     });
     setStatusMap(map);
   }, [layout]);
 
-  const { snapView } = useThreeScene(canvasRef, layout, statusMap, walkMode);
+  const onObjectsChange = useCallback((objs) => {
+    setPlacedObjects(objs);
+    const sel = objs.find(o => o.id === selectedId);
+    if (sel) setRenameVal(sel.name);
+    else setSelectedId(null);
+  }, [selectedId]);
+
+  const { snapView, setTransformMode, placeObject, handleCanvasClick, deleteSelected, renameSelected } =
+    useThreeScene(canvasRef, layout, statusMap, walkMode, onObjectsChange);
 
   const handleLayoutChange = useCallback((e) => {
     setSelectedLayoutId(Number(e.target.value) || null);
-    setLayout(null);
-    setWalkMode(false);
+    setLayout(null); setWalkMode(false); setPlacedObjects([]); setSelectedId(null);
   }, []);
+
+  const handleFileUpload = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const name = file.name.replace(/\.[^/.]+$/, '');
+    placeObject(file, name, selectedLayoutId);
+    setShowObjPanel(true);
+    e.target.value = '';
+  }, [placeObject, selectedLayoutId]);
+
+  const handleModeChange = useCallback((mode) => {
+    setTransformModeState(mode);
+    setTransformMode(mode);
+  }, [setTransformMode]);
+
+  const handleRename = useCallback(() => {
+    if (!renameVal.trim()) return;
+    renameSelected(renameVal.trim(), selectedLayoutId);
+  }, [renameVal, renameSelected, selectedLayoutId]);
+
+  const currentSelected = placedObjects.find(o => o.id === selectedId);
 
   return (
     <div className="z3d-root">
+      {/* ── Toolbar ── */}
       <div className="z3d-toolbar">
         <span className="z3d-toolbar-title">Z-Stage 3D Layout</span>
 
@@ -605,56 +622,113 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
           <>
             {/* View presets */}
             <div className="z3d-view-group">
-              {[
-                { id: '3d',    label: '3D'    },
-                { id: 'top',   label: 'Top'   },
-                { id: 'front', label: 'Front' },
-                { id: 'back',  label: 'Back'  },
-                { id: 'left',  label: 'Left'  },
-                { id: 'right', label: 'Right' },
-              ].map(v => (
-                <button key={v.id} className="z3d-view-btn" onClick={() => snapView(v.id)} title={`${v.label} view`}>
-                  {v.label}
-                </button>
+              {['3D','Top','Front','Back','Left','Right'].map(v => (
+                <button key={v} className="z3d-view-btn" onClick={() => snapView(v.toLowerCase())}>{v}</button>
               ))}
             </div>
 
+            {/* Upload object */}
+            <button className="z3d-upload-btn" onClick={() => fileInputRef.current?.click()} title="Upload GLB or OBJ file">
+              ⬆ Upload Object
+            </button>
+            <input ref={fileInputRef} type="file" accept=".glb,.gltf,.obj" style={{ display: 'none' }} onChange={handleFileUpload} />
+
+            {/* Object list toggle */}
+            <button className={`z3d-walk-btn${showObjPanel ? ' z3d-walk-btn--active' : ''}`} onClick={() => setShowObjPanel(v => !v)}>
+              📦 Objects {placedObjects.length > 0 && `(${placedObjects.length})`}
+            </button>
+
             {/* Walk mode */}
-            <button
-              className={`z3d-walk-btn${walkMode ? ' z3d-walk-btn--active' : ''}`}
-              onClick={() => setWalkMode(v => !v)}
-              title={walkMode ? 'Exit walk mode' : 'Enter first-person walk mode'}
-            >
+            <button className={`z3d-walk-btn${walkMode ? ' z3d-walk-btn--active' : ''}`} onClick={() => setWalkMode(v => !v)}>
               {walkMode ? '🧍 Exit Walk' : '🚶 Walk Mode'}
             </button>
           </>
         )}
 
         <div className="z3d-legend">
-          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--r" />Red</span>
-          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--y" />Yellow</span>
-          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--g" />Green</span>
-          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--na" />N/A</span>
-          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--path" />Walking Path</span>
+          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--r"/>Red</span>
+          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--y"/>Yellow</span>
+          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--g"/>Green</span>
+          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--na"/>N/A</span>
+          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--path"/>Path</span>
         </div>
       </div>
 
-      <div className="z3d-canvas-wrapper">
-        {!layout ? (
-          <div className="z3d-placeholder">
-            <span className="z3d-placeholder-icon">🏭</span>
-            <span>{savedLayouts.length === 0 ? 'No layouts saved yet' : 'Select a layout to view the 3D scene'}</span>
-          </div>
-        ) : (
-          <>
-            <canvas ref={canvasRef} className="z3d-canvas" />
-            <div className="z3d-walk-hint">
-              {walkMode
-                ? 'WASD / Arrow keys to move · Mouse to look · Click canvas to capture mouse'
-                : 'Left drag to orbit · Scroll to zoom · Right drag to pan'}
+      <div className="z3d-body">
+        {/* ── Object panel (left sidebar) ── */}
+        {showObjPanel && layout && (
+          <div className="z3d-obj-panel">
+            <div className="z3d-obj-panel-title">Placed Objects</div>
+
+            {/* Transform mode */}
+            {currentSelected && (
+              <div className="z3d-transform-group">
+                {[['translate','Move'],['rotate','Rotate'],['scale','Scale']].map(([m, lbl]) => (
+                  <button
+                    key={m}
+                    className={`z3d-transform-btn${transformMode === m ? ' z3d-transform-btn--active' : ''}`}
+                    onClick={() => handleModeChange(m)}
+                  >{lbl}</button>
+                ))}
+              </div>
+            )}
+
+            {/* Rename */}
+            {currentSelected && (
+              <div className="z3d-rename-row">
+                <input
+                  className="z3d-rename-input"
+                  value={renameVal}
+                  onChange={e => setRenameVal(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleRename()}
+                  placeholder="Label name"
+                />
+                <button className="z3d-rename-btn" onClick={handleRename}>✓</button>
+              </div>
+            )}
+
+            {/* Object list */}
+            <div className="z3d-obj-list">
+              {placedObjects.length === 0 && <div className="z3d-obj-empty">No objects placed yet</div>}
+              {placedObjects.map(obj => (
+                <div
+                  key={obj.id}
+                  className={`z3d-obj-item${selectedId === obj.id ? ' z3d-obj-item--active' : ''}`}
+                  onClick={() => { setSelectedId(obj.id); setRenameVal(obj.name); }}
+                >
+                  <span className="z3d-obj-icon">📦</span>
+                  <span className="z3d-obj-name">{obj.name}</span>
+                  <button
+                    className="z3d-obj-del"
+                    title="Delete"
+                    onClick={e => { e.stopPropagation(); deleteSelected(selectedLayoutId); }}
+                  >✕</button>
+                </div>
+              ))}
             </div>
-          </>
+          </div>
         )}
+
+        {/* ── Canvas area ── */}
+        <div className="z3d-canvas-wrapper">
+          {!layout ? (
+            <div className="z3d-placeholder">
+              <span className="z3d-placeholder-icon">🏭</span>
+              <span>{savedLayouts.length === 0 ? 'No layouts saved yet' : 'Select a layout to view the 3D scene'}</span>
+            </div>
+          ) : (
+            <>
+              <canvas ref={canvasRef} className="z3d-canvas" onClick={handleCanvasClick} />
+              <div className="z3d-walk-hint">
+                {walkMode
+                  ? 'WASD / Arrow keys to move · Mouse to look · Click canvas to capture mouse'
+                  : currentSelected
+                    ? 'Drag handles to move · Click empty space to deselect'
+                    : 'Left drag to orbit · Scroll to zoom · Click object to select'}
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
