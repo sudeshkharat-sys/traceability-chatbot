@@ -282,32 +282,18 @@ function buildStationShell(box, statusMap, scene) {
       group.add(lbl);
     }
 
-    // ── Nameplates on FRONT and BACK — each with correct readable texture ──
+    // ── Single nameplate on FRONT face, facing outward toward viewer ──
     const stnName = stationNames[i] || '';
-
-    // Front plate — normal texture, faces toward -Z (viewer standing in front)
-    const plateFront = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, false);
-    plateFront.position.set(cellCX, HEIGHT - 0.55, originZ + 0.04);
-    group.add(plateFront);
-
-    // Back plate — mirrored texture, faces toward +Z (viewer standing behind)
-    const plateBack = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, true);
-    plateBack.position.set(cellCX, HEIGHT - 0.55, originZ + DEPTH - 0.04);
-    plateBack.rotation.y = Math.PI;
-    group.add(plateBack);
+    const plate   = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, false);
+    plate.position.set(cellCX, HEIGHT - 0.55, originZ - 0.04); // just outside front beam
+    plate.rotation.y = Math.PI; // face outward (-Z direction)
+    group.add(plate);
   }
 
-  // ── Floating box name above the whole structure ──
-  const displayName = box.name || 'Box';
-  const nameSprite  = makeLabel(displayName, { fontSize: 52, color: '#1a237e', bgColor: 'rgba(255,255,255,0.85)', padding: 14, scale: 2.8 });
+  // ── Single floating box name above the whole structure ──
+  const nameSprite = makeLabel(box.name || 'Box', { fontSize: 52, color: '#1a237e', bgColor: 'rgba(255,255,255,0.85)', padding: 14, scale: 2.8 });
   nameSprite.position.set(originX + totalW / 2, HEIGHT + 1.3, originZ + DEPTH / 2);
   group.add(nameSprite);
-
-  if (boxDesc) {
-    const descSprite = makeLabel(boxDesc, { fontSize: 36, color: '#37474f', bgColor: 'rgba(255,255,255,0.75)', padding: 10, scale: 2.0 });
-    descSprite.position.set(originX + totalW / 2, HEIGHT + 0.6, originZ + DEPTH / 2);
-    group.add(descSprite);
-  }
 
   scene.add(group);
 }
