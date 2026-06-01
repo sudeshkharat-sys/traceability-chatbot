@@ -282,12 +282,19 @@ function buildStationShell(box, statusMap, scene) {
       group.add(lbl);
     }
 
-    // ── Single nameplate on FRONT face, facing outward toward viewer ──
     const stnName = stationNames[i] || '';
-    const plate   = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, false);
-    plate.position.set(cellCX, HEIGHT - 0.55, originZ - 0.04); // just outside front beam
-    plate.rotation.y = Math.PI; // face outward (-Z direction)
-    group.add(plate);
+
+    // ── Nameplate on FRONT frame — clearly in front of beam, facing outward ──
+    const plateFront = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, false);
+    plateFront.position.set(cellCX, HEIGHT - 0.55, originZ - 0.30); // 30cm in front of beam
+    plateFront.rotation.y = Math.PI; // face toward -Z (viewer in front)
+    group.add(plateFront);
+
+    // ── Nameplate on BACK frame — facing outward from back ──
+    const plateBack = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, true);
+    plateBack.position.set(cellCX, HEIGHT - 0.55, originZ + DEPTH + 0.30); // 30cm behind back beam
+    // no rotation — default faces +Z (viewer standing behind)
+    group.add(plateBack);
   }
 
   // ── Single floating box name above the whole structure ──
