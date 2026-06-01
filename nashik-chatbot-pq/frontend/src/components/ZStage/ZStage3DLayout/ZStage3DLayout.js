@@ -9,9 +9,9 @@ import './ZStage3DLayout.css';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const SCALE      = 0.04;
-const CELL_W     = 5.0;
-const DEPTH      = 20.0;
-const HEIGHT     = 8.0;
+const CELL_W     = 6.0;   // station box width
+const DEPTH      = 6.0;   // station box depth — square-ish box, NOT tunnel
+const HEIGHT     = 5.0;   // column height
 const IB_FLANGE  = 0.40;
 const IB_WEB     = 0.08;
 const IB_FT      = 0.08;
