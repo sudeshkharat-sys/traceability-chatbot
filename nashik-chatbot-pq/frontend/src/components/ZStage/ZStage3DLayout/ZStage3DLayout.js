@@ -128,8 +128,8 @@ function buildZebraCrossing(x, originZ, group) {
 }
 
 // ── Station nameplate (top front beam) ────────────────────────────────────────
-function makeNameplate(stnId, boxName, width) {
-  const W = 1024, H = 220;
+function makeNameplate(stnId, stnName, boxDesc, cellWidth) {
+  const W = 1024, H = 240;
   const canvas = document.createElement('canvas');
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
@@ -138,37 +138,52 @@ function makeNameplate(stnId, boxName, width) {
   ctx.fillStyle = '#1a237e';
   ctx.fillRect(0, 0, W, H);
 
-  // Bottom highlight strip
+  // Yellow bottom strip
   ctx.fillStyle = '#ffd600';
-  ctx.fillRect(0, H - 14, W, 14);
+  ctx.fillRect(0, H - 12, W, 12);
 
-  // Top strip
+  // Top accent strip
   ctx.fillStyle = '#283593';
-  ctx.fillRect(0, 0, W, 40);
+  ctx.fillRect(0, 0, W, 36);
 
-  // Station ID — large
+  // Station ID — large yellow left
   ctx.fillStyle = '#ffd600';
-  ctx.font = 'bold 96px Arial';
+  ctx.font = 'bold 90px Arial';
   ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(stnId, 28, H / 2 - 10);
+  ctx.textBaseline = 'top';
+  ctx.fillText(stnId, 24, 44);
 
-  // Box name — right side
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 52px Arial';
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(boxName, W - 28, H / 2 - 10);
+  // Station name — white right
+  if (stnName) {
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 48px Arial';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'top';
+    ctx.fillText(stnName, W - 24, 52);
+  }
 
-  // Bottom label
-  ctx.fillStyle = '#90caf9';
-  ctx.font = '32px Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('Z-STAGE STATION', W / 2, H - 42);
+  // Description — light blue bottom
+  if (boxDesc) {
+    ctx.fillStyle = '#90caf9';
+    ctx.font = '34px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    // Truncate if too long
+    let desc = boxDesc;
+    while (ctx.measureText(desc).width > W - 48 && desc.length > 0) desc = desc.slice(0, -1);
+    if (desc !== boxDesc) desc += '…';
+    ctx.fillText(desc, 24, H - 18);
+  } else {
+    ctx.fillStyle = '#90caf9';
+    ctx.font = '30px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('Z-STAGE STATION', W / 2, H - 18);
+  }
 
   const tex = new THREE.CanvasTexture(canvas);
-  const geo = new THREE.PlaneGeometry(width * 0.88, width * 0.88 * (H / W));
+  const plateW = cellWidth * 0.90;
+  const geo = new THREE.PlaneGeometry(plateW, plateW * (H / W));
   const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side: THREE.DoubleSide });
   return new THREE.Mesh(geo, mat);
 }
@@ -215,6 +230,15 @@ function buildStationShell(box, statusMap, scene) {
   });
 
   // ── Per-cell: floor + status sphere + floor label + nameplate ──
+  // Parse station_data for names and description
+  let stationNames = [];
+  let boxDesc      = '';
+  try {
+    const sd = JSON.parse(box.station_data || '{}');
+    stationNames = Array.isArray(sd.__station_names__) ? sd.__station_names__ : [];
+    boxDesc      = sd.__box_desc__ || '';
+  } catch (_) {}
+
   const stationIds = (box.station_ids || '').split(',').map(s => s.trim()).filter(Boolean);
 
   for (let i = 0; i < count; i++) {
@@ -249,17 +273,25 @@ function buildStationShell(box, statusMap, scene) {
       group.add(lbl);
     }
 
-    // ── Nameplate on top front beam (facing front, each cell) ──
-    const plate = makeNameplate(stnId, box.name || '', CELL_W);
+    // ── Nameplate on top front beam — real station name + box description ──
+    const stnName = stationNames[i] || '';
+    const plate   = makeNameplate(stnId, stnName, boxDesc, CELL_W);
     // Sit just below the top beam on the front face
     plate.position.set(cellCX, HEIGHT - 0.55, originZ + 0.04);
     group.add(plate);
   }
 
   // ── Floating box name above the whole structure ──
-  const nameSprite = makeLabel(box.name || 'Box', { fontSize: 52, color: '#1a237e', bgColor: 'rgba(255,255,255,0.85)', padding: 14, scale: 2.8 });
+  const displayName = box.name || 'Box';
+  const nameSprite  = makeLabel(displayName, { fontSize: 52, color: '#1a237e', bgColor: 'rgba(255,255,255,0.85)', padding: 14, scale: 2.8 });
   nameSprite.position.set(originX + totalW / 2, HEIGHT + 1.3, originZ + DEPTH / 2);
   group.add(nameSprite);
+
+  if (boxDesc) {
+    const descSprite = makeLabel(boxDesc, { fontSize: 36, color: '#37474f', bgColor: 'rgba(255,255,255,0.75)', padding: 10, scale: 2.0 });
+    descSprite.position.set(originX + totalW / 2, HEIGHT + 0.6, originZ + DEPTH / 2);
+    group.add(descSprite);
+  }
 
   scene.add(group);
 }
