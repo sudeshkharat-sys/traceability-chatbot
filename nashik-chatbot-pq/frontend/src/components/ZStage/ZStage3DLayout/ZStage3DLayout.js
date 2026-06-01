@@ -409,39 +409,47 @@ function useThreeScene(canvasRef, layout, statusMap, walkMode, onObjectsChange) 
 
     const onLoaded = (obj) => {
       URL.revokeObjectURL(url);
-      // Auto-scale to reasonable size (~2m tall)
-      const box  = new THREE.Box3().setFromObject(obj);
+
+      // Strip any existing text/label children from the loaded model
+      obj.traverse(child => {
+        if (child.isSprite || (child.material && child.material.map === null && child.isLine)) {
+          child.visible = false;
+        }
+      });
+
+      // Auto-scale to ~2m
+      const bbox = new THREE.Box3().setFromObject(obj);
       const size = new THREE.Vector3();
-      box.getSize(size);
+      bbox.getSize(size);
       const maxDim = Math.max(size.x, size.y, size.z);
       if (maxDim > 0) obj.scale.setScalar(2.0 / maxDim);
 
-      // Place at scene center floor level
+      // Re-compute after scale and sit on floor (y=0)
+      const bbox2 = new THREE.Box3().setFromObject(obj);
+      obj.position.y = -bbox2.min.y;
+
+      // Place at scene centre
       const c = sceneCenterRef.current;
-      obj.position.set(c.x, 0, c.z);
+      obj.position.x = c.x;
+      obj.position.z = c.z;
+
       obj.userData.isPlaced = true;
       obj.userData.objId    = Date.now().toString();
       obj.userData.objName  = name;
 
-      // Floating name label
-      const lbl = makeLabel(name, { fontSize: 44, color: '#ffff00', bgColor: 'rgba(0,0,0,0.65)', padding: 10, scale: 2.0 });
-      lbl.userData.isLabel    = true;
-      lbl.userData.parentId   = obj.userData.objId;
-      scene.add(lbl);
-
       scene.add(obj);
 
-      const entry = { id: obj.userData.objId, mesh: obj, label: lbl, name };
+      const entry = { id: obj.userData.objId, mesh: obj, label: null, name };
       placedRef.current = [...placedRef.current, entry];
 
-      // Select immediately
+      // Select immediately and set mode to translate
       if (transformRef.current) {
+        transformRef.current.setMode('translate');
         transformRef.current.attach(obj);
         selectedRef.current = entry;
       }
 
       onObjectsChange([...placedRef.current]);
-      saveToLS(layoutId);
     };
 
     if (ext === 'glb' || ext === 'gltf') {
@@ -480,53 +488,60 @@ function useThreeScene(canvasRef, layout, statusMap, walkMode, onObjectsChange) 
     onObjectsChange([...placedRef.current]);
   }, [canvasRef, onObjectsChange]);
 
-  // Delete selected object
-  const deleteSelected = useCallback((layoutId) => {
-    const sel = selectedRef.current, scene = sceneRef.current;
-    if (!sel || !scene) return;
-    if (transformRef.current) transformRef.current.detach();
-    scene.remove(sel.mesh);
-    scene.remove(sel.label);
-    placedRef.current = placedRef.current.filter(p => p.id !== sel.id);
-    selectedRef.current = null;
+  // Select object by id (called from panel)
+  const selectById = useCallback((id) => {
+    const entry = placedRef.current.find(p => p.id === id);
+    if (!entry) return;
+    selectedRef.current = entry;
+    if (transformRef.current) {
+      transformRef.current.attach(entry.mesh);
+    }
     onObjectsChange([...placedRef.current]);
-    saveToLS(layoutId);
   }, [onObjectsChange]);
 
-  // Rename label of selected object
-  const renameSelected = useCallback((newName, layoutId) => {
-    const sel = selectedRef.current, scene = sceneRef.current;
-    if (!sel || !scene) return;
-    sel.name = newName;
-    sel.mesh.userData.objName = newName;
-    scene.remove(sel.label);
-    const lbl = makeLabel(newName, { fontSize: 44, color: '#ffff00', bgColor: 'rgba(0,0,0,0.65)', padding: 10, scale: 2.0 });
+  // Delete object by id
+  const deleteById = useCallback((id) => {
+    const scene = sceneRef.current;
+    const entry = placedRef.current.find(p => p.id === id);
+    if (!entry || !scene) return;
+    if (transformRef.current && selectedRef.current?.id === id) transformRef.current.detach();
+    scene.remove(entry.mesh);
+    if (entry.label) scene.remove(entry.label);
+    placedRef.current = placedRef.current.filter(p => p.id !== id);
+    if (selectedRef.current?.id === id) selectedRef.current = null;
+    onObjectsChange([...placedRef.current]);
+  }, [onObjectsChange]);
+
+  // Rename label by id
+  const renameById = useCallback((id, newName) => {
+    const scene = sceneRef.current;
+    const entry = placedRef.current.find(p => p.id === id);
+    if (!entry || !scene) return;
+    entry.name = newName;
+    entry.mesh.userData.objName = newName;
+    if (entry.label) scene.remove(entry.label);
+    const lbl = makeLabel(newName, { fontSize: 44, color: '#ffff00', bgColor: 'rgba(0,0,0,0.7)', padding: 10, scale: 1.8 });
     lbl.userData.isLabel  = true;
-    lbl.userData.parentId = sel.id;
+    lbl.userData.parentId = id;
     scene.add(lbl);
-    sel.label = lbl;
+    entry.label = lbl;
     onObjectsChange([...placedRef.current]);
-    saveToLS(layoutId);
   }, [onObjectsChange]);
 
-  // Update floating labels to follow their parent mesh each frame
+  // Label follows mesh position
   useEffect(() => {
-    const id = setInterval(() => {
+    const tid = setInterval(() => {
       placedRef.current.forEach(({ mesh, label }) => {
         if (mesh && label) {
           const box = new THREE.Box3().setFromObject(mesh);
-          label.position.set(
-            mesh.position.x,
-            box.max.y + 0.5,
-            mesh.position.z
-          );
+          label.position.set(mesh.position.x, box.max.y + 0.6, mesh.position.z);
         }
       });
     }, 50);
-    return () => clearInterval(id);
+    return () => clearInterval(tid);
   }, []);
 
-  return { snapView, setTransformMode, placeObject, handleCanvasClick, deleteSelected, renameSelected };
+  return { snapView, setTransformMode, placeObject, handleCanvasClick, selectById, deleteById, renameById };
 }
 
 function saveToLS(layoutId) {
@@ -571,12 +586,9 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
 
   const onObjectsChange = useCallback((objs) => {
     setPlacedObjects(objs);
-    const sel = objs.find(o => o.id === selectedId);
-    if (sel) setRenameVal(sel.name);
-    else setSelectedId(null);
-  }, [selectedId]);
+  }, []);
 
-  const { snapView, setTransformMode, placeObject, handleCanvasClick, deleteSelected, renameSelected } =
+  const { snapView, setTransformMode, placeObject, handleCanvasClick, selectById, deleteById, renameById } =
     useThreeScene(canvasRef, layout, statusMap, walkMode, onObjectsChange);
 
   const handleLayoutChange = useCallback((e) => {
@@ -598,10 +610,21 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setTransformMode(mode);
   }, [setTransformMode]);
 
+  const handleSelect = useCallback((id) => {
+    setSelectedId(id);
+    setRenameVal(placedObjects.find(o => o.id === id)?.name || '');
+    selectById(id);
+  }, [placedObjects, selectById]);
+
+  const handleDelete = useCallback((id) => {
+    deleteById(id);
+    if (selectedId === id) setSelectedId(null);
+  }, [deleteById, selectedId]);
+
   const handleRename = useCallback(() => {
-    if (!renameVal.trim()) return;
-    renameSelected(renameVal.trim(), selectedLayoutId);
-  }, [renameVal, renameSelected, selectedLayoutId]);
+    if (!renameVal.trim() || !selectedId) return;
+    renameById(selectedId, renameVal.trim());
+  }, [renameVal, renameById, selectedId]);
 
   const currentSelected = placedObjects.find(o => o.id === selectedId);
 
@@ -694,14 +717,14 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                 <div
                   key={obj.id}
                   className={`z3d-obj-item${selectedId === obj.id ? ' z3d-obj-item--active' : ''}`}
-                  onClick={() => { setSelectedId(obj.id); setRenameVal(obj.name); }}
+                  onClick={() => handleSelect(obj.id)}
                 >
                   <span className="z3d-obj-icon">📦</span>
                   <span className="z3d-obj-name">{obj.name}</span>
                   <button
                     className="z3d-obj-del"
                     title="Delete"
-                    onClick={e => { e.stopPropagation(); deleteSelected(selectedLayoutId); }}
+                    onClick={e => { e.stopPropagation(); handleDelete(obj.id); }}
                   >✕</button>
                 </div>
               ))}
