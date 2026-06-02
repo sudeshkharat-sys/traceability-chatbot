@@ -200,7 +200,8 @@ function makeCantileverSign(stnId, ze, zeStatus) {
       new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(zeCanvas), transparent: true, side: THREE.DoubleSide })
     );
     zeMesh.rotation.y = Math.PI / 2;
-    zeMesh.position.set(0, -dropH - idBoardH - 0.06 - zeBoardH / 2, rodLen);
+    // Beside ID board along Z (rod direction) — same Y, offset in Z
+    zeMesh.position.set(0, -dropH - idBoardH / 2, rodLen + idBoardW / 2 + 0.06 + zeBoardW / 2);
     group.add(zeMesh);
   }
 
