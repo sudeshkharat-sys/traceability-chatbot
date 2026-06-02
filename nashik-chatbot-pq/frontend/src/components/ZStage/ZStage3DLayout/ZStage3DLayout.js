@@ -176,7 +176,10 @@ function makeCantileverSign(stnId, ze, zeStatus) {
   // Rotate 90° around Y so board faces sideways (parallel to rod, readable from aisle)
   // ID board starts close to column (low Z), Z/E goes beside it further out
   idMesh.rotation.y = Math.PI / 2;
-  idMesh.position.set(0, -dropH - idBoardH / 2, 0.15 + idBoardW / 2);
+  // ID board further along rod (higher Z = seen first from front camera)
+  const zeBoardW = idBoardW * 0.5;
+  const idStartZ = ze ? 0.15 + zeBoardW + 0.06 : 0.15;
+  idMesh.position.set(0, -dropH - idBoardH / 2, idStartZ + idBoardW / 2);
   group.add(idMesh);
 
   // ── Z/E badge board — stacked below ID board ────────────────────────────────
@@ -195,14 +198,14 @@ function makeCantileverSign(stnId, ze, zeStatus) {
     zc.textAlign = 'center'; zc.textBaseline = 'middle';
     zc.fillText(ze, zeCW / 2, zeCH / 2);
 
-    const zeBoardW = idBoardW * 0.5, zeBoardH = zeBoardW;
+    const zeBoardH = zeBoardW;
     const zeMesh = new THREE.Mesh(
       new THREE.PlaneGeometry(zeBoardW, zeBoardH),
       new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(zeCanvas), transparent: true, side: THREE.DoubleSide })
     );
     zeMesh.rotation.y = Math.PI / 2;
-    // Z/E beside ID board further along rod (higher Z)
-    zeMesh.position.set(0, -dropH - idBoardH / 2, 0.15 + idBoardW + 0.06 + zeBoardW / 2);
+    // Z/E closer to column (lower Z), ID is further out
+    zeMesh.position.set(0, -dropH - idBoardH / 2, 0.15 + zeBoardW / 2);
     group.add(zeMesh);
   }
 
