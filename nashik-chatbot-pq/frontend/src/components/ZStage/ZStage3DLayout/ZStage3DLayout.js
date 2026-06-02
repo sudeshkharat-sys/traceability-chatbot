@@ -178,7 +178,7 @@ function makeCantileverSign(stnId, ze, zeStatus) {
   idMesh.rotation.y = Math.PI / 2;
   const zeBoardW = idBoardW * 0.5;
   // No Z/E → centre ID on rod; Z/E present → ID at rod tip, Z/E closer to column
-  const idCentreZ = ze ? (0.15 + zeBoardW + 0.06 + idBoardW / 2) : (rodLen / 2);
+  const idCentreZ = ze ? (0.55 + zeBoardW + 0.06 + idBoardW / 2) : (rodLen / 2);
   idMesh.position.set(0, -dropH - idBoardH / 2, idCentreZ);
   group.add(idMesh);
 
@@ -205,7 +205,7 @@ function makeCantileverSign(stnId, ze, zeStatus) {
     );
     zeMesh.rotation.y = Math.PI / 2;
     // Z/E closer to column (lower Z), ID is further out
-    zeMesh.position.set(0, -dropH - idBoardH / 2, 0.15 + zeBoardW / 2);
+    zeMesh.position.set(0, -dropH - idBoardH / 2, 0.55 + zeBoardW / 2);
     group.add(zeMesh);
   }
 
