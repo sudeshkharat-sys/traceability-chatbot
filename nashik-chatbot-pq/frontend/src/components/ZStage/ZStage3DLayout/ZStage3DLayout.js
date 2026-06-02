@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
+import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
 import { layoutApi, inputApi } from '../../../services/api/layoutApi';
 import './ZStage3DLayout.css';
 
@@ -553,6 +554,9 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
         }
       });
 
+      // Reset position/rotation before measuring so bbox is in clean local space
+      obj.position.set(0, 0, 0);
+
       // Auto-scale to ~2m
       const bbox = new THREE.Box3().setFromObject(obj);
       const size = new THREE.Vector3();
@@ -560,11 +564,11 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       const maxDim = Math.max(size.x, size.y, size.z);
       if (maxDim > 0) obj.scale.setScalar(2.0 / maxDim);
 
-      // Re-compute after scale and sit on floor (y=0)
+      // Re-compute after scale — snap bottom of object exactly to floor (y=0)
       const bbox2 = new THREE.Box3().setFromObject(obj);
       obj.position.y = -bbox2.min.y;
 
-      // Place at scene centre
+      // Place at scene centre (XZ)
       const c = sceneCenterRef.current;
       obj.position.x = c.x;
       obj.position.z = c.z;
@@ -592,6 +596,15 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       new GLTFLoader().load(url, (gltf) => onLoaded(gltf.scene));
     } else if (ext === 'obj') {
       new OBJLoader().load(url, onLoaded);
+    } else if (ext === 'stl') {
+      new STLLoader().load(url, (geometry) => {
+        geometry.computeVertexNormals();
+        const mesh = new THREE.Mesh(
+          geometry,
+          new THREE.MeshLambertMaterial({ color: 0x90a4ae })
+        );
+        onLoaded(mesh);
+      });
     }
   }, [onObjectsChange]); // eslint-disable-line
 
@@ -820,10 +833,10 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             </div>
 
             {/* Upload object */}
-            <button className="z3d-upload-btn" onClick={() => fileInputRef.current?.click()} title="Upload GLB or OBJ file">
+            <button className="z3d-upload-btn" onClick={() => fileInputRef.current?.click()} title="Upload GLB, OBJ or STL file">
               ⬆ Upload Object
             </button>
-            <input ref={fileInputRef} type="file" accept=".glb,.gltf,.obj" style={{ display: 'none' }} onChange={handleFileUpload} />
+            <input ref={fileInputRef} type="file" accept=".glb,.gltf,.obj,.stl" style={{ display: 'none' }} onChange={handleFileUpload} />
 
             {/* Object list toggle */}
             <button className={`z3d-walk-btn${showObjPanel ? ' z3d-walk-btn--active' : ''}`} onClick={() => setShowObjPanel(v => !v)}>
