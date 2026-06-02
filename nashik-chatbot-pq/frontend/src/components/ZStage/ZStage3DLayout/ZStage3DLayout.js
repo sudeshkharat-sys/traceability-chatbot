@@ -139,7 +139,7 @@ const ZE_SIGN_COLOR = {
 
 function makeCantileverSign(stnId, ze, zeStatus) {
   const group    = new THREE.Group();
-  const rodLen   = 1.2;   // how far it sticks out in +Z
+  const rodLen   = 2.5;   // how far it sticks out in +Z
   const poleMat  = new THREE.MeshLambertMaterial({ color: 0x546e7a });
 
   // Horizontal cantilever rod pointing in +Z
@@ -174,8 +174,9 @@ function makeCantileverSign(stnId, ze, zeStatus) {
     new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(idCanvas), transparent: true, side: THREE.DoubleSide })
   );
   // Rotate 90° around Y so board faces sideways (parallel to rod, readable from aisle)
+  // ID board starts close to column (low Z), Z/E goes beside it further out
   idMesh.rotation.y = Math.PI / 2;
-  idMesh.position.set(0, -dropH - idBoardH / 2, rodLen);
+  idMesh.position.set(0, -dropH - idBoardH / 2, 0.15 + idBoardW / 2);
   group.add(idMesh);
 
   // ── Z/E badge board — stacked below ID board ────────────────────────────────
@@ -200,8 +201,8 @@ function makeCantileverSign(stnId, ze, zeStatus) {
       new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(zeCanvas), transparent: true, side: THREE.DoubleSide })
     );
     zeMesh.rotation.y = Math.PI / 2;
-    // Beside ID board along Z (rod direction) — same Y, offset in Z
-    zeMesh.position.set(0, -dropH - idBoardH / 2, rodLen + idBoardW / 2 + 0.06 + zeBoardW / 2);
+    // Z/E beside ID board further along rod (higher Z)
+    zeMesh.position.set(0, -dropH - idBoardH / 2, 0.15 + idBoardW + 0.06 + zeBoardW / 2);
     group.add(zeMesh);
   }
 
