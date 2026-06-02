@@ -105,20 +105,21 @@ function makeIBeam(length, mat, orientation) {
 }
 
 // ── Green path between cells ───────────────────────────────────────────────────
-function buildZebraCrossing(x, originZ, group) {
-  const fillGeo = new THREE.PlaneGeometry(ZEBRA_W - 0.08, DEPTH - 0.1);
+function buildZebraCrossing(cellCX, originZ, group) {
+  const cellCZ = originZ + DEPTH / 2;
+  const fillGeo = new THREE.PlaneGeometry(CELL_W - 0.1, ZEBRA_W - 0.08);
   const fillMat = new THREE.MeshBasicMaterial({ color: 0xa5d6a7, transparent: true, opacity: 0.7, side: THREE.DoubleSide });
   const fill = new THREE.Mesh(fillGeo, fillMat);
   fill.rotation.x = -Math.PI / 2;
-  fill.position.set(x, 0.19, originZ + DEPTH / 2);
+  fill.position.set(cellCX, 0.19, cellCZ);
   group.add(fill);
   const borderMat = new THREE.MeshBasicMaterial({ color: 0x2e7d32, side: THREE.DoubleSide });
   const T = 0.08;
   [
-    { geo: new THREE.PlaneGeometry(T, DEPTH),   pos: [x - ZEBRA_W / 2 + T / 2, 0.20, originZ + DEPTH / 2] },
-    { geo: new THREE.PlaneGeometry(T, DEPTH),   pos: [x + ZEBRA_W / 2 - T / 2, 0.20, originZ + DEPTH / 2] },
-    { geo: new THREE.PlaneGeometry(ZEBRA_W, T), pos: [x, 0.20, originZ + T / 2] },
-    { geo: new THREE.PlaneGeometry(ZEBRA_W, T), pos: [x, 0.20, originZ + DEPTH - T / 2] },
+    { geo: new THREE.PlaneGeometry(CELL_W, T), pos: [cellCX, 0.20, cellCZ - ZEBRA_W / 2 + T / 2] },
+    { geo: new THREE.PlaneGeometry(CELL_W, T), pos: [cellCX, 0.20, cellCZ + ZEBRA_W / 2 - T / 2] },
+    { geo: new THREE.PlaneGeometry(T, ZEBRA_W), pos: [cellCX - CELL_W / 2 + T / 2, 0.20, cellCZ] },
+    { geo: new THREE.PlaneGeometry(T, ZEBRA_W), pos: [cellCX + CELL_W / 2 - T / 2, 0.20, cellCZ] },
   ].forEach(({ geo, pos }) => {
     const mesh = new THREE.Mesh(geo, borderMat);
     mesh.rotation.x = -Math.PI / 2;
