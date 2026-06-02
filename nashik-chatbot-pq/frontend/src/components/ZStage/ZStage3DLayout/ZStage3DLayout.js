@@ -173,16 +173,14 @@ function makeCantileverSign(stnId, ze, zeStatus) {
     new THREE.PlaneGeometry(idBoardW, idBoardH),
     new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(idCanvas), transparent: true, side: THREE.DoubleSide })
   );
-  // Board hangs below rod tip, centred horizontally
-  const zeExists = !!ze;
-  const totalBoardW = zeExists ? idBoardW + 0.06 + idBoardH : idBoardW;
-  const startX = -totalBoardW / 2 + idBoardW / 2;
-  idMesh.position.set(startX, -dropH - idBoardH / 2, rodLen);
+  // Rotate 90° around Y so board faces sideways (parallel to rod, readable from aisle)
+  idMesh.rotation.y = Math.PI / 2;
+  idMesh.position.set(0, -dropH - idBoardH / 2, rodLen);
   group.add(idMesh);
 
-  // ── Z/E badge board ─────────────────────────────────────────────────────────
+  // ── Z/E badge board — stacked below ID board ────────────────────────────────
   if (ze) {
-    const zeCW = 200, zeCH = 256;
+    const zeCW = 256, zeCH = 256;
     const zeCanvas = document.createElement('canvas');
     zeCanvas.width = zeCW; zeCanvas.height = zeCH;
     const zc = zeCanvas.getContext('2d');
@@ -196,13 +194,13 @@ function makeCantileverSign(stnId, ze, zeStatus) {
     zc.textAlign = 'center'; zc.textBaseline = 'middle';
     zc.fillText(ze, zeCW / 2, zeCH / 2);
 
-    const zeBoardW = idBoardH * (zeCW / zeCH);
-    const zeBoardH = idBoardH;
+    const zeBoardW = idBoardW * 0.5, zeBoardH = zeBoardW;
     const zeMesh = new THREE.Mesh(
       new THREE.PlaneGeometry(zeBoardW, zeBoardH),
       new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(zeCanvas), transparent: true, side: THREE.DoubleSide })
     );
-    zeMesh.position.set(startX + idBoardW / 2 + 0.06 + zeBoardW / 2, -dropH - zeBoardH / 2, rodLen);
+    zeMesh.rotation.y = Math.PI / 2;
+    zeMesh.position.set(0, -dropH - idBoardH - 0.06 - zeBoardH / 2, rodLen);
     group.add(zeMesh);
   }
 
