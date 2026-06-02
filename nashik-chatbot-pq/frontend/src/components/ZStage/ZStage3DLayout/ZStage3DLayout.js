@@ -176,10 +176,10 @@ function makeCantileverSign(stnId, ze, zeStatus) {
   // Rotate 90° around Y so board faces sideways (parallel to rod, readable from aisle)
   // ID board starts close to column (low Z), Z/E goes beside it further out
   idMesh.rotation.y = Math.PI / 2;
-  // ID board further along rod (higher Z = seen first from front camera)
   const zeBoardW = idBoardW * 0.5;
-  const idStartZ = ze ? 0.15 + zeBoardW + 0.06 : 0.15;
-  idMesh.position.set(0, -dropH - idBoardH / 2, idStartZ + idBoardW / 2);
+  // No Z/E → centre ID on rod; Z/E present → ID at rod tip, Z/E closer to column
+  const idCentreZ = ze ? (0.15 + zeBoardW + 0.06 + idBoardW / 2) : (rodLen / 2);
+  idMesh.position.set(0, -dropH - idBoardH / 2, idCentreZ);
   group.add(idMesh);
 
   // ── Z/E badge board — stacked below ID board ────────────────────────────────
