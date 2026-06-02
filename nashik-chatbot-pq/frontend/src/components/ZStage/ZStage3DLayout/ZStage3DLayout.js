@@ -343,41 +343,32 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     // Z/E data from input records (via zeMap)
     const { ze = null, zeStatus = null } = zeMap[stnId] || {};
 
-    // Side-mounted nameplates on left and right columns — readable when walking along the aisle
-    // Plate width based on DEPTH so it fits the side face
-    const sidePlateW = DEPTH * 0.85;
-    const sidePlateH = sidePlateW * (240 / 1024);
-    const plateY     = HEIGHT - 0.55;
-    const sideCZ     = originZ + DEPTH / 2;
+    // Nameplate attached to front beam (faces outward toward front-view camera)
+    const plateFront = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, THREE.FrontSide, ze, zeStatus);
+    plateFront.position.set(cellCX, HEIGHT - 0.55, originZ + DEPTH + 0.02);
+    group.add(plateFront);
 
-    // Right column face (faces +X, readable from right aisle) — FrontSide, rotate -90° around Y
-    const plateRight = makeNameplateMesh(stnId, stnName, boxDesc, DEPTH * 0.85, THREE.FrontSide, ze, zeStatus);
-    plateRight.rotation.y = -Math.PI / 2;
-    plateRight.position.set(cellX + CELL_W + 0.02, plateY, sideCZ);
-    group.add(plateRight);
+    // Nameplate attached to back beam (faces outward toward back-view camera)
+    const plateBack = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, THREE.BackSide, ze, zeStatus);
+    plateBack.position.set(cellCX, HEIGHT - 0.55, originZ - 0.02);
+    group.add(plateBack);
 
-    // Left column face (faces -X, readable from left aisle) — BackSide+pre-mirror, rotate -90° around Y
-    const plateLeft = makeNameplateMesh(stnId, stnName, boxDesc, DEPTH * 0.85, THREE.BackSide, ze, zeStatus);
-    plateLeft.rotation.y = -Math.PI / 2;
-    plateLeft.position.set(cellX - 0.02, plateY, sideCZ);
-    group.add(plateLeft);
-
-    // Z/E sign boards below side nameplates
+    // Z/E sign boards just below the nameplate on each beam
     if (ze) {
-      const plateBottomY = plateY - sidePlateH / 2;
-      const signW        = 1.2, signH = signW * (96 / 256);
-      const signY        = plateBottomY - 0.05 - signH / 2;
+      const plateH       = CELL_W * 0.90 * (240 / 1024);
+      const signW        = 1.5, signH = signW * (96 / 256);
+      const plateBottomY = (HEIGHT - 0.55) - plateH / 2;
+      const signY        = plateBottomY - 0.06 - signH / 2;
 
-      const signRight = makeZeSignMesh(ze, zeStatus, THREE.FrontSide);
-      signRight.rotation.y = -Math.PI / 2;
-      signRight.position.set(cellX + CELL_W + 0.02, signY, sideCZ);
-      group.add(signRight);
+      const signFront = makeZeSignMesh(ze, zeStatus, THREE.FrontSide);
+      signFront.position.set(cellCX, signY, originZ + DEPTH + 0.02);
+      group.add(signFront);
 
-      const signLeft = makeZeSignMesh(ze, zeStatus, THREE.BackSide);
-      signLeft.rotation.y = -Math.PI / 2;
-      signLeft.position.set(cellX - 0.02, signY, sideCZ);
-      group.add(signLeft);
+      const signBack = makeZeSignMesh(ze, zeStatus, THREE.BackSide);
+      signBack.position.set(cellCX, signY, originZ - 0.02);
+      group.add(signBack);
     }
+    group.add(plateBack);
   }
 
   // ── Single floating box name above the whole structure ──
