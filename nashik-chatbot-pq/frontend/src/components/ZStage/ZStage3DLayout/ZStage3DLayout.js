@@ -378,7 +378,6 @@ function buildStationShell(box, statusMap, zeMap, scene) {
       signLeft.position.set(cellX - 0.02, signY, sideCZ);
       group.add(signLeft);
     }
-    group.add(plateBack);
   }
 
   // ── Single floating box name above the whole structure ──
