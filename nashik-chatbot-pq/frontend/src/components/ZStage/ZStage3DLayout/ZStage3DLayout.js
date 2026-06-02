@@ -128,32 +128,32 @@ function buildZebraCrossing(cellCX, originZ, group) {
   });
 }
 
-// ── Overhead pole sign — one per station cell ──────────────────────────────────
-// Structure: vertical rod → horizontal arm → boards hanging:
-//   [Station ID]  [Z/E badge]  [Station Name — vertical portrait box]
+// ── Cantilever sign — one per station cell ─────────────────────────────────────
+// Rod attaches to front beam at cell centre, sticks out +Z toward viewer.
+// Boards hang down from rod tip: [Station ID] [Z/E badge]
 const ZE_SIGN_COLOR = {
   red:    { bg: '#b71c1c', text: '#ffffff' },
   yellow: { bg: '#d97706', text: '#ffffff' },
   green:  { bg: '#155724', text: '#a5d6a7' },
 };
 
-function makeOverheadSign(stnId, stnName, ze, zeStatus) {
-  const group   = new THREE.Group();
-  const poleH   = 1.3;
-  const armW    = 2.8;
-  const poleMat = new THREE.MeshLambertMaterial({ color: 0x546e7a });
+function makeCantileverSign(stnId, ze, zeStatus) {
+  const group    = new THREE.Group();
+  const rodLen   = 1.2;   // how far it sticks out in +Z
+  const poleMat  = new THREE.MeshLambertMaterial({ color: 0x546e7a });
 
-  // Vertical rod
-  const pole = new THREE.Mesh(new THREE.BoxGeometry(0.07, poleH, 0.07), poleMat);
-  pole.position.y = poleH / 2;
-  group.add(pole);
+  // Horizontal cantilever rod pointing in +Z
+  const rod = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, rodLen), poleMat);
+  rod.position.set(0, 0, rodLen / 2);   // starts at column, extends outward
+  group.add(rod);
 
-  // Horizontal arm at top of rod
-  const arm = new THREE.Mesh(new THREE.BoxGeometry(armW, 0.07, 0.07), poleMat);
-  arm.position.set(armW / 2 - 0.4, poleH, 0);
-  group.add(arm);
+  // Small vertical drop at rod tip to mount boards
+  const dropH = 0.08;
+  const drop  = new THREE.Mesh(new THREE.BoxGeometry(0.07, dropH, 0.07), poleMat);
+  drop.position.set(0, -dropH / 2, rodLen);
+  group.add(drop);
 
-  // ── Station ID board (left, landscape) ──────────────────────────────────────
+  // ── Station ID board ────────────────────────────────────────────────────────
   const idCW = 512, idCH = 256;
   const idCanvas = document.createElement('canvas');
   idCanvas.width = idCW; idCanvas.height = idCH;
@@ -168,15 +168,19 @@ function makeOverheadSign(stnId, stnName, ze, zeStatus) {
   ic.textAlign = 'center'; ic.textBaseline = 'middle';
   ic.fillText(stnId, idCW / 2, idCH / 2);
 
-  const idBoardW = 1.5, idBoardH = idBoardW * (idCH / idCW);
+  const idBoardW = 1.4, idBoardH = idBoardW * (idCH / idCW);
   const idMesh = new THREE.Mesh(
     new THREE.PlaneGeometry(idBoardW, idBoardH),
     new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(idCanvas), transparent: true, side: THREE.DoubleSide })
   );
-  idMesh.position.set(-0.55, poleH - 0.05 - idBoardH / 2, 0);
+  // Board hangs below rod tip, centred horizontally
+  const zeExists = !!ze;
+  const totalBoardW = zeExists ? idBoardW + 0.06 + idBoardH : idBoardW;
+  const startX = -totalBoardW / 2 + idBoardW / 2;
+  idMesh.position.set(startX, -dropH - idBoardH / 2, rodLen);
   group.add(idMesh);
 
-  // ── Z/E badge board (beside ID) ─────────────────────────────────────────────
+  // ── Z/E badge board ─────────────────────────────────────────────────────────
   if (ze) {
     const zeCW = 200, zeCH = 256;
     const zeCanvas = document.createElement('canvas');
@@ -192,50 +196,14 @@ function makeOverheadSign(stnId, stnName, ze, zeStatus) {
     zc.textAlign = 'center'; zc.textBaseline = 'middle';
     zc.fillText(ze, zeCW / 2, zeCH / 2);
 
-    const zeBoardW = idBoardH * (zeCW / zeCH);   // same height as ID board
+    const zeBoardW = idBoardH * (zeCW / zeCH);
     const zeBoardH = idBoardH;
     const zeMesh = new THREE.Mesh(
       new THREE.PlaneGeometry(zeBoardW, zeBoardH),
       new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(zeCanvas), transparent: true, side: THREE.DoubleSide })
     );
-    zeMesh.position.set(-0.55 + idBoardW / 2 + 0.06 + zeBoardW / 2, poleH - 0.05 - zeBoardH / 2, 0);
+    zeMesh.position.set(startX + idBoardW / 2 + 0.06 + zeBoardW / 2, -dropH - zeBoardH / 2, rodLen);
     group.add(zeMesh);
-  }
-
-  // ── Station name — vertical portrait board (rightmost) ──────────────────────
-  if (stnName) {
-    const nmCW = 180, nmCH = 640;
-    const nmCanvas = document.createElement('canvas');
-    nmCanvas.width = nmCW; nmCanvas.height = nmCH;
-    const nc = nmCanvas.getContext('2d');
-    nc.fillStyle = '#263238';
-    nc.beginPath(); nc.roundRect(0, 0, nmCW, nmCH, 14); nc.fill();
-    nc.strokeStyle = 'rgba(255,255,255,0.3)'; nc.lineWidth = 4;
-    nc.beginPath(); nc.roundRect(6, 6, nmCW - 12, nmCH - 12, 10); nc.stroke();
-    // Vertical text — rotate canvas context
-    nc.save();
-    nc.translate(nmCW / 2, nmCH / 2);
-    nc.rotate(-Math.PI / 2);
-    nc.fillStyle = '#ffffff';
-    nc.font = 'bold 58px Arial';
-    nc.textAlign = 'center'; nc.textBaseline = 'middle';
-    let nm = stnName;
-    while (nc.measureText(nm).width > nmCH - 40 && nm.length > 0) nm = nm.slice(0, -1);
-    if (nm !== stnName) nm += '…';
-    nc.fillText(nm, 0, 0);
-    nc.restore();
-
-    const nmBoardW = 0.42, nmBoardH = nmBoardW * (nmCH / nmCW);
-    const nmMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(nmBoardW, nmBoardH),
-      new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(nmCanvas), transparent: true, side: THREE.DoubleSide })
-    );
-    // Position to right of Z/E (or ID if no Z/E), top-aligned with ID board
-    const rightEdge = ze
-      ? (-0.55 + idBoardW / 2 + 0.06 + idBoardH * (200 / 256) + 0.10)
-      : (-0.55 + idBoardW / 2 + 0.10);
-    nmMesh.position.set(rightEdge + nmBoardW / 2, poleH - 0.05 - nmBoardH / 2, 0);
-    group.add(nmMesh);
   }
 
   return group;
@@ -329,9 +297,9 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     // Z/E data from input records (via zeMap)
     const { ze = null, zeStatus = null } = zeMap[stnId] || {};
 
-    // Overhead pole sign rising from center of each station cell
-    const sign = makeOverheadSign(stnId, stnName, ze, zeStatus);
-    sign.position.set(cellCX, HEIGHT, originZ + DEPTH / 2);
+    // Cantilever rod + boards at front beam centre, sticking out toward viewer
+    const sign = makeCantileverSign(stnId, ze, zeStatus);
+    sign.position.set(cellCX, HEIGHT, originZ + DEPTH);
     group.add(sign);
   }
 
