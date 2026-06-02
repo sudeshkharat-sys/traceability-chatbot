@@ -343,30 +343,29 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     // Z/E data from input records (via zeMap)
     const { ze = null, zeStatus = null } = zeMap[stnId] || {};
 
-    // Front plate — FrontSide, no rotation, faces +Z toward front-view camera
+    // Nameplate attached to front beam (faces outward toward front-view camera)
     const plateFront = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, THREE.FrontSide, ze, zeStatus);
-    plateFront.position.set(cellCX, HEIGHT - 0.55, originZ + DEPTH + 0.30);
+    plateFront.position.set(cellCX, HEIGHT - 0.55, originZ + DEPTH + 0.02);
     group.add(plateFront);
 
-    // Back plate — BackSide + pre-mirrored canvas, no mesh rotation
-    // BackSide renders the -Z face; pre-mirror cancels BackSide UV reversal → readable ✓
+    // Nameplate attached to back beam (faces outward toward back-view camera)
     const plateBack = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, THREE.BackSide, ze, zeStatus);
-    plateBack.position.set(cellCX, HEIGHT - 0.55, originZ - 0.30);
+    plateBack.position.set(cellCX, HEIGHT - 0.55, originZ - 0.02);
+    group.add(plateBack);
 
-    // Z/E sign boards (only if ze exists)
+    // Z/E sign boards just below the nameplate on each beam
     if (ze) {
-      // Plate height: plateW * (H/W) = CELL_W*0.9 * (240/1024) ≈ 1.265m
-      const plateH   = CELL_W * 0.90 * (240 / 1024);
-      const signW    = 1.5, signH = signW * (96 / 256);
+      const plateH       = CELL_W * 0.90 * (240 / 1024);
+      const signW        = 1.5, signH = signW * (96 / 256);
       const plateBottomY = (HEIGHT - 0.55) - plateH / 2;
-      const signY = plateBottomY - 0.06 - signH / 2;
+      const signY        = plateBottomY - 0.06 - signH / 2;
 
       const signFront = makeZeSignMesh(ze, zeStatus, THREE.FrontSide);
-      signFront.position.set(cellCX, signY, originZ + DEPTH + 0.30);
+      signFront.position.set(cellCX, signY, originZ + DEPTH + 0.02);
       group.add(signFront);
 
       const signBack = makeZeSignMesh(ze, zeStatus, THREE.BackSide);
-      signBack.position.set(cellCX, signY, originZ - 0.30);
+      signBack.position.set(cellCX, signY, originZ - 0.02);
       group.add(signBack);
     }
     group.add(plateBack);
