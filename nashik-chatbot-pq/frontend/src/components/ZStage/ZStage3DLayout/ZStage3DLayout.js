@@ -128,131 +128,117 @@ function buildZebraCrossing(cellCX, originZ, group) {
   });
 }
 
-// ── Station nameplate ─────────────────────────────────────────────────────────
-// Nameplate bg: RED when ze exists (matches dashboard station header), blue when not
-// Sign board bg: zeStatus color — matches dashboard Z/E cell color
+// ── Overhead pole sign — one per station cell ──────────────────────────────────
+// Structure: vertical rod → horizontal arm → boards hanging:
+//   [Station ID]  [Z/E badge]  [Station Name — vertical portrait box]
 const ZE_SIGN_COLOR = {
   red:    { bg: '#b71c1c', text: '#ffffff' },
   yellow: { bg: '#d97706', text: '#ffffff' },
   green:  { bg: '#155724', text: '#a5d6a7' },
 };
 
-function drawNameplateCanvas(stnId, stnName, boxDesc, ze = null, zeStatus = null) {
-  const W = 1024, H = 240;
-  const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
+function makeOverheadSign(stnId, stnName, ze, zeStatus) {
+  const group   = new THREE.Group();
+  const poleH   = 1.3;
+  const armW    = 2.8;
+  const poleMat = new THREE.MeshLambertMaterial({ color: 0x546e7a });
 
-  // bg: red (#f70707) when ze exists — same as dash-grid-th--red; dark blue otherwise
-  const bg      = ze ? '#c62828' : '#1a237e';
-  const accent  = ze ? '#ef9a9a' : '#ffd600';
-  const idColor = '#ffffff';
+  // Vertical rod
+  const pole = new THREE.Mesh(new THREE.BoxGeometry(0.07, poleH, 0.07), poleMat);
+  pole.position.y = poleH / 2;
+  group.add(pole);
 
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, W, H);
-  ctx.fillStyle = accent;
-  ctx.fillRect(0, H - 12, W, 12);
-  ctx.fillStyle = 'rgba(0,0,0,0.2)';
-  ctx.fillRect(0, 0, W, 36);
+  // Horizontal arm at top of rod
+  const arm = new THREE.Mesh(new THREE.BoxGeometry(armW, 0.07, 0.07), poleMat);
+  arm.position.set(armW / 2 - 0.4, poleH, 0);
+  group.add(arm);
 
-  // Station ID
-  ctx.fillStyle = idColor;
-  ctx.font = 'bold 90px Arial';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
-  ctx.fillText(stnId, 24, 44);
+  // ── Station ID board (left, landscape) ──────────────────────────────────────
+  const idCW = 512, idCH = 256;
+  const idCanvas = document.createElement('canvas');
+  idCanvas.width = idCW; idCanvas.height = idCH;
+  const ic = idCanvas.getContext('2d');
+  const idBg = ze ? '#c62828' : '#1a237e';
+  ic.fillStyle = idBg;
+  ic.beginPath(); ic.roundRect(0, 0, idCW, idCH, 18); ic.fill();
+  ic.strokeStyle = 'rgba(255,255,255,0.45)'; ic.lineWidth = 5;
+  ic.beginPath(); ic.roundRect(7, 7, idCW - 14, idCH - 14, 13); ic.stroke();
+  ic.fillStyle = '#ffffff';
+  ic.font = 'bold 130px Arial';
+  ic.textAlign = 'center'; ic.textBaseline = 'middle';
+  ic.fillText(stnId, idCW / 2, idCH / 2);
 
-  // Station name
+  const idBoardW = 1.5, idBoardH = idBoardW * (idCH / idCW);
+  const idMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(idBoardW, idBoardH),
+    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(idCanvas), transparent: true, side: THREE.DoubleSide })
+  );
+  idMesh.position.set(-0.55, poleH - 0.05 - idBoardH / 2, 0);
+  group.add(idMesh);
+
+  // ── Z/E badge board (beside ID) ─────────────────────────────────────────────
+  if (ze) {
+    const zeCW = 200, zeCH = 256;
+    const zeCanvas = document.createElement('canvas');
+    zeCanvas.width = zeCW; zeCanvas.height = zeCH;
+    const zc = zeCanvas.getContext('2d');
+    const theme = ZE_SIGN_COLOR[zeStatus] || { bg: '#37474f', text: '#ffffff' };
+    zc.fillStyle = theme.bg;
+    zc.beginPath(); zc.roundRect(0, 0, zeCW, zeCH, 18); zc.fill();
+    zc.strokeStyle = 'rgba(255,255,255,0.45)'; zc.lineWidth = 5;
+    zc.beginPath(); zc.roundRect(7, 7, zeCW - 14, zeCH - 14, 13); zc.stroke();
+    zc.fillStyle = theme.text;
+    zc.font = 'bold 150px Arial';
+    zc.textAlign = 'center'; zc.textBaseline = 'middle';
+    zc.fillText(ze, zeCW / 2, zeCH / 2);
+
+    const zeBoardW = idBoardH * (zeCW / zeCH);   // same height as ID board
+    const zeBoardH = idBoardH;
+    const zeMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(zeBoardW, zeBoardH),
+      new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(zeCanvas), transparent: true, side: THREE.DoubleSide })
+    );
+    zeMesh.position.set(-0.55 + idBoardW / 2 + 0.06 + zeBoardW / 2, poleH - 0.05 - zeBoardH / 2, 0);
+    group.add(zeMesh);
+  }
+
+  // ── Station name — vertical portrait board (rightmost) ──────────────────────
   if (stnName) {
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 48px Arial';
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'top';
-    ctx.fillText(stnName, W - 24, 52);
+    const nmCW = 180, nmCH = 640;
+    const nmCanvas = document.createElement('canvas');
+    nmCanvas.width = nmCW; nmCanvas.height = nmCH;
+    const nc = nmCanvas.getContext('2d');
+    nc.fillStyle = '#263238';
+    nc.beginPath(); nc.roundRect(0, 0, nmCW, nmCH, 14); nc.fill();
+    nc.strokeStyle = 'rgba(255,255,255,0.3)'; nc.lineWidth = 4;
+    nc.beginPath(); nc.roundRect(6, 6, nmCW - 12, nmCH - 12, 10); nc.stroke();
+    // Vertical text — rotate canvas context
+    nc.save();
+    nc.translate(nmCW / 2, nmCH / 2);
+    nc.rotate(-Math.PI / 2);
+    nc.fillStyle = '#ffffff';
+    nc.font = 'bold 58px Arial';
+    nc.textAlign = 'center'; nc.textBaseline = 'middle';
+    let nm = stnName;
+    while (nc.measureText(nm).width > nmCH - 40 && nm.length > 0) nm = nm.slice(0, -1);
+    if (nm !== stnName) nm += '…';
+    nc.fillText(nm, 0, 0);
+    nc.restore();
+
+    const nmBoardW = 0.42, nmBoardH = nmBoardW * (nmCH / nmCW);
+    const nmMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(nmBoardW, nmBoardH),
+      new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(nmCanvas), transparent: true, side: THREE.DoubleSide })
+    );
+    // Position to right of Z/E (or ID if no Z/E), top-aligned with ID board
+    const rightEdge = ze
+      ? (-0.55 + idBoardW / 2 + 0.06 + idBoardH * (200 / 256) + 0.10)
+      : (-0.55 + idBoardW / 2 + 0.10);
+    nmMesh.position.set(rightEdge + nmBoardW / 2, poleH - 0.05 - nmBoardH / 2, 0);
+    group.add(nmMesh);
   }
 
-  // Description / status label
-  const bottomText = boxDesc || 'Z-STAGE STATION';
-  ctx.fillStyle = accent;
-  ctx.font = boxDesc ? '34px Arial' : '30px Arial';
-  ctx.textAlign = boxDesc ? 'left' : 'center';
-  ctx.textBaseline = 'bottom';
-  let desc = bottomText;
-  if (boxDesc) {
-    while (ctx.measureText(desc).width > W - 48 && desc.length > 0) desc = desc.slice(0, -1);
-    if (desc !== bottomText) desc += '…';
-    ctx.fillText(desc, 24, H - 18);
-  } else {
-    ctx.fillText(desc, W / 2, H - 18);
-  }
-
-  return { canvas, W, H };
-}
-
-function drawZeSignCanvas(ze, zeStatus) {
-  const W = 256, H = 96;
-  const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
-  const theme = ZE_SIGN_COLOR[zeStatus] || { bg: '#37474f', text: '#ffffff' };
-
-  ctx.fillStyle = theme.bg;
-  ctx.beginPath(); ctx.roundRect(0, 0, W, H, 10); ctx.fill();
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-  ctx.lineWidth = 3;
-  ctx.beginPath(); ctx.roundRect(4, 4, W - 8, H - 8, 7); ctx.stroke();
-
-  ctx.fillStyle = theme.text;
-  ctx.font = 'bold 64px Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(ze, W / 2, H / 2);
-
-  return { canvas, W, H };
-}
-
-function makeNameplateMesh(stnId, stnName, boxDesc, cellWidth, side = THREE.FrontSide, ze = null, zeStatus = null) {
-  const { canvas, W, H } = drawNameplateCanvas(stnId, stnName, boxDesc, ze, zeStatus);
-
-  let finalCanvas = canvas;
-  if (side === THREE.BackSide) {
-    // BackSide rendering mirrors the texture, so pre-mirror to cancel it out
-    const flipped  = document.createElement('canvas');
-    flipped.width  = W; flipped.height = H;
-    const ctx2     = flipped.getContext('2d');
-    ctx2.translate(W, 0);
-    ctx2.scale(-1, 1);
-    ctx2.drawImage(canvas, 0, 0);
-    finalCanvas = flipped;
-  }
-
-  const tex    = new THREE.CanvasTexture(finalCanvas);
-  const plateW = cellWidth * 0.90;
-  const geo    = new THREE.PlaneGeometry(plateW, plateW * (H / W));
-  const mat    = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side });
-  return new THREE.Mesh(geo, mat);
-}
-
-function makeZeSignMesh(ze, zeStatus, side = THREE.FrontSide) {
-  const { canvas, W, H } = drawZeSignCanvas(ze, zeStatus);
-
-  let finalCanvas = canvas;
-  if (side === THREE.BackSide) {
-    const flipped = document.createElement('canvas');
-    flipped.width = W; flipped.height = H;
-    const ctx2 = flipped.getContext('2d');
-    ctx2.translate(W, 0); ctx2.scale(-1, 1);
-    ctx2.drawImage(canvas, 0, 0);
-    finalCanvas = flipped;
-  }
-
-  const tex = new THREE.CanvasTexture(finalCanvas);
-  // Sign board: 1.5m wide × proportional height
-  const sw = 1.5, sh = sw * (H / W);
-  const geo = new THREE.PlaneGeometry(sw, sh);
-  const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, side });
-  return new THREE.Mesh(geo, mat);
+  return group;
 }
 
 // ── Station shell ──────────────────────────────────────────────────────────────
@@ -343,32 +329,10 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     // Z/E data from input records (via zeMap)
     const { ze = null, zeStatus = null } = zeMap[stnId] || {};
 
-    // Nameplate attached to front beam (faces outward toward front-view camera)
-    const plateFront = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, THREE.FrontSide, ze, zeStatus);
-    plateFront.position.set(cellCX, HEIGHT - 0.55, originZ + DEPTH + 0.02);
-    group.add(plateFront);
-
-    // Nameplate attached to back beam (faces outward toward back-view camera)
-    const plateBack = makeNameplateMesh(stnId, stnName, boxDesc, CELL_W, THREE.BackSide, ze, zeStatus);
-    plateBack.position.set(cellCX, HEIGHT - 0.55, originZ - 0.02);
-    group.add(plateBack);
-
-    // Z/E sign boards just below the nameplate on each beam
-    if (ze) {
-      const plateH       = CELL_W * 0.90 * (240 / 1024);
-      const signW        = 1.5, signH = signW * (96 / 256);
-      const plateBottomY = (HEIGHT - 0.55) - plateH / 2;
-      const signY        = plateBottomY - 0.06 - signH / 2;
-
-      const signFront = makeZeSignMesh(ze, zeStatus, THREE.FrontSide);
-      signFront.position.set(cellCX, signY, originZ + DEPTH + 0.02);
-      group.add(signFront);
-
-      const signBack = makeZeSignMesh(ze, zeStatus, THREE.BackSide);
-      signBack.position.set(cellCX, signY, originZ - 0.02);
-      group.add(signBack);
-    }
-    group.add(plateBack);
+    // Overhead pole sign rising from center of each station cell
+    const sign = makeOverheadSign(stnId, stnName, ze, zeStatus);
+    sign.position.set(cellCX, HEIGHT, originZ + DEPTH / 2);
+    group.add(sign);
   }
 
   // ── Single floating box name above the whole structure ──
