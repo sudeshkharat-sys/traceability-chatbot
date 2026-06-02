@@ -198,7 +198,7 @@ function makeCantileverSign(stnId, ze, zeStatus) {
 
   const idBoardW = 1.4, idBoardH = idBoardW * (idCH / idCW);
   const zeBoardW = idBoardW * 0.5;
-  const idCentreZ = ze ? (0.55 + zeBoardW + 0.06 + idBoardW / 2) : (rodLen / 2);
+  const idCentreZ = ze ? (0.55 + idBoardW / 2) : (rodLen / 2);
   const idBoard = makeDoubleSidedBoard(idCanvas, idBoardW, idBoardH);
   idBoard.rotation.y = Math.PI / 2;
   idBoard.position.set(0, -dropH - idBoardH / 2, idCentreZ);
@@ -223,7 +223,7 @@ function makeCantileverSign(stnId, ze, zeStatus) {
     const zeBoardH = zeBoardW;
     const zeBoard = makeDoubleSidedBoard(zeCanvas, zeBoardW, zeBoardH);
     zeBoard.rotation.y = Math.PI / 2;
-    zeBoard.position.set(0, -dropH - idBoardH / 2, 0.55 + zeBoardW / 2);
+    zeBoard.position.set(0, -dropH - idBoardH / 2, 0.55 + idBoardW + 0.06 + zeBoardW / 2);
     group.add(zeBoard);
   }
 
