@@ -7,6 +7,7 @@ import { VRMLLoader } from 'three/examples/jsm/loaders/VRMLLoader';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
 import { layoutApi, inputApi } from '../../../services/api/layoutApi';
+import { backend_url } from '../../../services/api/config';
 import './ZStage3DLayout.css';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -549,7 +550,6 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     if (needsConversion) {
       const form = new FormData();
       form.append('file', file);
-      const { backend_url } = require('../../../services/api/config');
       fetch(`${backend_url}/z-stage/convert-model/`, { method: 'POST', body: form })
         .then(res => {
           if (!res.ok) return res.json().then(e => { throw new Error(e.detail || 'Conversion failed'); });
