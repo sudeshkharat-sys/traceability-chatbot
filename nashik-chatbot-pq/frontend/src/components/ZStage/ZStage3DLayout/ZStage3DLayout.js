@@ -396,7 +396,7 @@ class WalkController {
 }
 
 // ── Three.js scene hook ────────────────────────────────────────────────────────
-function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange) {
+function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd) {
   const sceneRef       = useRef(null);
   const rendererRef    = useRef(null);
   const cameraRef      = useRef(null);
@@ -548,6 +548,13 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     // WRL and STP need server-side conversion to GLB first
     const needsConversion = ext === 'wrl' || ext === 'stp' || ext === 'step';
     if (needsConversion) {
+      onConvertStart && onConvertStart();
+      // Simulate progress while waiting for server (real progress not available via fetch)
+      let pct = 0;
+      const ticker = setInterval(() => {
+        pct = Math.min(pct + (pct < 60 ? 3 : pct < 85 ? 1 : 0.3), 92);
+        onConvertStart && onConvertStart(pct);
+      }, 400);
       const form = new FormData();
       form.append('file', file);
       fetch(`${backend_url}/z-stage/convert-model/`, { method: 'POST', body: form })
@@ -556,10 +563,16 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
           return res.blob();
         })
         .then(blob => {
+          clearInterval(ticker);
+          onConvertEnd && onConvertEnd(true);
           const glbFile = new File([blob], name + '.glb', { type: 'model/gltf-binary' });
           placeObject(glbFile, name, layoutId);
         })
-        .catch(err => alert(`Conversion failed: ${err.message}`));
+        .catch(err => {
+          clearInterval(ticker);
+          onConvertEnd && onConvertEnd(false);
+          alert(`Conversion failed: ${err.message}`);
+        });
       return;
     }
 
@@ -760,6 +773,8 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [transformMode, setTransformModeState] = useState('translate');
   const [renameVal,     setRenameVal]     = useState('');
   const [showObjPanel,  setShowObjPanel]  = useState(false);
+  const [converting,    setConverting]    = useState(false);
+  const [convertProgress, setConvertProgress] = useState(0);
 
   useEffect(() => {
     if (activeLayoutId && !selectedLayoutId) setSelectedLayoutId(activeLayoutId);
@@ -793,8 +808,17 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setPlacedObjects(objs);
   }, []);
 
+  const onConvertStart = useCallback((pct) => {
+    setConverting(true);
+    if (pct !== undefined) setConvertProgress(Math.round(pct));
+  }, []);
+  const onConvertEnd = useCallback(() => {
+    setConvertProgress(100);
+    setTimeout(() => { setConverting(false); setConvertProgress(0); }, 800);
+  }, []);
+
   const { snapView, setTransformMode, placeObject, handleCanvasClick, selectById, deleteById, renameById } =
-    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange);
+    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd);
 
   const handleLayoutChange = useCallback((e) => {
     setSelectedLayoutId(Number(e.target.value) || null);
@@ -947,6 +971,18 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
           ) : (
             <>
               <canvas ref={canvasRef} className="z3d-canvas" onClick={handleCanvasClick} />
+              {converting && (
+                <div className="z3d-convert-overlay">
+                  <div className="z3d-convert-box">
+                    <div className="z3d-convert-title">Converting file…</div>
+                    <div className="z3d-convert-sub">Server is simplifying the model for browser rendering</div>
+                    <div className="z3d-convert-bar-track">
+                      <div className="z3d-convert-bar-fill" style={{ width: `${convertProgress}%` }} />
+                    </div>
+                    <div className="z3d-convert-pct">{convertProgress}%</div>
+                  </div>
+                </div>
+              )}
               <div className="z3d-walk-hint">
                 {walkMode
                   ? 'WASD / Arrow keys to move · Mouse to look · Click canvas to capture mouse'
