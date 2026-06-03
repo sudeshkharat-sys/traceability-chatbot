@@ -2,6 +2,7 @@ import io
 import logging
 import tempfile
 import os
+import trimesh
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import Response
 
@@ -16,11 +17,6 @@ async def convert_model(file: UploadFile = File(...)):
     Accept WRL / OBJ / STL / GLB and return a simplified GLB.
     Runs server-side mesh decimation so large CAD files become browser-renderable.
     """
-    try:
-        import trimesh
-    except ImportError:
-        raise HTTPException(status_code=500, detail="trimesh not installed on server")
-
     ext = os.path.splitext(file.filename or '')[1].lower()
     if ext not in SUPPORTED:
         raise HTTPException(status_code=400, detail=f"Unsupported format: {ext}. Supported: {', '.join(SUPPORTED)}")
