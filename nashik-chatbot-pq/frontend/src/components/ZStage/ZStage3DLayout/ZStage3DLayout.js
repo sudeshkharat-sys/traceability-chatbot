@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import { VRMLLoader } from 'three/examples/jsm/loaders/VRMLLoader';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
 import { layoutApi, inputApi } from '../../../services/api/layoutApi';
@@ -596,6 +597,8 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       new GLTFLoader().load(url, (gltf) => onLoaded(gltf.scene));
     } else if (ext === 'obj') {
       new OBJLoader().load(url, onLoaded);
+    } else if (ext === 'wrl') {
+      new VRMLLoader().load(url, onLoaded);
     } else if (ext === 'stl') {
       new STLLoader().load(url, (geometry) => {
         geometry.computeVertexNormals();
@@ -836,7 +839,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             <button className="z3d-upload-btn" onClick={() => fileInputRef.current?.click()} title="Upload GLB, OBJ or STL file">
               ⬆ Upload Object
             </button>
-            <input ref={fileInputRef} type="file" accept=".glb,.gltf,.obj,.stl" style={{ display: 'none' }} onChange={handleFileUpload} />
+            <input ref={fileInputRef} type="file" accept=".glb,.gltf,.obj,.stl,.wrl" style={{ display: 'none' }} onChange={handleFileUpload} />
 
             {/* Object list toggle */}
             <button className={`z3d-walk-btn${showObjPanel ? ' z3d-walk-btn--active' : ''}`} onClick={() => setShowObjPanel(v => !v)}>
