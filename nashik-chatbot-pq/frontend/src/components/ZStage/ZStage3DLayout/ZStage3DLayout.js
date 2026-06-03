@@ -543,6 +543,26 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     const scene = sceneRef.current;
     if (!scene) return;
     const ext = file.name.split('.').pop().toLowerCase();
+
+    // WRL and STP need server-side conversion to GLB first
+    const needsConversion = ext === 'wrl' || ext === 'stp' || ext === 'step';
+    if (needsConversion) {
+      const form = new FormData();
+      form.append('file', file);
+      const { backend_url } = require('../../../services/api/config');
+      fetch(`${backend_url}/z-stage/convert-model/`, { method: 'POST', body: form })
+        .then(res => {
+          if (!res.ok) return res.json().then(e => { throw new Error(e.detail || 'Conversion failed'); });
+          return res.blob();
+        })
+        .then(blob => {
+          const glbFile = new File([blob], name + '.glb', { type: 'model/gltf-binary' });
+          placeObject(glbFile, name, layoutId);
+        })
+        .catch(err => alert(`Conversion failed: ${err.message}`));
+      return;
+    }
+
     const url  = URL.createObjectURL(file);
 
     const onLoaded = (obj) => {
@@ -839,7 +859,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             <button className="z3d-upload-btn" onClick={() => fileInputRef.current?.click()} title="Upload GLB, OBJ or STL file">
               ⬆ Upload Object
             </button>
-            <input ref={fileInputRef} type="file" accept=".glb,.gltf,.obj,.stl,.wrl" style={{ display: 'none' }} onChange={handleFileUpload} />
+            <input ref={fileInputRef} type="file" accept=".glb,.gltf,.obj,.stl,.wrl,.stp,.step" style={{ display: 'none' }} onChange={handleFileUpload} />
 
             {/* Object list toggle */}
             <button className={`z3d-walk-btn${showObjPanel ? ' z3d-walk-btn--active' : ''}`} onClick={() => setShowObjPanel(v => !v)}>

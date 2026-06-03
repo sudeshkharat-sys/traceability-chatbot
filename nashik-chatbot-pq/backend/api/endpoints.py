@@ -16,6 +16,7 @@ from backend.api.routes.z_satge.station_boxes import router as station_box_route
 from backend.api.routes.z_satge.input_records import router as input_record_router
 from backend.api.routes.z_satge.layered_audit import router as layered_audit_router
 from backend.api.routes.z_satge.docs import router as docs_router
+from backend.api.routes.z_satge.convert_model import router as convert_model_router
 
 # Create main router
 router = APIRouter()
@@ -44,3 +45,4 @@ router.include_router(connection_router, prefix="/z-stage", tags=["z_stage_conne
 router.include_router(input_record_router, prefix="/z-stage", tags=["z_stage_input_records"])
 router.include_router(layered_audit_router, prefix="/z-stage", tags=["z_stage_layered_audit"])
 router.include_router(docs_router, prefix="/z-stage", tags=["z_stage_docs"])
+router.include_router(convert_model_router, prefix="/z-stage", tags=["z_stage_convert_model"])

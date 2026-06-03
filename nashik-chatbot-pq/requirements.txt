@@ -41,6 +41,9 @@ httpx
 black
 flake8
 
+# 3D Model Processing
+trimesh[easy]
+
 # Document Processing (Docling & OCR)
 docling>=2.0.0
 docling-core
