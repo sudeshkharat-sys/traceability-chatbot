@@ -288,8 +288,7 @@
 /* ── Data grid ───────────────────────────────────────────────────────────── */
 .dash-grid {
   border-collapse: collapse;
-  width: 100%;
-  table-layout: fixed;
+  width: max-content;
 }
 
 /* Station ID header — minimum 40px; column grows if station name is wider */
@@ -303,8 +302,7 @@
   background-color: #45b480;
   border-right: 1px solid #1c4532;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
 }
 
 .dash-grid-th:last-child {

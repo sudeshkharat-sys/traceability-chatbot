@@ -1753,7 +1753,8 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                               position: 'absolute',
                               left: box.position.x,
                               top: box.position.y,
-                              width: w,
+                              width: 'max-content',
+                              minWidth: w,
                             }}
                           >
                             {/* Invisible Xarrow anchor points — mirror the layout editor dot positions */}
@@ -1776,7 +1777,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
 
                             {/* Data grid */}
                             <div className="dash-box-body">
-                              <table className="dash-grid" style={{ tableLayout: 'fixed', width: '100%' }}>
+                              <table className="dash-grid">
                                 <thead>
                                   <tr>
                                     {box.stationIds.map((sid) => {
@@ -1879,7 +1880,14 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
           ct + positionY + cy * scale,
         ];
 
-        const obstacles = buildObstacles(boxes, 0);
+        // Inject actual DOM widths so routeArrow uses the real rendered box width
+        const boxesWithDomW = boxes.map((b) => {
+          const el = document.getElementById(b.id);
+          const domW = el ? el.offsetWidth : null;
+          return domW ? { ...b, boxDomWidth: domW } : b;
+        });
+
+        const obstacles = buildObstacles(boxesWithDomW, 0);
 
         const strokeW = Math.max(0.5, Math.min(3, 2 * scale));
         // Arrowhead: minimum 10×8px so it's always readable; scales up when zoomed in
@@ -1887,8 +1895,8 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
         const mh = Math.max(8,   8 * scale);
 
         const arrows = connections.map((conn) => {
-          const sp  = getPortCanvasPos(conn.fromId, boxes, buyoffIcons);
-          const ep  = getPortCanvasPos(conn.toId,   boxes, buyoffIcons);
+          const sp  = getPortCanvasPos(conn.fromId, boxesWithDomW, buyoffIcons);
+          const ep  = getPortCanvasPos(conn.toId,   boxesWithDomW, buyoffIcons);
           const pts = routePath(sp, ep, obstacles);
           if (!pts || pts.length < 2) return null;
 
