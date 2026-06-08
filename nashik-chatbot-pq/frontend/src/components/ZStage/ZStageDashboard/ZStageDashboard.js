@@ -995,7 +995,9 @@ function parseLayout(apiLayout) {
       description,
       stationNames,
       stationIds: b.station_ids
-        ? (typeof b.station_ids === 'string' ? b.station_ids.split(',') : b.station_ids)
+        ? (typeof b.station_ids === 'string'
+            ? b.station_ids.split(',').map((s) => s.trim()).filter(Boolean)
+            : b.station_ids.map((s) => String(s).trim()).filter(Boolean))
         : [],
       position: { x: b.position_x, y: b.position_y },
     };
@@ -1872,7 +1874,9 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
           ct + positionY + cy * scale,
         ];
 
-        const obstacles = buildObstacles(boxes, 0);
+        // margin=1 adds one grid-cell (40px) padding around each box obstacle so
+        // paths clear the rendered box edges even when max-content width > computed w
+        const obstacles = buildObstacles(boxes, 1);
 
         const strokeW = Math.max(0.5, Math.min(3, 2 * scale));
         // Arrowhead: minimum 10×8px so it's always readable; scales up when zoomed in

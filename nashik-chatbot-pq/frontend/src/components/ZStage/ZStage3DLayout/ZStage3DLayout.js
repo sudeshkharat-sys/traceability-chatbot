@@ -348,8 +348,8 @@ function buildStationShell(box, statusMap, zeMap, scene) {
   [originX, originX + totalW].forEach((colX, side) => {
     const board = new THREE.Mesh(new THREE.PlaneGeometry(boardW3d, boardH3d), bMat);
     board.rotation.y = side === 0 ? -Math.PI / 2 : Math.PI / 2;
-    // top of board touches the beam at HEIGHT; hangs down by boardH3d
-    board.position.set(colX, HEIGHT - boardH3d / 2, originZ + DEPTH / 2);
+    // hang 0.35 units below the beam so there's a visible gap
+    board.position.set(colX, HEIGHT - boardH3d / 2 - 0.35, originZ + DEPTH / 2);
     group.add(board);
   });
 
@@ -407,9 +407,24 @@ function buildWalkingPath(fromBox, toBox, scene) {
     const gapBot = Math.max(fz0, tz0);
     addSegment(fCX, (gapTop + gapBot) / 2, gapBot - gapTop, false);
   } else {
-    // L-shaped: horizontal leg then vertical leg through the corner (tCX, fCZ)
-    addSegment((fCX + tCX) / 2, fCZ, Math.abs(tCX - fCX), true);
-    addSegment(tCX, (fCZ + tCZ) / 2, Math.abs(tCZ - fCZ), false);
+    // L-shaped: route through the AISLE between the two box rows so the visible
+    // path stays in open space (portions inside box footprints are hidden under floors)
+    const aisleNear = Math.min(fz1, tz1); // nearer Z-edge facing the aisle
+    const aisleFar  = Math.max(fz0, tz0); // farther Z-edge facing the aisle
+    if (aisleFar > aisleNear) {
+      // Clear aisle exists — horizontal crossing at aisle midpoint
+      const aisleMid = (aisleNear + aisleFar) / 2;
+      addSegment((fCX + tCX) / 2, aisleMid, Math.abs(tCX - fCX), true);
+      // Short vertical connectors from each box centre to the aisle
+      if (Math.abs(fCZ - aisleMid) > 0.15)
+        addSegment(fCX, (fCZ + aisleMid) / 2, Math.abs(aisleMid - fCZ), false);
+      if (Math.abs(tCZ - aisleMid) > 0.15)
+        addSegment(tCX, (tCZ + aisleMid) / 2, Math.abs(aisleMid - tCZ), false);
+    } else {
+      // Boxes overlap in Z — fall back to simple L through centres
+      addSegment((fCX + tCX) / 2, fCZ, Math.abs(tCX - fCX), true);
+      addSegment(tCX, (fCZ + tCZ) / 2, Math.abs(tCZ - fCZ), false);
+    }
   }
 }
 
