@@ -27,7 +27,7 @@ const DIR_DELTA = {
 
 // ─── Port position helpers ────────────────────────────────────────────────────
 
-export function getPortCanvasPos(portId, boxes, buyoffIcons, colWidth = GRID) {
+export function getPortCanvasPos(portId, boxes, buyoffIcons, colWidth = GRID, boxHeight = BOX_HEIGHT) {
   if (!portId) return null;
 
   // No separator → legacy bare buyoff id (dir='auto' is handled in routePath)
@@ -46,14 +46,15 @@ export function getPortCanvasPos(portId, boxes, buyoffIcons, colWidth = GRID) {
   if (box) {
     const cols     = box.stationIds?.length ?? 2;
     const w        = Math.max(2, cols) * colWidth + 4;
-    const h        = BOX_HEIGHT;
+    const h        = box.boxHeight ?? boxHeight;
     const { x: bx, y: by } = box.position;
     // Port centre per column: half column width + 2px border offset
     const portInset = colWidth / 2 + 2;
+    // Left/right port Y: snap to nearest GRID multiple of half-height
+    const portY     = Math.round(h / 2 / GRID) * GRID;
 
-    // 3*GRID (120 px) keeps port-y on a GRID multiple → aligns with snapBypass
-    if (suffix === 'left')  return { x: bx,     y: by + 3 * GRID, dir: 'left'  };
-    if (suffix === 'right') return { x: bx + w, y: by + 3 * GRID, dir: 'right' };
+    if (suffix === 'left')  return { x: bx,     y: by + portY, dir: 'left'  };
+    if (suffix === 'right') return { x: bx + w, y: by + portY, dir: 'right' };
 
     // Station dot centre: border(2) + col_center + idx * colWidth
     if (suffix.endsWith('__b')) {
@@ -82,12 +83,12 @@ export function getPortCanvasPos(portId, boxes, buyoffIcons, colWidth = GRID) {
 
 // ─── Obstacle builder ─────────────────────────────────────────────────────────
 
-export function buildObstacles(boxes, marginCells = 0, colWidth = GRID) {
+export function buildObstacles(boxes, marginCells = 0, colWidth = GRID, boxHeight = BOX_HEIGHT) {
   const occ = new Set();
   for (const box of boxes) {
     const cols = box.stationIds?.length ?? 2;
     const w    = Math.max(2, cols) * colWidth + 4;
-    const h    = BOX_HEIGHT;
+    const h    = box.boxHeight ?? boxHeight;
     const x1   = Math.floor(box.position.x / GRID)          - marginCells;
     const y1   = Math.floor(box.position.y / GRID)          - marginCells;
     const x2   = Math.ceil((box.position.x + w) / GRID) - 1 + marginCells;

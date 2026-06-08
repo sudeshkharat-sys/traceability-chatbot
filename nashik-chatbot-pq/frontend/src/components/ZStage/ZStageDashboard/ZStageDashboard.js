@@ -989,16 +989,22 @@ function parseLayout(apiLayout) {
         stationNames = Array.isArray(sd.__station_names__) ? sd.__station_names__ : [];
       } catch {}
     }
+    const stationIds = b.station_ids
+      ? (typeof b.station_ids === 'string'
+          ? b.station_ids.split(',').map((s) => s.trim()).filter(Boolean)
+          : b.station_ids.map((s) => String(s).trim()).filter(Boolean))
+      : [];
+    // Dashboard boxes render taller than LP (description + station-names row +
+    // data rows). Use 8×GRID as a safe upper-bound so buildObstacles covers the
+    // full rendered height and arrows don't route through the bottom of boxes.
+    const DASH_BOX_H = 8 * GRID;
     return {
       id: `db-box-${b.id}`,
       name: b.name,
       description,
       stationNames,
-      stationIds: b.station_ids
-        ? (typeof b.station_ids === 'string'
-            ? b.station_ids.split(',').map((s) => s.trim()).filter(Boolean)
-            : b.station_ids.map((s) => String(s).trim()).filter(Boolean))
-        : [],
+      stationIds,
+      boxHeight: DASH_BOX_H,
       position: { x: b.position_x, y: b.position_y },
     };
   });
@@ -1874,9 +1880,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
           ct + positionY + cy * scale,
         ];
 
-        // margin=1 adds one grid-cell (40px) padding around each box obstacle so
-        // paths clear the rendered box edges even when max-content width > computed w
-        const obstacles = buildObstacles(boxes, 1);
+        const obstacles = buildObstacles(boxes, 0);
 
         const strokeW = Math.max(0.5, Math.min(3, 2 * scale));
         // Arrowhead: minimum 10×8px so it's always readable; scales up when zoomed in
