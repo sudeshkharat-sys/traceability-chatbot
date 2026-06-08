@@ -327,22 +327,24 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     group.add(sign);
   }
 
-  // ── Box name boards at start and end columns, mid-height, facing aisle ──
+  // ── Box name boards on outer face of end columns, mid-height ──
+  // Wider than station ID (1.4) since this is the primary box label
   const boxLabel = box.name || 'Box';
   [originX, originX + totalW].forEach((colX, side) => {
-    const bW = 256, bH = 80;
+    const bW = 512, bH = 128;
     const bCanvas = document.createElement('canvas');
     bCanvas.width = bW; bCanvas.height = bH;
     const bc = bCanvas.getContext('2d');
     bc.fillStyle = '#78909c';
-    bc.beginPath(); bc.roundRect(0, 0, bW, bH, 10); bc.fill();
-    bc.strokeStyle = '#cfd8dc'; bc.lineWidth = 3;
-    bc.beginPath(); bc.roundRect(4, 4, bW - 8, bH - 8, 7); bc.stroke();
-    bc.fillStyle = '#1a237e'; bc.font = 'bold 34px Arial';
+    bc.beginPath(); bc.roundRect(0, 0, bW, bH, 14); bc.fill();
+    bc.strokeStyle = '#cfd8dc'; bc.lineWidth = 5;
+    bc.beginPath(); bc.roundRect(6, 6, bW - 12, bH - 12, 10); bc.stroke();
+    bc.fillStyle = '#1a237e'; bc.font = 'bold 64px Arial';
     bc.textAlign = 'center'; bc.textBaseline = 'middle';
     bc.fillText(boxLabel, bW / 2, bH / 2);
     const bTex = new THREE.CanvasTexture(bCanvas);
-    const bGeo = new THREE.PlaneGeometry(2.0, 0.625);
+    // Board is 3.5 wide × 0.875 tall (4× station ID width of 1.4)
+    const bGeo = new THREE.PlaneGeometry(3.5, 3.5 * (bH / bW));
     const bMat = new THREE.MeshBasicMaterial({ map: bTex, transparent: true, side: THREE.DoubleSide });
     const board = new THREE.Mesh(bGeo, bMat);
     board.rotation.y = side === 0 ? -Math.PI / 2 : Math.PI / 2;
@@ -452,18 +454,31 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
 
     const boxes = layout.station_boxes || [];
 
-    // Prevent boxes from overlapping: compute non-overlapping 3D positions
-    const layoutBoxes = (() => {
-      if (boxes.length <= 1) return boxes.map(b => ({ ...b, _x3d: (b.position_x || 0) * SCALE, _z3d: (b.position_y || 0) * SCALE }));
-      const sorted = [...boxes].sort((a, b) => (a.position_x || 0) - (b.position_x || 0));
-      let curX = (sorted[0].position_x || 0) * SCALE;
-      return sorted.map(b => {
-        const naturalX = (b.position_x || 0) * SCALE;
-        const x3d = Math.max(naturalX, curX);
-        curX = x3d + (b.station_count || 1) * CELL_W + 1.5;
-        return { ...b, _x3d: x3d, _z3d: (b.position_y || 0) * SCALE };
-      });
+    // Compute a single uniform scale that prevents overlap in both X and Z
+    const effectiveScale = (() => {
+      if (boxes.length <= 1) return SCALE;
+      let s = SCALE;
+      const GAP = 1.5;
+      // X-axis: boxes side by side
+      const byX = [...boxes].sort((a, b) => (a.position_x || 0) - (b.position_x || 0));
+      for (let i = 0; i < byX.length - 1; i++) {
+        const dx = (byX[i + 1].position_x || 0) - (byX[i].position_x || 0);
+        if (dx > 0) s = Math.max(s, ((byX[i].station_count || 1) * CELL_W + GAP) / dx);
+      }
+      // Z-axis: boxes above/below each other in 2D
+      const byY = [...boxes].sort((a, b) => (a.position_y || 0) - (b.position_y || 0));
+      for (let i = 0; i < byY.length - 1; i++) {
+        const dy = (byY[i + 1].position_y || 0) - (byY[i].position_y || 0);
+        if (dy > 0) s = Math.max(s, (DEPTH + GAP) / dy);
+      }
+      return s;
     })();
+
+    const layoutBoxes = boxes.map(b => ({
+      ...b,
+      _x3d: (b.position_x || 0) * effectiveScale,
+      _z3d: (b.position_y || 0) * effectiveScale,
+    }));
 
     layoutBoxes.forEach(box => buildStationShell(box, statusMap, zeMap, scene));
     (layout.connections || []).forEach(conn => {
