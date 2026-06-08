@@ -327,28 +327,29 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     group.add(sign);
   }
 
-  // ── Box name boards on outer face of end columns, mid-height ──
-  // Wider than station ID (1.4) since this is the primary box label
+  // ── Box name boards — mounted on front and back top beams, centred on box width ──
+  // Hangs below the beam (top of board flush with HEIGHT), white bg + navy text
   const boxLabel = box.name || 'Box';
-  [originX, originX + totalW].forEach((colX, side) => {
-    const bW = 512, bH = 128;
-    const bCanvas = document.createElement('canvas');
-    bCanvas.width = bW; bCanvas.height = bH;
-    const bc = bCanvas.getContext('2d');
-    bc.fillStyle = '#78909c';
-    bc.beginPath(); bc.roundRect(0, 0, bW, bH, 14); bc.fill();
-    bc.strokeStyle = '#cfd8dc'; bc.lineWidth = 5;
-    bc.beginPath(); bc.roundRect(6, 6, bW - 12, bH - 12, 10); bc.stroke();
-    bc.fillStyle = '#1a237e'; bc.font = 'bold 64px Arial';
-    bc.textAlign = 'center'; bc.textBaseline = 'middle';
-    bc.fillText(boxLabel, bW / 2, bH / 2);
-    const bTex = new THREE.CanvasTexture(bCanvas);
-    // Board is 3.5 wide × 0.875 tall (4× station ID width of 1.4)
-    const bGeo = new THREE.PlaneGeometry(3.5, 3.5 * (bH / bW));
-    const bMat = new THREE.MeshBasicMaterial({ map: bTex, transparent: true, side: THREE.DoubleSide });
-    const board = new THREE.Mesh(bGeo, bMat);
-    board.rotation.y = side === 0 ? -Math.PI / 2 : Math.PI / 2;
-    board.position.set(colX, HEIGHT / 2, originZ + DEPTH / 2);
+  const bW = 512, bH = 128;
+  const bCanvas = document.createElement('canvas');
+  bCanvas.width = bW; bCanvas.height = bH;
+  const bc = bCanvas.getContext('2d');
+  bc.fillStyle = '#ffffff';
+  bc.beginPath(); bc.roundRect(0, 0, bW, bH, 14); bc.fill();
+  bc.strokeStyle = '#1a237e'; bc.lineWidth = 6;
+  bc.beginPath(); bc.roundRect(5, 5, bW - 10, bH - 10, 10); bc.stroke();
+  bc.fillStyle = '#1a237e'; bc.font = 'bold 68px Arial';
+  bc.textAlign = 'center'; bc.textBaseline = 'middle';
+  bc.fillText(boxLabel, bW / 2, bH / 2);
+  const bTex = new THREE.CanvasTexture(bCanvas);
+  const boardW3d = 3.5;
+  const boardH3d = boardW3d * (bH / bW);
+  const bMat = new THREE.MeshBasicMaterial({ map: bTex, transparent: true, side: THREE.DoubleSide });
+  const cx = originX + totalW / 2;
+  // Front beam (z = originZ + DEPTH) and back beam (z = originZ) — both faces visible
+  [originZ + DEPTH, originZ].forEach(bz => {
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(boardW3d, boardH3d), bMat);
+    board.position.set(cx, HEIGHT - boardH3d / 2, bz);
     group.add(board);
   });
 
@@ -356,30 +357,60 @@ function buildStationShell(box, statusMap, zeMap, scene) {
 }
 
 function buildWalkingPath(fromBox, toBox, scene) {
-  const fW      = (fromBox.station_count || 1) * CELL_W;
-  const fEndX   = (fromBox._x3d ?? (fromBox.position_x || 0) * SCALE) + fW;
-  const tStartX = toBox._x3d ?? (toBox.position_x || 0) * SCALE;
-  const pathLen = tStartX - fEndX;
-  if (pathLen <= 0.1) return;
-  const pathCX = fEndX + pathLen / 2;
-  const pathCZ = (fromBox._z3d ?? (fromBox.position_y || 0) * SCALE) + DEPTH / 2;
-  // Gray road surface
-  const floor  = new THREE.Mesh(
-    new THREE.PlaneGeometry(pathLen, PATH_W),
-    new THREE.MeshLambertMaterial({ color: 0x8d8d8d, side: THREE.DoubleSide })
-  );
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.set(pathCX, 0.015, pathCZ);
-  scene.add(floor);
-  // White border lines along edges
-  const borderMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
-  const BT = 0.12;
-  [-1, 1].forEach(sign => {
-    const border = new THREE.Mesh(new THREE.PlaneGeometry(pathLen, BT), borderMat);
-    border.rotation.x = -Math.PI / 2;
-    border.position.set(pathCX, 0.02, pathCZ + sign * (PATH_W / 2 - BT / 2));
-    scene.add(border);
-  });
+  const fx0 = fromBox._x3d ?? (fromBox.position_x || 0) * SCALE;
+  const fx1 = fx0 + (fromBox.station_count || 1) * CELL_W;
+  const fz0 = (fromBox._z3d ?? (fromBox.position_y || 0) * SCALE);
+  const fz1 = fz0 + DEPTH;
+  const fCX = (fx0 + fx1) / 2, fCZ = (fz0 + fz1) / 2;
+
+  const tx0 = toBox._x3d ?? (toBox.position_x || 0) * SCALE;
+  const tx1 = tx0 + (toBox.station_count || 1) * CELL_W;
+  const tz0 = (toBox._z3d ?? (toBox.position_y || 0) * SCALE);
+  const tz1 = tz0 + DEPTH;
+  const tCX = (tx0 + tx1) / 2, tCZ = (tz0 + tz1) / 2;
+
+  // Helper: draw one gray road segment (flat on floor) with white borders
+  const addSegment = (cx, cz, len, horizontal) => {
+    if (len <= 0.1) return;
+    const [pw, pd] = horizontal ? [len, PATH_W] : [PATH_W, len];
+    const road = new THREE.Mesh(
+      new THREE.PlaneGeometry(pw, pd),
+      new THREE.MeshLambertMaterial({ color: 0x8d8d8d, side: THREE.DoubleSide })
+    );
+    road.rotation.x = -Math.PI / 2;
+    road.position.set(cx, 0.015, cz);
+    scene.add(road);
+    const borderMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+    const BT = 0.12;
+    [-1, 1].forEach(s => {
+      const bw = horizontal ? len : BT, bd = horizontal ? BT : len;
+      const bx = horizontal ? cx : cx + s * (PATH_W / 2 - BT / 2);
+      const bz = horizontal ? cz + s * (PATH_W / 2 - BT / 2) : cz;
+      const b = new THREE.Mesh(new THREE.PlaneGeometry(bw, bd), borderMat);
+      b.rotation.x = -Math.PI / 2;
+      b.position.set(bx, 0.02, bz);
+      scene.add(b);
+    });
+  };
+
+  const sameRow = Math.abs(fCZ - tCZ) < 1.0;
+  const sameCol = Math.abs(fCX - tCX) < 1.0;
+
+  if (sameRow) {
+    // Horizontal connection — find the gap between the two boxes in X
+    const gapLeft  = Math.min(fx1, tx1);
+    const gapRight = Math.max(fx0, tx0);
+    addSegment((gapLeft + gapRight) / 2, fCZ, gapRight - gapLeft, true);
+  } else if (sameCol) {
+    // Vertical connection — find the gap between the two boxes in Z
+    const gapTop = Math.min(fz1, tz1);
+    const gapBot = Math.max(fz0, tz0);
+    addSegment(fCX, (gapTop + gapBot) / 2, gapBot - gapTop, false);
+  } else {
+    // L-shaped: horizontal leg then vertical leg through the corner (tCX, fCZ)
+    addSegment((fCX + tCX) / 2, fCZ, Math.abs(tCX - fCX), true);
+    addSegment(tCX, (fCZ + tCZ) / 2, Math.abs(tCZ - fCZ), false);
+  }
 }
 
 // ── Walk mode controller ───────────────────────────────────────────────────────
@@ -454,30 +485,33 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
 
     const boxes = layout.station_boxes || [];
 
-    // Compute a single uniform scale that prevents overlap in both X and Z
-    const effectiveScale = (() => {
+    // Compute SEPARATE X and Z scales so each axis preserves its own 2D proportions
+    const GAP3D = 1.5;
+    const xScale = (() => {
       if (boxes.length <= 1) return SCALE;
       let s = SCALE;
-      const GAP = 1.5;
-      // X-axis: boxes side by side
       const byX = [...boxes].sort((a, b) => (a.position_x || 0) - (b.position_x || 0));
       for (let i = 0; i < byX.length - 1; i++) {
         const dx = (byX[i + 1].position_x || 0) - (byX[i].position_x || 0);
-        if (dx > 0) s = Math.max(s, ((byX[i].station_count || 1) * CELL_W + GAP) / dx);
+        if (dx > 0) s = Math.max(s, ((byX[i].station_count || 1) * CELL_W + GAP3D) / dx);
       }
-      // Z-axis: boxes above/below each other in 2D
+      return s;
+    })();
+    const zScale = (() => {
+      if (boxes.length <= 1) return SCALE;
+      let s = SCALE;
       const byY = [...boxes].sort((a, b) => (a.position_y || 0) - (b.position_y || 0));
       for (let i = 0; i < byY.length - 1; i++) {
         const dy = (byY[i + 1].position_y || 0) - (byY[i].position_y || 0);
-        if (dy > 0) s = Math.max(s, (DEPTH + GAP) / dy);
+        if (dy > 0) s = Math.max(s, (DEPTH + GAP3D) / dy);
       }
       return s;
     })();
 
     const layoutBoxes = boxes.map(b => ({
       ...b,
-      _x3d: (b.position_x || 0) * effectiveScale,
-      _z3d: (b.position_y || 0) * effectiveScale,
+      _x3d: (b.position_x || 0) * xScale,
+      _z3d: (b.position_y || 0) * zScale,
     }));
 
     layoutBoxes.forEach(box => buildStationShell(box, statusMap, zeMap, scene));
