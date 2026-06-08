@@ -263,7 +263,9 @@
   font-weight: 700;
   color: #001f5b;
   letter-spacing: 0.3px;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dash-box-desc {
@@ -288,12 +290,13 @@
 /* ── Data grid ───────────────────────────────────────────────────────────── */
 .dash-grid {
   border-collapse: collapse;
-  width: max-content;
+  width: 100%;
+  table-layout: fixed;
 }
 
-/* Station ID header — minimum 40px; column grows if station name is wider */
+/* Station ID header — fixed column width, text truncates */
 .dash-grid-th {
-  min-width: 40px;
+  width: 40px;
   padding: 3px 2px;
   text-align: center;
   font-size: 10px;
@@ -302,7 +305,8 @@
   background-color: #45b480;
   border-right: 1px solid #1c4532;
   white-space: nowrap;
-  overflow: visible;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dash-grid-th:last-child {
@@ -321,9 +325,10 @@
   border-bottom: 1px solid #bee3f8;
   text-align: center;
   vertical-align: middle;
-  min-width: 40px;
+  width: 40px;
   white-space: nowrap;
-  overflow: visible;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dash-grid-sname:last-child {

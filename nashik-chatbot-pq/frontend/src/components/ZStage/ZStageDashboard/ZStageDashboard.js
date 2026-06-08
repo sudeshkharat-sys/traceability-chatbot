@@ -1753,8 +1753,8 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                               position: 'absolute',
                               left: box.position.x,
                               top: box.position.y,
-                              width: 'max-content',
-                              minWidth: w,
+                              width: w,
+                              overflow: 'hidden',
                             }}
                           >
                             {/* Invisible Xarrow anchor points — mirror the layout editor dot positions */}
@@ -1875,64 +1875,24 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
 
         const { scale, positionX, positionY } = transformState;
         const { left: cl, top: ct } = canvasRect;
-        const GRID = 40;
 
-        // screen px → canvas coords (inverse of the TransformWrapper transform)
-        const toCanvas = (sx, sy) => [(sx - cl - positionX) / scale, (sy - ct - positionY) / scale];
-        // canvas coords → screen px (for fixed SVG)
-        const toScreen = (cx, cy) => [cl + positionX + cx * scale, ct + positionY + cy * scale];
+        const toScreen = (cx, cy) => [
+          cl + positionX + cx * scale,
+          ct + positionY + cy * scale,
+        ];
 
-        // ── resolve port position from anchor DOM element ──────────────────────
-        // Each port has a 1×1 anchor div whose getBoundingClientRect gives the
-        // exact visual screen position regardless of how wide content made the box.
-        const resolvePort = (portId) => {
-          if (!portId) return null;
-          const el = document.getElementById(portId);
-          if (!el) return null;
-          const r = el.getBoundingClientRect();
-          const sx = r.left + r.width  / 2;
-          const sy = r.top  + r.height / 2;
-          const [canvasX, canvasY] = toCanvas(sx, sy);
-
-          const sfx = portId.split('__').pop();
-          let dir = 'right';
-          if (sfx === 'left')        dir = 'left';
-          else if (sfx === 'right')  dir = 'right';
-          else if (sfx === 'b')      dir = 'bottom';
-          else                        dir = 'top';
-
-          return { x: canvasX, y: canvasY, dir };
-        };
-
-        // ── build obstacles from actual box DOM rects ──────────────────────────
-        const occ = new Set();
-        boxes.forEach((box) => {
-          const el = document.getElementById(box.id);
-          if (!el) return;
-          const r = el.getBoundingClientRect();
-          const [cx1, cy1] = toCanvas(r.left,  r.top);
-          const [cx2, cy2] = toCanvas(r.right, r.bottom);
-          const gx1 = Math.floor(cx1 / GRID);
-          const gy1 = Math.floor(cy1 / GRID);
-          const gx2 = Math.ceil(cx2  / GRID) - 1;
-          const gy2 = Math.ceil(cy2  / GRID) - 1;
-          for (let gx = gx1; gx <= gx2; gx++)
-            for (let gy = gy1; gy <= gy2; gy++)
-              occ.add(`${gx},${gy}`);
-        });
+        // 1-cell margin so paths always have breathing room around box edges
+        const obstacles = buildObstacles(boxes, 1);
 
         const strokeW = Math.max(0.5, Math.min(3, 2 * scale));
         const mw = Math.max(10, 10 * scale);
         const mh = Math.max(8,   8 * scale);
 
         const arrows = connections.map((conn) => {
-          // Use real anchor DOM positions; fall back to formula-based for buyoff icons
-          let sp = resolvePort(conn.fromId);
-          let ep = resolvePort(conn.toId);
-          if (!sp) sp = getPortCanvasPos(conn.fromId, boxes, buyoffIcons);
-          if (!ep) ep = getPortCanvasPos(conn.toId,   boxes, buyoffIcons);
+          const sp = getPortCanvasPos(conn.fromId, boxes, buyoffIcons);
+          const ep = getPortCanvasPos(conn.toId,   boxes, buyoffIcons);
 
-          const pts = routePath(sp, ep, occ);
+          const pts = routePath(sp, ep, obstacles);
           if (!pts || pts.length < 2) return null;
 
           const screenPts = pts.map(([cx, cy]) => toScreen(cx, cy));
