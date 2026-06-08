@@ -994,17 +994,12 @@ function parseLayout(apiLayout) {
           ? b.station_ids.split(',').map((s) => s.trim()).filter(Boolean)
           : b.station_ids.map((s) => String(s).trim()).filter(Boolean))
       : [];
-    // Dashboard boxes render taller than LP (description + station-names row +
-    // data rows). Use 8×GRID as a safe upper-bound so buildObstacles covers the
-    // full rendered height and arrows don't route through the bottom of boxes.
-    const DASH_BOX_H = 8 * GRID;
     return {
       id: `db-box-${b.id}`,
       name: b.name,
       description,
       stationNames,
       stationIds,
-      boxHeight: DASH_BOX_H,
       position: { x: b.position_x, y: b.position_y },
     };
   });
@@ -1882,7 +1877,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
         ];
 
         // 1-cell margin so paths always have breathing room around box edges
-        const obstacles = buildObstacles(boxes, 1);
+        const obstacles = buildObstacles(boxes, 0);
 
         const strokeW = Math.max(0.5, Math.min(3, 2 * scale));
         const mw = Math.max(10, 10 * scale);
