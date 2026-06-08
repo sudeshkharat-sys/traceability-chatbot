@@ -73,7 +73,7 @@ const DASHBOARD_HELP = {
 const GRID = 40;
 const CANVAS_SIZE = 5000;
 
-const boxWidth = (stationCount) => Math.max(2, stationCount) * 40 + 4;
+const boxWidth = (stationCount) => Math.max(1, stationCount) * 40 + 4;
 
 // Shows first 3 + '..' + last 3 chars for names longer than 8 chars
 // e.g. "DAC-UB-_01" → "DAC.._01",  "Welding" → "Welding"
@@ -1290,8 +1290,9 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
   // Station detail popup
   const [popupStation, setPopupStation] = useState(null); // stationId string | null
 
-  const canvasRef   = useRef(null);
+  const canvasRef    = useRef(null);
   const transformRef = useRef(null);
+  const boxWidthsRef = useRef({});  // { [boxId]: measuredOffsetWidth }
   // Track the activeLayoutId value from the last time savedLayouts synced,
   // so we can detect when it changed (e.g. a new layout was just created).
   const prevActiveLayoutIdRef = useRef(activeLayoutId);
@@ -1520,6 +1521,17 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
       }).catch(() => {/* non-critical */});
     }
   }, [selectedId]);
+
+  // Measure actual rendered box widths after each boxes render so arrow
+  // routing uses the real DOM width instead of the formula estimate.
+  useEffect(() => {
+    const measured = {};
+    boxes.forEach((box) => {
+      const el = document.getElementById(box.id);
+      if (el) measured[box.id] = el.offsetWidth;
+    });
+    boxWidthsRef.current = measured;
+  }, [boxes]);
 
   return (
     <>
@@ -1880,7 +1892,14 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
           ct + positionY + cy * scale,
         ];
 
-        const obstacles = buildObstacles(boxes, 0);
+        // Inject measured DOM widths so port positions and obstacles
+        // match the actual rendered box width (which grows with content).
+        const boxesWithDomW = boxes.map((b) => {
+          const domW = boxWidthsRef.current[b.id];
+          return domW ? { ...b, boxDomWidth: domW } : b;
+        });
+
+        const obstacles = buildObstacles(boxesWithDomW, 0);
 
         const strokeW = Math.max(0.5, Math.min(3, 2 * scale));
         // Arrowhead: minimum 10×8px so it's always readable; scales up when zoomed in
@@ -1888,8 +1907,8 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
         const mh = Math.max(8,   8 * scale);
 
         const arrows = connections.map((conn) => {
-          const sp  = getPortCanvasPos(conn.fromId, boxes, buyoffIcons);
-          const ep  = getPortCanvasPos(conn.toId,   boxes, buyoffIcons);
+          const sp  = getPortCanvasPos(conn.fromId, boxesWithDomW, buyoffIcons);
+          const ep  = getPortCanvasPos(conn.toId,   boxesWithDomW, buyoffIcons);
           const pts = routePath(sp, ep, obstacles);
           if (!pts || pts.length < 2) return null;
 
