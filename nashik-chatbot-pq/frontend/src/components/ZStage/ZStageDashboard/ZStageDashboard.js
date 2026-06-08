@@ -1753,8 +1753,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                               position: 'absolute',
                               left: box.position.x,
                               top: box.position.y,
-                              width: 'max-content',
-                              minWidth: w,
+                              width: w,
                             }}
                           >
                             {/* Invisible Xarrow anchor points — mirror the layout editor dot positions */}
@@ -1777,7 +1776,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
 
                             {/* Data grid */}
                             <div className="dash-box-body">
-                              <table className="dash-grid">
+                              <table className="dash-grid" style={{ tableLayout: 'fixed', width: '100%' }}>
                                 <thead>
                                   <tr>
                                     {box.stationIds.map((sid) => {
