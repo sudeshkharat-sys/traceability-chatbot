@@ -82,7 +82,7 @@ export function getPortCanvasPos(portId, boxes, buyoffIcons, colWidth = GRID, bo
 
 // ─── Obstacle builder ─────────────────────────────────────────────────────────
 
-export function buildObstacles(boxes, marginCells = 0, colWidth = GRID) {
+export function buildObstacles(boxes, marginCells = 0, colWidth = GRID, boxHeight = BOX_HEIGHT) {
   const occ = new Set();
   for (const box of boxes) {
     const cols = box.stationIds?.length ?? 2;
