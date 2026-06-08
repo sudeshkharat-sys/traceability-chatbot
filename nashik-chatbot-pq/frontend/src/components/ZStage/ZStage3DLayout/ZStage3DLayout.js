@@ -189,7 +189,7 @@ function makeCantileverSign(stnId, ze, zeStatus) {
   const idCanvas = document.createElement('canvas');
   idCanvas.width = idCW; idCanvas.height = idCH;
   const ic = idCanvas.getContext('2d');
-  const idBg = ze ? '#c62828' : '#1a237e';
+  const idBg = '#1a237e';
   ic.fillStyle = idBg;
   ic.beginPath(); ic.roundRect(0, 0, idCW, idCH, 18); ic.fill();
   ic.strokeStyle = 'rgba(255,255,255,0.45)'; ic.lineWidth = 5;
@@ -238,8 +238,8 @@ function buildStationShell(box, statusMap, zeMap, scene) {
   const group   = new THREE.Group();
   const count   = box.station_count || 1;
   const totalW  = count * CELL_W;
-  const originX = (box.position_x || 0) * SCALE;
-  const originZ = (box.position_y || 0) * SCALE;
+  const originX = box._x3d ?? (box.position_x || 0) * SCALE;
+  const originZ = box._z3d ?? (box.position_y || 0) * SCALE;
   const structMat = new THREE.MeshLambertMaterial({ color: 0x78909c });
 
   // ── 4 corner columns ──
@@ -327,40 +327,57 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     group.add(sign);
   }
 
-  // ── Single floating box name above the whole structure ──
-  const nameSprite = makeLabel(box.name || 'Box', { fontSize: 52, color: '#1a237e', bgColor: 'rgba(255,255,255,0.85)', padding: 14, scale: 2.8 });
-  nameSprite.position.set(originX + totalW / 2, HEIGHT + 1.3, originZ + DEPTH / 2);
-  group.add(nameSprite);
+  // ── Box name boards at start and end columns, mid-height, facing aisle ──
+  const boxLabel = box.name || 'Box';
+  [originX, originX + totalW].forEach((colX, side) => {
+    const bW = 256, bH = 80;
+    const bCanvas = document.createElement('canvas');
+    bCanvas.width = bW; bCanvas.height = bH;
+    const bc = bCanvas.getContext('2d');
+    bc.fillStyle = '#78909c';
+    bc.beginPath(); bc.roundRect(0, 0, bW, bH, 10); bc.fill();
+    bc.strokeStyle = '#cfd8dc'; bc.lineWidth = 3;
+    bc.beginPath(); bc.roundRect(4, 4, bW - 8, bH - 8, 7); bc.stroke();
+    bc.fillStyle = '#1a237e'; bc.font = 'bold 34px Arial';
+    bc.textAlign = 'center'; bc.textBaseline = 'middle';
+    bc.fillText(boxLabel, bW / 2, bH / 2);
+    const bTex = new THREE.CanvasTexture(bCanvas);
+    const bGeo = new THREE.PlaneGeometry(2.0, 0.625);
+    const bMat = new THREE.MeshBasicMaterial({ map: bTex, transparent: true, side: THREE.DoubleSide });
+    const board = new THREE.Mesh(bGeo, bMat);
+    board.rotation.y = side === 0 ? -Math.PI / 2 : Math.PI / 2;
+    board.position.set(colX, HEIGHT / 2, originZ + DEPTH / 2);
+    group.add(board);
+  });
 
   scene.add(group);
 }
 
 function buildWalkingPath(fromBox, toBox, scene) {
   const fW      = (fromBox.station_count || 1) * CELL_W;
-  const fEndX   = (fromBox.position_x || 0) * SCALE + fW;
-  const tStartX = (toBox.position_x || 0) * SCALE;
+  const fEndX   = (fromBox._x3d ?? (fromBox.position_x || 0) * SCALE) + fW;
+  const tStartX = toBox._x3d ?? (toBox.position_x || 0) * SCALE;
   const pathLen = tStartX - fEndX;
   if (pathLen <= 0.1) return;
   const pathCX = fEndX + pathLen / 2;
-  const pathCZ = ((fromBox.position_y || 0) * SCALE) + DEPTH / 2;
+  const pathCZ = (fromBox._z3d ?? (fromBox.position_y || 0) * SCALE) + DEPTH / 2;
+  // Gray road surface
   const floor  = new THREE.Mesh(
     new THREE.PlaneGeometry(pathLen, PATH_W),
-    new THREE.MeshLambertMaterial({ color: 0xfdd835, transparent: true, opacity: 0.65, side: THREE.DoubleSide })
+    new THREE.MeshLambertMaterial({ color: 0x8d8d8d, side: THREE.DoubleSide })
   );
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(pathCX, 0.015, pathCZ);
   scene.add(floor);
-  const stripeMat = new THREE.MeshBasicMaterial({ color: 0xff6f00 });
-  const n = Math.max(1, Math.floor(pathLen / 1.2));
-  for (let s = 0; s <= n; s++) {
-    const sm = new THREE.Mesh(new THREE.PlaneGeometry(0.1, PATH_W), stripeMat);
-    sm.rotation.x = -Math.PI / 2;
-    sm.position.set(fEndX + (s / n) * pathLen, 0.02, pathCZ);
-    scene.add(sm);
-  }
-  const wlbl = makeFloorLabel('WALKWAY', Math.min(pathLen * 0.8, 3.0), 40);
-  wlbl.position.set(pathCX, 0.025, pathCZ);
-  scene.add(wlbl);
+  // White border lines along edges
+  const borderMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+  const BT = 0.12;
+  [-1, 1].forEach(sign => {
+    const border = new THREE.Mesh(new THREE.PlaneGeometry(pathLen, BT), borderMat);
+    border.rotation.x = -Math.PI / 2;
+    border.position.set(pathCX, 0.02, pathCZ + sign * (PATH_W / 2 - BT / 2));
+    scene.add(border);
+  });
 }
 
 // ── Walk mode controller ───────────────────────────────────────────────────────
@@ -434,17 +451,31 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     scene.add(new THREE.GridHelper(200, 100, 0xb0bec5, 0xdde1e7));
 
     const boxes = layout.station_boxes || [];
-    boxes.forEach(box => buildStationShell(box, statusMap, zeMap, scene));
+
+    // Prevent boxes from overlapping: compute non-overlapping 3D positions
+    const layoutBoxes = (() => {
+      if (boxes.length <= 1) return boxes.map(b => ({ ...b, _x3d: (b.position_x || 0) * SCALE, _z3d: (b.position_y || 0) * SCALE }));
+      const sorted = [...boxes].sort((a, b) => (a.position_x || 0) - (b.position_x || 0));
+      let curX = (sorted[0].position_x || 0) * SCALE;
+      return sorted.map(b => {
+        const naturalX = (b.position_x || 0) * SCALE;
+        const x3d = Math.max(naturalX, curX);
+        curX = x3d + (b.station_count || 1) * CELL_W + 1.5;
+        return { ...b, _x3d: x3d, _z3d: (b.position_y || 0) * SCALE };
+      });
+    })();
+
+    layoutBoxes.forEach(box => buildStationShell(box, statusMap, zeMap, scene));
     (layout.connections || []).forEach(conn => {
-      const f = boxes.find(b => b.id === conn.from_box_id);
-      const t = boxes.find(b => b.id === conn.to_box_id);
+      const f = layoutBoxes.find(b => b.id === conn.from_box_id);
+      const t = layoutBoxes.find(b => b.id === conn.to_box_id);
       if (f && t) buildWalkingPath(f, t, scene);
     });
 
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-    boxes.forEach(b => {
-      const x0 = (b.position_x || 0) * SCALE, x1 = x0 + (b.station_count || 1) * CELL_W;
-      const z0 = (b.position_y || 0) * SCALE, z1 = z0 + DEPTH;
+    layoutBoxes.forEach(b => {
+      const x0 = b._x3d, x1 = x0 + (b.station_count || 1) * CELL_W;
+      const z0 = b._z3d, z1 = z0 + DEPTH;
       if (x0 < minX) minX = x0; if (x1 > maxX) maxX = x1;
       if (z0 < minZ) minZ = z0; if (z1 > maxZ) maxZ = z1;
     });
