@@ -989,17 +989,14 @@ function parseLayout(apiLayout) {
         stationNames = Array.isArray(sd.__station_names__) ? sd.__station_names__ : [];
       } catch {}
     }
-    const stationIds = b.station_ids
-      ? (typeof b.station_ids === 'string'
-          ? b.station_ids.split(',').map((s) => s.trim()).filter(Boolean)
-          : b.station_ids.map((s) => String(s).trim()).filter(Boolean))
-      : [];
     return {
       id: `db-box-${b.id}`,
       name: b.name,
       description,
       stationNames,
-      stationIds,
+      stationIds: b.station_ids
+        ? (typeof b.station_ids === 'string' ? b.station_ids.split(',') : b.station_ids)
+        : [],
       position: { x: b.position_x, y: b.position_y },
     };
   });
@@ -1748,8 +1745,8 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                               position: 'absolute',
                               left: box.position.x,
                               top: box.position.y,
-                              width: w,
-                              overflow: 'hidden',
+                              width: 'max-content',
+                              minWidth: w,
                             }}
                           >
                             {/* Invisible Xarrow anchor points — mirror the layout editor dot positions */}
@@ -1865,28 +1862,26 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
 
       {/* Connections: BFS-routed SVG arrows that avoid box obstacles */}
       {(() => {
-        const canvasRect = canvasRef.current?.getBoundingClientRect();
-        if (!canvasRect || connections.length === 0) return null;
-
+        const rect = canvasRef.current?.getBoundingClientRect();
+        if (!rect || connections.length === 0) return null;
+        const { left: cl, top: ct } = rect;
         const { scale, positionX, positionY } = transformState;
-        const { left: cl, top: ct } = canvasRect;
 
         const toScreen = (cx, cy) => [
           cl + positionX + cx * scale,
           ct + positionY + cy * scale,
         ];
 
-        // 1-cell margin so paths always have breathing room around box edges
         const obstacles = buildObstacles(boxes, 0);
 
         const strokeW = Math.max(0.5, Math.min(3, 2 * scale));
+        // Arrowhead: minimum 10×8px so it's always readable; scales up when zoomed in
         const mw = Math.max(10, 10 * scale);
         const mh = Math.max(8,   8 * scale);
 
         const arrows = connections.map((conn) => {
-          const sp = getPortCanvasPos(conn.fromId, boxes, buyoffIcons);
-          const ep = getPortCanvasPos(conn.toId,   boxes, buyoffIcons);
-
+          const sp  = getPortCanvasPos(conn.fromId, boxes, buyoffIcons);
+          const ep  = getPortCanvasPos(conn.toId,   boxes, buyoffIcons);
           const pts = routePath(sp, ep, obstacles);
           if (!pts || pts.length < 2) return null;
 
