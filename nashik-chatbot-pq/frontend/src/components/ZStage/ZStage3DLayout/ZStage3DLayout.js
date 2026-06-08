@@ -327,8 +327,8 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     group.add(sign);
   }
 
-  // ── Box name boards — mounted on front and back top beams, centred on box width ──
-  // Hangs below the beam (top of board flush with HEIGHT), white bg + navy text
+  // ── Box name boards on outer face of end columns, hanging from top beam ──
+  // White bg + navy text; top edge flush with top beam at HEIGHT
   const boxLabel = box.name || 'Box';
   const bW = 512, bH = 128;
   const bCanvas = document.createElement('canvas');
@@ -345,11 +345,11 @@ function buildStationShell(box, statusMap, zeMap, scene) {
   const boardW3d = 3.5;
   const boardH3d = boardW3d * (bH / bW);
   const bMat = new THREE.MeshBasicMaterial({ map: bTex, transparent: true, side: THREE.DoubleSide });
-  const cx = originX + totalW / 2;
-  // Front beam (z = originZ + DEPTH) and back beam (z = originZ) — both faces visible
-  [originZ + DEPTH, originZ].forEach(bz => {
+  [originX, originX + totalW].forEach((colX, side) => {
     const board = new THREE.Mesh(new THREE.PlaneGeometry(boardW3d, boardH3d), bMat);
-    board.position.set(cx, HEIGHT - boardH3d / 2, bz);
+    board.rotation.y = side === 0 ? -Math.PI / 2 : Math.PI / 2;
+    // top of board touches the beam at HEIGHT; hangs down by boardH3d
+    board.position.set(colX, HEIGHT - boardH3d / 2, originZ + DEPTH / 2);
     group.add(board);
   });
 
