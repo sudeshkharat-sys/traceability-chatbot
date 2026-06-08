@@ -27,7 +27,7 @@ const DIR_DELTA = {
 
 // ─── Port position helpers ────────────────────────────────────────────────────
 
-export function getPortCanvasPos(portId, boxes, buyoffIcons, colWidth = GRID) {
+export function getPortCanvasPos(portId, boxes, buyoffIcons, colWidth = GRID, boxHeight = BOX_HEIGHT) {
   if (!portId) return null;
 
   // No separator → legacy bare buyoff id (dir='auto' is handled in routePath)
@@ -45,13 +45,8 @@ export function getPortCanvasPos(portId, boxes, buyoffIcons, colWidth = GRID) {
   const box = boxes.find((b) => b.id === elemId);
   if (box) {
     const cols     = box.stationIds?.length ?? 2;
-<<<<<<< HEAD
-    const w        = Math.max(2, cols) * colWidth + 4;
-    const h        = BOX_HEIGHT;
-=======
     const w        = box.boxDomWidth ?? (Math.max(1, cols) * colWidth + 4);
     const h        = box.boxHeight ?? boxHeight;
->>>>>>> 3eb6ec385fff942615c66d4aefc54f4332a8dae0
     const { x: bx, y: by } = box.position;
     // Port centre per column: half column width + 2px border offset
     const portInset = colWidth / 2 + 2;
@@ -91,13 +86,8 @@ export function buildObstacles(boxes, marginCells = 0, colWidth = GRID) {
   const occ = new Set();
   for (const box of boxes) {
     const cols = box.stationIds?.length ?? 2;
-<<<<<<< HEAD
-    const w    = Math.max(2, cols) * colWidth + 4;
-    const h    = BOX_HEIGHT;
-=======
     const w    = box.boxDomWidth ?? (Math.max(1, cols) * colWidth + 4);
     const h    = box.boxHeight ?? boxHeight;
->>>>>>> 3eb6ec385fff942615c66d4aefc54f4332a8dae0
     const x1   = Math.floor(box.position.x / GRID)          - marginCells;
     const y1   = Math.floor(box.position.y / GRID)          - marginCells;
     const x2   = Math.ceil((box.position.x + w) / GRID) - 1 + marginCells;
