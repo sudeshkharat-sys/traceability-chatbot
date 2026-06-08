@@ -50,11 +50,10 @@ export function getPortCanvasPos(portId, boxes, buyoffIcons, colWidth = GRID, bo
     const { x: bx, y: by } = box.position;
     // Port centre per column: half column width + 2px border offset
     const portInset = colWidth / 2 + 2;
-    // Left/right port Y: snap to nearest GRID multiple of half-height
-    const portY     = Math.round(h / 2 / GRID) * GRID;
 
-    if (suffix === 'left')  return { x: bx,     y: by + portY, dir: 'left'  };
-    if (suffix === 'right') return { x: bx + w, y: by + portY, dir: 'right' };
+    // 3*GRID (120px) — fixed port Y kept consistent with LayoutPreparation
+    if (suffix === 'left')  return { x: bx,     y: by + 3 * GRID, dir: 'left'  };
+    if (suffix === 'right') return { x: bx + w, y: by + 3 * GRID, dir: 'right' };
 
     // Station dot centre: border(2) + col_center + idx * colWidth
     if (suffix.endsWith('__b')) {
