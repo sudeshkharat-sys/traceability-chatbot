@@ -341,14 +341,11 @@ function buildStationShell(box, statusMap, zeMap, scene) {
   bc.fillStyle = '#1a237e'; bc.font = 'bold 68px Arial';
   bc.textAlign = 'center'; bc.textBaseline = 'middle';
   bc.fillText(boxLabel, bW / 2, bH / 2);
-  const bTex = new THREE.CanvasTexture(bCanvas);
   const boardW3d = 3.5;
   const boardH3d = boardW3d * (bH / bW);
-  const bMat = new THREE.MeshBasicMaterial({ map: bTex, transparent: true, side: THREE.DoubleSide });
   [originX, originX + totalW].forEach((colX, side) => {
-    const board = new THREE.Mesh(new THREE.PlaneGeometry(boardW3d, boardH3d), bMat);
+    const board = makeDoubleSidedBoard(bCanvas, boardW3d, boardH3d);
     board.rotation.y = side === 0 ? -Math.PI / 2 : Math.PI / 2;
-    // hang 0.35 units below the beam so there's a visible gap
     board.position.set(colX, HEIGHT - boardH3d / 2 - 0.35, originZ + DEPTH / 2);
     group.add(board);
   });
@@ -500,33 +497,37 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
 
     const boxes = layout.station_boxes || [];
 
-    // Compute SEPARATE X and Z scales so each axis preserves its own 2D proportions
-    const GAP3D = 1.5;
-    const xScale = (() => {
-      if (boxes.length <= 1) return SCALE;
-      let s = SCALE;
-      const byX = [...boxes].sort((a, b) => (a.position_x || 0) - (b.position_x || 0));
-      for (let i = 0; i < byX.length - 1; i++) {
-        const dx = (byX[i + 1].position_x || 0) - (byX[i].position_x || 0);
-        if (dx > 0) s = Math.max(s, ((byX[i].station_count || 1) * CELL_W + GAP3D) / dx);
-      }
-      return s;
-    })();
-    const zScale = (() => {
-      if (boxes.length <= 1) return SCALE;
-      let s = SCALE;
-      const byY = [...boxes].sort((a, b) => (a.position_y || 0) - (b.position_y || 0));
-      for (let i = 0; i < byY.length - 1; i++) {
-        const dy = (byY[i + 1].position_y || 0) - (byY[i].position_y || 0);
-        if (dy > 0) s = Math.max(s, (DEPTH + GAP3D) / dy);
-      }
-      return s;
-    })();
+    // Fixed spacing: gap between boxes = 2 × CELL_W on both axes.
+    // Group boxes by unique position_y (rows), then lay out each row
+    // left-to-right with fixed gap, and rows top-to-bottom with fixed gap.
+    const AISLE = 2 * CELL_W;
+
+    // Collect unique row Y values sorted ascending
+    const rowYs = [...new Set(boxes.map(b => b.position_y || 0))].sort((a, b) => a - b);
+    // Collect unique col X values sorted ascending
+    const colXs = [...new Set(boxes.map(b => b.position_x || 0))].sort((a, b) => a - b);
+
+    // Map each unique position to a 3D coordinate
+    const xMap = {};
+    let curX = 0;
+    colXs.forEach((px, i) => {
+      xMap[px] = curX;
+      const boxAtX = boxes.find(b => (b.position_x || 0) === px);
+      const w = (boxAtX?.station_count || 1) * CELL_W;
+      curX += w + AISLE;
+    });
+
+    const zMap = {};
+    let curZ = 0;
+    rowYs.forEach((py) => {
+      zMap[py] = curZ;
+      curZ += DEPTH + AISLE;
+    });
 
     const layoutBoxes = boxes.map(b => ({
       ...b,
-      _x3d: (b.position_x || 0) * xScale,
-      _z3d: (b.position_y || 0) * zScale,
+      _x3d: xMap[b.position_x || 0] ?? 0,
+      _z3d: zMap[b.position_y || 0] ?? 0,
     }));
 
     layoutBoxes.forEach(box => buildStationShell(box, statusMap, zeMap, scene));
