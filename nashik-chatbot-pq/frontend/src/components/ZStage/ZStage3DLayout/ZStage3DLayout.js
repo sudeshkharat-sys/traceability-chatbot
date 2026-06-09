@@ -7,6 +7,9 @@ import { VRMLLoader } from 'three/examples/jsm/loaders/VRMLLoader';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
 import { layoutApi, inputApi } from '../../../services/api/layoutApi';
+import { layeredAuditApi } from '../../../services/api/layoutApi';
+import { StationDetailModal, MONTHLY_KEYS } from '../ZStageDashboard/ZStageDashboard';
+import '../ZStageDashboard/ZStageDashboard.css';
 import { backend_url } from '../../../services/api/config';
 import './ZStage3DLayout.css';
 
@@ -299,6 +302,7 @@ function buildStationShell(box, statusMap, zeMap, scene) {
       new THREE.MeshLambertMaterial({ color: 0xb0bec5, transparent: true, opacity: 0.80 })
     );
     floor.position.set(cellCX, 0.09, cellCZ);
+    floor.userData.stationId = stnId;
     group.add(floor);
 
     // Green center path strip running through middle of this station
@@ -307,6 +311,7 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     // Status sphere on top
     const sph = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 12), new THREE.MeshLambertMaterial({ color }));
     sph.position.set(cellCX, HEIGHT + 0.35, cellCZ);
+    sph.userData.stationId = stnId;
     group.add(sph);
 
     // Floor station-ID label
@@ -323,6 +328,7 @@ function buildStationShell(box, statusMap, zeMap, scene) {
 
     // Cantilever rod + boards at front beam centre, sticking out toward viewer
     const sign = makeCantileverSign(stnId, ze, zeStatus);
+    sign.traverse(child => { child.userData.stationId = stnId; });
     sign.position.set(cellCX, HEIGHT, originZ + DEPTH);
     group.add(sign);
   }
@@ -458,7 +464,7 @@ class WalkController {
 }
 
 // ── Three.js scene hook ────────────────────────────────────────────────────────
-function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd) {
+function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, onStationClick) {
   const sceneRef       = useRef(null);
   const rendererRef    = useRef(null);
   const cameraRef      = useRef(null);
@@ -750,23 +756,40 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     );
     const ray    = new THREE.Raycaster();
     ray.setFromCamera(mouse, camera);
+
+    // Check placed objects first
     const placed = placedRef.current.map(p => p.mesh);
-    const hits   = ray.intersectObjects(placed, true);
-    if (hits.length > 0) {
-      let obj = hits[0].object;
+    const placedHits = ray.intersectObjects(placed, true);
+    if (placedHits.length > 0) {
+      let obj = placedHits[0].object;
       while (obj.parent && !obj.userData.isPlaced) obj = obj.parent;
       const entry = placedRef.current.find(p => p.mesh === obj);
       if (entry) {
         selectedRef.current = entry;
         if (transformRef.current) transformRef.current.attach(obj);
+        onObjectsChange([...placedRef.current]);
+        return;
       }
-    } else {
-      // Deselect if clicked empty space
-      if (transformRef.current) transformRef.current.detach();
-      selectedRef.current = null;
     }
+
+    // Check for station mesh click
+    const allHits = ray.intersectObjects(scene.children, true);
+    for (const hit of allHits) {
+      let obj = hit.object;
+      while (obj && obj !== scene) {
+        if (obj.userData.stationId) {
+          onStationClick && onStationClick(obj.userData.stationId);
+          return;
+        }
+        obj = obj.parent;
+      }
+    }
+
+    // Deselect if clicked empty space
+    if (transformRef.current) transformRef.current.detach();
+    selectedRef.current = null;
     onObjectsChange([...placedRef.current]);
-  }, [canvasRef, onObjectsChange]);
+  }, [canvasRef, onObjectsChange, onStationClick]);
 
   // Select object by id (called from panel)
   const selectById = useCallback((id) => {
@@ -870,6 +893,10 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [showObjPanel,  setShowObjPanel]  = useState(false);
   const [converting,    setConverting]    = useState(false);
   const [convertProgress, setConvertProgress] = useState(0);
+  const [popupStation,      setPopupStation]      = useState(null);
+  const [records,           setRecords]           = useState([]);
+  const [auditRecords,      setAuditRecords]      = useState([]);
+  const [adherenceRecords,  setAdherenceRecords]  = useState([]);
 
   useEffect(() => {
     if (activeLayoutId && !selectedLayoutId) setSelectedLayoutId(activeLayoutId);
@@ -893,9 +920,19 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
 
     // Fetch input records to compute Z/E status per station
     if (userId && layout.id) {
-      inputApi.getRecords(userId, layout.id)
-        .then(res => setZeMap(computeZeMap(Array.isArray(res.data) ? res.data : [])))
-        .catch(() => setZeMap({}));
+      Promise.all([
+        inputApi.getRecords(userId, layout.id),
+        layeredAuditApi.getAuditRecords(userId, layout.id),
+        layeredAuditApi.getAdherenceRecords(userId, layout.id),
+      ])
+        .then(([recRes, auditRes, adherenceRes]) => {
+          const recs = Array.isArray(recRes.data) ? recRes.data : [];
+          setRecords(recs);
+          setZeMap(computeZeMap(recs));
+          setAuditRecords(Array.isArray(auditRes.data) ? auditRes.data : []);
+          setAdherenceRecords(Array.isArray(adherenceRes.data) ? adherenceRes.data : []);
+        })
+        .catch(() => { setZeMap({}); setRecords([]); setAuditRecords([]); setAdherenceRecords([]); });
     }
   }, [layout, userId]);
 
@@ -912,8 +949,32 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setTimeout(() => { setConverting(false); setConvertProgress(0); }, 800);
   }, []);
 
+  const allMonths = React.useMemo(() => {
+    const set = new Set(MONTHLY_KEYS);
+    records.forEach((rec) => {
+      if (rec.monthly_data) {
+        try { Object.keys(JSON.parse(rec.monthly_data)).forEach((k) => set.add(k)); } catch {}
+      }
+    });
+    return Array.from(set).sort();
+  }, [records]);
+
+  const handleRecordSaved = useCallback((recordId, updatedRecord) => {
+    setRecords((prev) => prev.map((r) => (r.id === recordId ? updatedRecord : r)));
+  }, []);
+
+  const handleRecordAdded = useCallback((tabType, newRec) => {
+    if (tabType === 'master') setRecords((prev) => [...prev, newRec]);
+    else if (tabType === 'layered-audit') setAuditRecords((prev) => [...prev, newRec]);
+    else if (tabType === 'audit-adherence') setAdherenceRecords((prev) => [...prev, newRec]);
+  }, []);
+
+  const handleStationClick = useCallback((stationId) => {
+    setPopupStation(stationId);
+  }, []);
+
   const { snapView, setTransformMode, placeObject, handleCanvasClick, selectById, deleteById, renameById } =
-    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd);
+    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick);
 
   const handleLayoutChange = useCallback((e) => {
     setSelectedLayoutId(Number(e.target.value) || null);
@@ -1089,6 +1150,24 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
           )}
         </div>
       </div>
+
+      {popupStation && (
+        <StationDetailModal
+          stationId={popupStation}
+          records={records}
+          allMonths={allMonths}
+          onSaved={handleRecordSaved}
+          onClose={() => setPopupStation(null)}
+          auditRecords={auditRecords}
+          adherenceRecords={adherenceRecords}
+          userId={userId}
+          layoutId={selectedLayoutId}
+          onRecordAdded={handleRecordAdded}
+          stationIds={(layout?.station_boxes || []).flatMap(b =>
+            (b.station_ids || '').split(',').map(s => s.trim()).filter(Boolean)
+          )}
+        />
+      )}
     </div>
   );
 }

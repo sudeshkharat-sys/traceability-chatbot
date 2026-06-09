@@ -83,7 +83,7 @@ function smartTrimName(name) {
 }
 
 // ── Column definitions (mirror InputData) ─────────────────────────────────────
-const MONTHLY_KEYS = [
+export const MONTHLY_KEYS = [
   '2024-01','2024-02','2024-03','2024-04','2024-05','2024-06',
   '2024-07','2024-08','2024-09','2024-10','2024-11','2024-12',
   '2025-01','2025-02','2025-03','2025-04','2025-05','2025-06',
@@ -748,7 +748,7 @@ function DocsTab({ stationId, masterRecords, userId, layoutId }) {
 // ── Station Detail Modal ───────────────────────────────────────────────────────
 // Rendered via portal to document.body so position:fixed is always
 // relative to the true viewport, regardless of ancestor transforms.
-function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, auditRecords, adherenceRecords, userId, layoutId, onRecordAdded, stationIds = [] }) {
+export function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, auditRecords, adherenceRecords, userId, layoutId, onRecordAdded, stationIds = [] }) {
   const [activeTab, setActiveTab] = useState('master');
   const [showAddRecord, setShowAddRecord] = useState(false);
   const filtered           = records.filter((r) => r.stage_no === stationId);
