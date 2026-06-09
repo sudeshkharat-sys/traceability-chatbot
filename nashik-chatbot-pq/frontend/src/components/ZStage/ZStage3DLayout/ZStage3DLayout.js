@@ -339,12 +339,6 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     // Green center path strip running through middle of this station
     buildZebraCrossing(cellCX, originZ, group);
 
-    // Status sphere on top
-    const sph = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 12), new THREE.MeshLambertMaterial({ color }));
-    sph.position.set(cellCX, HEIGHT + 0.35, cellCZ);
-    sph.userData.stationId = stnId;
-    group.add(sph);
-
     // Floor station-ID label
     if (stnId) {
       const lbl = makeFloorLabel(stnId, CELL_W * 0.65);
