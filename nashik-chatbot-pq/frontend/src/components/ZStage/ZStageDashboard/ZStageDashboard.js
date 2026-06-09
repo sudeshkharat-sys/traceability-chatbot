@@ -1503,53 +1503,50 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
     if (selectedId) handleRefreshRef.current?.();
   }, [refreshSignal, selectedId]);
 
-  // Compute dashboard box widths using canvas text measurement (synchronous,
-  // no DOM dependency) then resolve x-overlaps within each row band so
-  // full station-ID labels never overlap neighbouring boxes or arrows.
+  // Compute dashboard box widths + resolve 2D collisions (checks BOTH x and y
+  // overlap, not just row bands) so expanded full-name boxes never overlap.
   const adjPositions = React.useMemo(() => {
     if (!boxes.length) return {};
-    const ROW_BAND = 200;
-    const GAP      = 16;  // minimum gap between boxes
-    const COL_PAD  = 18;  // horizontal padding per column cell
+    const GAP     = 16;
+    const BOX_H   = 5 * 40; // 200px — same as layout box height
+    const COL_PAD = 18;
 
-    // Measure text width using an offscreen canvas — reliable before paint
     const ctx = (() => {
       try { return document.createElement('canvas').getContext('2d'); } catch { return null; }
     })();
-    const measureSid = (sid) => {
-      if (!ctx) return sid.length * 8;
-      ctx.font = 'bold 11px Arial';
-      return ctx.measureText(sid).width;
-    };
+    const measureSid = sid => ctx ? (ctx.font = 'bold 11px Arial', ctx.measureText(sid).width) : sid.length * 8;
 
-    // Estimated rendered width of a dashboard box (full station IDs shown)
-    const dashWidth = (box) => {
-      const colW = box.stationIds.reduce((sum, sid) =>
-        sum + Math.max(40, Math.ceil(measureSid(sid)) + COL_PAD), 0);
-      return colW + 4; // +4 for border
-    };
+    const dashWidth = box =>
+      box.stationIds.reduce((sum, sid) => sum + Math.max(40, Math.ceil(measureSid(sid)) + COL_PAD), 0) + 4;
 
-    // Group boxes into row bands
-    const rows = {};
-    boxes.forEach(b => {
-      const key = Math.floor((b.position?.y || 0) / ROW_BAND);
-      if (!rows[key]) rows[key] = [];
-      rows[key].push(b);
+    // Sort left-to-right; for each box shift it right past any previously
+    // placed box it overlaps in BOTH x and y.
+    const sorted = [...boxes].sort((a, b) => (a.position?.x || 0) - (b.position?.x || 0));
+    const placed = []; // { id, x, y, w }
+
+    sorted.forEach(box => {
+      let x = box.position?.x || 0;
+      const y = box.position?.y || 0;
+      const w = dashWidth(box);
+
+      // Keep re-checking until no more collisions (handles cascading shifts)
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const p of placed) {
+          const yOverlap = y < p.y + BOX_H && p.y < y + BOX_H;
+          if (!yOverlap) continue;
+          if (x < p.x + p.w + GAP) {
+            x = p.x + p.w + GAP;
+            changed = true;
+          }
+        }
+      }
+
+      placed.push({ id: box.id, x, y, w });
     });
 
-    const result = {};
-    Object.values(rows).forEach(rowBoxes => {
-      const sorted = [...rowBoxes].sort((a, b) => (a.position?.x || 0) - (b.position?.x || 0));
-      let minX = -Infinity;
-      sorted.forEach(box => {
-        const origX = box.position?.x || 0;
-        const x     = Math.max(origX, minX);
-        result[box.id] = { x, y: box.position?.y || 0 };
-        minX = x + dashWidth(box) + GAP;
-      });
-    });
-
-    return result;
+    return Object.fromEntries(placed.map(p => [p.id, { x: p.x, y: p.y }]));
   }, [boxes]);
 
   // Drag callback: update position live; auto-save to DB on commit
@@ -1934,11 +1931,16 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
           ct + positionY + cy * scale,
         ];
 
-        // Inject measured DOM widths so port positions and obstacles
-        // match the actual rendered box width (which grows with content).
+        // Inject adjusted positions + measured DOM widths so arrow routing
+        // matches the actual shifted/expanded box positions on screen.
         const boxesWithDomW = boxes.map((b) => {
           const domW = boxWidthsRef.current[b.id];
-          return domW ? { ...b, boxDomWidth: domW } : b;
+          const adj  = adjPositions[b.id];
+          return {
+            ...b,
+            ...(adj && { position: adj, position_x: adj.x, position_y: adj.y }),
+            ...(domW && { boxDomWidth: domW }),
+          };
         });
 
         const obstacles = buildObstacles(boxesWithDomW, 0);
