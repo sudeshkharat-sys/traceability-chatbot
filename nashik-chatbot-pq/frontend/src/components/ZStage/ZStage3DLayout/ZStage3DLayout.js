@@ -480,7 +480,7 @@ class WalkController {
 }
 
 // ── Three.js scene hook ────────────────────────────────────────────────────────
-function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, onStationClick) {
+function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, onStationClick, isActive) {
   const sceneRef       = useRef(null);
   const rendererRef    = useRef(null);
   const cameraRef      = useRef(null);
@@ -501,7 +501,8 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
 
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
-    renderer.setSize(canvas.clientWidth, canvas.clientHeight);
+    // Guard against 0×0 when tab is hidden — ResizeObserver will correct once visible
+    renderer.setSize(Math.max(1, canvas.clientWidth), Math.max(1, canvas.clientHeight));
     renderer.setClearColor(0xf0f2f5);
     rendererRef.current = renderer;
 
@@ -509,7 +510,9 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     scene.fog = new THREE.Fog(0xf0f2f5, 80, 250);
     sceneRef.current = scene;
 
-    const camera = new THREE.PerspectiveCamera(60, canvas.clientWidth / canvas.clientHeight, 0.1, 300);
+    const aspect = canvas.clientWidth && canvas.clientHeight
+      ? canvas.clientWidth / canvas.clientHeight : 1;
+    const camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 300);
     cameraRef.current = camera;
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.7));
@@ -629,6 +632,29 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     if (walkMode) { walk.yaw = 0; walk.pitch = 0; camera.position.y = 1.8; walk.attachMouseLook(canvas); }
     else { walk.detachMouseLook(); }
   }, [walkMode, canvasRef]);
+
+  // Force renderer resize when tab becomes visible.
+  // ResizeObserver on the canvas doesn't fire reliably when an ancestor
+  // toggles display:none → display:flex, so we handle it explicitly here.
+  useEffect(() => {
+    if (!isActive) return;
+    const canvas   = canvasRef.current;
+    const renderer = rendererRef.current;
+    const camera   = cameraRef.current;
+    if (!canvas || !renderer || !camera) return;
+    const doResize = () => {
+      const w = canvas.clientWidth, h = canvas.clientHeight;
+      if (!w || !h) return;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    };
+    // Run immediately in case canvas already has dimensions
+    doResize();
+    // Also schedule a deferred run to cover the paint frame
+    const tid = setTimeout(doResize, 60);
+    return () => clearTimeout(tid);
+  }, [isActive, canvasRef]);
 
   // Snap view
   const snapView = useCallback((view) => {
@@ -990,7 +1016,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   }, []);
 
   const { snapView, setTransformMode, placeObject, handleCanvasClick, selectById, deleteById, renameById } =
-    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick);
+    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive);
 
   const handleLayoutChange = useCallback((e) => {
     setSelectedLayoutId(Number(e.target.value) || null);
