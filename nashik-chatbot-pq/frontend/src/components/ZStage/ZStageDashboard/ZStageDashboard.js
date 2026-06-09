@@ -1503,55 +1503,60 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
     if (selectedId) handleRefreshRef.current?.();
   }, [refreshSignal, selectedId]);
 
-  // Compute dashboard box widths + resolve 2D collisions (checks BOTH x and y
-  // overlap, not just row bands) so expanded full-name boxes never overlap.
+  // Compute per-box dashboard widths and resolve overlaps ONLY for boxes that
+  // are truly on the same row (position_y within 1 grid = 40px of each other).
+  // Cross-row boxes are NOT shifted — shifting them disconnects them from their
+  // connected buyoff icons and arrows which stay at original positions.
   const adjPositions = React.useMemo(() => {
     if (!boxes.length) return {};
-    const GAP     = 16;
-    const BOX_H   = 5 * 40; // 200px — same as layout box height
-    const COL_PAD = 18;
+    const GRID_PX  = 40;
+    const GAP      = 12;   // minimum gap between same-row boxes
+    const COL_PAD  = 16;   // horizontal padding per column cell
 
     const ctx = (() => {
       try { return document.createElement('canvas').getContext('2d'); } catch { return null; }
     })();
-    const measureSid = sid => ctx ? (ctx.font = 'bold 11px Arial', ctx.measureText(sid).width) : sid.length * 8;
+    const measureSid = sid => ctx ? (ctx.font = 'bold 11px Arial', ctx.measureText(sid).width) : sid.length * 7;
 
+    // Fixed computed width per box (replaces max-content) — same value used
+    // for visual CSS width, arrow obstacles, and overlap detection.
     const dashWidth = box =>
-      box.stationIds.reduce((sum, sid) => sum + Math.max(40, Math.ceil(measureSid(sid)) + COL_PAD), 0) + 4;
+      box.stationIds.reduce((sum, sid) =>
+        sum + Math.max(GRID_PX, Math.ceil(measureSid(sid)) + COL_PAD), 0) + 4;
 
-    // Sort left-to-right; for each box shift it right past any previously
-    // placed box it overlaps in BOTH x and y.
-    const sorted = [...boxes].sort((a, b) => (a.position?.x || 0) - (b.position?.x || 0));
-    const placed = []; // { id, x, y, w }
+    // Group into same-row clusters: boxes whose position_y is within 40px of
+    // each other. Sort each cluster left-to-right and resolve x-overlaps.
+    const result = {};
+    const widths  = {};
+    boxes.forEach(b => { widths[b.id] = dashWidth(b); });
 
-    sorted.forEach(box => {
-      let x = box.position?.x || 0;
-      const y = box.position?.y || 0;
-      const w = dashWidth(box);
-
-      // Keep re-checking until no more collisions (handles cascading shifts).
-      // Only treat as collision if y-overlap > 30px to avoid large cascading
-      // shifts from tiny y-overlaps between boxes on adjacent rows.
-      const MIN_Y_OVERLAP = 30;
-      let changed = true;
-      while (changed) {
-        changed = false;
-        for (const p of placed) {
-          const yOverlapAmt = Math.min(y + BOX_H, p.y + BOX_H) - Math.max(y, p.y);
-          if (yOverlapAmt < MIN_Y_OVERLAP) continue;
-          if (x < p.x + p.w + GAP) {
-            x = p.x + p.w + GAP;
-            changed = true;
-          }
-        }
-      }
-
-      placed.push({ id: box.id, x, y, w });
+    // Cluster by snapping y to nearest 40px multiple
+    const clusters = {};
+    boxes.forEach(b => {
+      const key = Math.round((b.position?.y || 0) / GRID_PX) * GRID_PX;
+      if (!clusters[key]) clusters[key] = [];
+      clusters[key].push(b);
     });
 
-    // Include estimated width so arrow routing has correct obstacle sizes
-    // even on first render before boxWidthsRef is populated from DOM.
-    return Object.fromEntries(placed.map(p => [p.id, { x: p.x, y: p.y, estW: p.w }]));
+    Object.values(clusters).forEach(group => {
+      const sorted = [...group].sort((a, b) => (a.position?.x || 0) - (b.position?.x || 0));
+      let minX = -Infinity;
+      sorted.forEach(box => {
+        const origX = box.position?.x || 0;
+        const x = Math.max(origX, minX);
+        result[box.id] = { x, y: box.position?.y || 0, estW: widths[box.id] };
+        minX = x + widths[box.id] + GAP;
+      });
+    });
+
+    // For boxes not in a cluster (no same-row neighbours), still record width
+    boxes.forEach(b => {
+      if (!result[b.id]) {
+        result[b.id] = { x: b.position?.x || 0, y: b.position?.y || 0, estW: widths[b.id] };
+      }
+    });
+
+    return result;
   }, [boxes]);
 
   // Drag callback: update position live; auto-save to DB on commit
@@ -1809,8 +1814,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                               position: 'absolute',
                               left: adjPos.x,
                               top: adjPos.y,
-                              width: 'max-content',
-                              minWidth: w,
+                              width: adjPos.estW || w,
                             }}
                           >
                             {/* Invisible Xarrow anchor points — mirror the layout editor dot positions */}
