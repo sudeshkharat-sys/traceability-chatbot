@@ -505,30 +505,28 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     const scaleZ   = DEPTH  / BOX_H_2D; // 0.03
     const MIN_GAP  = CELL_W * 1.5;  // minimum clearance = 1.5 station-id cell widths
 
-    // Snap raw 2D positions to the nearest grid line so boxes within 1 grid
-    // cell of each other on the same axis share the same 3D coordinate.
-    const snapPos = v => Math.round((v || 0) / GRID_2D) * GRID_2D;
+    // Group boxes into rows using floor(position_y / BOX_H_2D) — any two boxes
+    // within the same 200px band (one box-height) are treated as the same row.
+    // This is more robust than snapping to 40px grid which fails when boxes in
+    // the same visual row differ by more than 20px in position_y.
+    const rowBand  = v => Math.floor((v || 0) / BOX_H_2D);
+    // Representative y for each band = band index * BOX_H_2D
+    const bandSet  = [...new Set(boxes.map(b => rowBand(b.position_y)))].sort((a, b) => a - b);
 
-    // z-axis: group by snapped position_y rows with minimum gap enforcement.
-    // x-axis: use direct position_x * scaleX — boxes in different rows can
-    // share x ranges, so forcing them into separate column slots (xMap) wrongly
-    // shifts boxes like a single-cell box sitting below a wider parent box.
-    const rowYs = [...new Set(boxes.map(b => snapPos(b.position_y)))].sort((a, b) => a - b);
-
-    const zMap = {};
+    const zMap = {};   // keyed by band index
     let curZ = 0;
-    rowYs.forEach((py, i) => {
-      zMap[py] = curZ;
-      if (i < rowYs.length - 1) {
-        const scaledStep = (rowYs[i + 1] - py) * scaleZ;
+    bandSet.forEach((band, i) => {
+      zMap[band] = curZ;
+      if (i < bandSet.length - 1) {
+        const scaledStep = (bandSet[i + 1] - band) * BOX_H_2D * scaleZ; // = (bandDiff) * DEPTH
         curZ += Math.max(scaledStep, DEPTH + MIN_GAP);
       }
     });
 
     const layoutBoxes = boxes.map(b => ({
       ...b,
-      _x3d: snapPos(b.position_x) * scaleX,
-      _z3d: zMap[snapPos(b.position_y)] ?? 0,
+      _x3d: (b.position_x || 0) * scaleX,
+      _z3d: zMap[rowBand(b.position_y)] ?? 0,
     }));
 
     layoutBoxes.forEach(box => buildStationShell(box, statusMap, zeMap, scene));
