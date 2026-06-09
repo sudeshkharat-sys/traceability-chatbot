@@ -500,7 +500,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     // Fixed spacing: gap between boxes = 2 × CELL_W on both axes.
     // Group boxes by unique position_y (rows), then lay out each row
     // left-to-right with fixed gap, and rows top-to-bottom with fixed gap.
-    const AISLE = 2 * CELL_W;
+    const AISLE = CELL_W;
 
     // Collect unique row Y values sorted ascending
     const rowYs = [...new Set(boxes.map(b => b.position_y || 0))].sort((a, b) => a - b);
