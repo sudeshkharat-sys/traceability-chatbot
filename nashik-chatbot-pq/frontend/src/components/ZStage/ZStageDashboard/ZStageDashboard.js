@@ -1263,8 +1263,6 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
   const [layouts, setLayouts]         = useState([]);
   const [selectedId, setSelectedId]   = useState(null);
   const [boxes, setBoxes]             = useState([]);
-  const boxMeasureRefs                = useRef({});
-  const [adjPositions, setAdjPositions] = useState({});
   const [buyoffIcons, setBuyoffIcons] = useState([]);
   const [connections, setConnections] = useState([]);
   const [textLabels, setTextLabels]   = useState([]);
@@ -1505,19 +1503,33 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
     if (selectedId) handleRefreshRef.current?.();
   }, [refreshSignal, selectedId]);
 
-  // After boxes render, measure actual DOM widths and shift same-row boxes
-  // apart so full station-ID labels don't overlap neighbouring boxes or arrows.
-  useEffect(() => {
-    if (!boxes.length) return;
+  // Compute dashboard box widths using canvas text measurement (synchronous,
+  // no DOM dependency) then resolve x-overlaps within each row band so
+  // full station-ID labels never overlap neighbouring boxes or arrows.
+  const adjPositions = React.useMemo(() => {
+    if (!boxes.length) return {};
     const ROW_BAND = 200;
-    const GAP      = 12;
+    const GAP      = 16;  // minimum gap between boxes
+    const COL_PAD  = 18;  // horizontal padding per column cell
 
-    const measured = {};
-    boxes.forEach(b => {
-      const el = boxMeasureRefs.current[b.id];
-      measured[b.id] = el ? el.getBoundingClientRect().width : boxWidth(b.stationIds.length);
-    });
+    // Measure text width using an offscreen canvas — reliable before paint
+    const ctx = (() => {
+      try { return document.createElement('canvas').getContext('2d'); } catch { return null; }
+    })();
+    const measureSid = (sid) => {
+      if (!ctx) return sid.length * 8;
+      ctx.font = 'bold 11px Arial';
+      return ctx.measureText(sid).width;
+    };
 
+    // Estimated rendered width of a dashboard box (full station IDs shown)
+    const dashWidth = (box) => {
+      const colW = box.stationIds.reduce((sum, sid) =>
+        sum + Math.max(40, Math.ceil(measureSid(sid)) + COL_PAD), 0);
+      return colW + 4; // +4 for border
+    };
+
+    // Group boxes into row bands
     const rows = {};
     boxes.forEach(b => {
       const key = Math.floor((b.position?.y || 0) / ROW_BAND);
@@ -1525,22 +1537,19 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
       rows[key].push(b);
     });
 
-    const next = {};
+    const result = {};
     Object.values(rows).forEach(rowBoxes => {
       const sorted = [...rowBoxes].sort((a, b) => (a.position?.x || 0) - (b.position?.x || 0));
       let minX = -Infinity;
       sorted.forEach(box => {
         const origX = box.position?.x || 0;
         const x     = Math.max(origX, minX);
-        next[box.id] = { x, y: box.position?.y || 0 };
-        minX = x + (measured[box.id] || boxWidth(box.stationIds.length)) + GAP;
+        result[box.id] = { x, y: box.position?.y || 0 };
+        minX = x + dashWidth(box) + GAP;
       });
     });
 
-    setAdjPositions(prev => {
-      const changed = boxes.some(b => prev[b.id]?.x !== next[b.id]?.x || prev[b.id]?.y !== next[b.id]?.y);
-      return changed ? next : prev;
-    });
+    return result;
   }, [boxes]);
 
   // Drag callback: update position live; auto-save to DB on commit
@@ -1793,7 +1802,6 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                           <div
                             key={box.id}
                             id={box.id}
-                            ref={el => { boxMeasureRefs.current[box.id] = el; }}
                             className="dash-box"
                             style={{
                               position: 'absolute',
