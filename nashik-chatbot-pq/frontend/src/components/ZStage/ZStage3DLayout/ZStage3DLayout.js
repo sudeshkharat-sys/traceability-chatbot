@@ -270,7 +270,10 @@ function buildStationShell(box, statusMap, zeMap, scene) {
   const totalW  = count * CELL_W;
   const originX = box._x3d ?? (box.position_x || 0) * SCALE;
   const originZ = box._z3d ?? (box.position_y || 0) * SCALE;
-  const structMat = new THREE.MeshLambertMaterial({ color: 0x37474f, transparent: true, opacity: 0.55 });
+  // Steel-look: dark blue-grey with specular highlight via Phong
+  const structMat = new THREE.MeshPhongMaterial({
+    color: 0x546e7a, specular: 0x90a4ae, shininess: 60,
+  });
 
   // ── 4 corner columns ──
   [[originX, originZ], [originX + totalW, originZ],
@@ -323,10 +326,10 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     const stnId  = stationIds[i] || `STN-${i + 1}`;
     const color  = STATUS_HEX[statusMap[stnId] || null] ?? STATUS_HEX.null;
 
-    // Gray floor — full cell width, semi-transparent dark
+    // Concrete-look floor — solid dark grey
     const floor  = new THREE.Mesh(
-      new THREE.BoxGeometry(CELL_W - 0.05, 0.12, DEPTH - 0.05),
-      new THREE.MeshLambertMaterial({ color: 0x263238, transparent: true, opacity: 0.45 })
+      new THREE.BoxGeometry(CELL_W - 0.05, 0.15, DEPTH - 0.05),
+      new THREE.MeshPhongMaterial({ color: 0x455a64, specular: 0x607d8b, shininess: 20 })
     );
     floor.position.set(cellCX, 0.09, cellCZ);
     floor.userData.stationId = stnId;
@@ -515,9 +518,12 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     const camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 300);
     cameraRef.current = camera;
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
-    dir.position.set(20, 30, 20); scene.add(dir);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    const dir = new THREE.DirectionalLight(0xffffff, 1.1);
+    dir.position.set(20, 40, 25); scene.add(dir);
+    // Fill light from opposite side to reduce harsh shadows
+    const fill = new THREE.DirectionalLight(0xdce8ff, 0.35);
+    fill.position.set(-20, 10, -20); scene.add(fill);
     scene.add(new THREE.GridHelper(200, 100, 0xb0bec5, 0xdde1e7));
 
     const boxes = layout.station_boxes || [];
