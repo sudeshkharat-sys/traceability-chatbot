@@ -1284,7 +1284,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
 
   const canvasRef    = useRef(null);
   const transformRef = useRef(null);
-  const boxWidthsRef = useRef({});  // { [boxId]: measuredOffsetWidth }
+  const [boxWidths, setBoxWidths] = useState({});  // { [boxId]: measuredOffsetWidth }
   // Track the activeLayoutId value from the last time savedLayouts synced,
   // so we can detect when it changed (e.g. a new layout was just created).
   const prevActiveLayoutIdRef = useRef(activeLayoutId);
@@ -1577,14 +1577,16 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
 
   // Measure actual rendered box widths after each boxes render so arrow
   // routing uses the real DOM width instead of the formula estimate.
+  // Re-measure whenever boxes change OR the tab becomes visible.
+  // Using state (not ref) so updating widths triggers a re-render of the arrows.
   useEffect(() => {
     const measured = {};
     boxes.forEach((box) => {
       const el = document.getElementById(box.id);
-      if (el) measured[box.id] = el.offsetWidth;
+      if (el && el.offsetWidth > 0) measured[box.id] = el.offsetWidth;
     });
-    boxWidthsRef.current = measured;
-  }, [boxes]);
+    if (Object.keys(measured).length > 0) setBoxWidths(measured);
+  }, [boxes, isActive]);
 
   return (
     <>
@@ -1948,7 +1950,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
         // Inject adjusted positions + measured DOM widths so arrow routing
         // matches the actual shifted/expanded box positions on screen.
         const boxesWithDomW = boxes.map((b) => {
-          const domW = boxWidthsRef.current[b.id];
+          const domW = boxWidths[b.id];
           const adj  = adjPositions[b.id];
           // Use actual DOM width if measured, else fall back to estimated width
           // from adjPositions so obstacle sizes are correct on first render.

@@ -496,6 +496,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
   const sceneCenterRef = useRef(new THREE.Vector3(0, 0, 0));
   const sceneSpanRef   = useRef(20);
   const walkModeRef    = useRef(walkMode);
+  const layoutIdRef    = useRef(null);   // kept in sync by the scene effect
   useEffect(() => { walkModeRef.current = walkMode; }, [walkMode]);
 
   useEffect(() => {
@@ -592,7 +593,22 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
 
     // TransformControls
     const tc = new TransformControls(camera, renderer.domElement);
-    tc.addEventListener('dragging-changed', (e) => { orbit.enabled = !e.value; });
+    tc.addEventListener('dragging-changed', (e) => {
+      orbit.enabled = !e.value;
+      // Drag finished — persist updated transform to IDB
+      if (!e.value && selectedRef.current && layoutIdRef.current) {
+        const { mesh, id, name } = selectedRef.current;
+        z3dPut({
+          key: `${layoutIdRef.current}_${id}`,
+          layoutId: layoutIdRef.current,
+          id, name,
+          ext: mesh.userData.objExt || 'glb',
+          px: mesh.position.x, py: mesh.position.y, pz: mesh.position.z,
+          rx: mesh.rotation.x, ry: mesh.rotation.y, rz: mesh.rotation.z,
+          sx: mesh.scale.x,    sy: mesh.scale.y,    sz: mesh.scale.z,
+        });
+      }
+    });
     scene.add(tc);
     transformRef.current = tc;
 
@@ -610,6 +626,48 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       camera.updateProjectionMatrix();
     });
     ro.observe(canvas);
+
+    // Track current layoutId for IDB saves inside event handlers
+    layoutIdRef.current = layout.id;
+
+    // Reload previously saved placed objects from IDB
+    z3dGetAll(layout.id).then(saved => {
+      saved.forEach(record => {
+        const blob = record.fileBlob;
+        if (!blob) return;
+        const file = new File([blob], `${record.name}.${record.ext || 'glb'}`, { type: blob.type || 'model/gltf-binary' });
+        const url  = URL.createObjectURL(file);
+        const ext  = record.ext || 'glb';
+
+        const onRestored = (obj) => {
+          URL.revokeObjectURL(url);
+          obj.traverse(child => {
+            if (child.isSprite || (child.material && child.material.map === null && child.isLine)) child.visible = false;
+          });
+          // Restore saved transform
+          obj.position.set(record.px ?? 0, record.py ?? 0, record.pz ?? 0);
+          obj.rotation.set(record.rx ?? 0, record.ry ?? 0, record.rz ?? 0);
+          obj.scale.set(record.sx ?? 1,    record.sy ?? 1,    record.sz ?? 1);
+          obj.userData.isPlaced = true;
+          obj.userData.objId    = record.id;
+          obj.userData.objName  = record.name;
+          obj.userData.objExt   = ext;
+          scene.add(obj);
+          const entry = { id: record.id, mesh: obj, label: null, name: record.name };
+          placedRef.current = [...placedRef.current, entry];
+          onObjectsChange([...placedRef.current]);
+        };
+
+        try {
+          if (ext === 'glb' || ext === 'gltf') new GLTFLoader().load(url, g => onRestored(g.scene));
+          else if (ext === 'obj') new OBJLoader().load(url, onRestored);
+          else if (ext === 'stl') new STLLoader().load(url, geo => {
+            geo.computeVertexNormals();
+            onRestored(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x90a4ae })));
+          });
+        } catch {}
+      });
+    });
 
     // Signal that the scene is built and ready to display
     onSceneReady && onSceneReady();
@@ -759,14 +817,30 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       obj.position.x = c.x;
       obj.position.z = c.z;
 
+      const objId = Date.now().toString();
       obj.userData.isPlaced = true;
-      obj.userData.objId    = Date.now().toString();
+      obj.userData.objId    = objId;
       obj.userData.objName  = name;
+      obj.userData.objExt   = ext;
 
       scene.add(obj);
 
-      const entry = { id: obj.userData.objId, mesh: obj, label: null, name };
+      const entry = { id: objId, mesh: obj, label: null, name };
       placedRef.current = [...placedRef.current, entry];
+
+      // Persist to IDB (file blob + initial transform)
+      if (layoutId) {
+        file.arrayBuffer().then(buf => {
+          z3dPut({
+            key: `${layoutId}_${objId}`,
+            layoutId, id: objId, name, ext,
+            fileBlob: new Blob([buf], { type: file.type || 'application/octet-stream' }),
+            px: obj.position.x, py: obj.position.y, pz: obj.position.z,
+            rx: obj.rotation.x, ry: obj.rotation.y, rz: obj.rotation.z,
+            sx: obj.scale.x,    sy: obj.scale.y,    sz: obj.scale.z,
+          });
+        }).catch(() => {});
+      }
 
       // Select immediately and set mode to translate
       if (transformRef.current) {
@@ -863,6 +937,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     if (entry.label) scene.remove(entry.label);
     placedRef.current = placedRef.current.filter(p => p.id !== id);
     if (selectedRef.current?.id === id) selectedRef.current = null;
+    if (layoutIdRef.current) z3dDel(`${layoutIdRef.current}_${id}`);
     onObjectsChange([...placedRef.current]);
   }, [onObjectsChange]);
 
@@ -923,9 +998,51 @@ function computeZeMap(records) {
   return map;
 }
 
-function saveToLS(layoutId) {
-  // Save object metadata (name + position) — mesh can't be serialised
-  // Full save would need backend; this is session persistence via localStorage
+// ── IndexedDB helpers for placed-object persistence ───────────────────────────
+const Z3D_DB   = 'z3d_placed_v1';
+const Z3D_STORE = 'objects';
+
+function z3dOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(Z3D_DB, 1);
+    req.onupgradeneeded = (e) => e.target.result.createObjectStore(Z3D_STORE, { keyPath: 'key' });
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror   = (e) => reject(e.target.error);
+  });
+}
+async function z3dGetAll(layoutId) {
+  try {
+    const db  = await z3dOpen();
+    const all = await new Promise((res) => {
+      const req = db.transaction(Z3D_STORE, 'readonly').objectStore(Z3D_STORE).getAll();
+      req.onsuccess = () => res(req.result || []);
+      req.onerror   = () => res([]);
+    });
+    db.close();
+    return all.filter(r => r.layoutId === layoutId);
+  } catch { return []; }
+}
+async function z3dPut(record) {
+  try {
+    const db = await z3dOpen();
+    await new Promise((res, rej) => {
+      const tx = db.transaction(Z3D_STORE, 'readwrite');
+      tx.objectStore(Z3D_STORE).put(record);
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+    db.close();
+  } catch {}
+}
+async function z3dDel(key) {
+  try {
+    const db = await z3dOpen();
+    await new Promise((res) => {
+      const tx = db.transaction(Z3D_STORE, 'readwrite');
+      tx.objectStore(Z3D_STORE).delete(key);
+      tx.oncomplete = res; tx.onerror = res;
+    });
+    db.close();
+  } catch {}
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
