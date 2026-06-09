@@ -137,8 +137,29 @@ function makeIBeam(length, mat, orientation) {
   return group;
 }
 
-// ── (removed zebra crossing — paths are drawn between boxes only) ──────────────
-function buildZebraCrossing(_cellCX, _originZ, _group) { /* no-op */ }
+// ── Green center strip inside each station cell ────────────────────────────────
+function buildZebraCrossing(cellCX, originZ, group) {
+  const cellCZ = originZ + DEPTH / 2;
+  const fillGeo = new THREE.PlaneGeometry(CELL_W - 0.1, ZEBRA_W - 0.08);
+  const fillMat = new THREE.MeshBasicMaterial({ color: 0xa5d6a7, transparent: true, opacity: 0.7, side: THREE.DoubleSide });
+  const fill = new THREE.Mesh(fillGeo, fillMat);
+  fill.rotation.x = -Math.PI / 2;
+  fill.position.set(cellCX, 0.19, cellCZ);
+  group.add(fill);
+  const borderMat = new THREE.MeshBasicMaterial({ color: 0x2e7d32, side: THREE.DoubleSide });
+  const T = 0.08;
+  [
+    { geo: new THREE.PlaneGeometry(CELL_W, T), pos: [cellCX, 0.20, cellCZ - ZEBRA_W / 2 + T / 2] },
+    { geo: new THREE.PlaneGeometry(CELL_W, T), pos: [cellCX, 0.20, cellCZ + ZEBRA_W / 2 - T / 2] },
+    { geo: new THREE.PlaneGeometry(T, ZEBRA_W), pos: [cellCX - CELL_W / 2 + T / 2, 0.20, cellCZ] },
+    { geo: new THREE.PlaneGeometry(T, ZEBRA_W), pos: [cellCX + CELL_W / 2 - T / 2, 0.20, cellCZ] },
+  ].forEach(({ geo, pos }) => {
+    const mesh = new THREE.Mesh(geo, borderMat);
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.position.set(...pos);
+    group.add(mesh);
+  });
+}
 
 // ── Cantilever sign — one per station cell ─────────────────────────────────────
 // Rod attaches to front beam at cell centre, sticks out +Z toward viewer.
