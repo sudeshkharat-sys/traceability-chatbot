@@ -647,3 +647,62 @@
   font-weight: 600;
   color: #1a237e;
 }
+
+/* ── Scene loading overlay ──────────────────────────────────────────────────── */
+.z3d-scene-loading {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 20, 30, 0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  pointer-events: none;
+}
+.z3d-scene-loading-box {
+  background: #1a1f2e;
+  border: 1px solid #2d3550;
+  border-radius: 14px;
+  padding: 36px 48px;
+  min-width: 280px;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+}
+.z3d-scene-loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(99, 179, 237, 0.2);
+  border-top-color: #63b3ed;
+  border-radius: 50%;
+  margin: 0 auto 18px;
+  animation: z3d-spin 0.9s linear infinite;
+}
+@keyframes z3d-spin {
+  to { transform: rotate(360deg); }
+}
+.z3d-scene-loading-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: #a0aec0;
+  margin-bottom: 18px;
+  letter-spacing: 0.3px;
+}
+.z3d-scene-loading-bar-track {
+  width: 100%;
+  height: 4px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.z3d-scene-loading-bar-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #2b6cb0, #63b3ed, #2b6cb0);
+  background-size: 200% 100%;
+  border-radius: 4px;
+  animation: z3d-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes z3d-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}

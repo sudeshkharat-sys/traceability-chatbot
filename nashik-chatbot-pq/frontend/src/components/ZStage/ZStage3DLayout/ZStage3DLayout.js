@@ -480,7 +480,7 @@ class WalkController {
 }
 
 // ── Three.js scene hook ────────────────────────────────────────────────────────
-function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, onStationClick, isActive) {
+function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, onStationClick, isActive, onSceneReady) {
   const sceneRef       = useRef(null);
   const rendererRef    = useRef(null);
   const cameraRef      = useRef(null);
@@ -604,6 +604,9 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       camera.updateProjectionMatrix();
     });
     ro.observe(canvas);
+
+    // Signal that the scene is built and ready to display
+    onSceneReady && onSceneReady();
 
     const animate = () => {
       rafRef.current = requestAnimationFrame(animate);
@@ -939,6 +942,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [records,           setRecords]           = useState([]);
   const [auditRecords,      setAuditRecords]      = useState([]);
   const [adherenceRecords,  setAdherenceRecords]  = useState([]);
+  const [sceneReady,        setSceneReady]        = useState(false);
 
   useEffect(() => {
     if (activeLayoutId && !selectedLayoutId) setSelectedLayoutId(activeLayoutId);
@@ -946,6 +950,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
 
   useEffect(() => {
     if (!selectedLayoutId) return;
+    setSceneReady(false);
     layoutApi.getLayout(selectedLayoutId).then(res => setLayout(res.data)).catch(() => {});
   }, [selectedLayoutId]);
 
@@ -1015,8 +1020,12 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setPopupStation(stationId);
   }, []);
 
+  const handleSceneReady = useCallback(() => {
+    setSceneReady(true);
+  }, []);
+
   const { snapView, setTransformMode, placeObject, handleCanvasClick, selectById, deleteById, renameById } =
-    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive);
+    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady);
 
   const handleLayoutChange = useCallback((e) => {
     setSelectedLayoutId(Number(e.target.value) || null);
@@ -1169,6 +1178,17 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
           ) : (
             <>
               <canvas ref={canvasRef} className="z3d-canvas" onClick={handleCanvasClick} />
+              {!sceneReady && (
+                <div className="z3d-scene-loading">
+                  <div className="z3d-scene-loading-box">
+                    <div className="z3d-scene-loading-spinner" />
+                    <div className="z3d-scene-loading-text">Building 3D scene…</div>
+                    <div className="z3d-scene-loading-bar-track">
+                      <div className="z3d-scene-loading-bar-fill" />
+                    </div>
+                  </div>
+                </div>
+              )}
               {converting && (
                 <div className="z3d-convert-overlay">
                   <div className="z3d-convert-box">
