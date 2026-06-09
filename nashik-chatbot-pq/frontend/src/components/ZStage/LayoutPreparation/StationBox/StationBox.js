@@ -16,6 +16,11 @@ function smartTrimName(name) {
 // Dot is 10px wide, so left edge offset: 22 + i*40 - 5 = 17 + i*40
 const SID_DOT_LEFT = (i) => 17 + i * 40;
 
+// Snap to absolute 40px grid multiples from canvas origin.
+// Using absolute snap (not delta-based) so boxes always land on the same
+// grid lines regardless of where the drag started.
+const snapAbs = v => Math.round(v / 40) * 40;
+
 function StationBox({
   id,
   name,
@@ -128,14 +133,15 @@ function StationBox({
 
   const handleDrag = (e, data) => {
     dragMovedRef.current = true;
-    setPos({ x: data.x, y: data.y });
+    // Snap to absolute grid multiples so box visually locks to grid during drag
+    setPos({ x: snapAbs(data.x), y: snapAbs(data.y) });
     updateXarrow();
   };
 
   const handleStop = (e, data) => {
     setIsDragging(false);
     if (dragMovedRef.current) {
-      if (onPositionChange) onPositionChange(id, { x: data.x, y: data.y });
+      if (onPositionChange) onPositionChange(id, { x: snapAbs(data.x), y: snapAbs(data.y) });
     } else {
       if (onSelect && !editingName && !editingDesc && editingSnameIdx === null && editingSidIdx === null) {
         onSelect(id, e.ctrlKey || e.metaKey);
@@ -170,7 +176,6 @@ function StationBox({
       handle=".station-box-drag-handle"
       disabled={editingName || editingSnameIdx !== null || editingSidIdx !== null}
       scale={canvasScale || 1}
-      grid={[40, 40]}
     >
       <div
         ref={nodeRef}

@@ -636,6 +636,46 @@ function DocsTab({ stationId, masterRecords, userId, layoutId }) {
 
   useEffect(() => { load(); }, [load]);
 
+  // After boxes render, measure actual DOM widths and shift same-row boxes
+  // apart so full station-ID labels don't overlap neighbouring boxes or arrows.
+  useEffect(() => {
+    if (!boxes.length) return;
+    const ROW_BAND = 200; // group boxes within 200px of each other as same row
+    const GAP      = 12;  // minimum pixel gap between boxes in dashboard
+
+    const measured = {};
+    boxes.forEach(b => {
+      const el = boxMeasureRefs.current[b.id];
+      measured[b.id] = el ? el.getBoundingClientRect().width : boxWidth(b.stationIds.length);
+    });
+
+    // Group by row band
+    const rows = {};
+    boxes.forEach(b => {
+      const key = Math.floor((b.position?.y || 0) / ROW_BAND);
+      if (!rows[key]) rows[key] = [];
+      rows[key].push(b);
+    });
+
+    const next = {};
+    Object.values(rows).forEach(rowBoxes => {
+      const sorted = [...rowBoxes].sort((a, b) => (a.position?.x || 0) - (b.position?.x || 0));
+      let minX = -Infinity;
+      sorted.forEach(box => {
+        const origX = box.position?.x || 0;
+        const x     = Math.max(origX, minX);
+        next[box.id] = { x, y: box.position?.y || 0 };
+        minX = x + (measured[box.id] || boxWidth(box.stationIds.length)) + GAP;
+      });
+    });
+
+    setAdjPositions(prev => {
+      // Only update state if something actually changed
+      const changed = boxes.some(b => prev[b.id]?.x !== next[b.id]?.x || prev[b.id]?.y !== next[b.id]?.y);
+      return changed ? next : prev;
+    });
+  }, [boxes]);
+
   const handleUpload = async (file, concernId, docType) => {
     const key = `${concernId}__${docType}`;
     setUploading((p) => ({ ...p, [key]: true }));
@@ -1263,6 +1303,8 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
   const [layouts, setLayouts]         = useState([]);
   const [selectedId, setSelectedId]   = useState(null);
   const [boxes, setBoxes]             = useState([]);
+  const boxMeasureRefs                = useRef({});
+  const [adjPositions, setAdjPositions] = useState({});
   const [buyoffIcons, setBuyoffIcons] = useState([]);
   const [connections, setConnections] = useState([]);
   const [textLabels, setTextLabels]   = useState([]);
@@ -1747,16 +1789,18 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                         box.stationIds.forEach((sid) => {
                           stationData[sid] = computeStationData(records, sid);
                         });
+                        const adjPos = adjPositions[box.id] ?? box.position;
 
                         return (
                           <div
                             key={box.id}
                             id={box.id}
+                            ref={el => { boxMeasureRefs.current[box.id] = el; }}
                             className="dash-box"
                             style={{
                               position: 'absolute',
-                              left: box.position.x,
-                              top: box.position.y,
+                              left: adjPos.x,
+                              top: adjPos.y,
                               width: 'max-content',
                               minWidth: w,
                             }}
