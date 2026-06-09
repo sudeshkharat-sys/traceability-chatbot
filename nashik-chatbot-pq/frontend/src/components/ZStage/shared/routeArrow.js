@@ -45,7 +45,7 @@ export function getPortCanvasPos(portId, boxes, buyoffIcons, colWidth = GRID, bo
   const box = boxes.find((b) => b.id === elemId);
   if (box) {
     const cols     = box.stationIds?.length ?? 2;
-    const w        = box.boxDomWidth ?? (Math.max(1, cols) * colWidth + 4);
+    const w        = box.boxDomWidth ?? (Math.max(2, cols) * colWidth + 4);
     const h        = box.boxHeight ?? boxHeight;
     const { x: bx, y: by } = box.position;
     // Port centre per column: half column width + 2px border offset
@@ -86,7 +86,7 @@ export function buildObstacles(boxes, marginCells = 0, colWidth = GRID, boxHeigh
   const occ = new Set();
   for (const box of boxes) {
     const cols = box.stationIds?.length ?? 2;
-    const w    = box.boxDomWidth ?? (Math.max(1, cols) * colWidth + 4);
+    const w    = box.boxDomWidth ?? (Math.max(2, cols) * colWidth + 4);
     const h    = box.boxHeight ?? boxHeight;
     const x1   = Math.floor(box.position.x / GRID)          - marginCells;
     const y1   = Math.floor(box.position.y / GRID)          - marginCells;
