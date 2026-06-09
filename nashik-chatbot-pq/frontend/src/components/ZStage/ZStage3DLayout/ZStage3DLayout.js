@@ -703,6 +703,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
   // Force renderer resize when tab becomes visible.
   // ResizeObserver on the canvas doesn't fire reliably when an ancestor
   // toggles display:none → display:flex, so we handle it explicitly here.
+  // onSceneReady is called again after the resize so the loading overlay clears.
   useEffect(() => {
     if (!isActive) return;
     const canvas   = canvasRef.current;
@@ -716,12 +717,10 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
     };
-    // Run immediately in case canvas already has dimensions
     doResize();
-    // Also schedule a deferred run to cover the paint frame
-    const tid = setTimeout(doResize, 60);
+    const tid = setTimeout(() => { doResize(); onSceneReady && onSceneReady(); }, 120);
     return () => clearTimeout(tid);
-  }, [isActive, canvasRef]);
+  }, [isActive, canvasRef]); // eslint-disable-line
 
   // Snap view
   const snapView = useCallback((view) => {

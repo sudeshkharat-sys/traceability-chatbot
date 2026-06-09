@@ -1575,18 +1575,31 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
     }
   }, [selectedId]);
 
-  // Measure actual rendered box widths after each boxes render so arrow
-  // routing uses the real DOM width instead of the formula estimate.
-  // Re-measure whenever boxes change OR the tab becomes visible.
-  // Using state (not ref) so updating widths triggers a re-render of the arrows.
-  useEffect(() => {
+  // Measure rendered box widths and store in state so arrows re-render.
+  // Deferred with setTimeout so the browser has actually laid out and
+  // painted the new elements before offsetWidth is read.
+  const measureBoxWidths = useCallback(() => {
     const measured = {};
     boxes.forEach((box) => {
       const el = document.getElementById(box.id);
       if (el && el.offsetWidth > 0) measured[box.id] = el.offsetWidth;
     });
     if (Object.keys(measured).length > 0) setBoxWidths(measured);
-  }, [boxes, isActive]);
+  }, [boxes]);
+
+  // Re-measure after boxes change (deferred one frame)
+  useEffect(() => {
+    const tid = setTimeout(measureBoxWidths, 0);
+    return () => clearTimeout(tid);
+  }, [measureBoxWidths]);
+
+  // Re-measure when tab becomes visible — parent was display:none so
+  // offsetWidth was 0 on previous measurements
+  useEffect(() => {
+    if (!isActive) return;
+    const tid = setTimeout(measureBoxWidths, 80);
+    return () => clearTimeout(tid);
+  }, [isActive, measureBoxWidths]);
 
   return (
     <>
