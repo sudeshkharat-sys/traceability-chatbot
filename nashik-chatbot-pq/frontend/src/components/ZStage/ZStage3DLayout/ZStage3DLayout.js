@@ -18,9 +18,10 @@ const SCALE      = 0.04;
 const CELL_W     = 6.0;   // station box width
 const DEPTH      = 6.0;   // station box depth — square-ish box, NOT tunnel
 const HEIGHT     = 5.0;   // column height
-const IB_FLANGE  = 0.40;
-const IB_WEB     = 0.08;
-const IB_FT      = 0.08;
+// I-beam proportions — wider flanges so they read clearly at any distance
+const IB_FLANGE  = 0.55;  // flange width (H-axis)
+const IB_WEB_H   = 0.06;  // web thickness
+const IB_FT      = 0.12;  // flange plate thickness
 const PATH_W     = 3.0;
 const ZEBRA_W    = 0.8;
 
@@ -89,50 +90,55 @@ function makeFloorLabel(text, width, fontSize = 36) {
 }
 
 // ── I-beam helper ──────────────────────────────────────────────────────────────
+// Each I-beam is built from 3 boxes: top flange, web, bottom flange.
+// "vertical"     — column running along Y (height)
+// "horizontal-x" — beam running along X (width)
+// "horizontal-z" — beam running along Z (depth)
 function makeIBeam(length, mat, orientation) {
   const group = new THREE.Group();
+  const F = IB_FLANGE;   // flange width
+  const W = IB_WEB_H;    // web thickness
+  const T = IB_FT;       // flange thickness
+
   if (orientation === 'vertical') {
-    group.add(new THREE.Mesh(new THREE.BoxGeometry(IB_WEB, length, IB_FLANGE), mat));
-    const fGeo = new THREE.BoxGeometry(IB_FLANGE, IB_FT, IB_FLANGE);
-    const tf = new THREE.Mesh(fGeo, mat); tf.position.y =  length / 2 - IB_FT / 2; group.add(tf);
-    const bf = new THREE.Mesh(fGeo, mat); bf.position.y = -(length / 2 - IB_FT / 2); group.add(bf);
+    // Web: thin slab along Y
+    group.add(new THREE.Mesh(new THREE.BoxGeometry(W, length, F), mat));
+    // Top flange
+    const tf = new THREE.Mesh(new THREE.BoxGeometry(F, T, F), mat);
+    tf.position.y =  length / 2 - T / 2;
+    group.add(tf);
+    // Bottom flange
+    const bf = new THREE.Mesh(new THREE.BoxGeometry(F, T, F), mat);
+    bf.position.y = -(length / 2 - T / 2);
+    group.add(bf);
   } else if (orientation === 'horizontal-x') {
-    group.add(new THREE.Mesh(new THREE.BoxGeometry(length, IB_FLANGE, IB_WEB), mat));
-    const fGeo = new THREE.BoxGeometry(length, IB_FT, IB_FLANGE);
-    const tf = new THREE.Mesh(fGeo, mat); tf.position.y =  IB_FLANGE / 2 - IB_FT / 2; group.add(tf);
-    const bf = new THREE.Mesh(fGeo, mat); bf.position.y = -(IB_FLANGE / 2 - IB_FT / 2); group.add(bf);
-  } else {
-    group.add(new THREE.Mesh(new THREE.BoxGeometry(IB_WEB, IB_FLANGE, length), mat));
-    const fGeo = new THREE.BoxGeometry(IB_FLANGE, IB_FT, length);
-    const tf = new THREE.Mesh(fGeo, mat); tf.position.y =  IB_FLANGE / 2 - IB_FT / 2; group.add(tf);
-    const bf = new THREE.Mesh(fGeo, mat); bf.position.y = -(IB_FLANGE / 2 - IB_FT / 2); group.add(bf);
+    // Web: thin slab along X
+    group.add(new THREE.Mesh(new THREE.BoxGeometry(length, W, F), mat));
+    // Top flange
+    const tf = new THREE.Mesh(new THREE.BoxGeometry(length, T, F), mat);
+    tf.position.y =  (F - T) / 2;
+    group.add(tf);
+    // Bottom flange
+    const bf = new THREE.Mesh(new THREE.BoxGeometry(length, T, F), mat);
+    bf.position.y = -(F - T) / 2;
+    group.add(bf);
+  } else { // horizontal-z
+    // Web: thin slab along Z
+    group.add(new THREE.Mesh(new THREE.BoxGeometry(F, W, length), mat));
+    // Top flange
+    const tf = new THREE.Mesh(new THREE.BoxGeometry(F, T, length), mat);
+    tf.position.y =  (F - T) / 2;
+    group.add(tf);
+    // Bottom flange
+    const bf = new THREE.Mesh(new THREE.BoxGeometry(F, T, length), mat);
+    bf.position.y = -(F - T) / 2;
+    group.add(bf);
   }
   return group;
 }
 
-// ── Green path between cells ───────────────────────────────────────────────────
-function buildZebraCrossing(cellCX, originZ, group) {
-  const cellCZ = originZ + DEPTH / 2;
-  const fillGeo = new THREE.PlaneGeometry(CELL_W - 0.1, ZEBRA_W - 0.08);
-  const fillMat = new THREE.MeshBasicMaterial({ color: 0xa5d6a7, transparent: true, opacity: 0.7, side: THREE.DoubleSide });
-  const fill = new THREE.Mesh(fillGeo, fillMat);
-  fill.rotation.x = -Math.PI / 2;
-  fill.position.set(cellCX, 0.19, cellCZ);
-  group.add(fill);
-  const borderMat = new THREE.MeshBasicMaterial({ color: 0x2e7d32, side: THREE.DoubleSide });
-  const T = 0.08;
-  [
-    { geo: new THREE.PlaneGeometry(CELL_W, T), pos: [cellCX, 0.20, cellCZ - ZEBRA_W / 2 + T / 2] },
-    { geo: new THREE.PlaneGeometry(CELL_W, T), pos: [cellCX, 0.20, cellCZ + ZEBRA_W / 2 - T / 2] },
-    { geo: new THREE.PlaneGeometry(T, ZEBRA_W), pos: [cellCX - CELL_W / 2 + T / 2, 0.20, cellCZ] },
-    { geo: new THREE.PlaneGeometry(T, ZEBRA_W), pos: [cellCX + CELL_W / 2 - T / 2, 0.20, cellCZ] },
-  ].forEach(({ geo, pos }) => {
-    const mesh = new THREE.Mesh(geo, borderMat);
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(...pos);
-    group.add(mesh);
-  });
-}
+// ── (removed zebra crossing — paths are drawn between boxes only) ──────────────
+function buildZebraCrossing(_cellCX, _originZ, _group) { /* no-op */ }
 
 // ── Cantilever sign — one per station cell ─────────────────────────────────────
 // Rod attaches to front beam at cell centre, sticks out +Z toward viewer.
@@ -243,7 +249,7 @@ function buildStationShell(box, statusMap, zeMap, scene) {
   const totalW  = count * CELL_W;
   const originX = box._x3d ?? (box.position_x || 0) * SCALE;
   const originZ = box._z3d ?? (box.position_y || 0) * SCALE;
-  const structMat = new THREE.MeshLambertMaterial({ color: 0x78909c });
+  const structMat = new THREE.MeshLambertMaterial({ color: 0x37474f, transparent: true, opacity: 0.55 });
 
   // ── 4 corner columns ──
   [[originX, originZ], [originX + totalW, originZ],
@@ -296,10 +302,10 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     const stnId  = stationIds[i] || `STN-${i + 1}`;
     const color  = STATUS_HEX[statusMap[stnId] || null] ?? STATUS_HEX.null;
 
-    // Gray floor — full cell width
+    // Gray floor — full cell width, semi-transparent dark
     const floor  = new THREE.Mesh(
-      new THREE.BoxGeometry(CELL_W - 0.05, 0.18, DEPTH - 0.05),
-      new THREE.MeshLambertMaterial({ color: 0xb0bec5, transparent: true, opacity: 0.80 })
+      new THREE.BoxGeometry(CELL_W - 0.05, 0.12, DEPTH - 0.05),
+      new THREE.MeshLambertMaterial({ color: 0x263238, transparent: true, opacity: 0.45 })
     );
     floor.position.set(cellCX, 0.09, cellCZ);
     floor.userData.stationId = stnId;
@@ -359,74 +365,63 @@ function buildStationShell(box, statusMap, zeMap, scene) {
   scene.add(group);
 }
 
+// ── Dotted green path between station boxes ────────────────────────────────────
 function buildWalkingPath(fromBox, toBox, scene) {
   const fx0 = fromBox._x3d ?? (fromBox.position_x || 0) * SCALE;
   const fx1 = fx0 + (fromBox.station_count || 1) * CELL_W;
-  const fz0 = (fromBox._z3d ?? (fromBox.position_y || 0) * SCALE);
+  const fz0 = fromBox._z3d ?? (fromBox.position_y || 0) * SCALE;
   const fz1 = fz0 + DEPTH;
   const fCX = (fx0 + fx1) / 2, fCZ = (fz0 + fz1) / 2;
 
   const tx0 = toBox._x3d ?? (toBox.position_x || 0) * SCALE;
   const tx1 = tx0 + (toBox.station_count || 1) * CELL_W;
-  const tz0 = (toBox._z3d ?? (toBox.position_y || 0) * SCALE);
+  const tz0 = toBox._z3d ?? (toBox.position_y || 0) * SCALE;
   const tz1 = tz0 + DEPTH;
   const tCX = (tx0 + tx1) / 2, tCZ = (tz0 + tz1) / 2;
 
-  // Helper: draw one gray road segment (flat on floor) with white borders
-  const addSegment = (cx, cz, len, horizontal) => {
-    if (len <= 0.1) return;
-    const [pw, pd] = horizontal ? [len, PATH_W] : [PATH_W, len];
-    const road = new THREE.Mesh(
-      new THREE.PlaneGeometry(pw, pd),
-      new THREE.MeshLambertMaterial({ color: 0x8d8d8d, side: THREE.DoubleSide })
-    );
-    road.rotation.x = -Math.PI / 2;
-    road.position.set(cx, 0.015, cz);
-    scene.add(road);
-    const borderMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
-    const BT = 0.12;
-    [-1, 1].forEach(s => {
-      const bw = horizontal ? len : BT, bd = horizontal ? BT : len;
-      const bx = horizontal ? cx : cx + s * (PATH_W / 2 - BT / 2);
-      const bz = horizontal ? cz + s * (PATH_W / 2 - BT / 2) : cz;
-      const b = new THREE.Mesh(new THREE.PlaneGeometry(bw, bd), borderMat);
-      b.rotation.x = -Math.PI / 2;
-      b.position.set(bx, 0.02, bz);
-      scene.add(b);
-    });
+  const Y = 0.05; // just above floor
+  const dashMat = new THREE.LineDashedMaterial({
+    color: 0x00e676,
+    dashSize: 0.55,
+    gapSize:  0.30,
+    linewidth: 2,
+  });
+
+  const addLine = (points) => {
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    const line = new THREE.Line(geo, dashMat);
+    line.computeLineDistances();
+    scene.add(line);
   };
 
   const sameRow = Math.abs(fCZ - tCZ) < 1.0;
   const sameCol = Math.abs(fCX - tCX) < 1.0;
 
   if (sameRow) {
-    // Horizontal connection — find the gap between the two boxes in X
-    const gapLeft  = Math.min(fx1, tx1);
-    const gapRight = Math.max(fx0, tx0);
-    addSegment((gapLeft + gapRight) / 2, fCZ, gapRight - gapLeft, true);
+    const x0 = Math.min(fx1, tx1), x1 = Math.max(fx0, tx0);
+    if (x1 > x0) addLine([new THREE.Vector3(x0, Y, fCZ), new THREE.Vector3(x1, Y, fCZ)]);
   } else if (sameCol) {
-    // Vertical connection — find the gap between the two boxes in Z
-    const gapTop = Math.min(fz1, tz1);
-    const gapBot = Math.max(fz0, tz0);
-    addSegment(fCX, (gapTop + gapBot) / 2, gapBot - gapTop, false);
+    const z0 = Math.min(fz1, tz1), z1 = Math.max(fz0, tz0);
+    if (z1 > z0) addLine([new THREE.Vector3(fCX, Y, z0), new THREE.Vector3(fCX, Y, z1)]);
   } else {
-    // L-shaped: route through the AISLE between the two box rows so the visible
-    // path stays in open space (portions inside box footprints are hidden under floors)
-    const aisleNear = Math.min(fz1, tz1); // nearer Z-edge facing the aisle
-    const aisleFar  = Math.max(fz0, tz0); // farther Z-edge facing the aisle
+    const aisleNear = Math.min(fz1, tz1);
+    const aisleFar  = Math.max(fz0, tz0);
     if (aisleFar > aisleNear) {
-      // Clear aisle exists — horizontal crossing at aisle midpoint
       const aisleMid = (aisleNear + aisleFar) / 2;
-      addSegment((fCX + tCX) / 2, aisleMid, Math.abs(tCX - fCX), true);
-      // Short vertical connectors from each box centre to the aisle
-      if (Math.abs(fCZ - aisleMid) > 0.15)
-        addSegment(fCX, (fCZ + aisleMid) / 2, Math.abs(aisleMid - fCZ), false);
-      if (Math.abs(tCZ - aisleMid) > 0.15)
-        addSegment(tCX, (tCZ + aisleMid) / 2, Math.abs(aisleMid - tCZ), false);
+      // L-path: vertical from from-box edge → aisle, then horizontal, then vertical to to-box edge
+      addLine([
+        new THREE.Vector3(fCX, Y, fCZ > aisleMid ? fz0 : fz1),
+        new THREE.Vector3(fCX, Y, aisleMid),
+        new THREE.Vector3(tCX, Y, aisleMid),
+        new THREE.Vector3(tCX, Y, tCZ > aisleMid ? tz0 : tz1),
+      ]);
     } else {
-      // Boxes overlap in Z — fall back to simple L through centres
-      addSegment((fCX + tCX) / 2, fCZ, Math.abs(tCX - fCX), true);
-      addSegment(tCX, (fCZ + tCZ) / 2, Math.abs(tCZ - fCZ), false);
+      // Overlapping Z — simple L through centres
+      addLine([
+        new THREE.Vector3(fCX, Y, fCZ),
+        new THREE.Vector3(tCX, Y, fCZ),
+        new THREE.Vector3(tCX, Y, tCZ),
+      ]);
     }
   }
 }
