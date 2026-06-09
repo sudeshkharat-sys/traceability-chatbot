@@ -1499,7 +1499,7 @@ function LayoutPreparation({
           {dragging && (
             <svg className="layout-drag-svg">
               <defs>
-                <marker id="drag-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+                <marker id="drag-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
                   <polygon points="0 0, 8 3, 0 6" fill="#3182ce" />
                 </marker>
               </defs>
@@ -1627,11 +1627,11 @@ function LayoutPreparation({
           >
             <defs>
               <marker id="lp-arrow-head" markerWidth="8" markerHeight="6"
-                      refX="7" refY="3" orient="auto">
+                      refX="8" refY="3" orient="auto">
                 <polygon points="0 0, 8 3, 0 6" fill="#1a2744" />
               </marker>
               <marker id="lp-arrow-head-sel" markerWidth="8" markerHeight="6"
-                      refX="7" refY="3" orient="auto">
+                      refX="8" refY="3" orient="auto">
                 <polygon points="0 0, 8 3, 0 6" fill="#e53935" />
               </marker>
             </defs>

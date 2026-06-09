@@ -73,7 +73,7 @@ const DASHBOARD_HELP = {
 const GRID = 40;
 const CANVAS_SIZE = 5000;
 
-const boxWidth = (stationCount) => Math.max(2, stationCount) * 40 + 4;
+const boxWidth = (stationCount) => Math.max(1, stationCount) * 40 + 4;
 
 // Shows first 3 + '..' + last 3 chars for names longer than 8 chars
 // e.g. "DAC-UB-_01" → "DAC.._01",  "Welding" → "Welding"
@@ -83,7 +83,7 @@ function smartTrimName(name) {
 }
 
 // ── Column definitions (mirror InputData) ─────────────────────────────────────
-const MONTHLY_KEYS = [
+export const MONTHLY_KEYS = [
   '2024-01','2024-02','2024-03','2024-04','2024-05','2024-06',
   '2024-07','2024-08','2024-09','2024-10','2024-11','2024-12',
   '2025-01','2025-02','2025-03','2025-04','2025-05','2025-06',
@@ -748,7 +748,7 @@ function DocsTab({ stationId, masterRecords, userId, layoutId }) {
 // ── Station Detail Modal ───────────────────────────────────────────────────────
 // Rendered via portal to document.body so position:fixed is always
 // relative to the true viewport, regardless of ancestor transforms.
-function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, auditRecords, adherenceRecords, userId, layoutId, onRecordAdded, stationIds = [] }) {
+export function StationDetailModal({ stationId, records, allMonths, onSaved, onClose, auditRecords, adherenceRecords, userId, layoutId, onRecordAdded, stationIds = [] }) {
   const [activeTab, setActiveTab] = useState('master');
   const [showAddRecord, setShowAddRecord] = useState(false);
   const filtered           = records.filter((r) => r.stage_no === stationId);
@@ -1282,8 +1282,9 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
   // Station detail popup
   const [popupStation, setPopupStation] = useState(null); // stationId string | null
 
-  const canvasRef   = useRef(null);
+  const canvasRef    = useRef(null);
   const transformRef = useRef(null);
+  const [boxWidths, setBoxWidths] = useState({});  // { [boxId]: measuredOffsetWidth }
   // Track the activeLayoutId value from the last time savedLayouts synced,
   // so we can detect when it changed (e.g. a new layout was just created).
   const prevActiveLayoutIdRef = useRef(activeLayoutId);
@@ -1502,6 +1503,67 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
     if (selectedId) handleRefreshRef.current?.();
   }, [refreshSignal, selectedId]);
 
+  // Compute per-box dashboard widths and resolve overlaps ONLY for boxes that
+  // are truly on the same row (position_y within 1 grid = 40px of each other).
+  // Cross-row boxes are NOT shifted — shifting them disconnects them from their
+  // connected buyoff icons and arrows which stay at original positions.
+  // All computed x positions are snapped to the 40px grid so routeArrow.js
+  // bridge segments never traverse obstacle cells (non-grid x causes the
+  // horizontal bridge to cross the grid cell that the obstacle starts in).
+  const adjPositions = React.useMemo(() => {
+    if (!boxes.length) return {};
+    const GRID_PX  = 40;
+    const GAP      = 12;   // minimum visual gap between same-row boxes
+    const COL_PAD  = 16;   // horizontal padding per column cell
+
+    const ctx = (() => {
+      try { return document.createElement('canvas').getContext('2d'); } catch { return null; }
+    })();
+    const measureSid = sid => ctx ? (ctx.font = 'bold 11px Arial', ctx.measureText(sid).width) : sid.length * 7;
+
+    // Fixed computed width per box snapped UP to nearest grid multiple.
+    // Snapping ensures the right edge of every box lands on a grid boundary,
+    // which keeps obstacle cell calculations exact in routeArrow.js.
+    const dashWidth = box => {
+      const raw = box.stationIds.reduce((sum, sid) =>
+        sum + Math.max(GRID_PX, Math.ceil(measureSid(sid)) + COL_PAD), 0) + 4;
+      return Math.ceil(raw / GRID_PX) * GRID_PX;
+    };
+
+    const result = {};
+    const widths  = {};
+    boxes.forEach(b => { widths[b.id] = dashWidth(b); });
+
+    // Cluster by snapping y to nearest 40px multiple (same-row only)
+    const clusters = {};
+    boxes.forEach(b => {
+      const key = Math.round((b.position?.y || 0) / GRID_PX) * GRID_PX;
+      if (!clusters[key]) clusters[key] = [];
+      clusters[key].push(b);
+    });
+
+    Object.values(clusters).forEach(group => {
+      const sorted = [...group].sort((a, b) => (a.position?.x || 0) - (b.position?.x || 0));
+      let minX = -Infinity;
+      sorted.forEach(box => {
+        const origX = box.position?.x || 0;
+        // Snap computed x to grid so left edge aligns with obstacle boundary
+        const x = Math.round(Math.max(origX, minX) / GRID_PX) * GRID_PX;
+        result[box.id] = { x, y: box.position?.y || 0, estW: widths[box.id] };
+        minX = x + widths[box.id] + GAP;
+      });
+    });
+
+    // For boxes not in a cluster, still record width
+    boxes.forEach(b => {
+      if (!result[b.id]) {
+        result[b.id] = { x: b.position?.x || 0, y: b.position?.y || 0, estW: widths[b.id] };
+      }
+    });
+
+    return result;
+  }, [boxes]);
+
   // Drag callback: update position live; auto-save to DB on commit
   const handleLegendDrag = useCallback((newPos, commit) => {
     setLegendPos(newPos);
@@ -1512,6 +1574,32 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
       }).catch(() => {/* non-critical */});
     }
   }, [selectedId]);
+
+  // Measure rendered box widths and store in state so arrows re-render.
+  // Deferred with setTimeout so the browser has actually laid out and
+  // painted the new elements before offsetWidth is read.
+  const measureBoxWidths = useCallback(() => {
+    const measured = {};
+    boxes.forEach((box) => {
+      const el = document.getElementById(box.id);
+      if (el && el.offsetWidth > 0) measured[box.id] = el.offsetWidth;
+    });
+    if (Object.keys(measured).length > 0) setBoxWidths(measured);
+  }, [boxes]);
+
+  // Re-measure after boxes change (deferred one frame)
+  useEffect(() => {
+    const tid = setTimeout(measureBoxWidths, 0);
+    return () => clearTimeout(tid);
+  }, [measureBoxWidths]);
+
+  // Re-measure when tab becomes visible — parent was display:none so
+  // offsetWidth was 0 on previous measurements
+  useEffect(() => {
+    if (!isActive) return;
+    const tid = setTimeout(measureBoxWidths, 80);
+    return () => clearTimeout(tid);
+  }, [isActive, measureBoxWidths]);
 
   return (
     <>
@@ -1735,6 +1823,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                         box.stationIds.forEach((sid) => {
                           stationData[sid] = computeStationData(records, sid);
                         });
+                        const adjPos = adjPositions[box.id] ?? box.position;
 
                         return (
                           <div
@@ -1743,10 +1832,9 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                             className="dash-box"
                             style={{
                               position: 'absolute',
-                              left: box.position.x,
-                              top: box.position.y,
-                              width: 'max-content',
-                              minWidth: w,
+                              left: adjPos.x,
+                              top: adjPos.y,
+                              width: adjPos.estW || w,
                             }}
                           >
                             {/* Invisible Xarrow anchor points — mirror the layout editor dot positions */}
@@ -1780,7 +1868,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                                           key={sid}
                                           colSpan={2}
                                           className={`dash-grid-th dash-grid-th--clickable${thClass}`}
-                                          title={`Click to view records for ${sid}`}
+                                          title={`${sid} — click to view records`}
                                           onClick={() => setPopupStation(sid)}
                                         >
                                           {sid}
@@ -1872,7 +1960,22 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
           ct + positionY + cy * scale,
         ];
 
-        const obstacles = buildObstacles(boxes, 0);
+        // Inject adjusted positions + measured DOM widths so arrow routing
+        // matches the actual shifted/expanded box positions on screen.
+        const boxesWithDomW = boxes.map((b) => {
+          const domW = boxWidths[b.id];
+          const adj  = adjPositions[b.id];
+          // Use actual DOM width if measured, else fall back to estimated width
+          // from adjPositions so obstacle sizes are correct on first render.
+          const resolvedW = domW || adj?.estW;
+          return {
+            ...b,
+            ...(adj  && { position: { x: adj.x, y: adj.y }, position_x: adj.x, position_y: adj.y }),
+            ...(resolvedW && { boxDomWidth: resolvedW }),
+          };
+        });
+
+        const obstacles = buildObstacles(boxesWithDomW, 0);
 
         const strokeW = Math.max(0.5, Math.min(3, 2 * scale));
         // Arrowhead: minimum 10×8px so it's always readable; scales up when zoomed in
@@ -1880,8 +1983,8 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
         const mh = Math.max(8,   8 * scale);
 
         const arrows = connections.map((conn) => {
-          const sp  = getPortCanvasPos(conn.fromId, boxes, buyoffIcons);
-          const ep  = getPortCanvasPos(conn.toId,   boxes, buyoffIcons);
+          const sp  = getPortCanvasPos(conn.fromId, boxesWithDomW, buyoffIcons);
+          const ep  = getPortCanvasPos(conn.toId,   boxesWithDomW, buyoffIcons);
           const pts = routePath(sp, ep, obstacles);
           if (!pts || pts.length < 2) return null;
 
@@ -1907,7 +2010,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
             <defs>
               <marker id="dash-arrow-head"
                       markerWidth={mw} markerHeight={mh}
-                      refX={mw - 1} refY={mh / 2}
+                      refX={mw} refY={mh / 2}
                       orient="auto" markerUnits="userSpaceOnUse">
                 <polygon points={`0 0, ${mw} ${mh / 2}, 0 ${mh}`} fill="#1a2744" />
               </marker>
