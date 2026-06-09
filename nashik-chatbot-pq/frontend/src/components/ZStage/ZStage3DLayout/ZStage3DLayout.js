@@ -340,7 +340,7 @@ function buildStationShell(box, statusMap, zeMap, scene) {
   [originX, originX + totalW].forEach((colX, side) => {
     const board = makeDoubleSidedBoard(bCanvas, boardW3d, boardH3d);
     board.rotation.y = side === 0 ? -Math.PI / 2 : Math.PI / 2;
-    board.position.set(colX, HEIGHT - boardH3d / 2 - 0.35, originZ + DEPTH / 2);
+    board.position.set(colX, HEIGHT - boardH3d / 2, originZ + DEPTH / 2);
     group.add(board);
   });
 
