@@ -505,15 +505,16 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     const scaleZ   = DEPTH  / BOX_H_2D; // 0.03
     const MIN_GAP  = CELL_W * 1.5;  // minimum clearance = 1.5 station-id cell widths
 
-    // Snap raw 2D positions to the nearest grid row/col so boxes that are
-    // visually on the same row (within 1 GRID unit) share the same 3D coordinate.
+    // Snap raw 2D positions to the nearest grid line so boxes within 1 grid
+    // cell of each other on the same axis share the same 3D coordinate.
     const snapPos = v => Math.round((v || 0) / GRID_2D) * GRID_2D;
 
-    // Unique snapped row/col values sorted ascending
+    // z-axis: group by snapped position_y rows with minimum gap enforcement.
+    // x-axis: use direct position_x * scaleX — boxes in different rows can
+    // share x ranges, so forcing them into separate column slots (xMap) wrongly
+    // shifts boxes like a single-cell box sitting below a wider parent box.
     const rowYs = [...new Set(boxes.map(b => snapPos(b.position_y)))].sort((a, b) => a - b);
-    const colXs = [...new Set(boxes.map(b => snapPos(b.position_x)))].sort((a, b) => a - b);
 
-    // Build zMap: use proportional distance but clamp to MIN_GAP between boxes
     const zMap = {};
     let curZ = 0;
     rowYs.forEach((py, i) => {
@@ -524,21 +525,9 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       }
     });
 
-    // Build xMap: use proportional distance but clamp to MIN_GAP between boxes
-    const xMap = {};
-    let curX = 0;
-    colXs.forEach((px, i) => {
-      xMap[px] = curX;
-      if (i < colXs.length - 1) {
-        const boxW       = (boxes.find(b => snapPos(b.position_x) === px)?.station_count || 1) * CELL_W;
-        const scaledStep = (colXs[i + 1] - px) * scaleX;
-        curX += Math.max(scaledStep, boxW + MIN_GAP);
-      }
-    });
-
     const layoutBoxes = boxes.map(b => ({
       ...b,
-      _x3d: xMap[snapPos(b.position_x)] ?? 0,
+      _x3d: snapPos(b.position_x) * scaleX,
       _z3d: zMap[snapPos(b.position_y)] ?? 0,
     }));
 
