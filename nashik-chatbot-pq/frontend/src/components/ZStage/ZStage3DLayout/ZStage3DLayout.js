@@ -497,37 +497,19 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
 
     const boxes = layout.station_boxes || [];
 
-    // Fixed spacing: gap between boxes = 2 × CELL_W on both axes.
-    // Group boxes by unique position_y (rows), then lay out each row
-    // left-to-right with fixed gap, and rows top-to-bottom with fixed gap.
-    const AISLE = CELL_W;
-
-    // Collect unique row Y values sorted ascending
-    const rowYs = [...new Set(boxes.map(b => b.position_y || 0))].sort((a, b) => a - b);
-    // Collect unique col X values sorted ascending
-    const colXs = [...new Set(boxes.map(b => b.position_x || 0))].sort((a, b) => a - b);
-
-    // Map each unique position to a 3D coordinate
-    const xMap = {};
-    let curX = 0;
-    colXs.forEach((px, i) => {
-      xMap[px] = curX;
-      const boxAtX = boxes.find(b => (b.position_x || 0) === px);
-      const w = (boxAtX?.station_count || 1) * CELL_W;
-      curX += w + AISLE;
-    });
-
-    const zMap = {};
-    let curZ = 0;
-    rowYs.forEach((py) => {
-      zMap[py] = curZ;
-      curZ += DEPTH + AISLE;
-    });
+    // Scale 2D canvas positions proportionally into 3D units so the 3D layout
+    // matches the 2D layout spacing exactly.
+    // 2D: GRID=40px per station column, box height = 5*GRID = 200px
+    // 3D: CELL_W per station column (x), DEPTH per box row (z)
+    const GRID_2D   = 40;
+    const BOX_H_2D  = 5 * GRID_2D; // 200px
+    const scaleX    = CELL_W / GRID_2D;   // 6/40 = 0.15
+    const scaleZ    = DEPTH  / BOX_H_2D;  // 6/200 = 0.03
 
     const layoutBoxes = boxes.map(b => ({
       ...b,
-      _x3d: xMap[b.position_x || 0] ?? 0,
-      _z3d: zMap[b.position_y || 0] ?? 0,
+      _x3d: (b.position_x || 0) * scaleX,
+      _z3d: (b.position_y || 0) * scaleZ,
     }));
 
     layoutBoxes.forEach(box => buildStationShell(box, statusMap, zeMap, scene));
