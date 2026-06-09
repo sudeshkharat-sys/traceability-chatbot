@@ -288,7 +288,8 @@
 /* ── Data grid ───────────────────────────────────────────────────────────── */
 .dash-grid {
   border-collapse: collapse;
-  width: max-content;
+  width: 100%;
+  table-layout: fixed;
 }
 
 /* Station ID header — minimum 40px; column grows if station name is wider */
