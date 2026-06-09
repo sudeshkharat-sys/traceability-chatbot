@@ -19,10 +19,6 @@ const SCALE      = 0.04;
 const CELL_W     = 6.0;   // station box width
 const DEPTH      = 6.0;   // station box depth — square-ish box, NOT tunnel
 const HEIGHT     = 5.0;   // column height
-// I-beam proportions — wider flanges so they read clearly at any distance
-const IB_FLANGE  = 0.55;  // flange width (H-axis)
-const IB_WEB_H   = 0.06;  // web thickness
-const IB_FT      = 0.12;  // flange plate thickness
 const PATH_W     = 3.0;
 const ZEBRA_W    = 0.8;
 
@@ -91,51 +87,18 @@ function makeFloorLabel(text, width, fontSize = 36) {
 }
 
 // ── I-beam helper ──────────────────────────────────────────────────────────────
-// Each I-beam is built from 3 boxes: top flange, web, bottom flange.
-// "vertical"     — column running along Y (height)
-// "horizontal-x" — beam running along X (width)
-// "horizontal-z" — beam running along Z (depth)
+// Solid rectangular column / beam — single filled box, no I-shape.
+// "vertical"     — square post along Y
+// "horizontal-x" — rectangular bar along X
+// "horizontal-z" — rectangular bar along Z
+const COL_W = 0.35;  // column / beam cross-section width
+const COL_H = 0.22;  // beam cross-section height (thinner for horizontal)
 function makeIBeam(length, mat, orientation) {
-  const group = new THREE.Group();
-  const F = IB_FLANGE;   // flange width
-  const W = IB_WEB_H;    // web thickness
-  const T = IB_FT;       // flange thickness
-
-  if (orientation === 'vertical') {
-    // Web: thin slab along Y
-    group.add(new THREE.Mesh(new THREE.BoxGeometry(W, length, F), mat));
-    // Top flange
-    const tf = new THREE.Mesh(new THREE.BoxGeometry(F, T, F), mat);
-    tf.position.y =  length / 2 - T / 2;
-    group.add(tf);
-    // Bottom flange
-    const bf = new THREE.Mesh(new THREE.BoxGeometry(F, T, F), mat);
-    bf.position.y = -(length / 2 - T / 2);
-    group.add(bf);
-  } else if (orientation === 'horizontal-x') {
-    // Web: thin slab along X
-    group.add(new THREE.Mesh(new THREE.BoxGeometry(length, W, F), mat));
-    // Top flange
-    const tf = new THREE.Mesh(new THREE.BoxGeometry(length, T, F), mat);
-    tf.position.y =  (F - T) / 2;
-    group.add(tf);
-    // Bottom flange
-    const bf = new THREE.Mesh(new THREE.BoxGeometry(length, T, F), mat);
-    bf.position.y = -(F - T) / 2;
-    group.add(bf);
-  } else { // horizontal-z
-    // Web: thin slab along Z
-    group.add(new THREE.Mesh(new THREE.BoxGeometry(F, W, length), mat));
-    // Top flange
-    const tf = new THREE.Mesh(new THREE.BoxGeometry(F, T, length), mat);
-    tf.position.y =  (F - T) / 2;
-    group.add(tf);
-    // Bottom flange
-    const bf = new THREE.Mesh(new THREE.BoxGeometry(F, T, length), mat);
-    bf.position.y = -(F - T) / 2;
-    group.add(bf);
-  }
-  return group;
+  let geo;
+  if (orientation === 'vertical')     geo = new THREE.BoxGeometry(COL_W, length, COL_W);
+  else if (orientation === 'horizontal-x') geo = new THREE.BoxGeometry(length, COL_H, COL_W);
+  else                                geo = new THREE.BoxGeometry(COL_W, COL_H, length);
+  return new THREE.Mesh(geo, mat);
 }
 
 // ── Green center strip inside each station cell ────────────────────────────────
