@@ -1853,7 +1853,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
                                           key={sid}
                                           colSpan={2}
                                           className={`dash-grid-th dash-grid-th--clickable${thClass}`}
-                                          title={`Click to view records for ${sid}`}
+                                          title={`${sid} — click to view records`}
                                           onClick={() => setPopupStation(sid)}
                                         >
                                           {sid}
