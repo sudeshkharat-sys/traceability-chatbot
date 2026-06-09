@@ -140,11 +140,17 @@ export function routePath(start, end, obstacles) {
 
   const snap = (v) => Math.round(v / GRID);
 
+  // For negative direction (left/top), use floor so the "outside" node is
+  // always to the LEFT/ABOVE the box boundary regardless of non-grid positions.
+  // round() can land inside the obstacle when the port x/y is in the upper
+  // half of a grid cell (e.g. x=355 → round→9 but floor→8, box x1=8 → inside).
+  const snapOut = (v, dir) => dir < 0 ? Math.floor(v / GRID) - 1 : snap(v) + dir;
+
   // Forced grid nodes just outside each port
-  const g1x = snap(sx) + SD[0];
-  const g1y = snap(sy) + SD[1];
-  const g2x = snap(ex) + ED[0];
-  const g2y = snap(ey) + ED[1];
+  const g1x = snapOut(sx, SD[0]);
+  const g1y = snapOut(sy, SD[1]);
+  const g2x = snapOut(ex, ED[0]);
+  const g2y = snapOut(ey, ED[1]);
 
   const sVert = sDir === 'top' || sDir === 'bottom';
   const eVert = eDir === 'top' || eDir === 'bottom';

@@ -1529,13 +1529,16 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
       const y = box.position?.y || 0;
       const w = dashWidth(box);
 
-      // Keep re-checking until no more collisions (handles cascading shifts)
+      // Keep re-checking until no more collisions (handles cascading shifts).
+      // Only treat as collision if y-overlap > 30px to avoid large cascading
+      // shifts from tiny y-overlaps between boxes on adjacent rows.
+      const MIN_Y_OVERLAP = 30;
       let changed = true;
       while (changed) {
         changed = false;
         for (const p of placed) {
-          const yOverlap = y < p.y + BOX_H && p.y < y + BOX_H;
-          if (!yOverlap) continue;
+          const yOverlapAmt = Math.min(y + BOX_H, p.y + BOX_H) - Math.max(y, p.y);
+          if (yOverlapAmt < MIN_Y_OVERLAP) continue;
           if (x < p.x + p.w + GAP) {
             x = p.x + p.w + GAP;
             changed = true;
@@ -1546,7 +1549,9 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
       placed.push({ id: box.id, x, y, w });
     });
 
-    return Object.fromEntries(placed.map(p => [p.id, { x: p.x, y: p.y }]));
+    // Include estimated width so arrow routing has correct obstacle sizes
+    // even on first render before boxWidthsRef is populated from DOM.
+    return Object.fromEntries(placed.map(p => [p.id, { x: p.x, y: p.y, estW: p.w }]));
   }, [boxes]);
 
   // Drag callback: update position live; auto-save to DB on commit
@@ -1936,10 +1941,13 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
         const boxesWithDomW = boxes.map((b) => {
           const domW = boxWidthsRef.current[b.id];
           const adj  = adjPositions[b.id];
+          // Use actual DOM width if measured, else fall back to estimated width
+          // from adjPositions so obstacle sizes are correct on first render.
+          const resolvedW = domW || adj?.estW;
           return {
             ...b,
-            ...(adj && { position: adj, position_x: adj.x, position_y: adj.y }),
-            ...(domW && { boxDomWidth: domW }),
+            ...(adj  && { position: { x: adj.x, y: adj.y }, position_x: adj.x, position_y: adj.y }),
+            ...(resolvedW && { boxDomWidth: resolvedW }),
           };
         });
 
