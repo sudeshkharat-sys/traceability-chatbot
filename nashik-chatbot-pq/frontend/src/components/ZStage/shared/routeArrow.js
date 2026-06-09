@@ -142,15 +142,34 @@ export function routePath(start, end, obstacles) {
 
   // For negative direction (left/top), use floor so the "outside" node is
   // always to the LEFT/ABOVE the box boundary regardless of non-grid positions.
-  // round() can land inside the obstacle when the port x/y is in the upper
-  // half of a grid cell (e.g. x=355 → round→9 but floor→8, box x1=8 → inside).
   const snapOut = (v, dir) => dir < 0 ? Math.floor(v / GRID) - 1 : snap(v) + dir;
 
   // Forced grid nodes just outside each port
-  const g1x = snapOut(sx, SD[0]);
-  const g1y = snapOut(sy, SD[1]);
-  const g2x = snapOut(ex, ED[0]);
-  const g2y = snapOut(ey, ED[1]);
+  let g1x = snapOut(sx, SD[0]);
+  let g1y = snapOut(sy, SD[1]);
+  let g2x = snapOut(ex, ED[0]);
+  let g2y = snapOut(ey, ED[1]);
+
+  // If a goal/start cell lands inside ANOTHER box's obstacle (e.g. T1-09's x2
+  // extends to the same cell that is one step outside the target box), A* will
+  // route THROUGH that box to reach the goal. Push the cell further out in the
+  // approach direction until it's clear of all obstacles.
+  if (obstacles) {
+    // start cell: move in exit direction until clear
+    while (obstacles.has(`${g1x},${g1y}`)) {
+      if      (SD[0] > 0) g1x++;
+      else if (SD[0] < 0) g1x--;
+      else if (SD[1] > 0) g1y++;
+      else                g1y--;
+    }
+    // goal cell: move in approach direction (opposite of ED) until clear
+    while (obstacles.has(`${g2x},${g2y}`)) {
+      if      (ED[0] < 0) g2x--;   // LEFT port → move further left
+      else if (ED[0] > 0) g2x++;   // RIGHT port → move further right
+      else if (ED[1] < 0) g2y--;   // TOP port → move further up
+      else                g2y++;   // BOTTOM port → move further down
+    }
+  }
 
   const sVert = sDir === 'top' || sDir === 'bottom';
   const eVert = eDir === 'top' || eDir === 'bottom';

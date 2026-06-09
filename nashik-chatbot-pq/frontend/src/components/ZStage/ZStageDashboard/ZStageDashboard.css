@@ -292,9 +292,8 @@
   table-layout: fixed;
 }
 
-/* Station ID header — minimum 40px; column grows if station name is wider */
+/* Station ID header — fills proportional share of box width */
 .dash-grid-th {
-  min-width: 40px;
   padding: 3px 2px;
   text-align: center;
   font-size: 10px;
@@ -303,7 +302,8 @@
   background-color: #45b480;
   border-right: 1px solid #1c4532;
   white-space: nowrap;
-  overflow: visible;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dash-grid-th:last-child {
