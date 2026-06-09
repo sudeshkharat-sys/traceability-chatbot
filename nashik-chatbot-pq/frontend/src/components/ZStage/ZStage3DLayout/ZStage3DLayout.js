@@ -6,6 +6,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { VRMLLoader } from 'three/examples/jsm/loaders/VRMLLoader';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
+import { RefreshCw } from 'lucide-react';
 import { layoutApi, inputApi } from '../../../services/api/layoutApi';
 import { layeredAuditApi } from '../../../services/api/layoutApi';
 import { StationDetailModal, MONTHLY_KEYS } from '../ZStageDashboard/ZStageDashboard';
@@ -1065,6 +1066,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [auditRecords,      setAuditRecords]      = useState([]);
   const [adherenceRecords,  setAdherenceRecords]  = useState([]);
   const [sceneReady,        setSceneReady]        = useState(false);
+  const [refreshing,        setRefreshing]        = useState(false);
 
   useEffect(() => {
     if (activeLayoutId && !selectedLayoutId) setSelectedLayoutId(activeLayoutId);
@@ -1137,6 +1139,22 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     else if (tabType === 'layered-audit') setAuditRecords((prev) => [...prev, newRec]);
     else if (tabType === 'audit-adherence') setAdherenceRecords((prev) => [...prev, newRec]);
   }, []);
+
+  const handleRefresh = useCallback(() => {
+    if (!selectedLayoutId) return;
+    setRefreshing(true);
+    setSceneReady(false);
+    Promise.allSettled([
+      layoutApi.getLayout(selectedLayoutId).then(res => setLayout(res.data)),
+      inputApi.getRecords(userId, selectedLayoutId).then(r => {
+        const recs = Array.isArray(r.data) ? r.data : [];
+        setRecords(recs);
+        setZeMap(computeZeMap(recs));
+      }),
+      layeredAuditApi.getAuditRecords(userId, selectedLayoutId).then(r => setAuditRecords(Array.isArray(r.data) ? r.data : [])),
+      layeredAuditApi.getAdherenceRecords(userId, selectedLayoutId).then(r => setAdherenceRecords(Array.isArray(r.data) ? r.data : [])),
+    ]).finally(() => setRefreshing(false));
+  }, [selectedLayoutId, userId]);
 
   const handleStationClick = useCallback((stationId) => {
     setPopupStation(stationId);
@@ -1226,13 +1244,33 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
           </>
         )}
 
-        <div className="z3d-legend">
-          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--r"/>Red</span>
-          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--y"/>Yellow</span>
-          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--g"/>Green</span>
-          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--na"/>N/A</span>
-          <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--path"/>Path</span>
+        <div className="dash-legend" style={{ marginLeft: 'auto' }}>
+          <span className="dash-legend-chip dash-legend-chip--red">Z</span>
+          <span className="dash-legend-text">Active issues</span>
+          <span className="dash-legend-chip dash-legend-chip--green">Z</span>
+          <span className="dash-legend-text">No issues</span>
+          <span className="dash-legend-sep" />
+          <span className="dash-legend-chip dash-legend-chip--m">M</span>
+          <span className="dash-legend-text">Manufacturing</span>
+          <span className="dash-legend-chip dash-legend-chip--p">P</span>
+          <span className="dash-legend-text">Part Quality</span>
+          <span className="dash-legend-chip dash-legend-chip--d">D</span>
+          <span className="dash-legend-text">Design</span>
+          <span className="dash-legend-chip dash-legend-chip--u">U</span>
+          <span className="dash-legend-text">Under Analysis</span>
+          <span className="dash-legend-sep" />
+          <div className="z3d-legend" style={{ margin: 0 }}>
+            <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--r"/>Red</span>
+            <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--y"/>Yellow</span>
+            <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--g"/>Green</span>
+            <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--na"/>N/A</span>
+          </div>
         </div>
+
+        <button className="dash-refresh-btn" onClick={handleRefresh} disabled={refreshing} title="Refresh layout and records">
+          <RefreshCw size={13} className={refreshing ? 'dash-spin' : ''} />
+          {refreshing ? 'Refreshing…' : 'Refresh'}
+        </button>
       </div>
 
       <div className="z3d-body">
