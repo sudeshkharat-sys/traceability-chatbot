@@ -1258,13 +1258,6 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
           <span className="dash-legend-text">Design</span>
           <span className="dash-legend-chip dash-legend-chip--u">U</span>
           <span className="dash-legend-text">Under Analysis</span>
-          <span className="dash-legend-sep" />
-          <div className="z3d-legend" style={{ margin: 0 }}>
-            <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--r"/>Red</span>
-            <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--y"/>Yellow</span>
-            <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--g"/>Green</span>
-            <span className="z3d-legend-item"><span className="z3d-legend-dot z3d-legend-dot--na"/>N/A</span>
-          </div>
         </div>
 
         <button className="dash-refresh-btn" onClick={handleRefresh} disabled={refreshing} title="Refresh layout and records">
