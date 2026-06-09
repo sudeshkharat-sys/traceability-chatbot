@@ -827,19 +827,24 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     }
   }, [onObjectsChange]); // eslint-disable-line
 
-  // Select object by click on canvas
-  const handleCanvasClick = useCallback((e) => {
+  const getRaycast = useCallback((e) => {
     const canvas = canvasRef.current, camera = cameraRef.current, scene = sceneRef.current;
-    if (!canvas || !camera || !scene || walkModeRef.current) return;
-    const rect   = canvas.getBoundingClientRect();
-    const mouse  = new THREE.Vector2(
+    if (!canvas || !camera || !scene || walkModeRef.current) return null;
+    const rect  = canvas.getBoundingClientRect();
+    const mouse = new THREE.Vector2(
       ((e.clientX - rect.left) / rect.width)  *  2 - 1,
       ((e.clientY - rect.top)  / rect.height) * -2 + 1
     );
-    const ray    = new THREE.Raycaster();
+    const ray = new THREE.Raycaster();
     ray.setFromCamera(mouse, camera);
+    return { ray, scene };
+  }, [canvasRef]);
 
-    // Check placed objects first
+  // Single click — select placed objects only
+  const handleCanvasClick = useCallback((e) => {
+    const res = getRaycast(e);
+    if (!res) return;
+    const { ray } = res;
     const placed = placedRef.current.map(p => p.mesh);
     const placedHits = ray.intersectObjects(placed, true);
     if (placedHits.length > 0) {
@@ -853,8 +858,17 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
         return;
       }
     }
+    // Deselect if clicked empty space
+    if (transformRef.current) transformRef.current.detach();
+    selectedRef.current = null;
+    onObjectsChange([...placedRef.current]);
+  }, [getRaycast, onObjectsChange]);
 
-    // Check for station mesh click
+  // Double click — open station popup
+  const handleCanvasDblClick = useCallback((e) => {
+    const res = getRaycast(e);
+    if (!res) return;
+    const { ray, scene } = res;
     const allHits = ray.intersectObjects(scene.children, true);
     for (const hit of allHits) {
       let obj = hit.object;
@@ -866,12 +880,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
         obj = obj.parent;
       }
     }
-
-    // Deselect if clicked empty space
-    if (transformRef.current) transformRef.current.detach();
-    selectedRef.current = null;
-    onObjectsChange([...placedRef.current]);
-  }, [canvasRef, onObjectsChange, onStationClick]);
+  }, [getRaycast, onStationClick]);
 
   // Select object by id (called from panel)
   const selectById = useCallback((id) => {
@@ -927,7 +936,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     return () => clearInterval(tid);
   }, []);
 
-  return { snapView, setTransformMode, placeObject, handleCanvasClick, selectById, deleteById, renameById };
+  return { snapView, setTransformMode, placeObject, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById };
 }
 
 // ── Compute Z/E status per station from input records (mirrors ZStageDashboard logic) ──
@@ -1121,7 +1130,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setSceneReady(true);
   }, []);
 
-  const { snapView, setTransformMode, placeObject, handleCanvasClick, selectById, deleteById, renameById } =
+  const { snapView, setTransformMode, placeObject, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById } =
     useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady);
 
   const handleLayoutChange = useCallback((e) => {
@@ -1287,7 +1296,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             </div>
           ) : (
             <>
-              <canvas ref={canvasRef} className="z3d-canvas" onClick={handleCanvasClick} />
+              <canvas ref={canvasRef} className="z3d-canvas" onClick={handleCanvasClick} onDoubleClick={handleCanvasDblClick} />
               {!sceneReady && (
                 <div className="z3d-scene-loading">
                   <div className="z3d-scene-loading-box">
