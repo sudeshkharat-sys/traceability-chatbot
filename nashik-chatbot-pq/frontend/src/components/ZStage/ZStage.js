@@ -3,6 +3,7 @@ import Sidebar from './Sidebar/Sidebar';
 import LayoutPreparation from './LayoutPreparation/LayoutPreparation';
 import InputData from './InputData/InputData';
 import ZStageDashboard from './ZStageDashboard/ZStageDashboard';
+import ZStage3DLayout from './ZStage3DLayout/ZStage3DLayout';
 import { layoutApi } from '../../services/api/layoutApi';
 import authService from '../../services/api/authService';
 import utilityLogo from '../../assests/image.png';
@@ -226,6 +227,19 @@ function ZStage() {
             refreshSignal={layoutSaveSignal}
             savedLayouts={savedLayouts}
             isActive={activeSection === 'dashboard'}
+          />
+        </div>
+
+        {/* ZStage3DLayout — always mounted so Three.js scene persists */}
+        <div style={{
+          display: activeSection === 'layout3d' ? 'flex' : 'none',
+          flex: 1, flexDirection: 'column', overflow: 'hidden', minHeight: 0,
+        }}>
+          <ZStage3DLayout
+            userId={userId}
+            savedLayouts={savedLayouts}
+            activeLayoutId={activeLayoutId}
+            isActive={activeSection === 'layout3d'}
           />
         </div>
 
