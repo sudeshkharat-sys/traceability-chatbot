@@ -1507,10 +1507,11 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
   // are truly on the same row (position_y within 1 grid = 40px of each other).
   // Cross-row boxes are NOT shifted — shifting them disconnects them from their
   // connected buyoff icons and arrows which stay at original positions.
+  // All computed x positions are snapped to the 40px grid so obstacle cell
+  // calculations in routeArrow.js are always exact (no bridge-crosses-obstacle).
   const adjPositions = React.useMemo(() => {
     if (!boxes.length) return {};
     const GRID_PX  = 40;
-    const GAP      = 12;   // minimum gap between same-row boxes
     const COL_PAD  = 16;   // horizontal padding per column cell
 
     const ctx = (() => {
@@ -1518,19 +1519,27 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
     })();
     const measureSid = sid => ctx ? (ctx.font = 'bold 11px Arial', ctx.measureText(sid).width) : sid.length * 7;
 
-    // Fixed computed width per box (replaces max-content) — same value used
-    // for visual CSS width, arrow obstacles, and overlap detection.
-    const dashWidth = box =>
-      box.stationIds.reduce((sum, sid) =>
+    // Fixed computed width per box rounded UP to nearest grid multiple so the
+    // box always occupies an integer number of 40px grid cells.
+    const dashWidth = box => {
+      const raw = box.stationIds.reduce((sum, sid) =>
         sum + Math.max(GRID_PX, Math.ceil(measureSid(sid)) + COL_PAD), 0) + 4;
+      return Math.ceil(raw / GRID_PX) * GRID_PX; // snap up to grid multiple
+    };
 
-    // Group into same-row clusters: boxes whose position_y is within 40px of
-    // each other. Sort each cluster left-to-right and resolve x-overlaps.
+    // Build a set of buyoff x-ranges per row so boxes don't shift onto them.
+    // Each entry: { x1, x2, rowKey }
+    const buyoffBlocks = buyoffIcons.map(icon => ({
+      x1: icon.position.x,
+      x2: icon.position.x + 80,
+      rowKey: Math.round((icon.position.y || 0) / GRID_PX) * GRID_PX,
+    }));
+
+    // Group into same-row clusters: boxes whose position_y snaps to same grid row
     const result = {};
     const widths  = {};
     boxes.forEach(b => { widths[b.id] = dashWidth(b); });
 
-    // Cluster by snapping y to nearest 40px multiple
     const clusters = {};
     boxes.forEach(b => {
       const key = Math.round((b.position?.y || 0) / GRID_PX) * GRID_PX;
@@ -1538,14 +1547,38 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
       clusters[key].push(b);
     });
 
-    Object.values(clusters).forEach(group => {
+    Object.values(clusters).forEach((group) => {
+      const rowKey = Math.round((group[0].position?.y || 0) / GRID_PX) * GRID_PX;
       const sorted = [...group].sort((a, b) => (a.position?.x || 0) - (b.position?.x || 0));
+
+      // Collect buyoff blocks on this row as fixed x-intervals to skip over
+      const rowBuyoffs = buyoffBlocks
+        .filter(bl => bl.rowKey === rowKey)
+        .sort((a, b) => a.x1 - b.x1);
+
       let minX = -Infinity;
       sorted.forEach(box => {
         const origX = box.position?.x || 0;
-        const x = Math.max(origX, minX);
+        let x = Math.max(origX, minX);
+
+        // Skip over any buyoff icon that overlaps the proposed [x, x+w] range
+        const w = widths[box.id];
+        let changed = true;
+        while (changed) {
+          changed = false;
+          for (const bl of rowBuyoffs) {
+            if (x < bl.x2 && x + w > bl.x1) {
+              // overlap — push box right past the buyoff icon, snapped to grid
+              x = Math.ceil(bl.x2 / GRID_PX) * GRID_PX;
+              changed = true;
+            }
+          }
+        }
+
+        // Snap final x to nearest grid multiple so obstacles are exact
+        x = Math.round(x / GRID_PX) * GRID_PX;
         result[box.id] = { x, y: box.position?.y || 0, estW: widths[box.id] };
-        minX = x + widths[box.id] + GAP;
+        minX = x + widths[box.id] + GRID_PX; // maintain at least 1 grid cell gap
       });
     });
 
@@ -1557,7 +1590,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
     });
 
     return result;
-  }, [boxes]);
+  }, [boxes, buyoffIcons]);
 
   // Drag callback: update position live; auto-save to DB on commit
   const handleLegendDrag = useCallback((newPos, commit) => {
@@ -1990,7 +2023,7 @@ function ZStageDashboard({ userId, activeLayoutId = null, refreshSignal = 0, sav
             <defs>
               <marker id="dash-arrow-head"
                       markerWidth={mw} markerHeight={mh}
-                      refX={mw - 1} refY={mh / 2}
+                      refX={mw} refY={mh / 2}
                       orient="auto" markerUnits="userSpaceOnUse">
                 <polygon points={`0 0, ${mw} ${mh / 2}, 0 ${mh}`} fill="#1a2744" />
               </marker>
