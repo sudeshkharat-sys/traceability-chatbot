@@ -501,7 +501,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     // gap of 2 × CELL_W (two station-id cells) between any two adjacent boxes.
     const GRID_2D  = 40;
     const BOX_H_2D = 5 * GRID_2D; // 200px
-    const scaleX   = CELL_W / GRID_2D;  // 0.15
+    const scaleX   = CELL_W / (GRID_2D * 1.5);  // ~0.10 — compressed to bring boxes closer in x
     const scaleZ   = DEPTH  / BOX_H_2D; // 0.03
     const MIN_GAP  = CELL_W * 1.5;  // minimum clearance = 1.5 station-id cell widths
 
