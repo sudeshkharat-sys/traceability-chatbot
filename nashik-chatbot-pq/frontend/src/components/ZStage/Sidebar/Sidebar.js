@@ -5,6 +5,7 @@ import {
   LayoutGrid,
   Inbox,
   BarChart2,
+  Box,
   Plus,
   Diamond,
   Type,
@@ -22,9 +23,10 @@ import { authService } from '../../../services/api';
 import './Sidebar.css';
 
 const NAV_ITEMS = [
-  { id: 'layout',    label: 'Layout Preparation', Icon: LayoutGrid },
-  { id: 'input',     label: 'Input Data',          Icon: Inbox },
-  { id: 'dashboard', label: 'Z-Stage Dashboard',   Icon: BarChart2 },
+  { id: 'layout',    label: 'Layout Preparation',  Icon: LayoutGrid },
+  { id: 'input',     label: 'Input Data',           Icon: Inbox },
+  { id: 'dashboard', label: 'Z-Stage Dashboard',    Icon: BarChart2 },
+  { id: 'layout3d',  label: 'Z-Stage 3D Layout',    Icon: Box },
 ];
 
 // ── Per-layout three-dot menu ──────────────────────────────────────────────────
@@ -44,7 +46,6 @@ function LayoutItem({
   const dropdownRef                 = useRef(null);
   const inputRef                    = useRef(null);
 
-  // Close menu on outside click or scroll
   useEffect(() => {
     if (!menuOpen) return;
     const close = (e) => {
@@ -62,7 +63,6 @@ function LayoutItem({
     };
   }, [menuOpen]);
 
-  // Focus rename input
   useEffect(() => {
     if (renaming && inputRef.current) inputRef.current.focus();
   }, [renaming]);
@@ -78,7 +78,6 @@ function LayoutItem({
     e.stopPropagation();
     if (!menuOpen && dotsBtnRef.current) {
       const rect = dotsBtnRef.current.getBoundingClientRect();
-      // Position dropdown to the RIGHT of the sidebar (outside it), aligned to button top
       setMenuPos({
         top: rect.top,
         left: rect.right + 6,
@@ -114,7 +113,6 @@ function LayoutItem({
         </button>
       )}
 
-      {/* Three-dot button */}
       <button
         ref={dotsBtnRef}
         className="layout-item-dots"
@@ -124,7 +122,6 @@ function LayoutItem({
         <MoreHorizontal size={13} />
       </button>
 
-      {/* Dropdown rendered via portal so sidebar overflow never clips it */}
       {menuOpen && createPortal(
         <div
           ref={dropdownRef}
@@ -232,7 +229,7 @@ function Sidebar({ activeSection, onSectionChange, layoutActions }) {
                   <Diamond size={14} className="sidebar-diamond-icon" /> Add Buyoff
                 </button>
 
-<button className="sidebar-sub-btn sidebar-sub-btn--text" onClick={onAddText}>
+                <button className="sidebar-sub-btn sidebar-sub-btn--text" onClick={onAddText}>
                   <Type size={14} /> Add Text
                 </button>
 
@@ -242,7 +239,6 @@ function Sidebar({ activeSection, onSectionChange, layoutActions }) {
 
                 <div className="sidebar-sub-divider" />
 
-                {/* Save Layout */}
                 <button
                   className="sidebar-sub-btn sidebar-sub-btn--save"
                   onClick={onSaveLayout}
@@ -252,7 +248,6 @@ function Sidebar({ activeSection, onSectionChange, layoutActions }) {
                   {isSaving ? 'Saving…' : 'Save Layout'}
                 </button>
 
-                {/* Open Layout — toggles the layout list dropdown */}
                 <button
                   className={`sidebar-open-layout-btn${layoutDropdownOpen ? ' sidebar-open-layout-btn--active' : ''}`}
                   onClick={() => setLayoutDropdownOpen((v) => !v)}
@@ -267,7 +262,6 @@ function Sidebar({ activeSection, onSectionChange, layoutActions }) {
                   />
                 </button>
 
-                {/* Inline layout list */}
                 {layoutDropdownOpen && (
                   <div className="layout-dropdown-panel">
                     {savedLayouts.length === 0 ? (
@@ -296,7 +290,6 @@ function Sidebar({ activeSection, onSectionChange, layoutActions }) {
         ))}
       </nav>
 
-      {/* User profile footer */}
       <div className="zstage-sidebar-footer">
         <div className="sidebar-user-profile">
           <div className="sidebar-user-avatar">
