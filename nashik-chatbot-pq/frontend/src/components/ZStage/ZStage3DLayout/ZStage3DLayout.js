@@ -503,7 +503,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     const BOX_H_2D = 5 * GRID_2D; // 200px
     const scaleX   = CELL_W / GRID_2D;  // 0.15
     const scaleZ   = DEPTH  / BOX_H_2D; // 0.03
-    const MIN_GAP  = 2 * CELL_W;        // minimum clearance between boxes
+    const MIN_GAP  = CELL_W;  // minimum clearance = one station-id cell width
 
     // Unique row/col values sorted ascending
     const rowYs = [...new Set(boxes.map(b => b.position_y || 0))].sort((a, b) => a - b);
