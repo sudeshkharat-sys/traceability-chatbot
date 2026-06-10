@@ -5,6 +5,10 @@ websockets
 python-multipart
 pandas
 
+# 3D model conversion (WRL/VRML → GLB)
+trimesh[easy]
+numpy
+
 # LangChain & AI
 langchain
 langchain-openai
