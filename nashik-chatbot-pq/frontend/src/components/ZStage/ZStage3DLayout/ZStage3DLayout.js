@@ -3,7 +3,6 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
-import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 import { VRMLLoader } from 'three/examples/jsm/loaders/VRMLLoader';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
@@ -15,15 +14,7 @@ import '../ZStageDashboard/ZStageDashboard.css';
 import { backend_url } from '../../../services/api/config';
 import './ZStage3DLayout.css';
 
-// Shared DracoLoader — reused across all GLTFLoader instances
-const dracoLoader = new DRACOLoader();
-dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
-
-function makeGLTFLoader() {
-  const loader = new GLTFLoader();
-  loader.setDRACOLoader(dracoLoader);
-  return loader;
-}
+function makeGLTFLoader() { return new GLTFLoader(); }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const SCALE      = 0.04;
@@ -811,7 +802,12 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     const onLoadError = (err) => {
       URL.revokeObjectURL(url);
       onPlaceEnd && onPlaceEnd();
-      alert(`Failed to load model: ${err?.message || 'Unknown error'}`);
+      const msg = err?.message || String(err) || '';
+      if (msg.toLowerCase().includes('draco')) {
+        alert('This GLB uses Draco compression.\n\nPlease re-export from Blender / your tool with Draco disabled:\n• Blender → File → Export → glTF 2.0 → uncheck "Draco mesh compression"');
+      } else {
+        alert(`Failed to load model: ${msg || 'Check browser console for details'}`);
+      }
     };
 
     const onLoaded = (baseObj) => {
