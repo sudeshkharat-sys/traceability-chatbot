@@ -1171,10 +1171,29 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [animToStation,     setAnimToStation]     = useState('');
   const [animDuration,      setAnimDuration]      = useState(6);
   const [animPlaying,       setAnimPlaying]       = useState(false);
+  const [animPresets,       setAnimPresets]       = useState([]);
+  const [playingAll,        setPlayingAll]        = useState(false);
 
   useEffect(() => {
     if (activeLayoutId && !selectedLayoutId) setSelectedLayoutId(activeLayoutId);
   }, [activeLayoutId]); // eslint-disable-line
+
+  // Load animation presets when layout changes
+  useEffect(() => {
+    if (!selectedLayoutId) { setAnimPresets([]); return; }
+    try {
+      const stored = localStorage.getItem(`z3d_anim_presets_${selectedLayoutId}`);
+      setAnimPresets(stored ? JSON.parse(stored) : []);
+    } catch (_) { setAnimPresets([]); }
+  }, [selectedLayoutId]);
+
+  // Save animation presets whenever they change
+  useEffect(() => {
+    if (!selectedLayoutId) return;
+    try {
+      localStorage.setItem(`z3d_anim_presets_${selectedLayoutId}`, JSON.stringify(animPresets));
+    } catch (_) {}
+  }, [animPresets, selectedLayoutId]);
 
   useEffect(() => {
     if (!selectedLayoutId) return;
@@ -1294,6 +1313,26 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const { snapView, setTransformMode, placeObject, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, animateAlongPath, stopAnimation } =
     useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady);
 
+  const runPreset = useCallback((preset) => {
+    const fromNum  = parseInt((preset.fromStation.match(/\d+/) || ['0'])[0], 10);
+    const toNum    = parseInt((preset.toStation.match(/\d+/)   || ['0'])[0], 10);
+    const filtered = stationList.filter(s => !preset.shop || s.shop === preset.shop);
+    const dir      = fromNum <= toNum ? 1 : -1;
+    const waypoints = filtered
+      .filter(s => {
+        const n = parseInt((s.id.match(/\d+/) || ['0'])[0], 10);
+        return dir === 1 ? n >= fromNum && n <= toNum : n <= fromNum && n >= toNum;
+      })
+      .sort((a, b) => {
+        const na = parseInt((a.id.match(/\d+/) || ['0'])[0], 10);
+        const nb = parseInt((b.id.match(/\d+/) || ['0'])[0], 10);
+        return dir === 1 ? na - nb : nb - na;
+      })
+      .map(s => s.id);
+    if (waypoints.length < 2) return;
+    animateAlongPath(preset.objId, waypoints, preset.duration, () => {});
+  }, [stationList, animateAlongPath]);
+
   const handleLayoutChange = useCallback((e) => {
     setSelectedLayoutId(Number(e.target.value) || null);
     setLayout(null); setWalkMode(false); setPlacedObjects([]); setSelectedId(null);
@@ -1388,6 +1427,28 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             <button type="button" className={`z3d-walk-btn${walkMode ? ' z3d-walk-btn--active' : ''}`} onClick={() => setWalkMode(v => !v)}>
               {walkMode ? '🧍 Exit Walk' : '🚶 Walk Mode'}
             </button>
+
+            {/* Play All / Stop All presets */}
+            {!playingAll ? (
+              <button type="button"
+                className="z3d-walk-btn z3d-play-all-btn"
+                disabled={animPresets.length === 0}
+                onClick={() => {
+                  setPlayingAll(true);
+                  animPresets.forEach(p => runPreset(p));
+                  // Stop All clears flag; use a short delay as a safety net
+                  setTimeout(() => setPlayingAll(false), Math.max(...animPresets.map(p => p.duration), 6) * 1000 + 500);
+                }}
+              >▶ Play All</button>
+            ) : (
+              <button type="button"
+                className="z3d-walk-btn z3d-play-all-btn z3d-walk-btn--playing"
+                onClick={() => {
+                  animPresets.forEach(p => stopAnimation(p.objId, true));
+                  setPlayingAll(false);
+                }}
+              >■ Stop All</button>
+            )}
 
             {/* Animate dropdown trigger */}
             <div className="z3d-anim-dropdown-wrapper">
@@ -1496,6 +1557,48 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                     )}
                     {animPlaying && <span className="z3d-anim-playing">Animating…</span>}
                   </div>
+
+                  {/* Save Preset */}
+                  <button
+                    type="button"
+                    className="z3d-anim-play-btn"
+                    style={{ marginTop: 6 }}
+                    disabled={!animObjId || !animFromStation || !animToStation}
+                    onClick={() => {
+                      const label = `${animFromStation} → ${animToStation}`;
+                      const newPreset = {
+                        id: `${Date.now()}`,
+                        label,
+                        objId: animObjId,
+                        shop: animShop,
+                        fromStation: animFromStation,
+                        toStation: animToStation,
+                        duration: animDuration,
+                      };
+                      setAnimPresets(prev => [...prev, newPreset]);
+                    }}
+                  >💾 Save Preset</button>
+
+                  {/* Saved presets list */}
+                  {animPresets.length > 0 && (
+                    <div className="z3d-preset-list">
+                      {animPresets.map(preset => (
+                        <div key={preset.id} className="z3d-preset-item">
+                          <span className="z3d-preset-label">{preset.label}</span>
+                          <button
+                            type="button"
+                            className="z3d-preset-play-btn"
+                            onClick={() => runPreset(preset)}
+                          >▶</button>
+                          <button
+                            type="button"
+                            className="z3d-preset-del-btn"
+                            onClick={() => setAnimPresets(prev => prev.filter(p => p.id !== preset.id))}
+                          >×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
