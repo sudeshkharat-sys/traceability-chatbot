@@ -652,16 +652,19 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       if (walkModeRef.current) { walk.update(); orbit.enabled = false; }
       else { if (!tc.dragging) orbit.enabled = true; orbit.update(); }
 
-      // Process active tweens
+      // Process active tweens — collect completions first, then fire callbacks
+      // so that runSegment's push() isn't overwritten by the filter assignment
       const now = performance.now();
+      const done = [];
       animationsRef.current = animationsRef.current.filter(anim => {
         const raw  = Math.min((now - anim.startTime) / anim.durationMs, 1);
         const ease = raw < 0.5 ? 2 * raw * raw : -1 + (4 - 2 * raw) * raw;
         anim.mesh.position.x = anim.fromX + (anim.toX - anim.fromX) * ease;
         anim.mesh.position.z = anim.fromZ + (anim.toZ - anim.fromZ) * ease;
-        if (raw >= 1) { anim.onComplete && anim.onComplete(); return false; }
+        if (raw >= 1) { done.push(anim); return false; }
         return true;
       });
+      done.forEach(anim => anim.onComplete && anim.onComplete());
 
       renderer.render(scene, camera);
     };
@@ -975,34 +978,50 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     }
   }, []);
 
-  // Animate object through station waypoints (from → to) then back to start.
-  // waypointIds: ordered array of station IDs forming the path.
+  // Animate object station-box end → end along the green center path, then back to origin.
+  // waypointIds: station IDs in travel order.
+  // The object travels from the X-start edge of the first station to the X-end edge
+  // of the last station (end-of-box to end-of-box), then returns to its original position.
   const animateAlongPath = useCallback((id, waypointIds, durationSec, onComplete) => {
     const entry = placedRef.current.find(p => p.id === id);
     if (!entry) return;
 
-    // Cancel any existing anim for this id
     animationsRef.current = animationsRef.current.filter(a => a.id !== id);
 
     const posMap = stationPosRef.current;
-    const pts = waypointIds
-      .map(sid => posMap[sid])
-      .filter(Boolean);
+    const pts = waypointIds.map(sid => posMap[sid]).filter(Boolean);
     if (pts.length < 2) return;
 
-    // Build full round-trip: forward then reverse back to start
-    const fullPath = [...pts, ...[...pts].reverse().slice(1)];
+    // Use end-of-box edges: first station left edge, last station right edge
+    // Each station center x is cellCX = originX + i*CELL_W + CELL_W/2
+    // So left edge = center - CELL_W/2, right edge = center + CELL_W/2
+    const firstPt = { x: pts[0].x - CELL_W / 2, z: pts[0].z };
+    const lastPt  = { x: pts[pts.length - 1].x + CELL_W / 2, z: pts[pts.length - 1].z };
 
-    const segCount   = fullPath.length - 1;
-    const segDurMs   = (durationSec * 1000) / segCount;
-    let   segIdx     = 0;
+    // Build waypoints: left-edge of first → centers of intermediate → right-edge of last
+    const forward = [firstPt, ...pts.slice(1, -1), lastPt];
+
+    // Save true origin position to return to
+    const originX = entry.mesh.position.x;
+    const originZ = entry.mesh.position.z;
+
+    // Full path: forward then reverse back to origin
+    const fullPath = [
+      ...forward,
+      ...[...forward].reverse().slice(1),
+      { x: originX, z: originZ },
+    ];
+
+    const segCount = fullPath.length - 1;
+    const segDurMs = (durationSec * 1000) / segCount;
+    let segIdx = 0;
 
     const runSegment = () => {
       if (segIdx >= segCount) { onComplete && onComplete(); return; }
       const from = fullPath[segIdx];
       const to   = fullPath[segIdx + 1];
-      animationsRef.current = animationsRef.current.filter(a => a.id !== id);
-      animationsRef.current.push({
+      // Push BEFORE filtering so we don't collide with the done[] flush
+      const newAnim = {
         id,
         mesh:       entry.mesh,
         fromX:      from.x,
@@ -1012,7 +1031,9 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
         startTime:  performance.now(),
         durationMs: segDurMs,
         onComplete: () => { segIdx++; runSegment(); },
-      });
+      };
+      animationsRef.current = animationsRef.current.filter(a => a.id !== id);
+      animationsRef.current.push(newAnim);
     };
     runSegment();
   }, []);
@@ -1148,7 +1169,10 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [uploadStation,     setUploadStation]     = useState('');
   // Per-object scale
   const [scaleVal,          setScaleVal]          = useState(1.0);
-  // Animation
+  // Animation panel (toolbar dropdown)
+  const [showAnimPanel,     setShowAnimPanel]     = useState(false);
+  const [animObjId,         setAnimObjId]         = useState('');
+  const [animShop,          setAnimShop]          = useState('');
   const [animFromStation,   setAnimFromStation]   = useState('');
   const [animToStation,     setAnimToStation]     = useState('');
   const [animDuration,      setAnimDuration]      = useState(6);
@@ -1370,6 +1394,117 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             <button className={`z3d-walk-btn${walkMode ? ' z3d-walk-btn--active' : ''}`} onClick={() => setWalkMode(v => !v)}>
               {walkMode ? '🧍 Exit Walk' : '🚶 Walk Mode'}
             </button>
+
+            {/* Animate dropdown trigger */}
+            <div className="z3d-anim-dropdown-wrapper">
+              <button
+                className={`z3d-walk-btn${showAnimPanel ? ' z3d-walk-btn--active' : ''}${animPlaying ? ' z3d-walk-btn--playing' : ''}`}
+                onClick={() => setShowAnimPanel(v => !v)}
+              >
+                🎬 Animate{animPlaying ? ' ●' : ''}
+              </button>
+
+              {showAnimPanel && (
+                <div className="z3d-anim-dropdown">
+                  <div className="z3d-anim-dropdown-title">Animate Object Along Path</div>
+
+                  <label className="z3d-anim-field-label">Object</label>
+                  <select
+                    className="z3d-anim-select"
+                    value={animObjId}
+                    onChange={e => setAnimObjId(e.target.value)}
+                    disabled={animPlaying}
+                  >
+                    <option value="">— Select object —</option>
+                    {placedObjects.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
+                  </select>
+
+                  <label className="z3d-anim-field-label">Site / Shop</label>
+                  <select
+                    className="z3d-anim-select"
+                    value={animShop}
+                    onChange={e => { setAnimShop(e.target.value); setAnimFromStation(''); setAnimToStation(''); }}
+                    disabled={animPlaying}
+                  >
+                    <option value="">— All shops —</option>
+                    {shopList.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+
+                  <label className="z3d-anim-field-label">From Station</label>
+                  <select
+                    className="z3d-anim-select"
+                    value={animFromStation}
+                    onChange={e => setAnimFromStation(e.target.value)}
+                    disabled={animPlaying}
+                  >
+                    <option value="">— Start —</option>
+                    {stationList
+                      .filter(s => !animShop || s.shop === animShop)
+                      .map(s => <option key={s.id} value={s.id}>{s.id}{s.shop ? ` · ${s.shop}` : ''}</option>)}
+                  </select>
+
+                  <label className="z3d-anim-field-label">To Station</label>
+                  <select
+                    className="z3d-anim-select"
+                    value={animToStation}
+                    onChange={e => setAnimToStation(e.target.value)}
+                    disabled={animPlaying}
+                  >
+                    <option value="">— End —</option>
+                    {stationList
+                      .filter(s => !animShop || s.shop === animShop)
+                      .map(s => <option key={s.id} value={s.id}>{s.id}{s.shop ? ` · ${s.shop}` : ''}</option>)}
+                  </select>
+
+                  <div className="z3d-anim-dur-row">
+                    <span className="z3d-anim-field-label">Duration</span>
+                    <input
+                      type="range" min="2" max="20" step="1"
+                      value={animDuration}
+                      className="z3d-scale-slider"
+                      onChange={e => setAnimDuration(parseInt(e.target.value, 10))}
+                      disabled={animPlaying}
+                    />
+                    <span className="z3d-scale-value">{animDuration}s</span>
+                  </div>
+
+                  <div className="z3d-anim-btns">
+                    {!animPlaying ? (
+                      <button
+                        className="z3d-anim-play-btn"
+                        disabled={!animObjId || !animFromStation || !animToStation || animFromStation === animToStation}
+                        onClick={() => {
+                          const fromNum  = parseInt((animFromStation.match(/\d+/) || ['0'])[0], 10);
+                          const toNum    = parseInt((animToStation.match(/\d+/)   || ['0'])[0], 10);
+                          const filtered = stationList.filter(s => !animShop || s.shop === animShop);
+                          const dir      = fromNum <= toNum ? 1 : -1;
+                          const waypoints = filtered
+                            .filter(s => {
+                              const n = parseInt((s.id.match(/\d+/) || ['0'])[0], 10);
+                              return dir === 1 ? n >= fromNum && n <= toNum : n <= fromNum && n >= toNum;
+                            })
+                            .sort((a, b) => {
+                              const na = parseInt((a.id.match(/\d+/) || ['0'])[0], 10);
+                              const nb = parseInt((b.id.match(/\d+/) || ['0'])[0], 10);
+                              return dir === 1 ? na - nb : nb - na;
+                            })
+                            .map(s => s.id);
+                          if (waypoints.length < 2) return;
+                          setAnimPlaying(true);
+                          animateAlongPath(animObjId, waypoints, animDuration, () => setAnimPlaying(false));
+                        }}
+                      >▶ Animate</button>
+                    ) : (
+                      <button
+                        className="z3d-anim-stop-btn"
+                        onClick={() => { stopAnimation(animObjId, true); setAnimPlaying(false); }}
+                      >■ Stop</button>
+                    )}
+                    {animPlaying && <span className="z3d-anim-playing">Animating…</span>}
+                  </div>
+                </div>
+              )}
+            </div>
           </>
         )}
 
@@ -1444,98 +1579,6 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                 />
                 <span className="z3d-scale-value">{scaleVal.toFixed(1)}×</span>
                 <button className="z3d-scale-reset" title="Reset scale" onClick={() => { setScaleVal(1.0); setObjectScale(selectedId, 1.0); }}>↺</button>
-              </div>
-            )}
-
-            {/* Animation */}
-            {currentSelected && stationList.length > 0 && (
-              <div className="z3d-anim-section">
-                <div className="z3d-anim-title">Animate Along Path</div>
-
-                <label className="z3d-anim-field-label">Site / Shop</label>
-                <select
-                  className="z3d-anim-select"
-                  value={uploadShop}
-                  onChange={e => { setUploadShop(e.target.value); setAnimFromStation(''); setAnimToStation(''); }}
-                  disabled={animPlaying}
-                >
-                  <option value="">— All shops —</option>
-                  {shopList.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-
-                <label className="z3d-anim-field-label">From Station</label>
-                <select
-                  className="z3d-anim-select"
-                  value={animFromStation}
-                  onChange={e => setAnimFromStation(e.target.value)}
-                  disabled={animPlaying}
-                >
-                  <option value="">— Start —</option>
-                  {stationList
-                    .filter(s => !uploadShop || s.shop === uploadShop)
-                    .map(s => <option key={s.id} value={s.id}>{s.id}{s.shop ? ` · ${s.shop}` : ''}</option>)}
-                </select>
-
-                <label className="z3d-anim-field-label">To Station</label>
-                <select
-                  className="z3d-anim-select"
-                  value={animToStation}
-                  onChange={e => setAnimToStation(e.target.value)}
-                  disabled={animPlaying}
-                >
-                  <option value="">— End —</option>
-                  {stationList
-                    .filter(s => !uploadShop || s.shop === uploadShop)
-                    .map(s => <option key={s.id} value={s.id}>{s.id}{s.shop ? ` · ${s.shop}` : ''}</option>)}
-                </select>
-
-                <div className="z3d-anim-dur-row">
-                  <span className="z3d-anim-field-label">Duration</span>
-                  <input
-                    type="range" min="2" max="20" step="1"
-                    value={animDuration}
-                    className="z3d-scale-slider"
-                    onChange={e => setAnimDuration(parseInt(e.target.value, 10))}
-                    disabled={animPlaying}
-                  />
-                  <span className="z3d-scale-value">{animDuration}s</span>
-                </div>
-
-                <div className="z3d-anim-btns">
-                  {!animPlaying ? (
-                    <button
-                      className="z3d-anim-play-btn"
-                      disabled={!animFromStation || !animToStation || animFromStation === animToStation}
-                      onClick={() => {
-                        // Build ordered waypoints from from→to using numeric sort
-                        const fromNum = parseInt((animFromStation.match(/\d+/) || ['0'])[0], 10);
-                        const toNum   = parseInt((animToStation.match(/\d+/)   || ['0'])[0], 10);
-                        const filtered = stationList.filter(s => !uploadShop || s.shop === uploadShop);
-                        const direction = fromNum <= toNum ? 1 : -1;
-                        const waypoints = filtered
-                          .filter(s => {
-                            const n = parseInt((s.id.match(/\d+/) || ['0'])[0], 10);
-                            return direction === 1 ? n >= fromNum && n <= toNum : n <= fromNum && n >= toNum;
-                          })
-                          .sort((a, b) => {
-                            const na = parseInt((a.id.match(/\d+/) || ['0'])[0], 10);
-                            const nb = parseInt((b.id.match(/\d+/) || ['0'])[0], 10);
-                            return direction === 1 ? na - nb : nb - na;
-                          })
-                          .map(s => s.id);
-                        if (waypoints.length < 2) return;
-                        setAnimPlaying(true);
-                        animateAlongPath(selectedId, waypoints, animDuration, () => setAnimPlaying(false));
-                      }}
-                    >▶ Animate</button>
-                  ) : (
-                    <button
-                      className="z3d-anim-stop-btn"
-                      onClick={() => { stopAnimation(selectedId, true); setAnimPlaying(false); }}
-                    >■ Stop</button>
-                  )}
-                  {animPlaying && <span className="z3d-anim-playing">Animating…</span>}
-                </div>
               </div>
             )}
 

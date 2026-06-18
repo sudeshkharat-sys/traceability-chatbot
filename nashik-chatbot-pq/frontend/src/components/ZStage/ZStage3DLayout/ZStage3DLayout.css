@@ -800,3 +800,37 @@
 .z3d-anim-stop-btn:hover { background: #991b1b; }
 .z3d-anim-playing { font-size: 11px; color: #f0b429; animation: z3d-blink 1s ease-in-out infinite; }
 @keyframes z3d-blink { 0%,100% { opacity:1; } 50% { opacity:0.25; } }
+
+/* ── Animate toolbar dropdown ───────────────────────────────── */
+.z3d-anim-dropdown-wrapper {
+  position: relative;
+}
+.z3d-walk-btn--playing {
+  border-color: #f0b429 !important;
+  color: #f0b429 !important;
+}
+.z3d-anim-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 500;
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 14px 16px;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.55);
+}
+.z3d-anim-dropdown-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #58a6ff;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #21262d;
+  padding-bottom: 6px;
+}
