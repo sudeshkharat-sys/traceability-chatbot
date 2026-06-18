@@ -690,7 +690,8 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       placedRef.current = [];
       selectedRef.current = null;
     };
-  }, [canvasRef, layout]); // eslint-disable-line — statusMap/zeMap intentionally excluded; they update via refs to avoid scene rebuilds
+  // statusMap/zeMap intentionally excluded — they update via refs to avoid scene rebuilds
+  }, [canvasRef, layout]); // eslint-disable-line
 
   // Walk mode toggle
   useEffect(() => {
