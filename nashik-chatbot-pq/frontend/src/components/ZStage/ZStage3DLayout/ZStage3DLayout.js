@@ -1036,82 +1036,83 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     });
   }, []);
 
-  // Place one file at every station in the given stationIds array (line placement)
+  // Place one file at every station in the given stationIds array (line placement).
+  // Loads the file once then deep-clones the resulting object per station — same
+  // code path as placeObject so it's proven to work.
   const placeObjectForLine = useCallback((file, name, layoutId, stationIds) => {
     const scene = sceneRef.current;
     if (!scene || !stationIds?.length) return;
-    const ext = file.name.split('.').pop().toLowerCase();
+    const ext  = file.name.split('.').pop().toLowerCase();
     const groupId = `line_${Date.now()}`;
-    const url = URL.createObjectURL(file);
+    const url  = URL.createObjectURL(file);
 
-    const onLoaded = (template) => {
+    const onTemplateLoaded = (template) => {
       URL.revokeObjectURL(url);
 
-      // Reset and auto-scale the template (keep it detached from scene)
+      // Measure auto-scale from a clean template at origin
       template.position.set(0, 0, 0);
       template.rotation.set(0, 0, 0);
-      const bbox = new THREE.Box3().setFromObject(template);
-      const size = new THREE.Vector3();
-      bbox.getSize(size);
-      const maxDim = Math.max(size.x, size.y, size.z);
+      template.scale.set(1, 1, 1);
+      const bbox0 = new THREE.Box3().setFromObject(template);
+      const size0 = new THREE.Vector3();
+      bbox0.getSize(size0);
+      const maxDim = Math.max(size0.x, size0.y, size0.z);
       const autoScale = maxDim > 0 ? 2.0 / maxDim : 1;
-      if (maxDim > 0) template.scale.setScalar(autoScale);
+      template.scale.setScalar(autoScale);
 
-      // Compute floor-snap Y offset once from the clean template (template still at origin)
-      const bboxFloor = new THREE.Box3().setFromObject(template);
-      const floorY = -bboxFloor.min.y;  // lift so bottom sits at y=0
+      // Floor-snap offset (computed once, same for every clone)
+      const bboxScaled = new THREE.Box3().setFromObject(template);
+      const floorY = -bboxScaled.min.y;
 
       const posMap = stationPosRef.current;
-      console.log('[Z3D line] stationIds=', stationIds, 'posMap keys=', Object.keys(posMap));
-
       const newEntries = [];
-      let masterObj = null; // first successfully placed object (template reused)
 
       stationIds.forEach((stationId, idx) => {
         const stnPos = posMap[stationId];
-        if (!stnPos) {
-          console.warn('[Z3D line] no 3D position for station', stationId, '— posMap has', Object.keys(posMap).length, 'keys');
-          return;
-        }
+        if (!stnPos) return; // station not in this scene yet
 
-        // Reuse template for the first placed object, clone for all others
-        const obj = masterObj === null ? template : masterObj.clone(true);
-        if (masterObj === null) masterObj = obj;
+        // Deep-clone for every station (idx 0 reuses template directly)
+        const obj = idx === 0 ? template : template.clone(true);
 
-        obj.userData.baseScale       = autoScale;
         obj.position.set(stnPos.x, floorY, stnPos.z);
+        obj.userData.baseScale        = autoScale;
+        obj.userData.isPlaced         = true;
+        obj.userData.objId            = `${groupId}_${idx}`;
+        obj.userData.objName          = name;
+        obj.userData.objExt           = ext;
+        obj.userData.assignedStation  = stationId;
+        obj.userData.lineGroupId      = groupId;
 
-        const objId = `${groupId}_${idx}`;
-        obj.userData.isPlaced        = true;
-        obj.userData.objId           = objId;
-        obj.userData.objName         = name;
-        obj.userData.objExt          = ext;
-        obj.userData.assignedStation = stationId;
-        obj.userData.lineGroupId     = groupId;
         scene.add(obj);
-        newEntries.push({ id: objId, mesh: obj, label: null, name, stationId, lineGroupId: groupId });
+        newEntries.push({
+          id: obj.userData.objId, mesh: obj,
+          label: null, name, stationId, lineGroupId: groupId,
+        });
       });
 
       if (newEntries.length === 0) {
-        alert(`No 3D positions found for the stations in this line.\nStation IDs tried: ${stationIds.join(', ')}\nPositions available: ${Object.keys(posMap).slice(0, 10).join(', ')}…`);
+        alert(
+          `Line Placement: no 3D positions found.\n` +
+          `Tried stations: ${stationIds.slice(0,5).join(', ')}${stationIds.length>5?'…':''}\n` +
+          `Scene has ${Object.keys(posMap).length} station(s) mapped.`
+        );
         return;
       }
 
       placedRef.current = [...placedRef.current, ...newEntries];
       onObjectsChange([...placedRef.current]);
 
-      // Persist: file blob stored only for first entry, others reference it; cache blob for all
+      // Persist each clone to IDB with its file blob cached
       if (layoutId) {
         file.arrayBuffer().then(buf => {
           const fileBlob = new Blob([buf], { type: file.type || 'application/octet-stream' });
-          newEntries.forEach((entry, i) => {
+          newEntries.forEach((entry) => {
             blobCacheRef.current[entry.id] = fileBlob;
             z3dPut({
               key: `${layoutId}_${entry.id}`,
               layoutId, id: entry.id, name, ext,
-              fileBlob: i === 0 ? fileBlob : undefined,
+              fileBlob,
               lineGroupId: groupId,
-              masterKey: i === 0 ? null : `${layoutId}_${newEntries[0].id}`,
               px: entry.mesh.position.x, py: entry.mesh.position.y, pz: entry.mesh.position.z,
               rx: entry.mesh.rotation.x, ry: entry.mesh.rotation.y, rz: entry.mesh.rotation.z,
               sx: entry.mesh.scale.x,    sy: entry.mesh.scale.y,    sz: entry.mesh.scale.z,
@@ -1122,14 +1123,14 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     };
 
     if (ext === 'glb' || ext === 'gltf') {
-      new GLTFLoader().load(url, (gltf) => onLoaded(gltf.scene));
+      new GLTFLoader().load(url, (gltf) => onTemplateLoaded(gltf.scene));
     } else if (ext === 'obj') {
-      new OBJLoader().load(url, onLoaded);
+      new OBJLoader().load(url, onTemplateLoaded);
     } else if (ext === 'stl') {
       new STLLoader().load(url, (geometry) => {
         geometry.computeVertexNormals();
         const mesh = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ color: 0x90a4ae }));
-        onLoaded(mesh);
+        onTemplateLoaded(mesh);
       });
     }
   }, [onObjectsChange]); // eslint-disable-line
