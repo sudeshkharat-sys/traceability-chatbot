@@ -441,7 +441,7 @@ class WalkController {
 }
 
 // ── Three.js scene hook ────────────────────────────────────────────────────────
-function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, onStationClick, isActive, onSceneReady) {
+function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, onStationClick, isActive, onSceneReady, onPlaceStart, onPlaceEnd) {
   const sceneRef       = useRef(null);
   const rendererRef    = useRef(null);
   const cameraRef      = useRef(null);
@@ -795,9 +795,17 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     }
 
     const url = URL.createObjectURL(file);
+    onPlaceStart && onPlaceStart();
+
+    const onLoadError = (err) => {
+      URL.revokeObjectURL(url);
+      onPlaceEnd && onPlaceEnd();
+      alert(`Failed to load model: ${err?.message || 'Unknown error'}`);
+    };
 
     const onLoaded = (baseObj) => {
       URL.revokeObjectURL(url);
+      onPlaceEnd && onPlaceEnd();
 
       // Strip text/label helpers from the loaded model
       baseObj.traverse(child => {
@@ -888,16 +896,16 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     };
 
     if (ext === 'glb' || ext === 'gltf') {
-      new GLTFLoader().load(url, (gltf) => onLoaded(gltf.scene));
+      new GLTFLoader().load(url, (gltf) => onLoaded(gltf.scene), undefined, onLoadError);
     } else if (ext === 'obj') {
-      new OBJLoader().load(url, onLoaded);
+      new OBJLoader().load(url, onLoaded, undefined, onLoadError);
     } else if (ext === 'wrl') {
-      new VRMLLoader().load(url, onLoaded);
+      new VRMLLoader().load(url, onLoaded, undefined, onLoadError);
     } else if (ext === 'stl') {
       new STLLoader().load(url, (geometry) => {
         geometry.computeVertexNormals();
         onLoaded(new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ color: 0x90a4ae })));
-      });
+      }, undefined, onLoadError);
     }
   }, [onObjectsChange]); // eslint-disable-line
 
@@ -1189,6 +1197,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [showLinePicker,    setShowLinePicker]    = useState(false);
   const [pickerLine,        setPickerLine]        = useState('');
   const [transformVals,     setTransformVals]     = useState({ rx: 0, ry: 0, rz: 0, sx: 1, sy: 1, sz: 1 });
+  const [placingObject,     setPlacingObject]     = useState(false);
 
   useEffect(() => {
     if (activeLayoutId && !selectedLayoutId) setSelectedLayoutId(activeLayoutId);
@@ -1296,8 +1305,11 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setSceneReady(true);
   }, []);
 
+  const onPlaceStart = useCallback(() => setPlacingObject(true),  []);
+  const onPlaceEnd   = useCallback(() => setPlacingObject(false), []);
+
   const { snapView, setTransformMode, placeObject, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, updateTransformVals } =
-    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady);
+    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady, onPlaceStart, onPlaceEnd);
 
   const handleLayoutChange = useCallback((e) => {
     setSelectedLayoutId(Number(e.target.value) || null);
@@ -1549,6 +1561,15 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                     <div className="z3d-scene-loading-bar-track">
                       <div className="z3d-scene-loading-bar-fill" />
                     </div>
+                  </div>
+                </div>
+              )}
+              {placingObject && (
+                <div className="z3d-convert-overlay">
+                  <div className="z3d-convert-box">
+                    <div className="z3d-convert-spinner" />
+                    <div className="z3d-convert-title">Loading model…</div>
+                    <div className="z3d-convert-sub">Parsing and placing the 3D object — large files may take a moment</div>
                   </div>
                 </div>
               )}
