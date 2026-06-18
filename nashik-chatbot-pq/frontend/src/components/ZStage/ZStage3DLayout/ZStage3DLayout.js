@@ -463,6 +463,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
   const layoutIdRef    = useRef(null);   // kept in sync by the scene effect
   const stationPosRef  = useRef({});     // stationId → { x, z, shopName }
   const animationsRef  = useRef([]);     // active tweens
+  const blobCacheRef   = useRef({});     // objId → Blob — keeps file data alive across IDB updates
   useEffect(() => { walkModeRef.current = walkMode; }, [walkMode]);
 
   useEffect(() => {
@@ -576,14 +577,16 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     const tc = new TransformControls(camera, renderer.domElement);
     tc.addEventListener('dragging-changed', (e) => {
       orbit.enabled = !e.value;
-      // Drag finished — persist updated transform to IDB
+      // Drag finished — persist updated transform to IDB (include blob so object survives reload)
       if (!e.value && selectedRef.current && layoutIdRef.current) {
-        const { mesh, id, name } = selectedRef.current;
+        const { mesh, id, name, lineGroupId } = selectedRef.current;
         z3dPut({
           key: `${layoutIdRef.current}_${id}`,
           layoutId: layoutIdRef.current,
           id, name,
           ext: mesh.userData.objExt || 'glb',
+          fileBlob: blobCacheRef.current[id] || undefined,
+          lineGroupId: lineGroupId || null,
           px: mesh.position.x, py: mesh.position.y, pz: mesh.position.z,
           rx: mesh.rotation.x, ry: mesh.rotation.y, rz: mesh.rotation.z,
           sx: mesh.scale.x,    sy: mesh.scale.y,    sz: mesh.scale.z,
@@ -616,6 +619,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       saved.forEach(record => {
         const blob = record.fileBlob;
         if (!blob) return;
+        blobCacheRef.current[record.id] = blob;
         const file = new File([blob], `${record.name}.${record.ext || 'glb'}`, { type: blob.type || 'model/gltf-binary' });
         const url  = URL.createObjectURL(file);
         const ext  = record.ext || 'glb';
@@ -837,13 +841,15 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       const entry = { id: objId, mesh: obj, label: null, name, stationId: options.stationId || null };
       placedRef.current = [...placedRef.current, entry];
 
-      // Persist to IDB (file blob + initial transform)
+      // Persist to IDB (file blob + initial transform) and cache blob for later updates
       if (layoutId) {
         file.arrayBuffer().then(buf => {
+          const blob = new Blob([buf], { type: file.type || 'application/octet-stream' });
+          blobCacheRef.current[objId] = blob;
           z3dPut({
             key: `${layoutId}_${objId}`,
             layoutId, id: objId, name, ext,
-            fileBlob: new Blob([buf], { type: file.type || 'application/octet-stream' }),
+            fileBlob: blob,
             px: obj.position.x, py: obj.position.y, pz: obj.position.z,
             rx: obj.rotation.x, ry: obj.rotation.y, rz: obj.rotation.z,
             sx: obj.scale.x,    sy: obj.scale.y,    sz: obj.scale.z,
@@ -991,6 +997,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           layoutId: layoutIdRef.current,
           id: t.id, name: t.name,
           ext: t.mesh.userData.objExt || 'glb',
+          fileBlob: blobCacheRef.current[t.id] || undefined,
           lineGroupId: t.lineGroupId || null,
           px: t.mesh.position.x, py: t.mesh.position.y, pz: t.mesh.position.z,
           rx: t.mesh.rotation.x, ry: t.mesh.rotation.y, rz: t.mesh.rotation.z,
@@ -1019,6 +1026,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           layoutId: layoutIdRef.current,
           id: t.id, name: t.name,
           ext: t.mesh.userData.objExt || 'glb',
+          fileBlob: blobCacheRef.current[t.id] || undefined,
           lineGroupId: t.lineGroupId || null,
           px: t.mesh.position.x, py: t.mesh.position.y, pz: t.mesh.position.z,
           rx: t.mesh.rotation.x, ry: t.mesh.rotation.y, rz: t.mesh.rotation.z,
@@ -1092,11 +1100,12 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       placedRef.current = [...placedRef.current, ...newEntries];
       onObjectsChange([...placedRef.current]);
 
-      // Persist: file blob stored only for first entry, others reference it
+      // Persist: file blob stored only for first entry, others reference it; cache blob for all
       if (layoutId) {
         file.arrayBuffer().then(buf => {
           const fileBlob = new Blob([buf], { type: file.type || 'application/octet-stream' });
           newEntries.forEach((entry, i) => {
+            blobCacheRef.current[entry.id] = fileBlob;
             z3dPut({
               key: `${layoutId}_${entry.id}`,
               layoutId, id: entry.id, name, ext,
