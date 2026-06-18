@@ -465,10 +465,11 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
   const sceneCenterRef = useRef(new THREE.Vector3(0, 0, 0));
   const sceneSpanRef   = useRef(20);
   const walkModeRef     = useRef(walkMode);
-  const layoutIdRef     = useRef(null);   // kept in sync by the scene effect
-  const stationCellsRef = useRef({});     // { stationId: { x, z } } — centre of each station cell
-  const linesRef        = useRef({});     // { lineName: [{stationId, x, z}] } — stations per line
-  const blobsRef        = useRef({});     // { 'tmpl_<id>': Blob } — template blobs
+  const layoutIdRef     = useRef(null);
+  const stationCellsRef = useRef({});
+  const linesRef        = useRef({});
+  const blobsRef        = useRef({});
+  const tcModeRef       = useRef('translate'); // current TransformControls mode
   useEffect(() => { walkModeRef.current = walkMode; }, [walkMode]);
 
   useEffect(() => {
@@ -590,6 +591,35 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       // Drag finished — persist updated transform to IDB
       if (!e.value && selectedRef.current && layoutIdRef.current) {
         const { mesh, id, name } = selectedRef.current;
+        const mode = tcModeRef.current;
+        const templateId = mesh.userData.templateId;
+
+        // For rotate/scale: propagate to all clones sharing the same templateId
+        if (mode !== 'translate' && templateId) {
+          const siblings = placedRef.current.filter(
+            p => p.templateId === templateId && p.id !== id
+          );
+          siblings.forEach(sib => {
+            if (mode === 'rotate' || mode === 'scale') {
+              sib.mesh.rotation.copy(mesh.rotation);
+              sib.mesh.scale.copy(mesh.scale);
+            }
+            z3dPut({
+              key: `${layoutIdRef.current}_${sib.id}`,
+              layoutId: layoutIdRef.current,
+              id: sib.id, name: sib.name,
+              ext:        sib.mesh.userData.objExt      || 'glb',
+              templateId: sib.mesh.userData.templateId  || null,
+              stationId:  sib.mesh.userData.stationId   || null,
+              lineName:   sib.mesh.userData.lineName    || null,
+              px: sib.mesh.position.x, py: sib.mesh.position.y, pz: sib.mesh.position.z,
+              rx: sib.mesh.rotation.x, ry: sib.mesh.rotation.y, rz: sib.mesh.rotation.z,
+              sx: sib.mesh.scale.x,    sy: sib.mesh.scale.y,    sz: sib.mesh.scale.z,
+            });
+          });
+        }
+
+        // Always save the dragged object itself
         z3dPut({
           key: `${layoutIdRef.current}_${id}`,
           layoutId: layoutIdRef.current,
@@ -766,6 +796,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
 
   // Set transform mode (translate / rotate / scale)
   const setTransformMode = useCallback((mode) => {
+    tcModeRef.current = mode;
     if (transformRef.current) transformRef.current.setMode(mode);
   }, []);
 
@@ -1048,25 +1079,43 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     const entry = placedRef.current.find(p => p.id === id);
     if (!entry) return;
     const m = entry.mesh;
-    if (vals.rx !== undefined) m.rotation.x = vals.rx * Math.PI / 180;
-    if (vals.ry !== undefined) m.rotation.y = vals.ry * Math.PI / 180;
-    if (vals.rz !== undefined) m.rotation.z = vals.rz * Math.PI / 180;
-    if (vals.sx !== undefined) m.scale.x = vals.sx;
-    if (vals.sy !== undefined) m.scale.y = vals.sy;
-    if (vals.sz !== undefined) m.scale.z = vals.sz;
+    const applyToMesh = (mesh) => {
+      if (vals.rx !== undefined) mesh.rotation.x = vals.rx * Math.PI / 180;
+      if (vals.ry !== undefined) mesh.rotation.y = vals.ry * Math.PI / 180;
+      if (vals.rz !== undefined) mesh.rotation.z = vals.rz * Math.PI / 180;
+      if (vals.sx !== undefined) mesh.scale.x = vals.sx;
+      if (vals.sy !== undefined) mesh.scale.y = vals.sy;
+      if (vals.sz !== undefined) mesh.scale.z = vals.sz;
+    };
+    applyToMesh(m);
+
+    // Propagate rotation/scale to all clones sharing the same templateId
+    const templateId = m.userData.templateId;
+    const isRotOrScale = vals.rx !== undefined || vals.ry !== undefined || vals.rz !== undefined
+                      || vals.sx !== undefined || vals.sy !== undefined || vals.sz !== undefined;
+    const siblings = templateId && isRotOrScale
+      ? placedRef.current.filter(p => p.templateId === templateId && p.id !== id)
+      : [];
+    siblings.forEach(sib => applyToMesh(sib.mesh));
+
     if (layoutIdRef.current) {
-      z3dPut({
-        key: `${layoutIdRef.current}_${id}`,
-        layoutId: layoutIdRef.current,
-        id, name: entry.name,
-        ext:        m.userData.objExt      || 'glb',
-        templateId: m.userData.templateId  || null,
-        stationId:  m.userData.stationId   || null,
-        lineName:   m.userData.lineName    || null,
-        px: m.position.x, py: m.position.y, pz: m.position.z,
-        rx: m.rotation.x, ry: m.rotation.y, rz: m.rotation.z,
-        sx: m.scale.x, sy: m.scale.y, sz: m.scale.z,
-      });
+      const saveEntry = (e) => {
+        const mesh = e.mesh;
+        z3dPut({
+          key: `${layoutIdRef.current}_${e.id}`,
+          layoutId: layoutIdRef.current,
+          id: e.id, name: e.name,
+          ext:        mesh.userData.objExt      || 'glb',
+          templateId: mesh.userData.templateId  || null,
+          stationId:  mesh.userData.stationId   || null,
+          lineName:   mesh.userData.lineName    || null,
+          px: mesh.position.x, py: mesh.position.y, pz: mesh.position.z,
+          rx: mesh.rotation.x, ry: mesh.rotation.y, rz: mesh.rotation.z,
+          sx: mesh.scale.x, sy: mesh.scale.y, sz: mesh.scale.z,
+        });
+      };
+      saveEntry(entry);
+      siblings.forEach(saveEntry);
     }
   }, []);
 
