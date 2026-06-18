@@ -1009,12 +1009,12 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     const endPt    = { x: pts[pts.length - 1].x + CELL_W / 2, z: pts[pts.length - 1].z };
     const originX  = entry.mesh.position.x;
     const originZ  = entry.mesh.position.z;
-    const durMs    = durationSec * 1000;
+    // durationSec = total round-trip time; each leg gets half
+    const legMs = (durationSec * 1000) / 2;
 
-    // Two segments: forward (constant speed full route), return (same duration back to origin)
     const segments = [
-      { fromX: startPt.x, fromZ: startPt.z, toX: endPt.x,   toZ: endPt.z,   durationMs: durMs },
-      { fromX: endPt.x,   fromZ: endPt.z,   toX: originX,    toZ: originZ,    durationMs: durMs },
+      { fromX: startPt.x, fromZ: startPt.z, toX: endPt.x, toZ: endPt.z,  durationMs: legMs },
+      { fromX: endPt.x,   fromZ: endPt.z,   toX: originX,  toZ: originZ,  durationMs: legMs },
     ];
 
     let segIdx = 0;
