@@ -705,8 +705,8 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
         const firstRec = records[0];
         const libKey   = tmpl?.libKey || firstRec?.libKey;
         const libEntry = libKey ? libMap[libKey] : null;
-        // Blob: prefer library (single copy), fall back to legacy template blob
-        const blob = libEntry?.fileBlob || tmpl?.fileBlob || firstRec?.fileBlob;
+        // Blob: template record is primary (always stored), library is secondary
+        const blob = tmpl?.fileBlob || firstRec?.fileBlob || libEntry?.fileBlob;
         if (!blob) return;
 
         const ext = (tmpl?.ext || firstRec?.ext || 'glb').toLowerCase();
@@ -966,10 +966,11 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
         });
 
         if (layoutId) {
-          // Template record: no blob, just libKey reference
+          // Template record stores blob (reliable restore) + libKey (library reuse)
           z3dPutTemplate({
             key: `${layoutId}_tmpl_${templateId}`,
             layoutId, templateId, name, ext, libKey,
+            fileBlob: blob,
             lineName: lineName || null,
           });
           newEntries.forEach(entry => {
@@ -1283,10 +1284,11 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       onObjectsChange([...placedRef.current]);
 
       if (layoutId) {
-        // Template references library key — blob already in library, no duplication
         z3dPutTemplate({
           key: `${layoutId}_tmpl_${templateId}`, layoutId, templateId,
-          name: preset.name, ext, libKey: preset.key, lineName: lineName || null,
+          name: preset.name, ext, libKey: preset.key,
+          fileBlob: blob,
+          lineName: lineName || null,
         });
         newEntries.forEach(entry => {
           const m = entry.mesh;
