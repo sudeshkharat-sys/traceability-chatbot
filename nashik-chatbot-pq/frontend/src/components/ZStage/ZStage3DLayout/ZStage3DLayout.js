@@ -1314,6 +1314,9 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady);
 
   const runPreset = useCallback((preset) => {
+    // Resolve current object ID by name (objId changes after page refresh)
+    const obj = placedObjects.find(o => o.name === preset.objName) || placedObjects.find(o => o.id === preset.objId);
+    if (!obj) return;
     const fromNum  = parseInt((preset.fromStation.match(/\d+/) || ['0'])[0], 10);
     const toNum    = parseInt((preset.toStation.match(/\d+/)   || ['0'])[0], 10);
     const filtered = stationList.filter(s => !preset.shop || s.shop === preset.shop);
@@ -1330,8 +1333,8 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
       })
       .map(s => s.id);
     if (waypoints.length < 2) return;
-    animateAlongPath(preset.objId, waypoints, preset.duration, () => {});
-  }, [stationList, animateAlongPath]);
+    animateAlongPath(obj.id, waypoints, preset.duration, () => {});
+  }, [stationList, animateAlongPath, placedObjects]);
 
   const handleLayoutChange = useCallback((e) => {
     setSelectedLayoutId(Number(e.target.value) || null);
@@ -1566,10 +1569,12 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                     disabled={!animObjId || !animFromStation || !animToStation}
                     onClick={() => {
                       const label = `${animFromStation} → ${animToStation}`;
+                      const objEntry = placedObjects.find(o => o.id === animObjId);
                       const newPreset = {
                         id: `${Date.now()}`,
                         label,
-                        objId: animObjId,
+                        objId:   animObjId,
+                        objName: objEntry ? objEntry.name : '',
                         shop: animShop,
                         fromStation: animFromStation,
                         toStation: animToStation,
