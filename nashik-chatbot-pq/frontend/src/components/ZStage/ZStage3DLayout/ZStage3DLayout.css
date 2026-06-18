@@ -834,3 +834,75 @@
   border-bottom: 1px solid #21262d;
   padding-bottom: 6px;
 }
+
+/* Animation presets */
+.z3d-preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  border-top: 1px solid #21262d;
+  padding-top: 6px;
+}
+
+.z3d-preset-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #161b22;
+  border-radius: 4px;
+  padding: 4px 6px;
+}
+
+.z3d-preset-label {
+  flex: 1;
+  font-size: 11px;
+  color: #c9d1d9;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.z3d-preset-play-btn {
+  background: #238636;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.z3d-preset-play-btn:hover {
+  background: #2ea043;
+}
+
+.z3d-preset-del-btn {
+  background: #6e2020;
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.z3d-preset-del-btn:hover {
+  background: #da3633;
+}
+
+/* Play All button */
+.z3d-play-all-btn {
+  background: #1f6feb;
+  color: #fff;
+  border-color: #1f6feb;
+}
+.z3d-play-all-btn:hover:not(:disabled) {
+  background: #388bfd;
+  border-color: #388bfd;
+}
+.z3d-play-all-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
