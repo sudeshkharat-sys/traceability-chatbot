@@ -906,3 +906,56 @@
   opacity: 0.45;
   cursor: not-allowed;
 }
+
+/* ── Rotation panel (Objects sidebar) ───────────────────────── */
+.z3d-rotation-panel {
+  display: flex; flex-direction: column; gap: 5px;
+  padding: 8px 10px 10px; background: #0d1117;
+  border-top: 1px solid #21262d;
+}
+.z3d-rotation-title {
+  font-size: 11px; font-weight: 700; color: #f0b429;
+  text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;
+}
+.z3d-rot-row {
+  display: flex; align-items: center; gap: 5px;
+}
+.z3d-rot-label {
+  font-size: 11px; color: #8b949e; flex-shrink: 0; width: 14px; font-weight: 700;
+}
+.z3d-rot-input {
+  width: 46px; background: #161b22; color: #e6edf3;
+  border: 1px solid #30363d; border-radius: 4px;
+  padding: 2px 4px; font-size: 11px; text-align: center;
+  flex-shrink: 0;
+}
+.z3d-rot-input:focus { outline: none; border-color: #f0b429; }
+
+/* ── Line placement: station chips preview ───────────────────── */
+.z3d-modal-hint--line {
+  color: #58a6ff;
+  background: #0d2033;
+  border: 1px solid #1f3d5c;
+  border-radius: 5px;
+  padding: 7px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.z3d-modal-line-preview {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  max-height: 110px; overflow-y: auto;
+  padding: 6px 0;
+}
+.z3d-modal-stn-chip {
+  background: #1c2f4d; color: #58a6ff;
+  border: 1px solid #1f6feb; border-radius: 4px;
+  font-size: 11px; padding: 2px 7px; white-space: nowrap;
+}
+
+/* ── Object station tag ──────────────────────────────────────── */
+.z3d-obj-station-tag {
+  display: inline-block; margin-left: 5px;
+  background: #1c2f4d; color: #58a6ff;
+  border-radius: 3px; font-size: 9px; padding: 1px 4px;
+  vertical-align: middle; white-space: nowrap; flex-shrink: 0;
+}
