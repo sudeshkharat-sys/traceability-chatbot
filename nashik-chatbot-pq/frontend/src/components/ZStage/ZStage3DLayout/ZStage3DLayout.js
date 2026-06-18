@@ -1375,29 +1375,29 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             {/* View presets */}
             <div className="z3d-view-group">
               {['3D','Top','Front','Back','Left','Right'].map(v => (
-                <button key={v} className="z3d-view-btn" onClick={() => snapView(v.toLowerCase())}>{v}</button>
+                <button key={v} type="button" className="z3d-view-btn" onClick={() => snapView(v.toLowerCase())}>{v}</button>
               ))}
             </div>
 
             {/* Upload object */}
-            <button className="z3d-upload-btn" onClick={() => fileInputRef.current?.click()} title="Upload GLB, OBJ or STL file">
+            <button type="button" className="z3d-upload-btn" onClick={() => fileInputRef.current?.click()} title="Upload GLB, OBJ or STL file">
               ⬆ Upload Object
             </button>
             <input ref={fileInputRef} type="file" accept=".glb,.gltf,.obj,.stl,.wrl,.stp,.step" style={{ display: 'none' }} onChange={handleFileUpload} />
 
             {/* Object list toggle */}
-            <button className={`z3d-walk-btn${showObjPanel ? ' z3d-walk-btn--active' : ''}`} onClick={() => setShowObjPanel(v => !v)}>
+            <button type="button" className={`z3d-walk-btn${showObjPanel ? ' z3d-walk-btn--active' : ''}`} onClick={() => setShowObjPanel(v => !v)}>
               📦 Objects {placedObjects.length > 0 && `(${placedObjects.length})`}
             </button>
 
             {/* Walk mode */}
-            <button className={`z3d-walk-btn${walkMode ? ' z3d-walk-btn--active' : ''}`} onClick={() => setWalkMode(v => !v)}>
+            <button type="button" className={`z3d-walk-btn${walkMode ? ' z3d-walk-btn--active' : ''}`} onClick={() => setWalkMode(v => !v)}>
               {walkMode ? '🧍 Exit Walk' : '🚶 Walk Mode'}
             </button>
 
             {/* Animate dropdown trigger */}
             <div className="z3d-anim-dropdown-wrapper">
-              <button
+              <button type="button"
                 className={`z3d-walk-btn${showAnimPanel ? ' z3d-walk-btn--active' : ''}${animPlaying ? ' z3d-walk-btn--playing' : ''}`}
                 onClick={() => setShowAnimPanel(v => !v)}
               >
@@ -1470,7 +1470,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
 
                   <div className="z3d-anim-btns">
                     {!animPlaying ? (
-                      <button
+                      <button type="button"
                         className="z3d-anim-play-btn"
                         disabled={!animObjId || !animFromStation || !animToStation || animFromStation === animToStation}
                         onClick={() => {
@@ -1495,7 +1495,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                         }}
                       >▶ Animate</button>
                     ) : (
-                      <button
+                      <button type="button"
                         className="z3d-anim-stop-btn"
                         onClick={() => { stopAnimation(animObjId, true); setAnimPlaying(false); }}
                       >■ Stop</button>
@@ -1524,7 +1524,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
           <span className="dash-legend-text">Under Analysis</span>
         </div>
 
-        <button className="dash-refresh-btn" onClick={handleRefresh} disabled={refreshing} title="Refresh layout and records">
+        <button type="button" className="dash-refresh-btn" onClick={handleRefresh} disabled={refreshing} title="Refresh layout and records">
           <RefreshCw size={13} className={refreshing ? 'dash-spin' : ''} />
           {refreshing ? 'Refreshing…' : 'Refresh'}
         </button>
@@ -1540,7 +1540,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             {currentSelected && (
               <div className="z3d-transform-group">
                 {[['translate','Move'],['rotate','Rotate'],['scale','Scale']].map(([m, lbl]) => (
-                  <button
+                  <button type="button"
                     key={m}
                     className={`z3d-transform-btn${transformMode === m ? ' z3d-transform-btn--active' : ''}`}
                     onClick={() => handleModeChange(m)}
@@ -1559,7 +1559,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                   onKeyDown={e => e.key === 'Enter' && handleRename()}
                   placeholder="Label name"
                 />
-                <button className="z3d-rename-btn" onClick={handleRename}>✓</button>
+                <button type="button" className="z3d-rename-btn" onClick={handleRename}>✓</button>
               </div>
             )}
 
@@ -1578,7 +1578,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                   }}
                 />
                 <span className="z3d-scale-value">{scaleVal.toFixed(1)}×</span>
-                <button className="z3d-scale-reset" title="Reset scale" onClick={() => { setScaleVal(1.0); setObjectScale(selectedId, 1.0); }}>↺</button>
+                <button type="button" className="z3d-scale-reset" title="Reset scale" onClick={() => { setScaleVal(1.0); setObjectScale(selectedId, 1.0); }}>↺</button>
               </div>
             )}
 
@@ -1593,7 +1593,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                 >
                   <span className="z3d-obj-icon">📦</span>
                   <span className="z3d-obj-name">{obj.name}</span>
-                  <button
+                  <button type="button"
                     className="z3d-obj-del"
                     title="Delete"
                     onClick={e => { e.stopPropagation(); handleDelete(obj.id); }}
@@ -1656,11 +1656,11 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             <div className="z3d-modal-filename">{pendingFile?.name}</div>
 
             <div className="z3d-upload-mode-tabs">
-              <button
+              <button type="button"
                 className={`z3d-upload-mode-tab${uploadMode === 'free' ? ' active' : ''}`}
                 onClick={() => setUploadMode('free')}
               >Free Placement</button>
-              <button
+              <button type="button"
                 className={`z3d-upload-mode-tab${uploadMode === 'station' ? ' active' : ''}`}
                 onClick={() => setUploadMode('station')}
               >Station Placement</button>
@@ -1697,8 +1697,8 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             )}
 
             <div className="z3d-modal-actions">
-              <button className="z3d-modal-cancel" onClick={() => { setShowUploadModal(false); setPendingFile(null); }}>Cancel</button>
-              <button
+              <button type="button" className="z3d-modal-cancel" onClick={() => { setShowUploadModal(false); setPendingFile(null); }}>Cancel</button>
+              <button type="button"
                 className="z3d-modal-confirm"
                 disabled={uploadMode === 'station' && !uploadStation}
                 onClick={handleUploadConfirm}
