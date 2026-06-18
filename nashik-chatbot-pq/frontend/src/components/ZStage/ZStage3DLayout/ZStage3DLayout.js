@@ -7,6 +7,13 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 import { VRMLLoader } from 'three/examples/jsm/loaders/VRMLLoader';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
+import { RefreshCw } from 'lucide-react';
+import { layoutApi, inputApi } from '../../../services/api/layoutApi';
+import { layeredAuditApi } from '../../../services/api/layoutApi';
+import { StationDetailModal, MONTHLY_KEYS } from '../ZStageDashboard/ZStageDashboard';
+import '../ZStageDashboard/ZStageDashboard.css';
+import { backend_url } from '../../../services/api/config';
+import './ZStage3DLayout.css';
 
 // Shared DracoLoader — reused across all GLTFLoader instances
 const dracoLoader = new DRACOLoader();
@@ -17,13 +24,6 @@ function makeGLTFLoader() {
   loader.setDRACOLoader(dracoLoader);
   return loader;
 }
-import { RefreshCw } from 'lucide-react';
-import { layoutApi, inputApi } from '../../../services/api/layoutApi';
-import { layeredAuditApi } from '../../../services/api/layoutApi';
-import { StationDetailModal, MONTHLY_KEYS } from '../ZStageDashboard/ZStageDashboard';
-import '../ZStageDashboard/ZStageDashboard.css';
-import { backend_url } from '../../../services/api/config';
-import './ZStage3DLayout.css';
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const SCALE      = 0.04;
