@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 import { VRMLLoader } from 'three/examples/jsm/loaders/VRMLLoader';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
@@ -14,7 +15,15 @@ import '../ZStageDashboard/ZStageDashboard.css';
 import { backend_url } from '../../../services/api/config';
 import './ZStage3DLayout.css';
 
-function makeGLTFLoader() { return new GLTFLoader(); }
+// Draco decoder files are copied to public/draco/ via scripts/copy-draco.js (postinstall)
+const _dracoLoader = new DRACOLoader();
+_dracoLoader.setDecoderPath('/draco/');
+
+function makeGLTFLoader() {
+  const loader = new GLTFLoader();
+  loader.setDRACOLoader(_dracoLoader);
+  return loader;
+}
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const SCALE      = 0.04;
