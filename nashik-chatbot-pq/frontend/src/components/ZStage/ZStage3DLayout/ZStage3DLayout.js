@@ -1038,7 +1038,10 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
 
     const onLoaded = (template) => {
       URL.revokeObjectURL(url);
+
+      // Reset and auto-scale the template (keep it detached from scene)
       template.position.set(0, 0, 0);
+      template.rotation.set(0, 0, 0);
       const bbox = new THREE.Box3().setFromObject(template);
       const size = new THREE.Vector3();
       bbox.getSize(size);
@@ -1046,41 +1049,60 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       const autoScale = maxDim > 0 ? 2.0 / maxDim : 1;
       if (maxDim > 0) template.scale.setScalar(autoScale);
 
+      // Compute floor-snap Y offset once from the clean template (template still at origin)
+      const bboxFloor = new THREE.Box3().setFromObject(template);
+      const floorY = -bboxFloor.min.y;  // lift so bottom sits at y=0
+
+      const posMap = stationPosRef.current;
+      console.log('[Z3D line] stationIds=', stationIds, 'posMap keys=', Object.keys(posMap));
+
       const newEntries = [];
+      let masterObj = null; // first successfully placed object (template reused)
+
       stationIds.forEach((stationId, idx) => {
-        const stnPos = stationPosRef.current[stationId];
-        if (!stnPos) return;
-        const obj = idx === 0 ? template : template.clone(true);
-        obj.userData.baseScale = autoScale;
-        const bbox2 = new THREE.Box3().setFromObject(obj);
-        obj.position.y = -bbox2.min.y;
-        obj.position.x = stnPos.x;
-        obj.position.z = stnPos.z;
+        const stnPos = posMap[stationId];
+        if (!stnPos) {
+          console.warn('[Z3D line] no position for station', stationId);
+          return;
+        }
+
+        // Reuse template for the first placed object, clone for all others
+        const obj = masterObj === null ? template : masterObj.clone(true);
+        if (masterObj === null) masterObj = obj;
+
+        obj.userData.baseScale       = autoScale;
+        obj.position.set(stnPos.x, floorY, stnPos.z);
+
         const objId = `${groupId}_${idx}`;
-        obj.userData.isPlaced       = true;
-        obj.userData.objId          = objId;
-        obj.userData.objName        = name;
-        obj.userData.objExt         = ext;
+        obj.userData.isPlaced        = true;
+        obj.userData.objId           = objId;
+        obj.userData.objName         = name;
+        obj.userData.objExt          = ext;
         obj.userData.assignedStation = stationId;
-        obj.userData.lineGroupId    = groupId;
+        obj.userData.lineGroupId     = groupId;
         scene.add(obj);
         newEntries.push({ id: objId, mesh: obj, label: null, name, stationId, lineGroupId: groupId });
       });
 
+      if (newEntries.length === 0) {
+        console.warn('[Z3D line] no objects placed — station positions not found in posMap');
+        return;
+      }
+
       placedRef.current = [...placedRef.current, ...newEntries];
       onObjectsChange([...placedRef.current]);
 
-      // Persist: file blob stored only for first entry, others store position only
-      if (layoutId && newEntries.length > 0) {
+      // Persist: file blob stored only for first entry, others reference it
+      if (layoutId) {
         file.arrayBuffer().then(buf => {
           const fileBlob = new Blob([buf], { type: file.type || 'application/octet-stream' });
-          newEntries.forEach((entry, idx) => {
+          newEntries.forEach((entry, i) => {
             z3dPut({
               key: `${layoutId}_${entry.id}`,
               layoutId, id: entry.id, name, ext,
-              fileBlob: idx === 0 ? fileBlob : undefined,
+              fileBlob: i === 0 ? fileBlob : undefined,
               lineGroupId: groupId,
-              masterKey: idx === 0 ? null : `${layoutId}_${newEntries[0].id}`,
+              masterKey: i === 0 ? null : `${layoutId}_${newEntries[0].id}`,
               px: entry.mesh.position.x, py: entry.mesh.position.y, pz: entry.mesh.position.z,
               rx: entry.mesh.rotation.x, ry: entry.mesh.rotation.y, rz: entry.mesh.rotation.z,
               sx: entry.mesh.scale.x,    sy: entry.mesh.scale.y,    sz: entry.mesh.scale.z,
