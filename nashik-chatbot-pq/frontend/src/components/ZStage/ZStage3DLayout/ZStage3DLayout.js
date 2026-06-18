@@ -649,24 +649,28 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
 
     const animate = () => {
       rafRef.current = requestAnimationFrame(animate);
-      if (walkModeRef.current) { walk.update(); orbit.enabled = false; }
-      else { if (!tc.dragging) orbit.enabled = true; orbit.update(); }
+      try {
+        if (walkModeRef.current) { walk.update(); orbit.enabled = false; }
+        else { if (!tc.dragging) orbit.enabled = true; orbit.update(); }
 
-      // Process active tweens — collect completions first, then fire callbacks
-      // so that runSegment's push() isn't overwritten by the filter assignment
-      const now = performance.now();
-      const done = [];
-      animationsRef.current = animationsRef.current.filter(anim => {
-        const raw  = Math.min((now - anim.startTime) / anim.durationMs, 1);
-        const ease = raw < 0.5 ? 2 * raw * raw : -1 + (4 - 2 * raw) * raw;
-        anim.mesh.position.x = anim.fromX + (anim.toX - anim.fromX) * ease;
-        anim.mesh.position.z = anim.fromZ + (anim.toZ - anim.fromZ) * ease;
-        if (raw >= 1) { done.push(anim); return false; }
-        return true;
-      });
-      done.forEach(anim => anim.onComplete && anim.onComplete());
+        // Process active tweens — collect completions first, then fire callbacks
+        // so that runSegment's push() isn't overwritten by the filter assignment
+        const now = performance.now();
+        const done = [];
+        animationsRef.current = animationsRef.current.filter(anim => {
+          const raw  = Math.min((now - anim.startTime) / anim.durationMs, 1);
+          const ease = raw < 0.5 ? 2 * raw * raw : -1 + (4 - 2 * raw) * raw;
+          anim.mesh.position.x = anim.fromX + (anim.toX - anim.fromX) * ease;
+          anim.mesh.position.z = anim.fromZ + (anim.toZ - anim.fromZ) * ease;
+          if (raw >= 1) { done.push(anim); return false; }
+          return true;
+        });
+        done.forEach(anim => anim.onComplete && anim.onComplete());
 
-      renderer.render(scene, camera);
+        renderer.render(scene, camera);
+      } catch (err) {
+        console.error('[Z3D animate error]', err);
+      }
     };
     animate();
 
@@ -1729,4 +1733,30 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   );
 }
 
-export default ZStage3DLayout;
+// ── Error boundary so a crash in the 3D scene doesn't take down the whole page ──
+class ZStage3DErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { error: null }; }
+  static getDerivedStateFromError(err) { return { error: err }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: 32, color: '#e6edf3', background: '#161b22', height: '100%', display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ fontSize: 32 }}>⚠️</div>
+          <div style={{ fontSize: 15, fontWeight: 700 }}>3D Layout encountered an error</div>
+          <div style={{ fontSize: 12, color: '#8b949e', maxWidth: 400, textAlign: 'center' }}>{this.state.error?.message}</div>
+          <button type="button" style={{ marginTop: 8, padding: '7px 18px', borderRadius: 6, border: 'none', background: '#238636', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
+            onClick={() => this.setState({ error: null })}>Retry</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function ZStage3DLayoutWithBoundary(props) {
+  return (
+    <ZStage3DErrorBoundary>
+      <ZStage3DLayout {...props} />
+    </ZStage3DErrorBoundary>
+  );
+}
