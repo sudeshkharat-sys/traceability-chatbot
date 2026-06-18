@@ -449,12 +449,14 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
   const walkRef        = useRef(null);
   const transformRef   = useRef(null);
   const rafRef         = useRef(null);
-  const placedRef      = useRef([]);   // [{ id, mesh, labelSprite, name }]
+  const placedRef      = useRef([]);   // [{ id, mesh, labelSprite, name, stationId }]
   const selectedRef    = useRef(null);
   const sceneCenterRef = useRef(new THREE.Vector3(0, 0, 0));
   const sceneSpanRef   = useRef(20);
   const walkModeRef    = useRef(walkMode);
   const layoutIdRef    = useRef(null);   // kept in sync by the scene effect
+  const stationPosRef  = useRef({});     // stationId → { x, z, shopName }
+  const animationsRef  = useRef([]);     // active tweens
   useEffect(() => { walkModeRef.current = walkMode; }, [walkMode]);
 
   useEffect(() => {
@@ -520,6 +522,21 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     }));
 
     layoutBoxes.forEach(box => buildStationShell(box, statusMap, zeMap, scene));
+
+    // Build station-position lookup for snap placement & animation waypoints
+    const stationPosMap = {};
+    layoutBoxes.forEach(box => {
+      const cnt    = box.station_count || 1;
+      const oX     = box._x3d;
+      const oZ     = box._z3d;
+      const stnIds = (box.station_ids || '').split(',').map(s => s.trim()).filter(Boolean);
+      for (let i = 0; i < cnt; i++) {
+        const sid = stnIds[i] || `STN-${i + 1}`;
+        stationPosMap[sid] = { x: oX + i * CELL_W + CELL_W / 2, z: oZ + DEPTH / 2, shopName: box.name || '' };
+      }
+    });
+    stationPosRef.current = stationPosMap;
+
     (layout.connections || []).forEach(conn => {
       const f = layoutBoxes.find(b => b.id === conn.from_box_id);
       const t = layoutBoxes.find(b => b.id === conn.to_box_id);
@@ -634,6 +651,18 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       rafRef.current = requestAnimationFrame(animate);
       if (walkModeRef.current) { walk.update(); orbit.enabled = false; }
       else { if (!tc.dragging) orbit.enabled = true; orbit.update(); }
+
+      // Process active tweens
+      const now = performance.now();
+      animationsRef.current = animationsRef.current.filter(anim => {
+        const raw  = Math.min((now - anim.startTime) / anim.durationMs, 1);
+        const ease = raw < 0.5 ? 2 * raw * raw : -1 + (4 - 2 * raw) * raw;
+        anim.mesh.position.x = anim.fromX + (anim.toX - anim.fromX) * ease;
+        anim.mesh.position.z = anim.fromZ + (anim.toZ - anim.fromZ) * ease;
+        if (raw >= 1) { anim.onComplete && anim.onComplete(); return false; }
+        return true;
+      });
+
       renderer.render(scene, camera);
     };
     animate();
@@ -707,7 +736,8 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
   }, []);
 
   // Load and place a 3D object file
-  const placeObject = useCallback((file, name, layoutId) => {
+  // options: { stationId? }  — if stationId is provided the object snaps to that station
+  const placeObject = useCallback((file, name, layoutId, options = {}) => {
     const scene = sceneRef.current;
     if (!scene) return;
     const ext = file.name.split('.').pop().toLowerCase();
@@ -716,7 +746,6 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     const needsConversion = ext === 'wrl' || ext === 'stp' || ext === 'step';
     if (needsConversion) {
       onConvertStart && onConvertStart();
-      // Simulate progress while waiting for server (real progress not available via fetch)
       let pct = 0;
       const ticker = setInterval(() => {
         pct = Math.min(pct + (pct < 60 ? 3 : pct < 85 ? 1 : 0.3), 92);
@@ -733,7 +762,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
           clearInterval(ticker);
           onConvertEnd && onConvertEnd(true);
           const glbFile = new File([blob], name + '.glb', { type: 'model/gltf-binary' });
-          placeObject(glbFile, name, layoutId);
+          placeObject(glbFile, name, layoutId, options);
         })
         .catch(err => {
           clearInterval(ticker);
@@ -763,26 +792,30 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       const size = new THREE.Vector3();
       bbox.getSize(size);
       const maxDim = Math.max(size.x, size.y, size.z);
-      if (maxDim > 0) obj.scale.setScalar(2.0 / maxDim);
+      const autoScale = maxDim > 0 ? 2.0 / maxDim : 1;
+      if (maxDim > 0) obj.scale.setScalar(autoScale);
+      obj.userData.baseScale = autoScale;
 
       // Re-compute after scale — snap bottom of object exactly to floor (y=0)
       const bbox2 = new THREE.Box3().setFromObject(obj);
       obj.position.y = -bbox2.min.y;
 
-      // Place at scene centre (XZ)
+      // Place at station centre or scene centre
+      const stnPos = options.stationId ? stationPosRef.current[options.stationId] : null;
       const c = sceneCenterRef.current;
-      obj.position.x = c.x;
-      obj.position.z = c.z;
+      obj.position.x = stnPos ? stnPos.x : c.x;
+      obj.position.z = stnPos ? stnPos.z : c.z;
 
       const objId = Date.now().toString();
-      obj.userData.isPlaced = true;
-      obj.userData.objId    = objId;
-      obj.userData.objName  = name;
-      obj.userData.objExt   = ext;
+      obj.userData.isPlaced       = true;
+      obj.userData.objId          = objId;
+      obj.userData.objName        = name;
+      obj.userData.objExt         = ext;
+      obj.userData.assignedStation = options.stationId || null;
 
       scene.add(obj);
 
-      const entry = { id: objId, mesh: obj, label: null, name };
+      const entry = { id: objId, mesh: obj, label: null, name, stationId: options.stationId || null };
       placedRef.current = [...placedRef.current, entry];
 
       // Persist to IDB (file blob + initial transform)
@@ -923,6 +956,80 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     onObjectsChange([...placedRef.current]);
   }, [onObjectsChange]);
 
+  // Set uniform scale multiplier on a placed object (multiplied against its auto-scale base)
+  const setObjectScale = useCallback((id, multiplier) => {
+    const entry = placedRef.current.find(p => p.id === id);
+    if (!entry) return;
+    const base = entry.mesh.userData.baseScale || 1;
+    entry.mesh.scale.setScalar(base * multiplier);
+    if (layoutIdRef.current) {
+      z3dPut({
+        key: `${layoutIdRef.current}_${id}`,
+        layoutId: layoutIdRef.current,
+        id, name: entry.name,
+        ext: entry.mesh.userData.objExt || 'glb',
+        px: entry.mesh.position.x, py: entry.mesh.position.y, pz: entry.mesh.position.z,
+        rx: entry.mesh.rotation.x, ry: entry.mesh.rotation.y, rz: entry.mesh.rotation.z,
+        sx: entry.mesh.scale.x,    sy: entry.mesh.scale.y,    sz: entry.mesh.scale.z,
+      });
+    }
+  }, []);
+
+  // Animate object through station waypoints (from → to) then back to start.
+  // waypointIds: ordered array of station IDs forming the path.
+  const animateAlongPath = useCallback((id, waypointIds, durationSec, onComplete) => {
+    const entry = placedRef.current.find(p => p.id === id);
+    if (!entry) return;
+
+    // Cancel any existing anim for this id
+    animationsRef.current = animationsRef.current.filter(a => a.id !== id);
+
+    const posMap = stationPosRef.current;
+    const pts = waypointIds
+      .map(sid => posMap[sid])
+      .filter(Boolean);
+    if (pts.length < 2) return;
+
+    // Build full round-trip: forward then reverse back to start
+    const fullPath = [...pts, ...[...pts].reverse().slice(1)];
+
+    const segCount   = fullPath.length - 1;
+    const segDurMs   = (durationSec * 1000) / segCount;
+    let   segIdx     = 0;
+
+    const runSegment = () => {
+      if (segIdx >= segCount) { onComplete && onComplete(); return; }
+      const from = fullPath[segIdx];
+      const to   = fullPath[segIdx + 1];
+      animationsRef.current = animationsRef.current.filter(a => a.id !== id);
+      animationsRef.current.push({
+        id,
+        mesh:       entry.mesh,
+        fromX:      from.x,
+        fromZ:      from.z,
+        toX:        to.x,
+        toZ:        to.z,
+        startTime:  performance.now(),
+        durationMs: segDurMs,
+        onComplete: () => { segIdx++; runSegment(); },
+      });
+    };
+    runSegment();
+  }, []);
+
+  const stopAnimation = useCallback((id, resetToStart) => {
+    animationsRef.current = animationsRef.current.filter(a => a.id !== id);
+    if (resetToStart) {
+      const entry = placedRef.current.find(p => p.id === id);
+      if (!entry) return;
+      const stn = entry.mesh.userData.assignedStation || entry.stationId;
+      if (stn && stationPosRef.current[stn]) {
+        entry.mesh.position.x = stationPosRef.current[stn].x;
+        entry.mesh.position.z = stationPosRef.current[stn].z;
+      }
+    }
+  }, []);
+
   // Label follows mesh position
   useEffect(() => {
     const tid = setInterval(() => {
@@ -936,7 +1043,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     return () => clearInterval(tid);
   }, []);
 
-  return { snapView, setTransformMode, placeObject, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById };
+  return { snapView, setTransformMode, placeObject, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, animateAlongPath, stopAnimation };
 }
 
 // ── Compute Z/E status per station from input records (mirrors ZStageDashboard logic) ──
@@ -1033,6 +1140,19 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [adherenceRecords,  setAdherenceRecords]  = useState([]);
   const [sceneReady,        setSceneReady]        = useState(false);
   const [refreshing,        setRefreshing]        = useState(false);
+  // Upload modal
+  const [showUploadModal,   setShowUploadModal]   = useState(false);
+  const [pendingFile,       setPendingFile]       = useState(null);
+  const [uploadMode,        setUploadMode]        = useState('free');
+  const [uploadShop,        setUploadShop]        = useState('');
+  const [uploadStation,     setUploadStation]     = useState('');
+  // Per-object scale
+  const [scaleVal,          setScaleVal]          = useState(1.0);
+  // Animation
+  const [animFromStation,   setAnimFromStation]   = useState('');
+  const [animToStation,     setAnimToStation]     = useState('');
+  const [animDuration,      setAnimDuration]      = useState(6);
+  const [animPlaying,       setAnimPlaying]       = useState(false);
 
   useEffect(() => {
     if (activeLayoutId && !selectedLayoutId) setSelectedLayoutId(activeLayoutId);
@@ -1096,6 +1216,29 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     return Array.from(set).sort();
   }, [records]);
 
+  // Flat ordered list of all station IDs in the layout (sorted numerically within each shop)
+  const stationList = React.useMemo(() => {
+    if (!layout) return [];
+    const result = [];
+    (layout.station_boxes || []).forEach(box => {
+      const ids = (box.station_ids || '').split(',').map(s => s.trim()).filter(Boolean);
+      ids.forEach(id => result.push({ id, shop: box.name || '' }));
+    });
+    // Sort numerically by the number embedded in the station ID
+    result.sort((a, b) => {
+      const na = parseInt((a.id.match(/\d+/) || ['0'])[0], 10);
+      const nb = parseInt((b.id.match(/\d+/) || ['0'])[0], 10);
+      return na - nb;
+    });
+    return result;
+  }, [layout]);
+
+  const shopList = React.useMemo(() => {
+    const set = new Set();
+    stationList.forEach(s => { if (s.shop) set.add(s.shop); });
+    return Array.from(set);
+  }, [stationList]);
+
   const handleRecordSaved = useCallback((recordId, updatedRecord) => {
     setRecords((prev) => prev.map((r) => (r.id === recordId ? updatedRecord : r)));
   }, []);
@@ -1130,7 +1273,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setSceneReady(true);
   }, []);
 
-  const { snapView, setTransformMode, placeObject, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById } =
+  const { snapView, setTransformMode, placeObject, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, animateAlongPath, stopAnimation } =
     useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady);
 
   const handleLayoutChange = useCallback((e) => {
@@ -1141,11 +1284,27 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const handleFileUpload = useCallback((e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const name = file.name.replace(/\.[^/.]+$/, '');
-    placeObject(file, name, selectedLayoutId);
-    setShowObjPanel(true);
+    setPendingFile(file);
+    setUploadMode('free');
+    setUploadShop('');
+    setUploadStation('');
+    setShowUploadModal(true);
     e.target.value = '';
-  }, [placeObject, selectedLayoutId]);
+  }, []);
+
+  const handleUploadConfirm = useCallback(() => {
+    if (!pendingFile) return;
+    const name = pendingFile.name.replace(/\.[^/.]+$/, '');
+    const opts = uploadMode === 'station' && uploadStation ? { stationId: uploadStation } : {};
+    placeObject(pendingFile, name, selectedLayoutId, opts);
+    setShowObjPanel(true);
+    setScaleVal(1.0);
+    setAnimFromStation('');
+    setAnimToStation('');
+    setAnimPlaying(false);
+    setShowUploadModal(false);
+    setPendingFile(null);
+  }, [pendingFile, uploadMode, uploadStation, placeObject, selectedLayoutId]);
 
   const handleModeChange = useCallback((mode) => {
     setTransformModeState(mode);
@@ -1155,6 +1314,10 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const handleSelect = useCallback((id) => {
     setSelectedId(id);
     setRenameVal(placedObjects.find(o => o.id === id)?.name || '');
+    setScaleVal(1.0);
+    setAnimFromStation('');
+    setAnimToStation('');
+    setAnimPlaying(false);
     selectById(id);
   }, [placedObjects, selectById]);
 
@@ -1265,6 +1428,117 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
               </div>
             )}
 
+            {/* Scale */}
+            {currentSelected && (
+              <div className="z3d-scale-row">
+                <span className="z3d-scale-label">Scale</span>
+                <input
+                  type="range" min="0.1" max="5" step="0.1"
+                  value={scaleVal}
+                  className="z3d-scale-slider"
+                  onChange={e => {
+                    const v = parseFloat(e.target.value);
+                    setScaleVal(v);
+                    setObjectScale(selectedId, v);
+                  }}
+                />
+                <span className="z3d-scale-value">{scaleVal.toFixed(1)}×</span>
+                <button className="z3d-scale-reset" title="Reset scale" onClick={() => { setScaleVal(1.0); setObjectScale(selectedId, 1.0); }}>↺</button>
+              </div>
+            )}
+
+            {/* Animation */}
+            {currentSelected && stationList.length > 0 && (
+              <div className="z3d-anim-section">
+                <div className="z3d-anim-title">Animate Along Path</div>
+
+                <label className="z3d-anim-field-label">Site / Shop</label>
+                <select
+                  className="z3d-anim-select"
+                  value={uploadShop}
+                  onChange={e => { setUploadShop(e.target.value); setAnimFromStation(''); setAnimToStation(''); }}
+                  disabled={animPlaying}
+                >
+                  <option value="">— All shops —</option>
+                  {shopList.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+
+                <label className="z3d-anim-field-label">From Station</label>
+                <select
+                  className="z3d-anim-select"
+                  value={animFromStation}
+                  onChange={e => setAnimFromStation(e.target.value)}
+                  disabled={animPlaying}
+                >
+                  <option value="">— Start —</option>
+                  {stationList
+                    .filter(s => !uploadShop || s.shop === uploadShop)
+                    .map(s => <option key={s.id} value={s.id}>{s.id}{s.shop ? ` · ${s.shop}` : ''}</option>)}
+                </select>
+
+                <label className="z3d-anim-field-label">To Station</label>
+                <select
+                  className="z3d-anim-select"
+                  value={animToStation}
+                  onChange={e => setAnimToStation(e.target.value)}
+                  disabled={animPlaying}
+                >
+                  <option value="">— End —</option>
+                  {stationList
+                    .filter(s => !uploadShop || s.shop === uploadShop)
+                    .map(s => <option key={s.id} value={s.id}>{s.id}{s.shop ? ` · ${s.shop}` : ''}</option>)}
+                </select>
+
+                <div className="z3d-anim-dur-row">
+                  <span className="z3d-anim-field-label">Duration</span>
+                  <input
+                    type="range" min="2" max="20" step="1"
+                    value={animDuration}
+                    className="z3d-scale-slider"
+                    onChange={e => setAnimDuration(parseInt(e.target.value, 10))}
+                    disabled={animPlaying}
+                  />
+                  <span className="z3d-scale-value">{animDuration}s</span>
+                </div>
+
+                <div className="z3d-anim-btns">
+                  {!animPlaying ? (
+                    <button
+                      className="z3d-anim-play-btn"
+                      disabled={!animFromStation || !animToStation || animFromStation === animToStation}
+                      onClick={() => {
+                        // Build ordered waypoints from from→to using numeric sort
+                        const fromNum = parseInt((animFromStation.match(/\d+/) || ['0'])[0], 10);
+                        const toNum   = parseInt((animToStation.match(/\d+/)   || ['0'])[0], 10);
+                        const filtered = stationList.filter(s => !uploadShop || s.shop === uploadShop);
+                        const direction = fromNum <= toNum ? 1 : -1;
+                        const waypoints = filtered
+                          .filter(s => {
+                            const n = parseInt((s.id.match(/\d+/) || ['0'])[0], 10);
+                            return direction === 1 ? n >= fromNum && n <= toNum : n <= fromNum && n >= toNum;
+                          })
+                          .sort((a, b) => {
+                            const na = parseInt((a.id.match(/\d+/) || ['0'])[0], 10);
+                            const nb = parseInt((b.id.match(/\d+/) || ['0'])[0], 10);
+                            return direction === 1 ? na - nb : nb - na;
+                          })
+                          .map(s => s.id);
+                        if (waypoints.length < 2) return;
+                        setAnimPlaying(true);
+                        animateAlongPath(selectedId, waypoints, animDuration, () => setAnimPlaying(false));
+                      }}
+                    >▶ Animate</button>
+                  ) : (
+                    <button
+                      className="z3d-anim-stop-btn"
+                      onClick={() => { stopAnimation(selectedId, true); setAnimPlaying(false); }}
+                    >■ Stop</button>
+                  )}
+                  {animPlaying && <span className="z3d-anim-playing">Animating…</span>}
+                </div>
+              </div>
+            )}
+
             {/* Object list */}
             <div className="z3d-obj-list">
               {placedObjects.length === 0 && <div className="z3d-obj-empty">No objects placed yet</div>}
@@ -1331,6 +1605,65 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
           )}
         </div>
       </div>
+
+      {showUploadModal && (
+        <div className="z3d-modal-overlay" onClick={() => { setShowUploadModal(false); setPendingFile(null); }}>
+          <div className="z3d-modal-box" onClick={e => e.stopPropagation()}>
+            <div className="z3d-modal-title">Upload 3D Object</div>
+            <div className="z3d-modal-filename">{pendingFile?.name}</div>
+
+            <div className="z3d-upload-mode-tabs">
+              <button
+                className={`z3d-upload-mode-tab${uploadMode === 'free' ? ' active' : ''}`}
+                onClick={() => setUploadMode('free')}
+              >Free Placement</button>
+              <button
+                className={`z3d-upload-mode-tab${uploadMode === 'station' ? ' active' : ''}`}
+                onClick={() => setUploadMode('station')}
+              >Station Placement</button>
+            </div>
+
+            {uploadMode === 'free' && (
+              <div className="z3d-modal-hint">Object will be placed at scene centre. Drag it anywhere using the transform handles.</div>
+            )}
+
+            {uploadMode === 'station' && (
+              <div className="z3d-modal-station-fields">
+                <label className="z3d-modal-label">Shop / Line</label>
+                <select
+                  className="z3d-modal-select"
+                  value={uploadShop}
+                  onChange={e => { setUploadShop(e.target.value); setUploadStation(''); }}
+                >
+                  <option value="">— All shops —</option>
+                  {shopList.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+
+                <label className="z3d-modal-label">Station ID</label>
+                <select
+                  className="z3d-modal-select"
+                  value={uploadStation}
+                  onChange={e => setUploadStation(e.target.value)}
+                >
+                  <option value="">— Select station —</option>
+                  {stationList
+                    .filter(s => !uploadShop || s.shop === uploadShop)
+                    .map(s => <option key={s.id} value={s.id}>{s.id}{s.shop ? ` (${s.shop})` : ''}</option>)}
+                </select>
+              </div>
+            )}
+
+            <div className="z3d-modal-actions">
+              <button className="z3d-modal-cancel" onClick={() => { setShowUploadModal(false); setPendingFile(null); }}>Cancel</button>
+              <button
+                className="z3d-modal-confirm"
+                disabled={uploadMode === 'station' && !uploadStation}
+                onClick={handleUploadConfirm}
+              >Upload</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {popupStation && (
         <StationDetailModal
