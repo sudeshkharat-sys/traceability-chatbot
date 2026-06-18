@@ -816,6 +816,11 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
 
       // Place at station centre or scene centre
       const stnPos = options.stationId ? stationPosRef.current[options.stationId] : null;
+      if (options.stationId) {
+        console.log('[Z3D] place stationId=', options.stationId,
+          'posMap keys=', Object.keys(stationPosRef.current),
+          'found=', stnPos);
+      }
       const c = sceneCenterRef.current;
       obj.position.x = stnPos ? stnPos.x : c.x;
       obj.position.z = stnPos ? stnPos.z : c.z;
@@ -989,10 +994,6 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     }
   }, []);
 
-  // Animate object station-box end → end along the green center path, then back to origin.
-  // waypointIds: station IDs in travel order.
-  // The object travels from the X-start edge of the first station to the X-end edge
-  // of the last station (end-of-box to end-of-box), then returns to its original position.
   const animateAlongPath = useCallback((id, waypointIds, durationSec, onComplete) => {
     const entry = placedRef.current.find(p => p.id === id);
     if (!entry) return;
@@ -1003,44 +1004,43 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     const pts = waypointIds.map(sid => posMap[sid]).filter(Boolean);
     if (pts.length < 2) return;
 
-    // Use end-of-box edges: first station left edge, last station right edge
-    // Each station center x is cellCX = originX + i*CELL_W + CELL_W/2
-    // So left edge = center - CELL_W/2, right edge = center + CELL_W/2
     const firstPt = { x: pts[0].x - CELL_W / 2, z: pts[0].z };
     const lastPt  = { x: pts[pts.length - 1].x + CELL_W / 2, z: pts[pts.length - 1].z };
-
-    // Build waypoints: left-edge of first → centers of intermediate → right-edge of last
     const forward = [firstPt, ...pts.slice(1, -1), lastPt];
 
-    // Save true origin position to return to
     const originX = entry.mesh.position.x;
     const originZ = entry.mesh.position.z;
 
-    // Full path: forward then reverse back to origin
-    const fullPath = [
-      ...forward,
-      ...[...forward].reverse().slice(1),
-      { x: originX, z: originZ },
-    ];
+    // Return path goes back through the same waypoints, ending at original position
+    const returnPath = [...forward].reverse().slice(1).concat([{ x: originX, z: originZ }]);
 
-    const segCount = fullPath.length - 1;
-    const segDurMs = (durationSec * 1000) / segCount;
+    // durationSec = time for the FORWARD leg; return leg gets the same time
+    const fwdSegMs  = (durationSec * 1000) / (forward.length - 1);
+    const retSegMs  = (durationSec * 1000) / returnPath.length;
+
+    // Build a flat segment list with per-segment durations
+    const segments = [];
+    for (let i = 0; i < forward.length - 1; i++) {
+      segments.push({ from: forward[i], to: forward[i + 1], durationMs: fwdSegMs });
+    }
+    for (let i = 0; i < returnPath.length; i++) {
+      const from = i === 0 ? forward[forward.length - 1] : returnPath[i - 1];
+      segments.push({ from, to: returnPath[i], durationMs: retSegMs });
+    }
+
     let segIdx = 0;
-
     const runSegment = () => {
-      if (segIdx >= segCount) { onComplete && onComplete(); return; }
-      const from = fullPath[segIdx];
-      const to   = fullPath[segIdx + 1];
-      // Push BEFORE filtering so we don't collide with the done[] flush
+      if (segIdx >= segments.length) { onComplete && onComplete(); return; }
+      const seg = segments[segIdx];
       const newAnim = {
         id,
         mesh:       entry.mesh,
-        fromX:      from.x,
-        fromZ:      from.z,
-        toX:        to.x,
-        toZ:        to.z,
+        fromX:      seg.from.x,
+        fromZ:      seg.from.z,
+        toX:        seg.to.x,
+        toZ:        seg.to.z,
         startTime:  performance.now(),
-        durationMs: segDurMs,
+        durationMs: seg.durationMs,
         onComplete: () => { segIdx++; runSegment(); },
       };
       animationsRef.current = animationsRef.current.filter(a => a.id !== id);
