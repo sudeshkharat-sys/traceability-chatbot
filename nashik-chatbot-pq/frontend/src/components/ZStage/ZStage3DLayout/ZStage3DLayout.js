@@ -1119,7 +1119,124 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     }
   }, []);
 
-  return { snapView, setTransformMode, placeObject, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, updateTransformVals, stationCellsRef };
+  // Save current selected object (scale + rotation + blob) as a named preset
+  const saveAsPreset = useCallback((id, presetName) => {
+    const entry = placedRef.current.find(p => p.id === id);
+    if (!entry) return;
+    const m = entry.mesh;
+    const templateId = m.userData.templateId;
+    const blob = templateId ? blobsRef.current[`tmpl_${templateId}`] : null;
+    if (!blob) { alert('File data not available for this object — cannot save preset.'); return; }
+    const presetKey = `preset_${Date.now()}`;
+    z3dPutPreset({
+      key:  presetKey,
+      name: presetName,
+      ext:  m.userData.objExt || 'glb',
+      fileBlob: blob,
+      rx: m.rotation.x, ry: m.rotation.y, rz: m.rotation.z,
+      sx: m.scale.x,    sy: m.scale.y,    sz: m.scale.z,
+    });
+    return { key: presetKey, name: presetName, ext: m.userData.objExt || 'glb', rx: m.rotation.x, ry: m.rotation.y, rz: m.rotation.z, sx: m.scale.x, sy: m.scale.y, sz: m.scale.z };
+  }, []);
+
+  // Place a saved preset (with its stored transforms) onto a line
+  const placeFromPreset = useCallback((preset, layoutId, lineName = null) => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    const blob = preset.fileBlob;
+    if (!blob) return;
+    const ext = (preset.ext || 'glb').toLowerCase();
+    const url = URL.createObjectURL(new Blob([blob], { type: blob.type || 'model/gltf-binary' }));
+    onPlaceStart && onPlaceStart();
+
+    const onLoaded = (baseObj) => {
+      URL.revokeObjectURL(url);
+      onPlaceEnd && onPlaceEnd();
+      const lineStations = lineName && linesRef.current[lineName];
+      const stations = lineStations && lineStations.length > 0
+        ? lineStations
+        : [{ stationId: null, x: sceneCenterRef.current.x, z: sceneCenterRef.current.z }];
+
+      // Auto-scale first, then apply preset transforms on top
+      const box = new THREE.Box3().setFromObject(baseObj);
+      const size = new THREE.Vector3(); box.getSize(size);
+      const maxDim = Math.max(size.x, size.y, size.z) || 1;
+      const autoS = 2 / maxDim;
+      const presetScale = { x: preset.sx ?? 1, y: preset.sy ?? 1, z: preset.sz ?? 1 };
+
+      const templateId = Date.now().toString();
+      blobsRef.current[`tmpl_${templateId}`] = blob;
+      const newEntries = [];
+
+      stations.forEach((station, idx) => {
+        const obj = idx === 0 ? baseObj : baseObj.clone(true);
+        obj.rotation.set(preset.rx ?? 0, preset.ry ?? 0, preset.rz ?? 0);
+        obj.scale.set(presetScale.x, presetScale.y, presetScale.z);
+
+        // Recompute bottom after scale
+        const b2 = new THREE.Box3().setFromObject(obj);
+        const bottomY = -(b2.min.y);
+        obj.position.set(station.x, bottomY, station.z);
+
+        obj.userData.isPlaced   = true;
+        obj.userData.objExt     = ext;
+        obj.userData.templateId = templateId;
+        obj.userData.lineName   = lineName || null;
+        obj.userData.stationId  = station.stationId || null;
+
+        scene.add(obj);
+        const objId = `${templateId}_${idx}`;
+        obj.userData.objId   = objId;
+        obj.userData.objName = preset.name;
+
+        const entry = {
+          id: objId, mesh: obj, label: null, name: preset.name,
+          stationId: station.stationId || null,
+          lineName:  lineName || null,
+          templateId,
+        };
+        newEntries.push(entry);
+      });
+
+      placedRef.current = [...placedRef.current, ...newEntries];
+      onObjectsChange([...placedRef.current]);
+
+      if (layoutId) {
+        z3dPutTemplate({
+          key: `${layoutId}_tmpl_${templateId}`, layoutId, templateId,
+          name: preset.name, ext, fileBlob: blob, lineName: lineName || null,
+        });
+        newEntries.forEach(entry => {
+          const m = entry.mesh;
+          z3dPut({
+            key: `${layoutId}_${entry.id}`, layoutId, id: entry.id, name: entry.name, ext,
+            templateId, stationId: entry.stationId || null, lineName: entry.lineName || null,
+            px: m.position.x, py: m.position.y, pz: m.position.z,
+            rx: m.rotation.x, ry: m.rotation.y, rz: m.rotation.z,
+            sx: m.scale.x,    sy: m.scale.y,    sz: m.scale.z,
+          });
+        });
+      }
+
+      // Select first clone
+      const first = newEntries[0];
+      if (first) {
+        selectedRef.current = first;
+        transformRef.current?.attach(first.mesh);
+      }
+    };
+
+    const onErr = () => { URL.revokeObjectURL(url); onPlaceEnd && onPlaceEnd(); };
+    if (ext === 'glb' || ext === 'gltf') makeGLTFLoader().load(url, g => onLoaded(g.scene), undefined, onErr);
+    else if (ext === 'obj') new OBJLoader().load(url, onLoaded, undefined, onErr);
+    else if (ext === 'stl') new STLLoader().load(url, geo => {
+      geo.computeVertexNormals();
+      onLoaded(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x90a4ae })));
+    }, undefined, onErr);
+    else onErr();
+  }, [onObjectsChange]); // eslint-disable-line
+
+  return { snapView, setTransformMode, placeObject, placeFromPreset, saveAsPreset, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, updateTransformVals, stationCellsRef };
 }
 
 // ── Compute Z/E status per station from input records (mirrors ZStageDashboard logic) ──
@@ -1148,23 +1265,61 @@ function computeZeMap(records) {
 }
 
 // ── IndexedDB helpers for placed-object persistence ───────────────────────────
-const Z3D_DB    = 'z3d_placed_v1';
-const Z3D_STORE = 'objects';
-const Z3D_TMPL  = 'templates';
+const Z3D_DB     = 'z3d_placed_v1';
+const Z3D_STORE  = 'objects';
+const Z3D_TMPL   = 'templates';
+const Z3D_PRESET = 'presets';
 
 function z3dOpen() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(Z3D_DB, 2);
+    const req = indexedDB.open(Z3D_DB, 3);
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
       if (!db.objectStoreNames.contains(Z3D_STORE))
         db.createObjectStore(Z3D_STORE, { keyPath: 'key' });
       if (!db.objectStoreNames.contains(Z3D_TMPL))
         db.createObjectStore(Z3D_TMPL, { keyPath: 'key' });
+      if (!db.objectStoreNames.contains(Z3D_PRESET))
+        db.createObjectStore(Z3D_PRESET, { keyPath: 'key' });
     };
     req.onsuccess = (e) => resolve(e.target.result);
     req.onerror   = (e) => reject(e.target.error);
   });
+}
+
+async function z3dPutPreset(record) {
+  try {
+    const db = await z3dOpen();
+    await new Promise((res, rej) => {
+      const tx = db.transaction(Z3D_PRESET, 'readwrite');
+      tx.objectStore(Z3D_PRESET).put(record);
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+    db.close();
+  } catch {}
+}
+async function z3dGetAllPresets() {
+  try {
+    const db  = await z3dOpen();
+    const all = await new Promise(res => {
+      const req = db.transaction(Z3D_PRESET, 'readonly').objectStore(Z3D_PRESET).getAll();
+      req.onsuccess = () => res(req.result || []);
+      req.onerror   = () => res([]);
+    });
+    db.close();
+    return all;
+  } catch { return []; }
+}
+async function z3dDelPreset(key) {
+  try {
+    const db = await z3dOpen();
+    await new Promise(res => {
+      const tx = db.transaction(Z3D_PRESET, 'readwrite');
+      tx.objectStore(Z3D_PRESET).delete(key);
+      tx.oncomplete = res; tx.onerror = res;
+    });
+    db.close();
+  } catch {}
 }
 async function z3dGetAll(layoutId) {
   try {
@@ -1263,6 +1418,13 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [pickerLine,        setPickerLine]        = useState('');
   const [transformVals,     setTransformVals]     = useState({ rx: 0, ry: 0, rz: 0, sx: 1, sy: 1, sz: 1 });
   const [placingObject,     setPlacingObject]     = useState(false);
+  const [presets,           setPresets]           = useState([]);
+  const [showPresetPanel,   setShowPresetPanel]   = useState(false);
+  const [showSavePreset,    setShowSavePreset]    = useState(false);
+  const [presetSaveName,    setPresetSaveName]    = useState('');
+  const [pendingPreset,     setPendingPreset]     = useState(null);
+  const [showPresetLinePicker, setShowPresetLinePicker] = useState(false);
+  const [presetPickerLine,  setPresetPickerLine]  = useState('');
 
   useEffect(() => {
     if (activeLayoutId && !selectedLayoutId) setSelectedLayoutId(activeLayoutId);
@@ -1373,8 +1535,11 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const onPlaceStart = useCallback(() => setPlacingObject(true),  []);
   const onPlaceEnd   = useCallback(() => setPlacingObject(false), []);
 
-  const { snapView, setTransformMode, placeObject, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, updateTransformVals } =
+  const { snapView, setTransformMode, placeObject, placeFromPreset, saveAsPreset, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, updateTransformVals } =
     useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady, onPlaceStart, onPlaceEnd);
+
+  // Load presets from IDB on mount
+  useEffect(() => { z3dGetAllPresets().then(setPresets); }, []);
 
   const handleLayoutChange = useCallback((e) => {
     setSelectedLayoutId(Number(e.target.value) || null);
@@ -1443,6 +1608,38 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     if (!isNaN(v) && selectedId) updateTransformVals(selectedId, { [key]: v });
   }, [selectedId, updateTransformVals]);
 
+  const handleSavePresetConfirm = useCallback(() => {
+    if (!presetSaveName.trim() || !selectedId) return;
+    const result = saveAsPreset(selectedId, presetSaveName.trim());
+    if (result) setPresets(prev => [...prev, result]);
+    setShowSavePreset(false);
+    setPresetSaveName('');
+  }, [selectedId, presetSaveName, saveAsPreset]);
+
+  const handleDeletePreset = useCallback((key) => {
+    z3dDelPreset(key);
+    setPresets(prev => prev.filter(p => p.key !== key));
+  }, []);
+
+  const handlePlacePreset = useCallback((preset) => {
+    setPendingPreset(preset);
+    setPresetPickerLine('');
+    setShowPresetLinePicker(true);
+  }, []);
+
+  const handlePresetLinePick = useCallback(() => {
+    if (!pendingPreset) return;
+    // Need fileBlob — fetch from IDB if not in memory
+    z3dGetAllPresets().then(all => {
+      const full = all.find(p => p.key === pendingPreset.key);
+      if (!full?.fileBlob) { alert('Preset file not found.'); return; }
+      placeFromPreset(full, selectedLayoutId, presetPickerLine || null);
+      setShowPresetLinePicker(false);
+      setPendingPreset(null);
+      setShowObjPanel(true);
+    });
+  }, [pendingPreset, presetPickerLine, selectedLayoutId, placeFromPreset]);
+
   const currentSelected = placedObjects.find(o => o.id === selectedId);
 
   return (
@@ -1476,6 +1673,11 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             {/* Object list toggle */}
             <button className={`z3d-walk-btn${showObjPanel ? ' z3d-walk-btn--active' : ''}`} onClick={() => setShowObjPanel(v => !v)}>
               📦 Objects {placedObjects.length > 0 && `(${placedObjects.length})`}
+            </button>
+
+            {/* Presets panel toggle */}
+            <button className={`z3d-walk-btn${showPresetPanel ? ' z3d-walk-btn--active' : ''}`} onClick={() => setShowPresetPanel(v => !v)}>
+              🗂 Presets {presets.length > 0 && `(${presets.length})`}
             </button>
 
             {/* Walk mode */}
@@ -1580,6 +1782,17 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
               </div>
             )}
 
+            {/* Save as Preset */}
+            {currentSelected && (
+              <button
+                className="z3d-save-preset-btn"
+                title="Save current scale & rotation as a reusable preset"
+                onClick={() => { setPresetSaveName(currentSelected.name); setShowSavePreset(true); }}
+              >
+                💾 Save as Preset
+              </button>
+            )}
+
             {/* Object list */}
             <div className="z3d-obj-list">
               {placedObjects.length === 0 && <div className="z3d-obj-empty">No objects placed yet</div>}
@@ -1602,6 +1815,35 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                     title="Delete"
                     onClick={e => { e.stopPropagation(); handleDelete(obj.id); }}
                   >✕</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── Presets panel (right sidebar) ── */}
+        {showPresetPanel && layout && (
+          <div className="z3d-preset-panel">
+            <div className="z3d-obj-panel-title">Model Presets</div>
+            <div className="z3d-preset-hint">Saved models with their scale & rotation. Click Place to add to scene.</div>
+            <div className="z3d-obj-list">
+              {presets.length === 0 && (
+                <div className="z3d-obj-empty">No presets saved yet.<br/>Select an object and click "Save as Preset".</div>
+              )}
+              {presets.map(preset => (
+                <div key={preset.key} className="z3d-preset-item">
+                  <span className="z3d-obj-icon">🗂</span>
+                  <div className="z3d-obj-info">
+                    <span className="z3d-obj-name">{preset.name}</span>
+                    <div className="z3d-obj-tags">
+                      <span className="z3d-obj-station-tag">{preset.ext?.toUpperCase()}</span>
+                      <span className="z3d-obj-line-tag">S:{+(preset.sx??1).toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <div className="z3d-preset-actions">
+                    <button className="z3d-preset-place-btn" onClick={() => handlePlacePreset(preset)}>Place</button>
+                    <button className="z3d-obj-del" title="Delete preset" onClick={() => handleDeletePreset(preset.key)}>✕</button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -1685,6 +1927,59 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             <div className="z3d-picker-actions">
               <button className="z3d-picker-cancel" onClick={() => { setShowLinePicker(false); setPendingFile(null); }}>Cancel</button>
               <button className="z3d-picker-confirm" onClick={handlePickerConfirm}>Place Object</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Save Preset modal */}
+      {showSavePreset && (
+        <div className="z3d-picker-overlay">
+          <div className="z3d-picker-box">
+            <div className="z3d-picker-title">Save as Preset</div>
+            <div className="z3d-picker-sub">
+              Give this model configuration a name. The current <strong>scale and rotation</strong> will be saved with it.
+            </div>
+            <input
+              className="z3d-picker-select"
+              style={{ fontFamily: 'inherit' }}
+              value={presetSaveName}
+              onChange={e => setPresetSaveName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSavePresetConfirm()}
+              placeholder="e.g. Trim Line Final, Break Line Setup…"
+              autoFocus
+            />
+            <div className="z3d-picker-actions">
+              <button className="z3d-picker-cancel" onClick={() => setShowSavePreset(false)}>Cancel</button>
+              <button className="z3d-picker-confirm" onClick={handleSavePresetConfirm} disabled={!presetSaveName.trim()}>Save Preset</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Preset line picker modal */}
+      {showPresetLinePicker && pendingPreset && (
+        <div className="z3d-picker-overlay">
+          <div className="z3d-picker-box">
+            <div className="z3d-picker-title">Place "{pendingPreset.name}"</div>
+            <div className="z3d-picker-sub">
+              Choose a line to place this preset. It will be cloned to every station with its saved scale &amp; rotation.
+            </div>
+            <select
+              className="z3d-picker-select"
+              value={presetPickerLine}
+              onChange={e => setPresetPickerLine(e.target.value)}
+            >
+              <option value="">— Free placement (no line) —</option>
+              {allLines.map(line => (
+                <option key={line.name} value={line.name}>
+                  {line.name}  ({line.count} station{line.count !== 1 ? 's' : ''})
+                </option>
+              ))}
+            </select>
+            <div className="z3d-picker-actions">
+              <button className="z3d-picker-cancel" onClick={() => { setShowPresetLinePicker(false); setPendingPreset(null); }}>Cancel</button>
+              <button className="z3d-picker-confirm" onClick={handlePresetLinePick}>Place Preset</button>
             </div>
           </div>
         </div>
