@@ -3,9 +3,20 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 import { VRMLLoader } from 'three/examples/jsm/loaders/VRMLLoader';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
+
+// Shared DracoLoader — reused across all GLTFLoader instances
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+
+function makeGLTFLoader() {
+  const loader = new GLTFLoader();
+  loader.setDRACOLoader(dracoLoader);
+  return loader;
+}
 import { RefreshCw } from 'lucide-react';
 import { layoutApi, inputApi } from '../../../services/api/layoutApi';
 import { layeredAuditApi } from '../../../services/api/layoutApi';
@@ -669,7 +680,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
         };
 
         try {
-          if (ext === 'glb' || ext === 'gltf') new GLTFLoader().load(url, g => onBaseLoaded(g.scene));
+          if (ext === 'glb' || ext === 'gltf') makeGLTFLoader().load(url, g => onBaseLoaded(g.scene));
           else if (ext === 'obj') new OBJLoader().load(url, onBaseLoaded);
           else if (ext === 'stl') new STLLoader().load(url, geo => {
             geo.computeVertexNormals();
@@ -896,7 +907,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     };
 
     if (ext === 'glb' || ext === 'gltf') {
-      new GLTFLoader().load(url, (gltf) => onLoaded(gltf.scene), undefined, onLoadError);
+      makeGLTFLoader().load(url, (gltf) => onLoaded(gltf.scene), undefined, onLoadError);
     } else if (ext === 'obj') {
       new OBJLoader().load(url, onLoaded, undefined, onLoadError);
     } else if (ext === 'wrl') {
