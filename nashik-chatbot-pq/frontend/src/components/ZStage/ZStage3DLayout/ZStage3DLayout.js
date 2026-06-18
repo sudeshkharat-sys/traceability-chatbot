@@ -456,7 +456,8 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
   const walkModeRef     = useRef(walkMode);
   const layoutIdRef     = useRef(null);   // kept in sync by the scene effect
   const stationCellsRef = useRef({});     // { stationId: { x, z } } — centre of each station cell
-  const blobsRef        = useRef({});     // { objId: Blob } — file blobs for IDB re-saves
+  const linesRef        = useRef({});     // { lineName: [{stationId, x, z}] } — stations per line
+  const blobsRef        = useRef({});     // { 'tmpl_<id>': Blob } — template blobs
   useEffect(() => { walkModeRef.current = walkMode; }, [walkMode]);
 
   useEffect(() => {
@@ -523,10 +524,17 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
 
     layoutBoxes.forEach(box => buildStationShell(box, statusMap, zeMap, scene));
 
-    // Populate station cell centres for object snapping
+    // Populate station cell centres and line→stations map
     stationCellsRef.current = {};
+    linesRef.current = {};
     layoutBoxes.forEach(box => {
-      const sids = (box.station_ids || '').split(',').map(s => s.trim()).filter(Boolean);
+      const sids     = (box.station_ids || '').split(',').map(s => s.trim()).filter(Boolean);
+      const lineName = box.name || `Box-${box.id}`;
+      linesRef.current[lineName] = sids.map((sid, i) => ({
+        stationId: sid,
+        x: box._x3d + i * CELL_W + CELL_W / 2,
+        z: box._z3d + DEPTH / 2,
+      }));
       sids.forEach((sid, i) => {
         stationCellsRef.current[sid] = {
           x: box._x3d + i * CELL_W + CELL_W / 2,
@@ -575,9 +583,10 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
           key: `${layoutIdRef.current}_${id}`,
           layoutId: layoutIdRef.current,
           id, name,
-          ext: mesh.userData.objExt || 'glb',
-          fileBlob: blobsRef.current[id],
-          stationId: mesh.userData.stationId || null,
+          ext:        mesh.userData.objExt      || 'glb',
+          templateId: mesh.userData.templateId  || null,
+          stationId:  mesh.userData.stationId   || null,
+          lineName:   mesh.userData.lineName    || null,
           px: mesh.position.x, py: mesh.position.y, pz: mesh.position.z,
           rx: mesh.rotation.x, ry: mesh.rotation.y, rz: mesh.rotation.z,
           sx: mesh.scale.x,    sy: mesh.scale.y,    sz: mesh.scale.z,
@@ -606,41 +615,65 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     layoutIdRef.current = layout.id;
 
     // Reload previously saved placed objects from IDB
-    z3dGetAll(layout.id).then(saved => {
-      saved.forEach(record => {
-        const blob = record.fileBlob;
-        if (!blob) return;
-        const file = new File([blob], `${record.name}.${record.ext || 'glb'}`, { type: blob.type || 'model/gltf-binary' });
-        const url  = URL.createObjectURL(file);
-        const ext  = record.ext || 'glb';
+    // Template blob is stored once; each station clone references it by templateId.
+    Promise.all([z3dGetAll(layout.id), z3dGetAllTemplates(layout.id)]).then(([saved, templates]) => {
+      const tmplMap = {};
+      templates.forEach(t => { tmplMap[t.templateId] = t; });
 
-        const onRestored = (obj) => {
+      // Group object records by templateId (fallback: use id as group key for legacy records)
+      const groups = {};
+      saved.forEach(record => {
+        const gKey = record.templateId || record.id;
+        if (!groups[gKey]) groups[gKey] = [];
+        groups[gKey].push(record);
+      });
+
+      Object.entries(groups).forEach(([templateId, records]) => {
+        const tmpl      = tmplMap[templateId];
+        const firstRec  = records[0];
+        const blob      = tmpl?.fileBlob || firstRec?.fileBlob;
+        if (!blob) return;
+
+        const ext = (tmpl?.ext || firstRec?.ext || 'glb').toLowerCase();
+        const url = URL.createObjectURL(new Blob([blob], { type: blob.type || 'model/gltf-binary' }));
+
+        if (tmpl) blobsRef.current[`tmpl_${templateId}`] = tmpl.fileBlob;
+
+        const onBaseLoaded = (baseObj) => {
           URL.revokeObjectURL(url);
-          obj.traverse(child => {
-            if (child.isSprite || (child.material && child.material.map === null && child.isLine)) child.visible = false;
+          records.forEach((record, idx) => {
+            const obj = idx === 0 ? baseObj : baseObj.clone(true);
+            obj.traverse(child => {
+              if (child.isSprite || (child.material && child.material.map === null && child.isLine)) child.visible = false;
+            });
+            obj.position.set(record.px ?? 0, record.py ?? 0, record.pz ?? 0);
+            obj.rotation.set(record.rx ?? 0, record.ry ?? 0, record.rz ?? 0);
+            obj.scale.set(record.sx ?? 1, record.sy ?? 1, record.sz ?? 1);
+            obj.userData.isPlaced   = true;
+            obj.userData.objId      = record.id;
+            obj.userData.objName    = record.name;
+            obj.userData.objExt     = ext;
+            obj.userData.stationId  = record.stationId  || null;
+            obj.userData.templateId = record.templateId || null;
+            obj.userData.lineName   = record.lineName   || null;
+            scene.add(obj);
+            const entry = {
+              id: record.id, mesh: obj, label: null, name: record.name,
+              stationId:  record.stationId  || null,
+              lineName:   record.lineName   || null,
+              templateId: record.templateId || null,
+            };
+            placedRef.current = [...placedRef.current, entry];
+            onObjectsChange([...placedRef.current]);
           });
-          // Restore saved transform
-          obj.position.set(record.px ?? 0, record.py ?? 0, record.pz ?? 0);
-          obj.rotation.set(record.rx ?? 0, record.ry ?? 0, record.rz ?? 0);
-          obj.scale.set(record.sx ?? 1,    record.sy ?? 1,    record.sz ?? 1);
-          obj.userData.isPlaced  = true;
-          obj.userData.objId     = record.id;
-          obj.userData.objName   = record.name;
-          obj.userData.objExt    = ext;
-          obj.userData.stationId = record.stationId || null;
-          if (blob) blobsRef.current[record.id] = blob;
-          scene.add(obj);
-          const entry = { id: record.id, mesh: obj, label: null, name: record.name, stationId: record.stationId || null };
-          placedRef.current = [...placedRef.current, entry];
-          onObjectsChange([...placedRef.current]);
         };
 
         try {
-          if (ext === 'glb' || ext === 'gltf') new GLTFLoader().load(url, g => onRestored(g.scene));
-          else if (ext === 'obj') new OBJLoader().load(url, onRestored);
+          if (ext === 'glb' || ext === 'gltf') new GLTFLoader().load(url, g => onBaseLoaded(g.scene));
+          else if (ext === 'obj') new OBJLoader().load(url, onBaseLoaded);
           else if (ext === 'stl') new STLLoader().load(url, geo => {
             geo.computeVertexNormals();
-            onRestored(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x90a4ae })));
+            onBaseLoaded(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x90a4ae })));
           });
         } catch {}
       });
@@ -725,8 +758,8 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     if (transformRef.current) transformRef.current.setMode(mode);
   }, []);
 
-  // Load and place a 3D object file
-  const placeObject = useCallback((file, name, layoutId, stationId = null) => {
+  // Load and place a 3D object file — cloned to every station on lineName
+  const placeObject = useCallback((file, name, layoutId, lineName = null) => {
     const scene = sceneRef.current;
     if (!scene) return;
     const ext = file.name.split('.').pop().toLowerCase();
@@ -735,7 +768,6 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     const needsConversion = ext === 'wrl' || ext === 'stp' || ext === 'step';
     if (needsConversion) {
       onConvertStart && onConvertStart();
-      // Simulate progress while waiting for server (real progress not available via fetch)
       let pct = 0;
       const ticker = setInterval(() => {
         pct = Math.min(pct + (pct < 60 ? 3 : pct < 85 ? 1 : 0.3), 92);
@@ -752,7 +784,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
           clearInterval(ticker);
           onConvertEnd && onConvertEnd(true);
           const glbFile = new File([blob], name + '.glb', { type: 'model/gltf-binary' });
-          placeObject(glbFile, name, layoutId);
+          placeObject(glbFile, name, layoutId, lineName);
         })
         .catch(err => {
           clearInterval(ticker);
@@ -762,72 +794,94 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       return;
     }
 
-    const url  = URL.createObjectURL(file);
+    const url = URL.createObjectURL(file);
 
-    const onLoaded = (obj) => {
+    const onLoaded = (baseObj) => {
       URL.revokeObjectURL(url);
 
-      // Strip any existing text/label children from the loaded model
-      obj.traverse(child => {
-        if (child.isSprite || (child.material && child.material.map === null && child.isLine)) {
+      // Strip text/label helpers from the loaded model
+      baseObj.traverse(child => {
+        if (child.isSprite || (child.material && child.material.map === null && child.isLine))
           child.visible = false;
-        }
       });
 
-      // Reset position/rotation before measuring so bbox is in clean local space
-      obj.position.set(0, 0, 0);
-
-      // Auto-scale to ~2m
-      const bbox = new THREE.Box3().setFromObject(obj);
+      // Auto-scale to ~2m on base object
+      baseObj.position.set(0, 0, 0);
+      baseObj.rotation.set(0, 0, 0);
+      const bbox = new THREE.Box3().setFromObject(baseObj);
       const size = new THREE.Vector3();
       bbox.getSize(size);
       const maxDim = Math.max(size.x, size.y, size.z);
-      if (maxDim > 0) obj.scale.setScalar(2.0 / maxDim);
+      if (maxDim > 0) baseObj.scale.setScalar(2.0 / maxDim);
+      const bbox2 = new THREE.Box3().setFromObject(baseObj);
+      const bottomY = -bbox2.min.y;
 
-      // Re-compute after scale — snap bottom of object exactly to floor (y=0)
-      const bbox2 = new THREE.Box3().setFromObject(obj);
-      obj.position.y = -bbox2.min.y;
+      // Determine target stations (all stations on the chosen line, or scene centre)
+      const lineStations = lineName && linesRef.current[lineName];
+      const stations = lineStations && lineStations.length > 0
+        ? lineStations
+        : [{ stationId: null, x: sceneCenterRef.current.x, z: sceneCenterRef.current.z }];
 
-      // Place at station centre (if assigned) or scene centre
-      const cell = stationId && stationCellsRef.current[stationId];
-      const c = sceneCenterRef.current;
-      obj.position.x = cell ? cell.x : c.x;
-      obj.position.z = cell ? cell.z : c.z;
+      const templateId  = Date.now().toString();
+      const newEntries  = [];
 
-      const objId = Date.now().toString();
-      obj.userData.isPlaced   = true;
-      obj.userData.objId      = objId;
-      obj.userData.objName    = name;
-      obj.userData.objExt     = ext;
-      obj.userData.stationId  = stationId || null;
+      stations.forEach((station, idx) => {
+        const obj = idx === 0 ? baseObj : baseObj.clone(true);
+        obj.position.set(station.x, bottomY, station.z);
+        obj.rotation.set(0, 0, 0);
 
-      scene.add(obj);
+        const objId = `${templateId}_${idx}`;
+        obj.userData.isPlaced   = true;
+        obj.userData.objId      = objId;
+        obj.userData.objName    = name;
+        obj.userData.objExt     = ext;
+        obj.userData.stationId  = station.stationId || null;
+        obj.userData.templateId = templateId;
+        obj.userData.lineName   = lineName || null;
 
-      const entry = { id: objId, mesh: obj, label: null, name, stationId: stationId || null };
-      placedRef.current = [...placedRef.current, entry];
+        scene.add(obj);
+        newEntries.push({
+          id: objId, mesh: obj, label: null, name,
+          stationId: station.stationId || null,
+          lineName:  lineName || null,
+          templateId,
+        });
+      });
 
-      // Persist to IDB (file blob + initial transform)
+      placedRef.current = [...placedRef.current, ...newEntries];
+
+      // Persist: one template record (with blob) + one lightweight record per station clone
       if (layoutId) {
         file.arrayBuffer().then(buf => {
           const blob = new Blob([buf], { type: file.type || 'application/octet-stream' });
-          blobsRef.current[objId] = blob;
-          z3dPut({
-            key: `${layoutId}_${objId}`,
-            layoutId, id: objId, name, ext,
+          blobsRef.current[`tmpl_${templateId}`] = blob;
+          z3dPutTemplate({
+            key: `${layoutId}_tmpl_${templateId}`,
+            layoutId, templateId, name, ext,
             fileBlob: blob,
-            stationId: stationId || null,
-            px: obj.position.x, py: obj.position.y, pz: obj.position.z,
-            rx: obj.rotation.x, ry: obj.rotation.y, rz: obj.rotation.z,
-            sx: obj.scale.x,    sy: obj.scale.y,    sz: obj.scale.z,
+            lineName: lineName || null,
+          });
+          newEntries.forEach(entry => {
+            z3dPut({
+              key: `${layoutId}_${entry.id}`,
+              layoutId, id: entry.id, name, ext,
+              templateId,
+              stationId: entry.stationId || null,
+              lineName:  entry.lineName  || null,
+              px: entry.mesh.position.x, py: entry.mesh.position.y, pz: entry.mesh.position.z,
+              rx: 0, ry: 0, rz: 0,
+              sx: entry.mesh.scale.x, sy: entry.mesh.scale.y, sz: entry.mesh.scale.z,
+            });
           });
         }).catch(() => {});
       }
 
-      // Select immediately and set mode to translate
-      if (transformRef.current) {
+      // Select first clone
+      const first = newEntries[0];
+      if (first && transformRef.current) {
         transformRef.current.setMode('translate');
-        transformRef.current.attach(obj);
-        selectedRef.current = entry;
+        transformRef.current.attach(first.mesh);
+        selectedRef.current = first;
       }
 
       onObjectsChange([...placedRef.current]);
@@ -842,11 +896,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     } else if (ext === 'stl') {
       new STLLoader().load(url, (geometry) => {
         geometry.computeVertexNormals();
-        const mesh = new THREE.Mesh(
-          geometry,
-          new THREE.MeshLambertMaterial({ color: 0x90a4ae })
-        );
-        onLoaded(mesh);
+        onLoaded(new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ color: 0x90a4ae })));
       });
     }
   }, [onObjectsChange]); // eslint-disable-line
@@ -917,7 +967,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     onObjectsChange([...placedRef.current]);
   }, [onObjectsChange]);
 
-  // Delete object by id
+  // Delete object by id (and template if it was the last clone)
   const deleteById = useCallback((id) => {
     const scene = sceneRef.current;
     const entry = placedRef.current.find(p => p.id === id);
@@ -927,7 +977,16 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     if (entry.label) scene.remove(entry.label);
     placedRef.current = placedRef.current.filter(p => p.id !== id);
     if (selectedRef.current?.id === id) selectedRef.current = null;
-    if (layoutIdRef.current) z3dDel(`${layoutIdRef.current}_${id}`);
+    if (layoutIdRef.current) {
+      z3dDel(`${layoutIdRef.current}_${id}`);
+      if (entry.templateId) {
+        const remaining = placedRef.current.filter(p => p.templateId === entry.templateId);
+        if (remaining.length === 0) {
+          z3dDelTemplate(`${layoutIdRef.current}_tmpl_${entry.templateId}`);
+          delete blobsRef.current[`tmpl_${entry.templateId}`];
+        }
+      }
+    }
     onObjectsChange([...placedRef.current]);
   }, [onObjectsChange]);
 
@@ -976,9 +1035,10 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
         key: `${layoutIdRef.current}_${id}`,
         layoutId: layoutIdRef.current,
         id, name: entry.name,
-        ext: m.userData.objExt || 'glb',
-        fileBlob: blobsRef.current[id],
-        stationId: m.userData.stationId || null,
+        ext:        m.userData.objExt      || 'glb',
+        templateId: m.userData.templateId  || null,
+        stationId:  m.userData.stationId   || null,
+        lineName:   m.userData.lineName    || null,
         px: m.position.x, py: m.position.y, pz: m.position.z,
         rx: m.rotation.x, ry: m.rotation.y, rz: m.rotation.z,
         sx: m.scale.x, sy: m.scale.y, sz: m.scale.z,
@@ -1015,13 +1075,20 @@ function computeZeMap(records) {
 }
 
 // ── IndexedDB helpers for placed-object persistence ───────────────────────────
-const Z3D_DB   = 'z3d_placed_v1';
+const Z3D_DB    = 'z3d_placed_v1';
 const Z3D_STORE = 'objects';
+const Z3D_TMPL  = 'templates';
 
 function z3dOpen() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(Z3D_DB, 1);
-    req.onupgradeneeded = (e) => e.target.result.createObjectStore(Z3D_STORE, { keyPath: 'key' });
+    const req = indexedDB.open(Z3D_DB, 2);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(Z3D_STORE))
+        db.createObjectStore(Z3D_STORE, { keyPath: 'key' });
+      if (!db.objectStoreNames.contains(Z3D_TMPL))
+        db.createObjectStore(Z3D_TMPL, { keyPath: 'key' });
+    };
     req.onsuccess = (e) => resolve(e.target.result);
     req.onerror   = (e) => reject(e.target.error);
   });
@@ -1060,6 +1127,40 @@ async function z3dDel(key) {
     db.close();
   } catch {}
 }
+async function z3dPutTemplate(record) {
+  try {
+    const db = await z3dOpen();
+    await new Promise((res, rej) => {
+      const tx = db.transaction(Z3D_TMPL, 'readwrite');
+      tx.objectStore(Z3D_TMPL).put(record);
+      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
+    });
+    db.close();
+  } catch {}
+}
+async function z3dGetAllTemplates(layoutId) {
+  try {
+    const db  = await z3dOpen();
+    const all = await new Promise(res => {
+      const req = db.transaction(Z3D_TMPL, 'readonly').objectStore(Z3D_TMPL).getAll();
+      req.onsuccess = () => res(req.result || []);
+      req.onerror   = () => res([]);
+    });
+    db.close();
+    return all.filter(r => r.layoutId === layoutId);
+  } catch { return []; }
+}
+async function z3dDelTemplate(key) {
+  try {
+    const db = await z3dOpen();
+    await new Promise(res => {
+      const tx = db.transaction(Z3D_TMPL, 'readwrite');
+      tx.objectStore(Z3D_TMPL).delete(key);
+      tx.oncomplete = res; tx.onerror = res;
+    });
+    db.close();
+  } catch {}
+}
 
 // ── Main component ─────────────────────────────────────────────────────────────
 function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive }) {
@@ -1085,8 +1186,8 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [refreshing,        setRefreshing]        = useState(false);
   const [pendingFile,       setPendingFile]       = useState(null);
   const [pendingName,       setPendingName]       = useState('');
-  const [showStationPicker, setShowStationPicker] = useState(false);
-  const [pickerStation,     setPickerStation]     = useState('');
+  const [showLinePicker,    setShowLinePicker]    = useState(false);
+  const [pickerLine,        setPickerLine]        = useState('');
   const [transformVals,     setTransformVals]     = useState({ rx: 0, ry: 0, rz: 0, sx: 1, sy: 1, sz: 1 });
 
   useEffect(() => {
@@ -1128,13 +1229,14 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     }
   }, [layout, userId]);
 
-  const allStationIds = React.useMemo(() => {
+  const allLines = React.useMemo(() => {
     if (!layout) return [];
-    return [...new Set(
-      (layout.station_boxes || []).flatMap(b =>
-        (b.station_ids || '').split(',').map(s => s.trim()).filter(Boolean)
-      )
-    )].sort();
+    return (layout.station_boxes || [])
+      .filter(b => b.name)
+      .map(b => ({
+        name: b.name,
+        count: (b.station_ids || '').split(',').filter(s => s.trim()).length,
+      }));
   }, [layout]);
 
   const onObjectsChange = useCallback((objs) => {
@@ -1208,18 +1310,18 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     const name = file.name.replace(/\.[^/.]+$/, '');
     setPendingFile(file);
     setPendingName(name);
-    setPickerStation('');
-    setShowStationPicker(true);
+    setPickerLine('');
+    setShowLinePicker(true);
     e.target.value = '';
   }, []);
 
   const handlePickerConfirm = useCallback(() => {
     if (!pendingFile) return;
-    placeObject(pendingFile, pendingName, selectedLayoutId, pickerStation || null);
-    setShowStationPicker(false);
+    placeObject(pendingFile, pendingName, selectedLayoutId, pickerLine || null);
+    setShowLinePicker(false);
     setPendingFile(null);
     setShowObjPanel(true);
-  }, [pendingFile, pendingName, selectedLayoutId, pickerStation, placeObject]);
+  }, [pendingFile, pendingName, selectedLayoutId, pickerLine, placeObject]);
 
   const handleModeChange = useCallback((mode) => {
     setTransformModeState(mode);
@@ -1413,7 +1515,10 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                   <span className="z3d-obj-icon">📦</span>
                   <div className="z3d-obj-info">
                     <span className="z3d-obj-name">{obj.name}</span>
-                    {obj.stationId && <span className="z3d-obj-station-tag">{obj.stationId}</span>}
+                    <div className="z3d-obj-tags">
+                      {obj.lineName  && <span className="z3d-obj-line-tag">{obj.lineName}</span>}
+                      {obj.stationId && <span className="z3d-obj-station-tag">{obj.stationId}</span>}
+                    </div>
                   </div>
                   <button
                     className="z3d-obj-del"
@@ -1471,24 +1576,28 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
         </div>
       </div>
 
-      {/* Station picker modal */}
-      {showStationPicker && (
+      {/* Line picker modal */}
+      {showLinePicker && (
         <div className="z3d-picker-overlay">
           <div className="z3d-picker-box">
-            <div className="z3d-picker-title">Assign Object to Station</div>
-            <div className="z3d-picker-sub">Choose a station ID to snap this object to that station's position, or place it freely.</div>
+            <div className="z3d-picker-title">Select Line</div>
+            <div className="z3d-picker-sub">
+              The object is uploaded <strong>once</strong> and automatically cloned to every station on the chosen line.
+            </div>
             <select
               className="z3d-picker-select"
-              value={pickerStation}
-              onChange={e => setPickerStation(e.target.value)}
+              value={pickerLine}
+              onChange={e => setPickerLine(e.target.value)}
             >
-              <option value="">— Free placement (no station) —</option>
-              {allStationIds.map(sid => (
-                <option key={sid} value={sid}>{sid}</option>
+              <option value="">— Free placement (no line) —</option>
+              {allLines.map(line => (
+                <option key={line.name} value={line.name}>
+                  {line.name}  ({line.count} station{line.count !== 1 ? 's' : ''})
+                </option>
               ))}
             </select>
             <div className="z3d-picker-actions">
-              <button className="z3d-picker-cancel" onClick={() => { setShowStationPicker(false); setPendingFile(null); }}>Cancel</button>
+              <button className="z3d-picker-cancel" onClick={() => { setShowLinePicker(false); setPendingFile(null); }}>Cancel</button>
               <button className="z3d-picker-confirm" onClick={handlePickerConfirm}>Place Object</button>
             </div>
           </div>

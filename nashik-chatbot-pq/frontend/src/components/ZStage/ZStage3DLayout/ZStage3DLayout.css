@@ -715,6 +715,27 @@
   min-width: 0;
   overflow: hidden;
 }
+.z3d-obj-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 3px;
+}
+.z3d-obj-line-tag {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  color: #68d391;
+  background: rgba(104,211,145,0.12);
+  border: 1px solid rgba(104,211,145,0.3);
+  border-radius: 3px;
+  padding: 1px 5px;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 90px;
+}
 .z3d-obj-station-tag {
   display: inline-block;
   font-size: 9px;
@@ -724,7 +745,6 @@
   border: 1px solid rgba(99,179,237,0.3);
   border-radius: 3px;
   padding: 1px 5px;
-  margin-top: 2px;
   letter-spacing: 0.5px;
   text-transform: uppercase;
   white-space: nowrap;
