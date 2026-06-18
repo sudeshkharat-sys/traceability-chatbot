@@ -586,6 +586,22 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
 
     // TransformControls
     const tc = new TransformControls(camera, renderer.domElement);
+    // Real-time sibling sync while dragging rotate/scale
+    tc.addEventListener('change', () => {
+      if (!tc.dragging || !selectedRef.current) return;
+      const { mesh } = selectedRef.current;
+      const mode = tcModeRef.current;
+      if (mode === 'translate') return;
+      const templateId = mesh.userData.templateId;
+      if (!templateId) return;
+      placedRef.current
+        .filter(p => p.templateId === templateId && p.mesh !== mesh)
+        .forEach(sib => {
+          sib.mesh.rotation.copy(mesh.rotation);
+          sib.mesh.scale.copy(mesh.scale);
+        });
+    });
+
     tc.addEventListener('dragging-changed', (e) => {
       orbit.enabled = !e.value;
       // Drag finished — persist updated transform to IDB
@@ -682,6 +698,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
 
         const onBaseLoaded = (baseObj) => {
           URL.revokeObjectURL(url);
+          const newEntries = [];
           records.forEach((record, idx) => {
             const obj = idx === 0 ? baseObj : baseObj.clone(true);
             obj.traverse(child => {
@@ -698,15 +715,16 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
             obj.userData.templateId = record.templateId || null;
             obj.userData.lineName   = record.lineName   || null;
             scene.add(obj);
-            const entry = {
+            newEntries.push({
               id: record.id, mesh: obj, label: null, name: record.name,
               stationId:  record.stationId  || null,
               lineName:   record.lineName   || null,
               templateId: record.templateId || null,
-            };
-            placedRef.current = [...placedRef.current, entry];
-            onObjectsChange([...placedRef.current]);
+            });
           });
+          // Single React update after all clones are added
+          placedRef.current = [...placedRef.current, ...newEntries];
+          onObjectsChange([...placedRef.current]);
         };
 
         try {
@@ -1024,24 +1042,37 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
 
   // Delete object by id (and template if it was the last clone)
   const deleteById = useCallback((id) => {
+    deleteGroupByTemplateKey(id, null);
+  }, []); // eslint-disable-line
+
+  // Delete all clones whose (templateId || id) matches templateKey, or just one if singleId provided
+  const deleteGroupByTemplateKey = useCallback((singleId, templateKey) => {
     const scene = sceneRef.current;
-    const entry = placedRef.current.find(p => p.id === id);
-    if (!entry || !scene) return;
-    if (transformRef.current && selectedRef.current?.id === id) transformRef.current.detach();
-    scene.remove(entry.mesh);
-    if (entry.label) scene.remove(entry.label);
-    placedRef.current = placedRef.current.filter(p => p.id !== id);
-    if (selectedRef.current?.id === id) selectedRef.current = null;
-    if (layoutIdRef.current) {
-      z3dDel(`${layoutIdRef.current}_${id}`);
-      if (entry.templateId) {
-        const remaining = placedRef.current.filter(p => p.templateId === entry.templateId);
-        if (remaining.length === 0) {
-          z3dDelTemplate(`${layoutIdRef.current}_tmpl_${entry.templateId}`);
-          delete blobsRef.current[`tmpl_${entry.templateId}`];
-        }
+    if (!scene) return;
+    const toDelete = templateKey
+      ? placedRef.current.filter(p => (p.templateId || p.id) === templateKey)
+      : placedRef.current.filter(p => p.id === singleId);
+    if (!toDelete.length) return;
+    toDelete.forEach(entry => {
+      if (transformRef.current && selectedRef.current?.id === entry.id) transformRef.current.detach();
+      scene.remove(entry.mesh);
+      if (entry.label) scene.remove(entry.label);
+      if (selectedRef.current?.id === entry.id) selectedRef.current = null;
+      if (layoutIdRef.current) z3dDel(`${layoutIdRef.current}_${entry.id}`);
+    });
+    // Clean up template blob if no clones remain
+    const firstTemplateId = toDelete[0]?.templateId;
+    if (firstTemplateId && layoutIdRef.current) {
+      const remaining = placedRef.current.filter(
+        p => p.templateId === firstTemplateId && !toDelete.find(d => d.id === p.id)
+      );
+      if (remaining.length === 0) {
+        z3dDelTemplate(`${layoutIdRef.current}_tmpl_${firstTemplateId}`);
+        delete blobsRef.current[`tmpl_${firstTemplateId}`];
       }
     }
+    const deleteIds = new Set(toDelete.map(e => e.id));
+    placedRef.current = placedRef.current.filter(p => !deleteIds.has(p.id));
     onObjectsChange([...placedRef.current]);
   }, [onObjectsChange]);
 
@@ -1236,7 +1267,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     else onErr();
   }, [onObjectsChange]); // eslint-disable-line
 
-  return { snapView, setTransformMode, placeObject, placeFromPreset, saveAsPreset, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, updateTransformVals, stationCellsRef };
+  return { snapView, setTransformMode, placeObject, placeFromPreset, saveAsPreset, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, deleteGroupByTemplateKey, renameById, updateTransformVals, stationCellsRef };
 }
 
 // ── Compute Z/E status per station from input records (mirrors ZStageDashboard logic) ──
@@ -1535,7 +1566,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const onPlaceStart = useCallback(() => setPlacingObject(true),  []);
   const onPlaceEnd   = useCallback(() => setPlacingObject(false), []);
 
-  const { snapView, setTransformMode, placeObject, placeFromPreset, saveAsPreset, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, updateTransformVals } =
+  const { snapView, setTransformMode, placeObject, placeFromPreset, saveAsPreset, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, deleteGroupByTemplateKey, renameById, updateTransformVals } =
     useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady, onPlaceStart, onPlaceEnd);
 
   // Load presets from IDB on mount
@@ -1570,16 +1601,20 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setTransformMode(mode);
   }, [setTransformMode]);
 
-  const handleSelect = useCallback((id) => {
-    setSelectedId(id);
-    setRenameVal(placedObjects.find(o => o.id === id)?.name || '');
-    selectById(id);
+  const handleSelect = useCallback((templateKey) => {
+    // Find the first clone in this group
+    const first = placedObjects.find(o => (o.templateId || o.id) === templateKey);
+    if (!first) return;
+    setSelectedId(first.id);
+    setRenameVal(first.name);
+    selectById(first.id);
   }, [placedObjects, selectById]);
 
-  const handleDelete = useCallback((id) => {
-    deleteById(id);
-    if (selectedId === id) setSelectedId(null);
-  }, [deleteById, selectedId]);
+  const handleDelete = useCallback((templateKey) => {
+    const group = placedObjects.filter(o => (o.templateId || o.id) === templateKey);
+    if (group.some(o => o.id === selectedId)) setSelectedId(null);
+    deleteGroupByTemplateKey(null, templateKey);
+  }, [deleteGroupByTemplateKey, selectedId, placedObjects]);
 
   const handleRename = useCallback(() => {
     if (!renameVal.trim() || !selectedId) return;
@@ -1640,7 +1675,20 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     });
   }, [pendingPreset, presetPickerLine, selectedLayoutId, placeFromPreset]);
 
+  // Group placed objects by templateId so the list shows one row per model+line
+  const placedGroups = React.useMemo(() => {
+    const seen = new Map();
+    placedObjects.forEach(obj => {
+      const key = obj.templateId || obj.id;
+      if (!seen.has(key)) seen.set(key, { ...obj, count: 1 });
+      else seen.get(key).count++;
+    });
+    return Array.from(seen.values());
+  }, [placedObjects]);
+
   const currentSelected = placedObjects.find(o => o.id === selectedId);
+  // The selected group is whichever group contains the selected clone
+  const selectedGroupKey = currentSelected ? (currentSelected.templateId || currentSelected.id) : null;
 
   return (
     <div className="z3d-root">
@@ -1793,30 +1841,36 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
               </button>
             )}
 
-            {/* Object list */}
+            {/* Object list — one row per model+line group */}
             <div className="z3d-obj-list">
-              {placedObjects.length === 0 && <div className="z3d-obj-empty">No objects placed yet</div>}
-              {placedObjects.map(obj => (
-                <div
-                  key={obj.id}
-                  className={`z3d-obj-item${selectedId === obj.id ? ' z3d-obj-item--active' : ''}`}
-                  onClick={() => handleSelect(obj.id)}
-                >
-                  <span className="z3d-obj-icon">📦</span>
-                  <div className="z3d-obj-info">
-                    <span className="z3d-obj-name">{obj.name}</span>
-                    <div className="z3d-obj-tags">
-                      {obj.lineName  && <span className="z3d-obj-line-tag">{obj.lineName}</span>}
-                      {obj.stationId && <span className="z3d-obj-station-tag">{obj.stationId}</span>}
+              {placedGroups.length === 0 && <div className="z3d-obj-empty">No objects placed yet</div>}
+              {placedGroups.map(grp => {
+                const groupKey = grp.templateId || grp.id;
+                const isActive = selectedGroupKey === groupKey;
+                return (
+                  <div
+                    key={groupKey}
+                    className={`z3d-obj-item${isActive ? ' z3d-obj-item--active' : ''}`}
+                    onClick={() => handleSelect(groupKey)}
+                  >
+                    <span className="z3d-obj-icon">📦</span>
+                    <div className="z3d-obj-info">
+                      <span className="z3d-obj-name">{grp.name}</span>
+                      <div className="z3d-obj-tags">
+                        {grp.lineName && <span className="z3d-obj-line-tag">{grp.lineName}</span>}
+                        {grp.count > 1
+                          ? <span className="z3d-obj-station-tag">{grp.count} stations</span>
+                          : grp.stationId && <span className="z3d-obj-station-tag">{grp.stationId}</span>}
+                      </div>
                     </div>
+                    <button
+                      className="z3d-obj-del"
+                      title="Delete all clones on this line"
+                      onClick={e => { e.stopPropagation(); handleDelete(groupKey); }}
+                    >✕</button>
                   </div>
-                  <button
-                    className="z3d-obj-del"
-                    title="Delete"
-                    onClick={e => { e.stopPropagation(); handleDelete(obj.id); }}
-                  >✕</button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
