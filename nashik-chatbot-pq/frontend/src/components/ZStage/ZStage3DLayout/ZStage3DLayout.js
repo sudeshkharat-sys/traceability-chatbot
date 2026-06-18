@@ -882,10 +882,11 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       URL.revokeObjectURL(url);
       onPlaceEnd && onPlaceEnd();
       const msg = err?.message || String(err) || '';
+      console.error('[Z3D] Model load error:', err);
       if (msg.toLowerCase().includes('draco')) {
         alert('This GLB uses Draco compression.\n\nPlease re-export from Blender / your tool with Draco disabled:\n• Blender → File → Export → glTF 2.0 → uncheck "Draco mesh compression"');
       } else {
-        alert(`Failed to load model: ${msg || 'Check browser console for details'}`);
+        alert(`Failed to load model (${ext.toUpperCase()}): ${msg || 'Unknown error'}\n\nOpen browser Console (F12) for full details.`);
       }
     };
 
@@ -1205,10 +1206,11 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     const entry = placedRef.current.find(p => p.id === id);
     if (!entry) return;
     const m = entry.mesh;
-    const templateId = m.userData.templateId;
-    const blob = templateId ? blobsRef.current[`tmpl_${templateId}`] : null;
-    if (!blob) { alert('File data not available for this object — cannot save preset.'); return; }
-    const presetKey = `preset_${Date.now()}`;
+    const libKey = m.userData.libKey;
+    const blob = libKey ? blobsRef.current[libKey] : null;
+    if (!blob) { alert('File data not available — cannot rename preset. The model is still auto-saved to the library.'); return; }
+    // Update the existing library entry with the new name
+    const presetKey = libKey;
     z3dPutPreset({
       key:  presetKey,
       name: presetName,
@@ -1311,7 +1313,13 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       }
     };
 
-    const onErr = () => { URL.revokeObjectURL(url); onPlaceEnd && onPlaceEnd(); };
+    const onErr = (err) => {
+      URL.revokeObjectURL(url);
+      onPlaceEnd && onPlaceEnd();
+      const msg = err?.message || String(err) || '';
+      console.error('[Z3D] Preset load error:', err);
+      alert(`Failed to load preset model (${ext.toUpperCase()}): ${msg || 'Unknown error'}\n\nOpen browser Console (F12) for full details.`);
+    };
     if (ext === 'glb' || ext === 'gltf') makeGLTFLoader().load(url, g => onLoaded(g.scene), undefined, onErr);
     else if (ext === 'obj') new OBJLoader().load(url, onLoaded, undefined, onErr);
     else if (ext === 'stl') new STLLoader().load(url, geo => {
