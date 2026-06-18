@@ -1004,17 +1004,12 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     const pts = waypointIds.map(sid => posMap[sid]).filter(Boolean);
     if (pts.length < 2) return;
 
-    // Travel center of first station → center of last station
-    const startPt  = pts[0];
-    const endPt    = pts[pts.length - 1];
-    const originX  = entry.mesh.position.x;
-    const originZ  = entry.mesh.position.z;
-    // durationSec = total round-trip time; each leg gets half
-    const legMs = (durationSec * 1000) / 2;
+    // Travel center of From station → center of To station, stop there
+    const startPt = pts[0];
+    const endPt   = pts[pts.length - 1];
 
     const segments = [
-      { fromX: startPt.x, fromZ: startPt.z, toX: endPt.x, toZ: endPt.z,  durationMs: legMs },
-      { fromX: endPt.x,   fromZ: endPt.z,   toX: originX,  toZ: originZ,  durationMs: legMs },
+      { fromX: startPt.x, fromZ: startPt.z, toX: endPt.x, toZ: endPt.z, durationMs: durationSec * 1000 },
     ];
 
     let segIdx = 0;
