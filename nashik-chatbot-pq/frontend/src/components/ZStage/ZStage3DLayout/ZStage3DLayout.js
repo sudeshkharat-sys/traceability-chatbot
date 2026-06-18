@@ -453,8 +453,10 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
   const selectedRef    = useRef(null);
   const sceneCenterRef = useRef(new THREE.Vector3(0, 0, 0));
   const sceneSpanRef   = useRef(20);
-  const walkModeRef    = useRef(walkMode);
-  const layoutIdRef    = useRef(null);   // kept in sync by the scene effect
+  const walkModeRef     = useRef(walkMode);
+  const layoutIdRef     = useRef(null);   // kept in sync by the scene effect
+  const stationCellsRef = useRef({});     // { stationId: { x, z } } — centre of each station cell
+  const blobsRef        = useRef({});     // { objId: Blob } — file blobs for IDB re-saves
   useEffect(() => { walkModeRef.current = walkMode; }, [walkMode]);
 
   useEffect(() => {
@@ -520,6 +522,19 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     }));
 
     layoutBoxes.forEach(box => buildStationShell(box, statusMap, zeMap, scene));
+
+    // Populate station cell centres for object snapping
+    stationCellsRef.current = {};
+    layoutBoxes.forEach(box => {
+      const sids = (box.station_ids || '').split(',').map(s => s.trim()).filter(Boolean);
+      sids.forEach((sid, i) => {
+        stationCellsRef.current[sid] = {
+          x: box._x3d + i * CELL_W + CELL_W / 2,
+          z: box._z3d + DEPTH / 2,
+        };
+      });
+    });
+
     (layout.connections || []).forEach(conn => {
       const f = layoutBoxes.find(b => b.id === conn.from_box_id);
       const t = layoutBoxes.find(b => b.id === conn.to_box_id);
@@ -561,6 +576,8 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
           layoutId: layoutIdRef.current,
           id, name,
           ext: mesh.userData.objExt || 'glb',
+          fileBlob: blobsRef.current[id],
+          stationId: mesh.userData.stationId || null,
           px: mesh.position.x, py: mesh.position.y, pz: mesh.position.z,
           rx: mesh.rotation.x, ry: mesh.rotation.y, rz: mesh.rotation.z,
           sx: mesh.scale.x,    sy: mesh.scale.y,    sz: mesh.scale.z,
@@ -606,12 +623,14 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
           obj.position.set(record.px ?? 0, record.py ?? 0, record.pz ?? 0);
           obj.rotation.set(record.rx ?? 0, record.ry ?? 0, record.rz ?? 0);
           obj.scale.set(record.sx ?? 1,    record.sy ?? 1,    record.sz ?? 1);
-          obj.userData.isPlaced = true;
-          obj.userData.objId    = record.id;
-          obj.userData.objName  = record.name;
-          obj.userData.objExt   = ext;
+          obj.userData.isPlaced  = true;
+          obj.userData.objId     = record.id;
+          obj.userData.objName   = record.name;
+          obj.userData.objExt    = ext;
+          obj.userData.stationId = record.stationId || null;
+          if (blob) blobsRef.current[record.id] = blob;
           scene.add(obj);
-          const entry = { id: record.id, mesh: obj, label: null, name: record.name };
+          const entry = { id: record.id, mesh: obj, label: null, name: record.name, stationId: record.stationId || null };
           placedRef.current = [...placedRef.current, entry];
           onObjectsChange([...placedRef.current]);
         };
@@ -707,7 +726,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
   }, []);
 
   // Load and place a 3D object file
-  const placeObject = useCallback((file, name, layoutId) => {
+  const placeObject = useCallback((file, name, layoutId, stationId = null) => {
     const scene = sceneRef.current;
     if (!scene) return;
     const ext = file.name.split('.').pop().toLowerCase();
@@ -769,29 +788,34 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       const bbox2 = new THREE.Box3().setFromObject(obj);
       obj.position.y = -bbox2.min.y;
 
-      // Place at scene centre (XZ)
+      // Place at station centre (if assigned) or scene centre
+      const cell = stationId && stationCellsRef.current[stationId];
       const c = sceneCenterRef.current;
-      obj.position.x = c.x;
-      obj.position.z = c.z;
+      obj.position.x = cell ? cell.x : c.x;
+      obj.position.z = cell ? cell.z : c.z;
 
       const objId = Date.now().toString();
-      obj.userData.isPlaced = true;
-      obj.userData.objId    = objId;
-      obj.userData.objName  = name;
-      obj.userData.objExt   = ext;
+      obj.userData.isPlaced   = true;
+      obj.userData.objId      = objId;
+      obj.userData.objName    = name;
+      obj.userData.objExt     = ext;
+      obj.userData.stationId  = stationId || null;
 
       scene.add(obj);
 
-      const entry = { id: objId, mesh: obj, label: null, name };
+      const entry = { id: objId, mesh: obj, label: null, name, stationId: stationId || null };
       placedRef.current = [...placedRef.current, entry];
 
       // Persist to IDB (file blob + initial transform)
       if (layoutId) {
         file.arrayBuffer().then(buf => {
+          const blob = new Blob([buf], { type: file.type || 'application/octet-stream' });
+          blobsRef.current[objId] = blob;
           z3dPut({
             key: `${layoutId}_${objId}`,
             layoutId, id: objId, name, ext,
-            fileBlob: new Blob([buf], { type: file.type || 'application/octet-stream' }),
+            fileBlob: blob,
+            stationId: stationId || null,
             px: obj.position.x, py: obj.position.y, pz: obj.position.z,
             rx: obj.rotation.x, ry: obj.rotation.y, rz: obj.rotation.z,
             sx: obj.scale.x,    sy: obj.scale.y,    sz: obj.scale.z,
@@ -936,7 +960,33 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     return () => clearInterval(tid);
   }, []);
 
-  return { snapView, setTransformMode, placeObject, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById };
+  // Apply value-based rotation (degrees) or scale to selected object
+  const updateTransformVals = useCallback((id, vals) => {
+    const entry = placedRef.current.find(p => p.id === id);
+    if (!entry) return;
+    const m = entry.mesh;
+    if (vals.rx !== undefined) m.rotation.x = vals.rx * Math.PI / 180;
+    if (vals.ry !== undefined) m.rotation.y = vals.ry * Math.PI / 180;
+    if (vals.rz !== undefined) m.rotation.z = vals.rz * Math.PI / 180;
+    if (vals.sx !== undefined) m.scale.x = vals.sx;
+    if (vals.sy !== undefined) m.scale.y = vals.sy;
+    if (vals.sz !== undefined) m.scale.z = vals.sz;
+    if (layoutIdRef.current) {
+      z3dPut({
+        key: `${layoutIdRef.current}_${id}`,
+        layoutId: layoutIdRef.current,
+        id, name: entry.name,
+        ext: m.userData.objExt || 'glb',
+        fileBlob: blobsRef.current[id],
+        stationId: m.userData.stationId || null,
+        px: m.position.x, py: m.position.y, pz: m.position.z,
+        rx: m.rotation.x, ry: m.rotation.y, rz: m.rotation.z,
+        sx: m.scale.x, sy: m.scale.y, sz: m.scale.z,
+      });
+    }
+  }, []);
+
+  return { snapView, setTransformMode, placeObject, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, updateTransformVals, stationCellsRef };
 }
 
 // ── Compute Z/E status per station from input records (mirrors ZStageDashboard logic) ──
@@ -1033,6 +1083,11 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [adherenceRecords,  setAdherenceRecords]  = useState([]);
   const [sceneReady,        setSceneReady]        = useState(false);
   const [refreshing,        setRefreshing]        = useState(false);
+  const [pendingFile,       setPendingFile]       = useState(null);
+  const [pendingName,       setPendingName]       = useState('');
+  const [showStationPicker, setShowStationPicker] = useState(false);
+  const [pickerStation,     setPickerStation]     = useState('');
+  const [transformVals,     setTransformVals]     = useState({ rx: 0, ry: 0, rz: 0, sx: 1, sy: 1, sz: 1 });
 
   useEffect(() => {
     if (activeLayoutId && !selectedLayoutId) setSelectedLayoutId(activeLayoutId);
@@ -1072,6 +1127,15 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
         .catch(() => { setZeMap({}); setRecords([]); setAuditRecords([]); setAdherenceRecords([]); });
     }
   }, [layout, userId]);
+
+  const allStationIds = React.useMemo(() => {
+    if (!layout) return [];
+    return [...new Set(
+      (layout.station_boxes || []).flatMap(b =>
+        (b.station_ids || '').split(',').map(s => s.trim()).filter(Boolean)
+      )
+    )].sort();
+  }, [layout]);
 
   const onObjectsChange = useCallback((objs) => {
     setPlacedObjects(objs);
@@ -1130,7 +1194,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setSceneReady(true);
   }, []);
 
-  const { snapView, setTransformMode, placeObject, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById } =
+  const { snapView, setTransformMode, placeObject, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, updateTransformVals } =
     useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady);
 
   const handleLayoutChange = useCallback((e) => {
@@ -1142,10 +1206,20 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     const file = e.target.files?.[0];
     if (!file) return;
     const name = file.name.replace(/\.[^/.]+$/, '');
-    placeObject(file, name, selectedLayoutId);
-    setShowObjPanel(true);
+    setPendingFile(file);
+    setPendingName(name);
+    setPickerStation('');
+    setShowStationPicker(true);
     e.target.value = '';
-  }, [placeObject, selectedLayoutId]);
+  }, []);
+
+  const handlePickerConfirm = useCallback(() => {
+    if (!pendingFile) return;
+    placeObject(pendingFile, pendingName, selectedLayoutId, pickerStation || null);
+    setShowStationPicker(false);
+    setPendingFile(null);
+    setShowObjPanel(true);
+  }, [pendingFile, pendingName, selectedLayoutId, pickerStation, placeObject]);
 
   const handleModeChange = useCallback((mode) => {
     setTransformModeState(mode);
@@ -1167,6 +1241,28 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     if (!renameVal.trim() || !selectedId) return;
     renameById(selectedId, renameVal.trim());
   }, [renameVal, renameById, selectedId]);
+
+  // Sync transform values when selected object changes
+  useEffect(() => {
+    if (!selectedId) return;
+    const sel = placedObjects.find(o => o.id === selectedId);
+    if (!sel?.mesh) return;
+    const m = sel.mesh;
+    setTransformVals({
+      rx: +(m.rotation.x * 180 / Math.PI).toFixed(1),
+      ry: +(m.rotation.y * 180 / Math.PI).toFixed(1),
+      rz: +(m.rotation.z * 180 / Math.PI).toFixed(1),
+      sx: +m.scale.x.toFixed(3),
+      sy: +m.scale.y.toFixed(3),
+      sz: +m.scale.z.toFixed(3),
+    });
+  }, [selectedId]); // eslint-disable-line
+
+  const handleTransformInput = useCallback((key, value) => {
+    setTransformVals(prev => ({ ...prev, [key]: value }));
+    const v = parseFloat(value);
+    if (!isNaN(v) && selectedId) updateTransformVals(selectedId, { [key]: v });
+  }, [selectedId, updateTransformVals]);
 
   const currentSelected = placedObjects.find(o => o.id === selectedId);
 
@@ -1251,6 +1347,46 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
               </div>
             )}
 
+            {/* Value-based rotation inputs */}
+            {currentSelected && transformMode === 'rotate' && (
+              <div className="z3d-transform-inputs">
+                <div className="z3d-transform-input-label">Rotation (degrees)</div>
+                {[['rx','X'],['ry','Y'],['rz','Z']].map(([key, axis]) => (
+                  <div key={key} className="z3d-transform-input-row">
+                    <span className="z3d-transform-axis">{axis}</span>
+                    <input
+                      type="number"
+                      className="z3d-transform-val-input"
+                      value={transformVals[key]}
+                      onChange={e => handleTransformInput(key, e.target.value)}
+                      step="1"
+                    />
+                    <span className="z3d-transform-unit">°</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Value-based scale inputs */}
+            {currentSelected && transformMode === 'scale' && (
+              <div className="z3d-transform-inputs">
+                <div className="z3d-transform-input-label">Scale</div>
+                {[['sx','X'],['sy','Y'],['sz','Z']].map(([key, axis]) => (
+                  <div key={key} className="z3d-transform-input-row">
+                    <span className="z3d-transform-axis">{axis}</span>
+                    <input
+                      type="number"
+                      className="z3d-transform-val-input"
+                      value={transformVals[key]}
+                      onChange={e => handleTransformInput(key, e.target.value)}
+                      step="0.01"
+                      min="0.001"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Rename */}
             {currentSelected && (
               <div className="z3d-rename-row">
@@ -1275,7 +1411,10 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                   onClick={() => handleSelect(obj.id)}
                 >
                   <span className="z3d-obj-icon">📦</span>
-                  <span className="z3d-obj-name">{obj.name}</span>
+                  <div className="z3d-obj-info">
+                    <span className="z3d-obj-name">{obj.name}</span>
+                    {obj.stationId && <span className="z3d-obj-station-tag">{obj.stationId}</span>}
+                  </div>
                   <button
                     className="z3d-obj-del"
                     title="Delete"
@@ -1331,6 +1470,30 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
           )}
         </div>
       </div>
+
+      {/* Station picker modal */}
+      {showStationPicker && (
+        <div className="z3d-picker-overlay">
+          <div className="z3d-picker-box">
+            <div className="z3d-picker-title">Assign Object to Station</div>
+            <div className="z3d-picker-sub">Choose a station ID to snap this object to that station's position, or place it freely.</div>
+            <select
+              className="z3d-picker-select"
+              value={pickerStation}
+              onChange={e => setPickerStation(e.target.value)}
+            >
+              <option value="">— Free placement (no station) —</option>
+              {allStationIds.map(sid => (
+                <option key={sid} value={sid}>{sid}</option>
+              ))}
+            </select>
+            <div className="z3d-picker-actions">
+              <button className="z3d-picker-cancel" onClick={() => { setShowStationPicker(false); setPendingFile(null); }}>Cancel</button>
+              <button className="z3d-picker-confirm" onClick={handlePickerConfirm}>Place Object</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {popupStation && (
         <StationDetailModal

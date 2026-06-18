@@ -706,3 +706,153 @@
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+
+/* ── Object info layout ──────────────────────────────────────────────────────── */
+.z3d-obj-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.z3d-obj-station-tag {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  color: #63b3ed;
+  background: rgba(99,179,237,0.12);
+  border: 1px solid rgba(99,179,237,0.3);
+  border-radius: 3px;
+  padding: 1px 5px;
+  margin-top: 2px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Value-based transform inputs ────────────────────────────────────────────── */
+.z3d-transform-inputs {
+  background: rgba(0,0,0,0.18);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+}
+.z3d-transform-input-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #90a4ae;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  margin-bottom: 6px;
+}
+.z3d-transform-input-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.z3d-transform-input-row:last-child { margin-bottom: 0; }
+.z3d-transform-axis {
+  width: 14px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #63b3ed;
+  flex-shrink: 0;
+}
+.z3d-transform-val-input {
+  flex: 1;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 4px;
+  color: #e2e8f0;
+  font-size: 12px;
+  padding: 3px 6px;
+  outline: none;
+  min-width: 0;
+  transition: border-color 0.15s;
+}
+.z3d-transform-val-input:focus {
+  border-color: #63b3ed;
+  background: rgba(99,179,237,0.08);
+}
+.z3d-transform-unit {
+  font-size: 11px;
+  color: #718096;
+  flex-shrink: 0;
+}
+
+/* ── Station picker modal ─────────────────────────────────────────────────────── */
+.z3d-picker-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+.z3d-picker-box {
+  background: #1e2a38;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 24px 28px;
+  width: 340px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+}
+.z3d-picker-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #e2e8f0;
+  margin-bottom: 6px;
+}
+.z3d-picker-sub {
+  font-size: 12px;
+  color: #718096;
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+.z3d-picker-select {
+  width: 100%;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 6px;
+  color: #e2e8f0;
+  font-size: 13px;
+  padding: 8px 10px;
+  outline: none;
+  margin-bottom: 18px;
+  cursor: pointer;
+}
+.z3d-picker-select:focus { border-color: #63b3ed; }
+.z3d-picker-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.z3d-picker-cancel {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 5px;
+  color: #a0aec0;
+  font-size: 12px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.z3d-picker-cancel:hover { background: rgba(255,255,255,0.06); }
+.z3d-picker-confirm {
+  background: #2b6cb0;
+  border: none;
+  border-radius: 5px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.z3d-picker-confirm:hover { background: #3182ce; }
