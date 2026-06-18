@@ -1070,7 +1070,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       stationIds.forEach((stationId, idx) => {
         const stnPos = posMap[stationId];
         if (!stnPos) {
-          console.warn('[Z3D line] no position for station', stationId);
+          console.warn('[Z3D line] no 3D position for station', stationId, '— posMap has', Object.keys(posMap).length, 'keys');
           return;
         }
 
@@ -1093,7 +1093,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       });
 
       if (newEntries.length === 0) {
-        console.warn('[Z3D line] no objects placed — station positions not found in posMap');
+        alert(`No 3D positions found for the stations in this line.\nStation IDs tried: ${stationIds.join(', ')}\nPositions available: ${Object.keys(posMap).slice(0, 10).join(', ')}…`);
         return;
       }
 
@@ -1501,6 +1501,11 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     const name = pendingFile.name.replace(/\.[^/.]+$/, '');
     if (uploadMode === 'line' && uploadLine) {
       const lineStations = stationList.filter(s => s.shop === uploadLine).map(s => s.id);
+      console.log('[Upload] line mode, line=', uploadLine, 'stations=', lineStations);
+      if (lineStations.length === 0) {
+        alert(`No stations found for line "${uploadLine}". Please check the layout.`);
+        return;
+      }
       placeObjectForLine(pendingFile, name, selectedLayoutId, lineStations);
     } else {
       const opts = uploadMode === 'station' && uploadStation ? { stationId: uploadStation } : {};
