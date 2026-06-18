@@ -1004,47 +1004,35 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     const pts = waypointIds.map(sid => posMap[sid]).filter(Boolean);
     if (pts.length < 2) return;
 
-    const firstPt = { x: pts[0].x - CELL_W / 2, z: pts[0].z };
-    const lastPt  = { x: pts[pts.length - 1].x + CELL_W / 2, z: pts[pts.length - 1].z };
-    const forward = [firstPt, ...pts.slice(1, -1), lastPt];
+    // Travel from left edge of first station to right edge of last station
+    const startPt  = { x: pts[0].x - CELL_W / 2, z: pts[0].z };
+    const endPt    = { x: pts[pts.length - 1].x + CELL_W / 2, z: pts[pts.length - 1].z };
+    const originX  = entry.mesh.position.x;
+    const originZ  = entry.mesh.position.z;
+    const durMs    = durationSec * 1000;
 
-    const originX = entry.mesh.position.x;
-    const originZ = entry.mesh.position.z;
-
-    // Return path goes back through the same waypoints, ending at original position
-    const returnPath = [...forward].reverse().slice(1).concat([{ x: originX, z: originZ }]);
-
-    // durationSec = time for the FORWARD leg; return leg gets the same time
-    const fwdSegMs  = (durationSec * 1000) / (forward.length - 1);
-    const retSegMs  = (durationSec * 1000) / returnPath.length;
-
-    // Build a flat segment list with per-segment durations
-    const segments = [];
-    for (let i = 0; i < forward.length - 1; i++) {
-      segments.push({ from: forward[i], to: forward[i + 1], durationMs: fwdSegMs });
-    }
-    for (let i = 0; i < returnPath.length; i++) {
-      const from = i === 0 ? forward[forward.length - 1] : returnPath[i - 1];
-      segments.push({ from, to: returnPath[i], durationMs: retSegMs });
-    }
+    // Two segments: forward (constant speed full route), return (same duration back to origin)
+    const segments = [
+      { fromX: startPt.x, fromZ: startPt.z, toX: endPt.x,   toZ: endPt.z,   durationMs: durMs },
+      { fromX: endPt.x,   fromZ: endPt.z,   toX: originX,    toZ: originZ,    durationMs: durMs },
+    ];
 
     let segIdx = 0;
     const runSegment = () => {
       if (segIdx >= segments.length) { onComplete && onComplete(); return; }
       const seg = segments[segIdx];
-      const newAnim = {
+      animationsRef.current = animationsRef.current.filter(a => a.id !== id);
+      animationsRef.current.push({
         id,
         mesh:       entry.mesh,
-        fromX:      seg.from.x,
-        fromZ:      seg.from.z,
-        toX:        seg.to.x,
-        toZ:        seg.to.z,
+        fromX:      seg.fromX,
+        fromZ:      seg.fromZ,
+        toX:        seg.toX,
+        toZ:        seg.toZ,
         startTime:  performance.now(),
         durationMs: seg.durationMs,
         onComplete: () => { segIdx++; runSegment(); },
-      };
-      animationsRef.current = animationsRef.current.filter(a => a.id !== id);
-      animationsRef.current.push(newAnim);
+      });
     };
     runSegment();
   }, []);
