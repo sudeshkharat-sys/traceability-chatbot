@@ -441,7 +441,13 @@ class WalkController {
 }
 
 // ── Three.js scene hook ────────────────────────────────────────────────────────
-function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, onStationClick, isActive, onSceneReady) {
+function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, onObjectsChange, onConvertStart, onConvertEnd, onStationClick, isActive, onSceneReady) {
+  // Keep latest statusMap/zeMap in refs so scene reads current values
+  // without triggering a full scene rebuild on every API response
+  const statusMapRef = useRef(statusMapProp);
+  const zeMapRef     = useRef(zeMapProp);
+  useEffect(() => { statusMapRef.current = statusMapProp; }, [statusMapProp]);
+  useEffect(() => { zeMapRef.current     = zeMapProp;     }, [zeMapProp]);
   const sceneRef       = useRef(null);
   const rendererRef    = useRef(null);
   const cameraRef      = useRef(null);
@@ -521,7 +527,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       _z3d: zMap[rowBand(b.position_y)] ?? 0,
     }));
 
-    layoutBoxes.forEach(box => buildStationShell(box, statusMap, zeMap, scene));
+    layoutBoxes.forEach(box => buildStationShell(box, statusMapRef.current, zeMapRef.current, scene));
 
     // Build station-position lookup for snap placement & animation waypoints
     const stationPosMap = {};
@@ -684,7 +690,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       placedRef.current = [];
       selectedRef.current = null;
     };
-  }, [canvasRef, layout, statusMap, zeMap]); // eslint-disable-line
+  }, [canvasRef, layout]); // eslint-disable-line — statusMap/zeMap intentionally excluded; they update via refs to avoid scene rebuilds
 
   // Walk mode toggle
   useEffect(() => {
