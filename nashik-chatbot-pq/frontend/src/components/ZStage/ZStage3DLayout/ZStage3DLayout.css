@@ -954,3 +954,16 @@
 .z3d-save-preset-btn:hover { background: rgba(104,211,145,0.22); }
 
 .z3d-picker-confirm:disabled { background: #4a5568; cursor: not-allowed; }
+
+/* ── Auto-save note ──────────────────────────────────────────────────────────── */
+.z3d-autosave-note {
+  font-size: 10px;
+  color: #68d391;
+  background: rgba(104,211,145,0.08);
+  border: 1px solid rgba(104,211,145,0.2);
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin-bottom: 8px;
+  text-align: center;
+  letter-spacing: 0.2px;
+}

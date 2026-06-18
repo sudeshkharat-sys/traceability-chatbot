@@ -452,7 +452,7 @@ class WalkController {
 }
 
 // ── Three.js scene hook ────────────────────────────────────────────────────────
-function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, onStationClick, isActive, onSceneReady, onPlaceStart, onPlaceEnd) {
+function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, onStationClick, isActive, onSceneReady, onPlaceStart, onPlaceEnd, onLibraryChange) {
   const sceneRef       = useRef(null);
   const rendererRef    = useRef(null);
   const cameraRef      = useRef(null);
@@ -644,10 +644,23 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
           templateId: mesh.userData.templateId  || null,
           stationId:  mesh.userData.stationId   || null,
           lineName:   mesh.userData.lineName    || null,
+          libKey:     mesh.userData.libKey      || null,
           px: mesh.position.x, py: mesh.position.y, pz: mesh.position.z,
           rx: mesh.rotation.x, ry: mesh.rotation.y, rz: mesh.rotation.z,
           sx: mesh.scale.x,    sy: mesh.scale.y,    sz: mesh.scale.z,
         });
+
+        // Auto-update library entry transforms (rotate/scale only)
+        if (mode !== 'translate') {
+          const lk = mesh.userData.libKey;
+          if (lk) {
+            z3dGetAllPresets().then(all => {
+              const prev = all.find(p => p.key === lk);
+              if (prev) z3dPutPreset({ ...prev, rx: mesh.rotation.x, ry: mesh.rotation.y, rz: mesh.rotation.z, sx: mesh.scale.x, sy: mesh.scale.y, sz: mesh.scale.z });
+            });
+            onLibraryChange && onLibraryChange();
+          }
+        }
       }
     });
     scene.add(tc);
@@ -672,10 +685,12 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
     layoutIdRef.current = layout.id;
 
     // Reload previously saved placed objects from IDB
-    // Template blob is stored once; each station clone references it by templateId.
-    Promise.all([z3dGetAll(layout.id), z3dGetAllTemplates(layout.id)]).then(([saved, templates]) => {
+    // Blob lives only in the library (presets store); templates reference it by libKey.
+    Promise.all([z3dGetAll(layout.id), z3dGetAllTemplates(layout.id), z3dGetAllPresets()]).then(([saved, templates, library]) => {
       const tmplMap = {};
       templates.forEach(t => { tmplMap[t.templateId] = t; });
+      const libMap = {};
+      library.forEach(l => { libMap[l.key] = l; });
 
       // Group object records by templateId (fallback: use id as group key for legacy records)
       const groups = {};
@@ -686,15 +701,19 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       });
 
       Object.entries(groups).forEach(([templateId, records]) => {
-        const tmpl      = tmplMap[templateId];
-        const firstRec  = records[0];
-        const blob      = tmpl?.fileBlob || firstRec?.fileBlob;
+        const tmpl     = tmplMap[templateId];
+        const firstRec = records[0];
+        const libKey   = tmpl?.libKey || firstRec?.libKey;
+        const libEntry = libKey ? libMap[libKey] : null;
+        // Blob: prefer library (single copy), fall back to legacy template blob
+        const blob = libEntry?.fileBlob || tmpl?.fileBlob || firstRec?.fileBlob;
         if (!blob) return;
 
         const ext = (tmpl?.ext || firstRec?.ext || 'glb').toLowerCase();
         const url = URL.createObjectURL(new Blob([blob], { type: blob.type || 'model/gltf-binary' }));
 
-        if (tmpl) blobsRef.current[`tmpl_${templateId}`] = tmpl.fileBlob;
+        if (libKey) blobsRef.current[libKey] = blob;
+        else if (tmpl) blobsRef.current[`tmpl_${templateId}`] = blob;
 
         const onBaseLoaded = (baseObj) => {
           URL.revokeObjectURL(url);
@@ -714,12 +733,14 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
             obj.userData.stationId  = record.stationId  || null;
             obj.userData.templateId = record.templateId || null;
             obj.userData.lineName   = record.lineName   || null;
+            obj.userData.libKey     = record.libKey     || libKey || null;
             scene.add(obj);
             newEntries.push({
               id: record.id, mesh: obj, label: null, name: record.name,
               stationId:  record.stationId  || null,
               lineName:   record.lineName   || null,
               templateId: record.templateId || null,
+              libKey:     record.libKey     || libKey || null,
             });
           });
           // Single React update after all clones are added
@@ -895,8 +916,10 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
         ? lineStations
         : [{ stationId: null, x: sceneCenterRef.current.x, z: sceneCenterRef.current.z }];
 
-      const templateId  = Date.now().toString();
-      const newEntries  = [];
+      const templateId = Date.now().toString();
+      // Library key — shared identity for this model across sessions
+      const libKey = `lib_${name}_${ext}`;
+      const newEntries = [];
 
       stations.forEach((station, idx) => {
         const obj = idx === 0 ? baseObj : baseObj.clone(true);
@@ -911,34 +934,49 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
         obj.userData.stationId  = station.stationId || null;
         obj.userData.templateId = templateId;
         obj.userData.lineName   = lineName || null;
+        obj.userData.libKey     = libKey;
 
         scene.add(obj);
         newEntries.push({
           id: objId, mesh: obj, label: null, name,
           stationId: station.stationId || null,
           lineName:  lineName || null,
-          templateId,
+          templateId, libKey,
         });
       });
 
       placedRef.current = [...placedRef.current, ...newEntries];
 
-      // Persist: one template record (with blob) + one lightweight record per station clone
-      if (layoutId) {
-        file.arrayBuffer().then(buf => {
-          const blob = new Blob([buf], { type: file.type || 'application/octet-stream' });
-          blobsRef.current[`tmpl_${templateId}`] = blob;
+      // Persist: blob lives in library (presets) only — templates reference libKey, no blob
+      file.arrayBuffer().then(buf => {
+        const blob = new Blob([buf], { type: file.type || 'application/octet-stream' });
+        blobsRef.current[libKey] = blob;
+
+        // Upsert library entry — if model was uploaded before, update blob but keep user transforms
+        z3dGetAllPresets().then(existing => {
+          const prev = existing.find(p => p.key === libKey);
+          z3dPutPreset({
+            key: libKey, name, ext, fileBlob: blob,
+            rx: prev?.rx ?? 0, ry: prev?.ry ?? 0, rz: prev?.rz ?? 0,
+            sx: prev?.sx ?? baseObj.scale.x,
+            sy: prev?.sy ?? baseObj.scale.y,
+            sz: prev?.sz ?? baseObj.scale.z,
+          });
+          onLibraryChange && onLibraryChange();
+        });
+
+        if (layoutId) {
+          // Template record: no blob, just libKey reference
           z3dPutTemplate({
             key: `${layoutId}_tmpl_${templateId}`,
-            layoutId, templateId, name, ext,
-            fileBlob: blob,
+            layoutId, templateId, name, ext, libKey,
             lineName: lineName || null,
           });
           newEntries.forEach(entry => {
             z3dPut({
               key: `${layoutId}_${entry.id}`,
               layoutId, id: entry.id, name, ext,
-              templateId,
+              templateId, libKey,
               stationId: entry.stationId || null,
               lineName:  entry.lineName  || null,
               px: entry.mesh.position.x, py: entry.mesh.position.y, pz: entry.mesh.position.z,
@@ -946,8 +984,8 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
               sx: entry.mesh.scale.x, sy: entry.mesh.scale.y, sz: entry.mesh.scale.z,
             });
           });
-        }).catch(() => {});
-      }
+        }
+      }).catch(() => {});
 
       // Select first clone
       const first = newEntries[0];
@@ -1140,6 +1178,7 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
           templateId: mesh.userData.templateId  || null,
           stationId:  mesh.userData.stationId   || null,
           lineName:   mesh.userData.lineName    || null,
+          libKey:     mesh.userData.libKey      || null,
           px: mesh.position.x, py: mesh.position.y, pz: mesh.position.z,
           rx: mesh.rotation.x, ry: mesh.rotation.y, rz: mesh.rotation.z,
           sx: mesh.scale.x, sy: mesh.scale.y, sz: mesh.scale.z,
@@ -1147,8 +1186,18 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       };
       saveEntry(entry);
       siblings.forEach(saveEntry);
+
+      // Auto-update library entry with new transforms
+      const lk = entry.mesh.userData.libKey;
+      if (lk) {
+        z3dGetAllPresets().then(all => {
+          const prev = all.find(p => p.key === lk);
+          if (prev) z3dPutPreset({ ...prev, rx: entry.mesh.rotation.x, ry: entry.mesh.rotation.y, rz: entry.mesh.rotation.z, sx: entry.mesh.scale.x, sy: entry.mesh.scale.y, sz: entry.mesh.scale.z });
+        });
+        onLibraryChange && onLibraryChange();
+      }
     }
-  }, []);
+  }, []); // eslint-disable-line
 
   // Save current selected object (scale + rotation + blob) as a named preset
   const saveAsPreset = useCallback((id, presetName) => {
@@ -1215,16 +1264,17 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
         obj.userData.lineName   = lineName || null;
         obj.userData.stationId  = station.stationId || null;
 
-        scene.add(obj);
         const objId = `${templateId}_${idx}`;
         obj.userData.objId   = objId;
         obj.userData.objName = preset.name;
+        obj.userData.libKey  = preset.key;
+        scene.add(obj);
 
         const entry = {
           id: objId, mesh: obj, label: null, name: preset.name,
           stationId: station.stationId || null,
           lineName:  lineName || null,
-          templateId,
+          templateId, libKey: preset.key,
         };
         newEntries.push(entry);
       });
@@ -1233,15 +1283,17 @@ function useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsC
       onObjectsChange([...placedRef.current]);
 
       if (layoutId) {
+        // Template references library key — blob already in library, no duplication
         z3dPutTemplate({
           key: `${layoutId}_tmpl_${templateId}`, layoutId, templateId,
-          name: preset.name, ext, fileBlob: blob, lineName: lineName || null,
+          name: preset.name, ext, libKey: preset.key, lineName: lineName || null,
         });
         newEntries.forEach(entry => {
           const m = entry.mesh;
           z3dPut({
             key: `${layoutId}_${entry.id}`, layoutId, id: entry.id, name: entry.name, ext,
-            templateId, stationId: entry.stationId || null, lineName: entry.lineName || null,
+            templateId, libKey: preset.key,
+            stationId: entry.stationId || null, lineName: entry.lineName || null,
             px: m.position.x, py: m.position.y, pz: m.position.z,
             rx: m.rotation.x, ry: m.rotation.y, rz: m.rotation.z,
             sx: m.scale.x,    sy: m.scale.y,    sz: m.scale.z,
@@ -1566,11 +1618,17 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const onPlaceStart = useCallback(() => setPlacingObject(true),  []);
   const onPlaceEnd   = useCallback(() => setPlacingObject(false), []);
 
-  const { snapView, setTransformMode, placeObject, placeFromPreset, saveAsPreset, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, deleteGroupByTemplateKey, renameById, updateTransformVals } =
-    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady, onPlaceStart, onPlaceEnd);
+  const onLibraryChange = useCallback(() => {
+    z3dGetAllPresets().then(all => setPresets(all.map(p => ({ ...p, fileBlob: undefined }))));
+  }, []);
 
-  // Load presets from IDB on mount
-  useEffect(() => { z3dGetAllPresets().then(setPresets); }, []);
+  const { snapView, setTransformMode, placeObject, placeFromPreset, saveAsPreset, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, deleteGroupByTemplateKey, renameById, updateTransformVals } =
+    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady, onPlaceStart, onPlaceEnd, onLibraryChange);
+
+  // Load library from IDB on mount (strip blob from state — blobs live in IDB only)
+  useEffect(() => {
+    z3dGetAllPresets().then(all => setPresets(all.map(p => ({ ...p, fileBlob: undefined }))));
+  }, []);
 
   const handleLayoutChange = useCallback((e) => {
     setSelectedLayoutId(Number(e.target.value) || null);
@@ -1723,9 +1781,9 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
               📦 Objects {placedObjects.length > 0 && `(${placedObjects.length})`}
             </button>
 
-            {/* Presets panel toggle */}
+            {/* Library panel toggle */}
             <button className={`z3d-walk-btn${showPresetPanel ? ' z3d-walk-btn--active' : ''}`} onClick={() => setShowPresetPanel(v => !v)}>
-              🗂 Presets {presets.length > 0 && `(${presets.length})`}
+              🗂 Library {presets.length > 0 && `(${presets.length})`}
             </button>
 
             {/* Walk mode */}
@@ -1830,15 +1888,9 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
               </div>
             )}
 
-            {/* Save as Preset */}
-            {currentSelected && (
-              <button
-                className="z3d-save-preset-btn"
-                title="Save current scale & rotation as a reusable preset"
-                onClick={() => { setPresetSaveName(currentSelected.name); setShowSavePreset(true); }}
-              >
-                💾 Save as Preset
-              </button>
+            {/* Auto-save note */}
+            {currentSelected && currentSelected.libKey && (
+              <div className="z3d-autosave-note">✓ Scale &amp; rotation auto-saved to library</div>
             )}
 
             {/* Object list — one row per model+line group */}
@@ -1878,11 +1930,11 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
         {/* ── Presets panel (right sidebar) ── */}
         {showPresetPanel && layout && (
           <div className="z3d-preset-panel">
-            <div className="z3d-obj-panel-title">Model Presets</div>
-            <div className="z3d-preset-hint">Saved models with their scale & rotation. Click Place to add to scene.</div>
+            <div className="z3d-obj-panel-title">Model Library</div>
+            <div className="z3d-preset-hint">Models auto-saved on upload. Adjust scale/rotation → it updates here. Click Place to reuse on any line.</div>
             <div className="z3d-obj-list">
               {presets.length === 0 && (
-                <div className="z3d-obj-empty">No presets saved yet.<br/>Select an object and click "Save as Preset".</div>
+                <div className="z3d-obj-empty">Upload a model to add it to the library.</div>
               )}
               {presets.map(preset => (
                 <div key={preset.key} className="z3d-preset-item">
