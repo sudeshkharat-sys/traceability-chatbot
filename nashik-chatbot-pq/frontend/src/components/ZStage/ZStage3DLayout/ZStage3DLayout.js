@@ -684,7 +684,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         };
 
         try {
-          if (ext === 'glb' || ext === 'gltf') makeGLTFLoader().load(url, g => onTemplate(g.scene));
+          if (ext === 'glb' || ext === 'gltf') makeGLTFLoader().load(url, g => onTemplate(g.scene), undefined, (err) => console.error('[Z3D] GLB reload failed:', err));
           else if (ext === 'obj') new OBJLoader().load(url, onTemplate);
           else if (ext === 'stl') new STLLoader().load(url, geo => {
             geo.computeVertexNormals();
@@ -908,7 +908,10 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     };
 
     if (ext === 'glb' || ext === 'gltf') {
-      makeGLTFLoader().load(url, (gltf) => onLoaded(gltf.scene));
+      makeGLTFLoader().load(url, (gltf) => onLoaded(gltf.scene), undefined, (err) => {
+        console.error('[Z3D] GLB upload failed:', err);
+        alert('Failed to load GLB: ' + (err?.message || err));
+      });
     } else if (ext === 'obj') {
       new OBJLoader().load(url, onLoaded);
     } else if (ext === 'wrl') {
@@ -1164,7 +1167,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     };
 
     if (ext === 'glb' || ext === 'gltf') {
-      makeGLTFLoader().load(url, (gltf) => onTemplateLoaded(gltf.scene));
+      makeGLTFLoader().load(url, (gltf) => onTemplateLoaded(gltf.scene), undefined, (err) => console.error('[Z3D] GLB line-load failed:', err));
     } else if (ext === 'obj') {
       new OBJLoader().load(url, onTemplateLoaded);
     } else if (ext === 'stl') {
