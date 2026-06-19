@@ -18,6 +18,7 @@ import './ZStage3DLayout.css';
 function makeGLTFLoader() {
   const draco = new DRACOLoader();
   draco.setDecoderPath('/draco/');
+  draco.setDecoderConfig({ type: 'js' });
   const loader = new GLTFLoader();
   loader.setDRACOLoader(draco);
   return loader;
