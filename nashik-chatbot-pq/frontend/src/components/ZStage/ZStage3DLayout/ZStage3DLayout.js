@@ -597,32 +597,43 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     // TransformControls
     const tc = new TransformControls(camera, renderer.domElement);
 
-    // While dragging: sync position/rotation/scale to all group members in real time
-    let prevPos = null;
+    // Absolute-delta approach: record leader start pos + each member start pos at drag begin.
+    // During drag, apply (leaderCurrent - leaderStart) to each member's start pos.
+    // More reliable than incremental deltas which can drift or miss the first frame.
+    let leaderDragStart = null;
+    const memberDragStarts = new Map(); // id → Vector3
+
     tc.addEventListener('objectChange', () => {
       const sel = selectedRef.current;
-      if (!sel?.lineGroupId) return;
+      if (!sel?.lineGroupId || !leaderDragStart) return;
       const leader = sel.mesh;
-      const members = placedRef.current.filter(p => p.lineGroupId === sel.lineGroupId && p.id !== sel.id);
-      const dx = leader.position.x - (prevPos?.x ?? leader.position.x);
-      const dz = leader.position.z - (prevPos?.z ?? leader.position.z);
-      members.forEach(m => {
-        m.mesh.position.x += dx;
-        m.mesh.position.z += dz;
-        m.mesh.rotation.copy(leader.rotation);
-        m.mesh.scale.copy(leader.scale);
-      });
-      prevPos = leader.position.clone();
+      const dx = leader.position.x - leaderDragStart.x;
+      const dy = leader.position.y - leaderDragStart.y;
+      const dz = leader.position.z - leaderDragStart.z;
+      placedRef.current
+        .filter(p => p.lineGroupId === sel.lineGroupId && p.id !== sel.id)
+        .forEach(m => {
+          const start = memberDragStarts.get(m.id);
+          if (start) m.mesh.position.set(start.x + dx, start.y + dy, start.z + dz);
+          m.mesh.rotation.copy(leader.rotation);
+          m.mesh.scale.copy(leader.scale);
+        });
+      dirtyRef.current = true;
     });
 
     tc.addEventListener('dragging-changed', (e) => {
       orbit.enabled = !e.value;
-      if (e.value) {
-        // drag started — capture initial position
-        prevPos = selectedRef.current?.mesh.position.clone() ?? null;
-      } else {
-        // drag finished — persist all group members to IDB
-        prevPos = null;
+      if (e.value && selectedRef.current?.lineGroupId) {
+        // Drag started — snapshot positions of leader and all group members
+        leaderDragStart = selectedRef.current.mesh.position.clone();
+        memberDragStarts.clear();
+        placedRef.current
+          .filter(p => p.lineGroupId === selectedRef.current.lineGroupId && p.id !== selectedRef.current.id)
+          .forEach(m => memberDragStarts.set(m.id, m.mesh.position.clone()));
+      } else if (!e.value) {
+        leaderDragStart = null;
+        memberDragStarts.clear();
+        // Drag finished — persist all group members to IDB
         if (selectedRef.current && layoutIdRef.current) {
           const sel = selectedRef.current;
           const targets = sel.lineGroupId
@@ -951,11 +962,16 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     };
 
     if (ext === 'glb' || ext === 'gltf') {
-      makeGLTFLoader().load(url, (gltf) => onLoaded(gltf.scene), undefined, (err) => {
-        onConvertEnd && onConvertEnd();
-        console.error('[Z3D] GLB upload failed:', err);
-        alert('Failed to load GLB: ' + (err?.message || err));
-      });
+      makeGLTFLoader().load(
+        url,
+        (gltf) => onLoaded(gltf.scene),
+        (xhr) => { if (xhr.total) onConvertStart && onConvertStart(Math.round(xhr.loaded / xhr.total * 90)); },
+        (err) => {
+          onConvertEnd && onConvertEnd();
+          console.error('[Z3D] GLB upload failed:', err);
+          alert('Failed to load GLB: ' + (err?.message || err));
+        }
+      );
     } else if (ext === 'obj') {
       new OBJLoader().load(url, onLoaded);
     } else if (ext === 'wrl') {
@@ -1972,6 +1988,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                       type="number" min="0" max="360"
                       value={val}
                       className="z3d-rot-input"
+                      onFocus={e => e.target.select()}
                       onChange={e => {
                         const v = Math.max(0, Math.min(360, parseInt(e.target.value, 10) || 0));
                         setter(v);
