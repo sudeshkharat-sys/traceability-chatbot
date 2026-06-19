@@ -6,6 +6,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { VRMLLoader } from 'three/examples/jsm/loaders/VRMLLoader';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
+import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils';
 import { RefreshCw } from 'lucide-react';
 import { layoutApi, inputApi } from '../../../services/api/layoutApi';
 import { layeredAuditApi } from '../../../services/api/layoutApi';
@@ -614,41 +615,61 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     // Track current layoutId for IDB saves inside event handlers
     layoutIdRef.current = layout.id;
 
-    // Reload previously saved placed objects from IDB
+    // Reload previously saved placed objects from IDB.
+    // Group records by lineGroupId (or individual id) so each unique GLB blob
+    // is parsed only ONCE, then shallow-cloned for every station — avoids
+    // parsing a 70 MB file N times for a line-placement group.
     z3dGetAll(layout.id).then(saved => {
+      // Build groups: lineGroupId -> [record, ...] or individual records
+      const groups = new Map();
       saved.forEach(record => {
-        const blob = record.fileBlob;
-        if (!blob) return;
-        blobCacheRef.current[record.id] = blob;
-        const file = new File([blob], `${record.name}.${record.ext || 'glb'}`, { type: blob.type || 'model/gltf-binary' });
-        const url  = URL.createObjectURL(file);
-        const ext  = record.ext || 'glb';
+        const gKey = record.lineGroupId || record.id;
+        if (!groups.has(gKey)) groups.set(gKey, []);
+        groups.get(gKey).push(record);
+      });
 
-        const onRestored = (obj) => {
-          URL.revokeObjectURL(url);
+      groups.forEach(records => {
+        const first = records[0];
+        const blob  = first.fileBlob;
+        if (!blob) return;
+        const ext = first.ext || 'glb';
+        const url = URL.createObjectURL(blob);
+
+        const applyRecord = (template, record) => {
+          // Clone for every record after the first so geometry buffers are shared
+          const obj = record === first ? template : skeletonClone(template);
           obj.traverse(child => {
             if (child.isSprite || (child.material && child.material.map === null && child.isLine)) child.visible = false;
           });
-          // Restore saved transform
           obj.position.set(record.px ?? 0, record.py ?? 0, record.pz ?? 0);
           obj.rotation.set(record.rx ?? 0, record.ry ?? 0, record.rz ?? 0);
           obj.scale.set(record.sx ?? 1,    record.sy ?? 1,    record.sz ?? 1);
-          obj.userData.isPlaced = true;
-          obj.userData.objId    = record.id;
-          obj.userData.objName  = record.name;
-          obj.userData.objExt   = ext;
+          obj.userData.isPlaced   = true;
+          obj.userData.objId      = record.id;
+          obj.userData.objName    = record.name;
+          obj.userData.objExt     = ext;
+          blobCacheRef.current[record.id] = blob;
           scene.add(obj);
-          const entry = { id: record.id, mesh: obj, label: null, name: record.name };
+          const entry = {
+            id: record.id, mesh: obj, label: null, name: record.name,
+            stationId: record.stationId || null,
+            lineGroupId: record.lineGroupId || null,
+          };
           placedRef.current = [...placedRef.current, entry];
           onObjectsChange([...placedRef.current]);
         };
 
+        const onTemplate = (template) => {
+          URL.revokeObjectURL(url);
+          records.forEach(record => applyRecord(template, record));
+        };
+
         try {
-          if (ext === 'glb' || ext === 'gltf') new GLTFLoader().load(url, g => onRestored(g.scene));
-          else if (ext === 'obj') new OBJLoader().load(url, onRestored);
+          if (ext === 'glb' || ext === 'gltf') new GLTFLoader().load(url, g => onTemplate(g.scene));
+          else if (ext === 'obj') new OBJLoader().load(url, onTemplate);
           else if (ext === 'stl') new STLLoader().load(url, geo => {
             geo.computeVertexNormals();
-            onRestored(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x90a4ae })));
+            onTemplate(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x90a4ae })));
           });
         } catch {}
       });
@@ -1071,8 +1092,9 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         const stnPos = posMap[stationId];
         if (!stnPos) return; // station not in this scene yet
 
-        // Deep-clone for every station (idx 0 reuses template directly)
-        const obj = idx === 0 ? template : template.clone(true);
+        // Clone for every station — skeletonClone shares geometry/material buffers
+        // so GPU memory stays ~1× instead of N× for a 70 MB model
+        const obj = idx === 0 ? template : skeletonClone(template);
 
         obj.position.set(stnPos.x, floorY, stnPos.z);
         obj.userData.baseScale        = autoScale;
@@ -1186,14 +1208,19 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     }
   }, []);
 
-  // Label follows mesh position
+  // Label follows mesh position — reuse cached height offset to avoid
+  // expensive Box3.setFromObject() calls every 50 ms per object
   useEffect(() => {
+    const labelHeightCache = new Map();
     const tid = setInterval(() => {
       placedRef.current.forEach(({ mesh, label }) => {
-        if (mesh && label) {
+        if (!mesh || !label) return;
+        if (!labelHeightCache.has(mesh.uuid)) {
           const box = new THREE.Box3().setFromObject(mesh);
-          label.position.set(mesh.position.x, box.max.y + 0.6, mesh.position.z);
+          labelHeightCache.set(mesh.uuid, box.max.y + 0.6);
         }
+        const labelY = labelHeightCache.get(mesh.uuid);
+        label.position.set(mesh.position.x, labelY, mesh.position.z);
       });
     }, 50);
     return () => clearInterval(tid);
