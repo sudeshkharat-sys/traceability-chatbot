@@ -15,12 +15,16 @@ import '../ZStageDashboard/ZStageDashboard.css';
 import { backend_url } from '../../../services/api/config';
 import './ZStage3DLayout.css';
 
+// Single shared DRACOLoader — decoder is downloaded and initialised once,
+// then reused for every upload. Saves 1-3 s per upload vs creating a new one each time.
+const _sharedDraco = new DRACOLoader();
+_sharedDraco.setDecoderPath('/draco/');
+_sharedDraco.setDecoderConfig({ type: 'js' });
+_sharedDraco.preload(); // start downloading decoder immediately on page load
+
 function makeGLTFLoader() {
-  const draco = new DRACOLoader();
-  draco.setDecoderPath('/draco/');
-  draco.setDecoderConfig({ type: 'js' });
   const loader = new GLTFLoader();
-  loader.setDRACOLoader(draco);
+  loader.setDRACOLoader(_sharedDraco);
   return loader;
 }
 
