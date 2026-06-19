@@ -993,16 +993,22 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     onObjectsChange([...placedRef.current]);
   }, [onObjectsChange]);
 
-  // Delete object by id
+  // Delete object by id — if the object belongs to a line group, deletes all group members
   const deleteById = useCallback((id) => {
     const scene = sceneRef.current;
     const entry = placedRef.current.find(p => p.id === id);
     if (!entry || !scene) return;
-    if (transformRef.current && selectedRef.current?.id === id) transformRef.current.detach();
-    scene.remove(entry.mesh);
-    if (entry.label) scene.remove(entry.label);
-    placedRef.current = placedRef.current.filter(p => p.id !== id);
-    if (selectedRef.current?.id === id) selectedRef.current = null;
+    const targets = entry.lineGroupId
+      ? placedRef.current.filter(p => p.lineGroupId === entry.lineGroupId)
+      : [entry];
+    targets.forEach(t => {
+      if (transformRef.current && selectedRef.current?.id === t.id) transformRef.current.detach();
+      scene.remove(t.mesh);
+      if (t.label) scene.remove(t.label);
+      if (selectedRef.current?.id === t.id) selectedRef.current = null;
+    });
+    const deleteIds = new Set(targets.map(t => t.id));
+    placedRef.current = placedRef.current.filter(p => !deleteIds.has(p.id));
     if (layoutIdRef.current) z3dDel(`${layoutIdRef.current}_${id}`);
     onObjectsChange([...placedRef.current]);
   }, [onObjectsChange]);
@@ -1587,9 +1593,14 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   }, [placedObjects, selectById]);
 
   const handleDelete = useCallback((id) => {
+    // deleteById removes entire group — clear selection if any group member was selected
+    const obj = placedObjects.find(o => o.id === id);
+    const groupIds = obj?.lineGroupId
+      ? placedObjects.filter(o => o.lineGroupId === obj.lineGroupId).map(o => o.id)
+      : [id];
     deleteById(id);
-    if (selectedId === id) setSelectedId(null);
-  }, [deleteById, selectedId]);
+    if (groupIds.includes(selectedId)) setSelectedId(null);
+  }, [deleteById, selectedId, placedObjects]);
 
   const handleRename = useCallback(() => {
     if (!renameVal.trim() || !selectedId) return;
@@ -1932,27 +1943,42 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
               </div>
             )}
 
-            {/* Object list */}
+            {/* Object list — line groups collapsed into one row */}
             <div className="z3d-obj-list">
               {placedObjects.length === 0 && <div className="z3d-obj-empty">No objects placed yet</div>}
-              {placedObjects.map(obj => (
-                <div
-                  key={obj.id}
-                  className={`z3d-obj-item${selectedId === obj.id ? ' z3d-obj-item--active' : ''}`}
-                  onClick={() => handleSelect(obj.id)}
-                >
-                  <span className="z3d-obj-icon">{obj.lineGroupId ? '🔗' : '📦'}</span>
-                  <span className="z3d-obj-name">
-                    {obj.name}
-                    {obj.stationId && <span className="z3d-obj-station-tag">{obj.stationId}</span>}
-                  </span>
-                  <button type="button"
-                    className="z3d-obj-del"
-                    title="Delete"
-                    onClick={e => { e.stopPropagation(); handleDelete(obj.id); }}
-                  >✕</button>
-                </div>
-              ))}
+              {(() => {
+                const seen = new Set();
+                return placedObjects.map(obj => {
+                  const key = obj.lineGroupId || obj.id;
+                  if (seen.has(key)) return null;
+                  seen.add(key);
+                  const groupMembers = obj.lineGroupId
+                    ? placedObjects.filter(o => o.lineGroupId === obj.lineGroupId)
+                    : [obj];
+                  const isGroupSelected = groupMembers.some(o => o.id === selectedId);
+                  return (
+                    <div
+                      key={key}
+                      className={`z3d-obj-item${isGroupSelected ? ' z3d-obj-item--active' : ''}`}
+                      onClick={() => handleSelect(obj.id)}
+                    >
+                      <span className="z3d-obj-icon">{obj.lineGroupId ? '🔗' : '📦'}</span>
+                      <span className="z3d-obj-name">
+                        {obj.name}
+                        {obj.lineGroupId
+                          ? <span className="z3d-obj-station-tag">{groupMembers.length} stations</span>
+                          : obj.stationId && <span className="z3d-obj-station-tag">{obj.stationId}</span>
+                        }
+                      </span>
+                      <button type="button"
+                        className="z3d-obj-del"
+                        title={obj.lineGroupId ? 'Delete all in line' : 'Delete'}
+                        onClick={e => { e.stopPropagation(); handleDelete(obj.id); }}
+                      >✕</button>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           </div>
         )}
