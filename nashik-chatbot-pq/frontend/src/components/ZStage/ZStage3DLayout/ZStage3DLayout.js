@@ -483,14 +483,16 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
   const stationPosRef  = useRef({});     // stationId → { x, z, shopName }
   const animationsRef  = useRef([]);     // active tweens
   const blobCacheRef   = useRef({});     // objId → Blob — keeps file data alive across IDB updates
+  const dirtyRef       = useRef(true);   // render dirty flag — set true whenever scene changes
   useEffect(() => { walkModeRef.current = walkMode; }, [walkMode]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !layout) return;
 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    // Cap pixel ratio at 1.5 — full devicePixelRatio (2-3×) multiplies GPU work by 4-9× for no visible benefit
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     // Guard against 0×0 when tab is hidden — ResizeObserver will correct once visible
     renderer.setSize(Math.max(1, canvas.clientWidth), Math.max(1, canvas.clientHeight));
     renderer.setClearColor(0xf0f2f5);
@@ -697,7 +699,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           obj.userData.objName    = record.name;
           obj.userData.objExt     = ext;
           blobCacheRef.current[record.id] = blob;
-          scene.add(obj);
+          scene.add(obj); dirtyRef.current = true;
           const entry = {
             id: record.id, mesh: obj, label: null, name: record.name,
             stationId: record.stationId || null,
@@ -726,27 +728,37 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     // Signal that the scene is built and ready to display
     onSceneReady && onSceneReady();
 
+    // Only re-render when something changes — saves GPU when user is idle
+    dirtyRef.current = true;
+    orbit.addEventListener('change', () => { dirtyRef.current = true; });
+    tc.addEventListener('change',    () => { dirtyRef.current = true; });
+
     const animate = () => {
       rafRef.current = requestAnimationFrame(animate);
       try {
-        if (walkModeRef.current) { walk.update(); orbit.enabled = false; }
+        if (walkModeRef.current) { walk.update(); dirtyRef.current = true; orbit.enabled = false; }
         else { if (!tc.dragging) orbit.enabled = true; orbit.update(); }
 
-        // Process active tweens — collect completions first, then fire callbacks
-        // so that runSegment's push() isn't overwritten by the filter assignment
+        // Process active tweens
         const now = performance.now();
         const done = [];
-        animationsRef.current = animationsRef.current.filter(anim => {
-          const raw  = Math.min((now - anim.startTime) / anim.durationMs, 1);
-          const ease = raw < 0.5 ? 2 * raw * raw : -1 + (4 - 2 * raw) * raw;
-          anim.mesh.position.x = anim.fromX + (anim.toX - anim.fromX) * ease;
-          anim.mesh.position.z = anim.fromZ + (anim.toZ - anim.fromZ) * ease;
-          if (raw >= 1) { done.push(anim); return false; }
-          return true;
-        });
+        if (animationsRef.current.length > 0) {
+          dirtyRef.current = true;
+          animationsRef.current = animationsRef.current.filter(anim => {
+            const raw  = Math.min((now - anim.startTime) / anim.durationMs, 1);
+            const ease = raw < 0.5 ? 2 * raw * raw : -1 + (4 - 2 * raw) * raw;
+            anim.mesh.position.x = anim.fromX + (anim.toX - anim.fromX) * ease;
+            anim.mesh.position.z = anim.fromZ + (anim.toZ - anim.fromZ) * ease;
+            if (raw >= 1) { done.push(anim); return false; }
+            return true;
+          });
+        }
         done.forEach(anim => anim.onComplete && anim.onComplete());
 
-        renderer.render(scene, camera);
+        if (dirtyRef.current) {
+          renderer.render(scene, camera);
+          dirtyRef.current = false;
+        }
       } catch (err) {
         console.error('[Z3D animate error]', err);
       }
@@ -907,7 +919,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       obj.userData.objExt         = ext;
       obj.userData.assignedStation = options.stationId || null;
 
-      scene.add(obj);
+      scene.add(obj); dirtyRef.current = true;
 
       const entry = { id: objId, mesh: obj, label: null, name, stationId: options.stationId || null };
       placedRef.current = [...placedRef.current, entry];
@@ -1168,7 +1180,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         obj.userData.assignedStation  = stationId;
         obj.userData.lineGroupId      = groupId;
 
-        scene.add(obj);
+        scene.add(obj); dirtyRef.current = true;
         newEntries.push({
           id: obj.userData.objId, mesh: obj,
           label: null, name, stationId, lineGroupId: groupId,
