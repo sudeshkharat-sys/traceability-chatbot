@@ -594,22 +594,52 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
 
     // TransformControls
     const tc = new TransformControls(camera, renderer.domElement);
+
+    // While dragging: sync position/rotation/scale to all group members in real time
+    let prevPos = null;
+    tc.addEventListener('objectChange', () => {
+      const sel = selectedRef.current;
+      if (!sel?.lineGroupId) return;
+      const leader = sel.mesh;
+      const members = placedRef.current.filter(p => p.lineGroupId === sel.lineGroupId && p.id !== sel.id);
+      const dx = leader.position.x - (prevPos?.x ?? leader.position.x);
+      const dz = leader.position.z - (prevPos?.z ?? leader.position.z);
+      members.forEach(m => {
+        m.mesh.position.x += dx;
+        m.mesh.position.z += dz;
+        m.mesh.rotation.copy(leader.rotation);
+        m.mesh.scale.copy(leader.scale);
+      });
+      prevPos = leader.position.clone();
+    });
+
     tc.addEventListener('dragging-changed', (e) => {
       orbit.enabled = !e.value;
-      // Drag finished — persist updated transform to IDB (include blob so object survives reload)
-      if (!e.value && selectedRef.current && layoutIdRef.current) {
-        const { mesh, id, name, lineGroupId } = selectedRef.current;
-        z3dPut({
-          key: `${layoutIdRef.current}_${id}`,
-          layoutId: layoutIdRef.current,
-          id, name,
-          ext: mesh.userData.objExt || 'glb',
-          fileBlob: blobCacheRef.current[id] || undefined,
-          lineGroupId: lineGroupId || null,
-          px: mesh.position.x, py: mesh.position.y, pz: mesh.position.z,
-          rx: mesh.rotation.x, ry: mesh.rotation.y, rz: mesh.rotation.z,
-          sx: mesh.scale.x,    sy: mesh.scale.y,    sz: mesh.scale.z,
-        });
+      if (e.value) {
+        // drag started — capture initial position
+        prevPos = selectedRef.current?.mesh.position.clone() ?? null;
+      } else {
+        // drag finished — persist all group members to IDB
+        prevPos = null;
+        if (selectedRef.current && layoutIdRef.current) {
+          const sel = selectedRef.current;
+          const targets = sel.lineGroupId
+            ? placedRef.current.filter(p => p.lineGroupId === sel.lineGroupId)
+            : [sel];
+          targets.forEach(({ mesh, id, name, lineGroupId }) => {
+            z3dPut({
+              key: `${layoutIdRef.current}_${id}`,
+              layoutId: layoutIdRef.current,
+              id, name,
+              ext: mesh.userData.objExt || 'glb',
+              fileBlob: blobCacheRef.current[id] || undefined,
+              lineGroupId: lineGroupId || null,
+              px: mesh.position.x, py: mesh.position.y, pz: mesh.position.z,
+              rx: mesh.rotation.x, ry: mesh.rotation.y, rz: mesh.rotation.z,
+              sx: mesh.scale.x,    sy: mesh.scale.y,    sz: mesh.scale.z,
+            });
+          });
+        }
       }
     });
     scene.add(tc);
@@ -830,8 +860,10 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     }
 
     const url  = URL.createObjectURL(file);
+    onConvertStart && onConvertStart(10); // show loading overlay while GLB is being parsed
 
     const onLoaded = (obj) => {
+      onConvertEnd && onConvertEnd();
       URL.revokeObjectURL(url);
 
       // Strip any existing text/label children from the loaded model
@@ -908,6 +940,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
 
     if (ext === 'glb' || ext === 'gltf') {
       makeGLTFLoader().load(url, (gltf) => onLoaded(gltf.scene), undefined, (err) => {
+        onConvertEnd && onConvertEnd();
         console.error('[Z3D] GLB upload failed:', err);
         alert('Failed to load GLB: ' + (err?.message || err));
       });
@@ -1094,7 +1127,10 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     const groupId = `line_${Date.now()}`;
     const url  = URL.createObjectURL(file);
 
+    onConvertStart && onConvertStart(10); // show loading overlay while parsing GLB
+
     const onTemplateLoaded = (template) => {
+      onConvertEnd && onConvertEnd();
       URL.revokeObjectURL(url);
 
       // Measure auto-scale from a clean template at origin
