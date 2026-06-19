@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 import { VRMLLoader } from 'three/examples/jsm/loaders/VRMLLoader';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
@@ -13,6 +14,16 @@ import { StationDetailModal, MONTHLY_KEYS } from '../ZStageDashboard/ZStageDashb
 import '../ZStageDashboard/ZStageDashboard.css';
 import { backend_url } from '../../../services/api/config';
 import './ZStage3DLayout.css';
+
+// GLTFLoader pre-wired with DRACOLoader so Blender-compressed GLB files load correctly.
+// Draco decoder WASM is served from the Three.js CDN (no local copy needed).
+function makeGLTFLoader() {
+  const draco = new DRACOLoader();
+  draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+  const loader = new GLTFLoader();
+  loader.setDRACOLoader(draco);
+  return loader;
+}
 
 // Clone a Three.js object sharing geometry + material buffers (no deep copy).
 // Avoids the N×fileSize GPU cost of clone(true) for line-placement groups.
@@ -673,7 +684,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         };
 
         try {
-          if (ext === 'glb' || ext === 'gltf') new GLTFLoader().load(url, g => onTemplate(g.scene));
+          if (ext === 'glb' || ext === 'gltf') makeGLTFLoader().load(url, g => onTemplate(g.scene));
           else if (ext === 'obj') new OBJLoader().load(url, onTemplate);
           else if (ext === 'stl') new STLLoader().load(url, geo => {
             geo.computeVertexNormals();
@@ -897,7 +908,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     };
 
     if (ext === 'glb' || ext === 'gltf') {
-      new GLTFLoader().load(url, (gltf) => onLoaded(gltf.scene));
+      makeGLTFLoader().load(url, (gltf) => onLoaded(gltf.scene));
     } else if (ext === 'obj') {
       new OBJLoader().load(url, onLoaded);
     } else if (ext === 'wrl') {
@@ -1153,7 +1164,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     };
 
     if (ext === 'glb' || ext === 'gltf') {
-      new GLTFLoader().load(url, (gltf) => onTemplateLoaded(gltf.scene));
+      makeGLTFLoader().load(url, (gltf) => onTemplateLoaded(gltf.scene));
     } else if (ext === 'obj') {
       new OBJLoader().load(url, onTemplateLoaded);
     } else if (ext === 'stl') {
