@@ -6,7 +6,6 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { VRMLLoader } from 'three/examples/jsm/loaders/VRMLLoader';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
-import { clone as skeletonClone } from 'three/examples/jsm/utils/SkeletonUtils';
 import { RefreshCw } from 'lucide-react';
 import { layoutApi, inputApi } from '../../../services/api/layoutApi';
 import { layeredAuditApi } from '../../../services/api/layoutApi';
@@ -14,6 +13,15 @@ import { StationDetailModal, MONTHLY_KEYS } from '../ZStageDashboard/ZStageDashb
 import '../ZStageDashboard/ZStageDashboard.css';
 import { backend_url } from '../../../services/api/config';
 import './ZStage3DLayout.css';
+
+// Clone a Three.js object sharing geometry + material buffers (no deep copy).
+// Avoids the N×fileSize GPU cost of clone(true) for line-placement groups.
+function sharedClone(src) {
+  const dst = src.clone(false); // shallow — does NOT copy geometry/material
+  dst.copy(src, false);
+  src.children.forEach(child => dst.add(sharedClone(child)));
+  return dst;
+}
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const SCALE      = 0.04;
@@ -637,7 +645,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
 
         const applyRecord = (template, record) => {
           // Clone for every record after the first so geometry buffers are shared
-          const obj = record === first ? template : skeletonClone(template);
+          const obj = record === first ? template : sharedClone(template);
           obj.traverse(child => {
             if (child.isSprite || (child.material && child.material.map === null && child.isLine)) child.visible = false;
           });
@@ -1092,9 +1100,9 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         const stnPos = posMap[stationId];
         if (!stnPos) return; // station not in this scene yet
 
-        // Clone for every station — skeletonClone shares geometry/material buffers
+        // Clone for every station — sharedClone shares geometry/material buffers
         // so GPU memory stays ~1× instead of N× for a 70 MB model
-        const obj = idx === 0 ? template : skeletonClone(template);
+        const obj = idx === 0 ? template : sharedClone(template);
 
         obj.position.set(stnPos.x, floorY, stnPos.z);
         obj.userData.baseScale        = autoScale;
