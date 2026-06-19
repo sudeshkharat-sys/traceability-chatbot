@@ -19,7 +19,7 @@ import './ZStage3DLayout.css';
 // Draco decoder WASM is served from the Three.js CDN (no local copy needed).
 function makeGLTFLoader() {
   const draco = new DRACOLoader();
-  draco.setDecoderPath('/draco/');
+  draco.setDecoderPath('https://unpkg.com/three@0.168.0/examples/jsm/libs/draco/');
   const loader = new GLTFLoader();
   loader.setDRACOLoader(draco);
   return loader;
