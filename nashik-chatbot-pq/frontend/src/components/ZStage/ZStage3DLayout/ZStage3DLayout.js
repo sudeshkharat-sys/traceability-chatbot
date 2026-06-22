@@ -12,7 +12,7 @@ import { layoutApi, inputApi } from '../../../services/api/layoutApi';
 import { layeredAuditApi } from '../../../services/api/layoutApi';
 import { StationDetailModal, MONTHLY_KEYS } from '../ZStageDashboard/ZStageDashboard';
 import '../ZStageDashboard/ZStageDashboard.css';
-import { backend_url } from '../../../services/api/config';
+import { backend_url, converter_url } from '../../../services/api/config';
 import './ZStage3DLayout.css';
 
 // Single shared DRACOLoader — decoder is downloaded and initialised once,
@@ -856,9 +856,90 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     if (!scene) return;
     const ext = file.name.split('.').pop().toLowerCase();
 
-    // WRL and STP need server-side conversion to GLB first
-    const needsConversion = ext === 'wrl' || ext === 'stp' || ext === 'step';
-    if (needsConversion) {
+    // WRL → vrml-converter service (async SSE job pattern; handles 800 MB+ files without timeout)
+    // STP/STEP → main backend synchronous conversion (smaller files, unchanged path)
+    if (ext === 'wrl') {
+      onConvertStart && onConvertStart(2);
+      const form = new FormData();
+      form.append('file', file);
+      form.append('out_format', 'glb');
+      form.append('max_faces', '20000000');
+      form.append('color_mode', 'actual');
+
+      fetch(`${converter_url}/z-stage/convert-model/start`, { method: 'POST', body: form })
+        .then(res => {
+          if (!res.ok) return res.json().then(e => { throw new Error(e.detail || 'Upload failed'); });
+          return res.json();
+        })
+        .then(({ job_id }) => {
+          // Stream real progress via SSE — no fake ticker, no HTTP timeout
+          const evtSrc = new EventSource(`${converter_url}/z-stage/convert-model/progress/${job_id}`);
+          evtSrc.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            // Map converter 0-100% → 0-90% so the final "loading GLB" phase shows progress
+            onConvertStart && onConvertStart(Math.round(data.pct * 0.9));
+            if (data.status === 'done') {
+              evtSrc.close();
+              fetch(`${converter_url}/z-stage/convert-model/download/${job_id}`)
+                .then(r => {
+                  if (!r.ok) throw new Error('Download failed');
+                  return r.blob();
+                })
+                .then(blob => {
+                  onConvertEnd && onConvertEnd(true);
+                  const glbFile = new File([blob], name + '.glb', { type: 'model/gltf-binary' });
+                  placeObject(glbFile, name, layoutId, options);
+                })
+                .catch(err => {
+                  onConvertEnd && onConvertEnd(false);
+                  alert(`Download failed: ${err.message}`);
+                });
+            } else if (data.status === 'error') {
+              evtSrc.close();
+              onConvertEnd && onConvertEnd(false);
+              alert(`Conversion failed: ${data.error}`);
+            }
+          };
+          evtSrc.onerror = () => {
+            // SSE dropped (proxy, mobile network) — fall back to polling the /once endpoint
+            evtSrc.close();
+            const poll = setInterval(() => {
+              fetch(`${converter_url}/z-stage/convert-model/progress/${job_id}/once`)
+                .then(r => r.json())
+                .then(data => {
+                  onConvertStart && onConvertStart(Math.round(data.pct * 0.9));
+                  if (data.status === 'done') {
+                    clearInterval(poll);
+                    fetch(`${converter_url}/z-stage/convert-model/download/${job_id}`)
+                      .then(r => r.blob())
+                      .then(blob => {
+                        onConvertEnd && onConvertEnd(true);
+                        const glbFile = new File([blob], name + '.glb', { type: 'model/gltf-binary' });
+                        placeObject(glbFile, name, layoutId, options);
+                      })
+                      .catch(err => {
+                        onConvertEnd && onConvertEnd(false);
+                        alert(`Download failed: ${err.message}`);
+                      });
+                  } else if (data.status === 'error') {
+                    clearInterval(poll);
+                    onConvertEnd && onConvertEnd(false);
+                    alert(`Conversion failed: ${data.error}`);
+                  }
+                })
+                .catch(() => {}); // transient network error — keep polling
+            }, 3000);
+          };
+        })
+        .catch(err => {
+          onConvertEnd && onConvertEnd(false);
+          alert(`Conversion failed: ${err.message}`);
+        });
+      return;
+    }
+
+    // STP/STEP: server-side conversion via main backend (unchanged)
+    if (ext === 'stp' || ext === 'step') {
       onConvertStart && onConvertStart();
       let pct = 0;
       const ticker = setInterval(() => {
@@ -903,7 +984,9 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       // Reset position/rotation before measuring so bbox is in clean local space
       obj.position.set(0, 0, 0);
 
-      // Auto-scale to ~2m
+      // Auto-scale to ~2m, then snap bottom to floor — single bbox traversal:
+      // compute scale from the unscaled bbox, apply it, then derive the floor offset
+      // algebraically (bbox.min.y * autoScale) instead of a second setFromObject call.
       const bbox = new THREE.Box3().setFromObject(obj);
       const size = new THREE.Vector3();
       bbox.getSize(size);
@@ -911,10 +994,8 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       const autoScale = maxDim > 0 ? 2.0 / maxDim : 1;
       if (maxDim > 0) obj.scale.setScalar(autoScale);
       obj.userData.baseScale = autoScale;
-
-      // Re-compute after scale — snap bottom of object exactly to floor (y=0)
-      const bbox2 = new THREE.Box3().setFromObject(obj);
-      obj.position.y = -bbox2.min.y;
+      // bbox.min.y is in local (pre-scale) space; after scale the world min.y = bbox.min.y * autoScale
+      obj.position.y = -bbox.min.y * autoScale;
 
       // Place at station centre or scene centre
       const stnPos = options.stationId ? stationPosRef.current[options.stationId] : null;
