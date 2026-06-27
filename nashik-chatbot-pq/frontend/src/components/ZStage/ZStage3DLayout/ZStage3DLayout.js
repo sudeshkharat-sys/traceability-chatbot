@@ -1209,7 +1209,8 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     onObjectsChange([...placedRef.current]);
   }, [onObjectsChange]);
 
-  // Set uniform scale multiplier — if object is in a line group, applies to all group members
+  // Set uniform scale multiplier — if object is in a line group, applies to all group members.
+  // Auto-saves as default for the model name so other layouts inherit the same scale.
   const setObjectScale = useCallback((id, multiplier) => {
     const entry = placedRef.current.find(p => p.id === id);
     if (!entry) return;
@@ -1233,9 +1234,16 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         }).catch(() => {});
       }
     });
+    // Auto-save scale as default for this model so other layouts inherit it
+    const modelName = entry.mesh.userData.objName || entry.name;
+    if (modelName) {
+      saveModelPreset(modelName, { scale: multiplier, rotX: 0, rotY: 0, rotZ: 0 });
+      z3dModelApi.saveDefaults(modelName, { sx: multiplier, sy: multiplier, sz: multiplier, rx: 0, ry: 0, rz: 0 }).catch(() => {});
+    }
   }, []);
 
-  // Set rotation (degrees) on a placed object — if in a line group, applies to all group members
+  // Set rotation (degrees) on a placed object — if in a line group, applies to all group members.
+  // Auto-saves as default for the model name so other layouts inherit the same rotation.
   const setGroupRotation = useCallback((id, rx, ry, rz) => {
     const entry = placedRef.current.find(p => p.id === id);
     if (!entry) return;
@@ -1257,6 +1265,18 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         }).catch(() => {});
       }
     });
+    // Auto-save rotation as default for this model
+    const modelName = entry.mesh.userData.objName || entry.name;
+    if (modelName) {
+      const currentScale = entry.mesh.userData.baseScale
+        ? entry.mesh.scale.x / entry.mesh.userData.baseScale
+        : 1;
+      saveModelPreset(modelName, { scale: currentScale, rotX: rx, rotY: ry, rotZ: rz });
+      z3dModelApi.saveDefaults(modelName, {
+        sx: currentScale, sy: currentScale, sz: currentScale,
+        rx, ry, rz,
+      }).catch(() => {});
+    }
   }, []);
 
   // Place one file at every station in the given stationIds array (line placement).
@@ -2157,19 +2177,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                   title="Reset rotation"
                   onClick={() => { setRotX(0); setRotY(0); setRotZ(0); setGroupRotation(selectedId, 0, 0, 0); }}
                 >↺ Reset</button>
-                <button
-                  type="button" className="z3d-preset-save"
-                  title="Save scale & rotation as default for this model name"
-                  onClick={() => {
-                    if (!currentSelected) return;
-                    const n = currentSelected.name;
-                    // Save to localStorage for fast access + server library for cross-user persistence
-                    saveModelPreset(n, { scale: scaleVal, rotX, rotY, rotZ });
-                    z3dModelApi.saveDefaults(n, { sx: scaleVal, sy: scaleVal, sz: scaleVal, rx: rotX, ry: rotY, rz: rotZ })
-                      .catch(() => {});
-                    alert(`Preset saved for "${n}"`);
-                  }}
-                >💾 Save as default</button>
+                <div className="z3d-autosave-notice">✓ Scale &amp; rotation auto-saved as default</div>
               </div>
             )}
 
