@@ -731,22 +731,55 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       const allLineGroups = (layout.station_boxes || []).map(b => b.name).filter(Boolean);
       const unseededLines = allLineGroups.filter(lg => !placedLineGroups.has(lg));
 
+      // Build a local station-id → 3D-position map for THIS layout
+      // (stationPosRef is already populated by the box-building loop above)
+      const localPosMap = stationPosRef.current;
+
+      // For each line in the current layout that has no placements:
+      //   1. Fetch what model + scale/rotation was used for that line in any other layout
+      //   2. Place that model at EVERY station of that line in THIS layout
+      //      using THIS layout's 3D positions (not the other layout's positions)
+      const localStationsByLine = {};
+      (layout.station_boxes || []).forEach(box => {
+        if (!box.name) return;
+        const ids = (box.station_ids || '').split(',').map(s => s.trim()).filter(Boolean);
+        localStationsByLine[box.name] = ids;
+      });
+
       const seedPromises = unseededLines.map(lineGroupId =>
         z3dModelApi.getPlacementsByLineGroup(lineGroupId).then(r => {
           const crossRecords = r.data || [];
           if (crossRecords.length === 0) return;
-          // Re-create placement records for this layout, inheriting scale/rotation
-          return Promise.all(crossRecords.map(rec =>
-            z3dModelApi.createPlacement({
+
+          // Take model name + scale + rotation from the first cross-layout record
+          // (all records for the same line+model should share the same scale/rotation)
+          const tmpl = crossRecords[0];
+          const modelName = tmpl.model_name;
+          const sx = tmpl.sx ?? 1, sy = tmpl.sy ?? 1, sz = tmpl.sz ?? 1;
+          const rx = tmpl.rx ?? 0, ry = tmpl.ry ?? 0, rz = tmpl.rz ?? 0;
+          const py = tmpl.py ?? 0; // floor-snapped Y height — same regardless of layout
+
+          // Stations for this line IN THE CURRENT LAYOUT
+          const lineStationIds = localStationsByLine[lineGroupId] || [];
+          if (lineStationIds.length === 0) return;
+
+          // Create one placement per station using this layout's X/Z positions
+          return Promise.all(lineStationIds.map(stationId => {
+            const pos = localPosMap[stationId] || { x: 0, z: 0 };
+            return z3dModelApi.createPlacement({
               layoutId: layout.id,
-              modelName: rec.model_name,
-              lineGroupId: rec.line_group_id,
-              stationId: rec.station_id,
-              px: rec.px, py: rec.py, pz: rec.pz,
-              rx: rec.rx, ry: rec.ry, rz: rec.rz,
-              sx: rec.sx, sy: rec.sy, sz: rec.sz,
-            }).then(cr => ({ ...rec, id: cr.data.id, layout_id: layout.id }))
-          ));
+              modelName,
+              lineGroupId,
+              stationId,
+              px: pos.x, py, pz: pos.z,
+              rx, ry, rz,
+              sx, sy, sz,
+            }).then(cr => ({
+              id: cr.data.id, layout_id: layout.id,
+              model_name: modelName, line_group_id: lineGroupId, station_id: stationId,
+              px: pos.x, py, pz: pos.z, rx, ry, rz, sx, sy, sz,
+            }));
+          }));
         }).then(seeded => seeded && seeded.forEach(p => placements.push(p)))
           .catch(() => {})
       );
