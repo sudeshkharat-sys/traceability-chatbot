@@ -767,6 +767,13 @@
 }
 .z3d-scale-reset:hover { background: #21262d; color: #e6edf3; }
 
+.z3d-preset-save {
+  margin-top: 4px; width: 100%;
+  background: #0d419d; border: 1px solid #1f6feb; border-radius: 4px;
+  color: #c9d1d9; cursor: pointer; font-size: 12px; padding: 4px 8px;
+}
+.z3d-preset-save:hover { background: #1158c7; color: #fff; }
+
 /* ── Animation section ──────────────────────────────────────── */
 .z3d-anim-section {
   display: flex; flex-direction: column; gap: 6px;

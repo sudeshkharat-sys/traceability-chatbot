@@ -15,6 +15,21 @@ import '../ZStageDashboard/ZStageDashboard.css';
 import { backend_url } from '../../../services/api/config';
 import './ZStage3DLayout.css';
 
+// ── Model Presets (localStorage) ─────────────────────────────────────────────
+// Keyed by normalised model name. Stores { scale, rotX, rotY, rotZ }.
+const MODEL_PRESETS_KEY = 'z3d_model_presets_v1';
+function loadModelPresets() {
+  try { return JSON.parse(localStorage.getItem(MODEL_PRESETS_KEY) || '{}'); } catch { return {}; }
+}
+function saveModelPreset(modelName, preset) {
+  const all = loadModelPresets();
+  all[modelName.toLowerCase().trim()] = preset;
+  localStorage.setItem(MODEL_PRESETS_KEY, JSON.stringify(all));
+}
+function getModelPreset(modelName) {
+  return loadModelPresets()[modelName.toLowerCase().trim()] || null;
+}
+
 // Single shared DRACOLoader — decoder is downloaded and initialised once,
 // then reused for every upload. Saves 1-3 s per upload vs creating a new one each time.
 const _sharedDraco = new DRACOLoader();
@@ -935,6 +950,21 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       // Re-compute after scale — snap bottom of object exactly to floor (y=0)
       const bbox2 = new THREE.Box3().setFromObject(obj);
       obj.position.y = -bbox2.min.y;
+      // Store ratio so setObjectScale can re-snap without recomputing bbox
+      obj.userData.floorOffsetAtBase = obj.position.y / autoScale;
+
+      // Apply saved model preset (scale + rotation) if one exists
+      const _preset = getModelPreset(name);
+      if (_preset) {
+        const presetScale = (obj.userData.baseScale || 1) * (_preset.scale || 1);
+        obj.scale.setScalar(presetScale);
+        obj.position.y = (obj.userData.floorOffsetAtBase || 0) * presetScale;
+        obj.rotation.set(
+          ((_preset.rotX || 0) * Math.PI) / 180,
+          ((_preset.rotY || 0) * Math.PI) / 180,
+          ((_preset.rotZ || 0) * Math.PI) / 180
+        );
+      }
 
       // Place at station centre or scene centre
       const stnPos = options.stationId ? stationPosRef.current[options.stationId] : null;
@@ -1124,7 +1154,12 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       : [entry];
     targets.forEach(t => {
       const base = t.mesh.userData.baseScale || 1;
-      t.mesh.scale.setScalar(base * multiplier);
+      const newScale = base * multiplier;
+      t.mesh.scale.setScalar(newScale);
+      // Re-snap floor: keep ratio constant so model stays planted on floor
+      if (t.mesh.userData.floorOffsetAtBase !== undefined) {
+        t.mesh.position.y = t.mesh.userData.floorOffsetAtBase * newScale;
+      }
       if (layoutIdRef.current) {
         z3dPut({
           key: `${layoutIdRef.current}_${t.id}`,
@@ -1206,6 +1241,25 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       // Floor-snap offset (computed once, same for every clone)
       const bboxScaled = new THREE.Box3().setFromObject(template);
       const floorY = -bboxScaled.min.y;
+      const floorOffsetAtBase = floorY / autoScale;
+
+      // Apply saved model preset if one exists
+      const _linePreset = getModelPreset(name);
+      if (_linePreset) {
+        const ps = autoScale * (_linePreset.scale || 1);
+        template.scale.setScalar(ps);
+        template.rotation.set(
+          ((_linePreset.rotX || 0) * Math.PI) / 180,
+          ((_linePreset.rotY || 0) * Math.PI) / 180,
+          ((_linePreset.rotZ || 0) * Math.PI) / 180
+        );
+        // recompute floorY after scale change
+        const bboxPreset = new THREE.Box3().setFromObject(template);
+        // override floorY for this preset
+        Object.defineProperty(template, '_presetFloorY', { value: -bboxPreset.min.y, writable: true, configurable: true });
+      }
+      const effectiveFloorY = template._presetFloorY !== undefined ? template._presetFloorY : floorY;
+      const effectiveScale  = _linePreset ? autoScale * (_linePreset.scale || 1) : autoScale;
 
       const posMap = stationPosRef.current;
       const newEntries = [];
@@ -1218,8 +1272,9 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         // so GPU memory stays ~1× instead of N× for a 70 MB model
         const obj = idx === 0 ? template : sharedClone(template);
 
-        obj.position.set(stnPos.x, floorY, stnPos.z);
-        obj.userData.baseScale        = autoScale;
+        obj.position.set(stnPos.x, effectiveFloorY, stnPos.z);
+        obj.userData.baseScale           = effectiveScale;
+        obj.userData.floorOffsetAtBase   = effectiveFloorY / effectiveScale;
         obj.userData.isPlaced         = true;
         obj.userData.objId            = `${groupId}_${idx}`;
         obj.userData.objName          = name;
@@ -1645,12 +1700,25 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     const file = e.target.files?.[0];
     if (!file) return;
     setPendingFile(file);
-    setUploadMode('free');
+
+    // Auto-detect line from filename — fuzzy match against shopList
+    const baseName = file.name.replace(/\.[^/.]+$/, '').toLowerCase().replace(/[-_\s]+/g, ' ');
+    const matched = shopList.find(shop => {
+      const s = shop.toLowerCase().replace(/[-_\s]+/g, ' ');
+      return baseName.includes(s) || s.includes(baseName);
+    });
+    if (matched) {
+      setUploadMode('line');
+      setUploadLine(matched);
+    } else {
+      setUploadMode('free');
+      setUploadLine('');
+    }
     setUploadShop('');
     setUploadStation('');
     setShowUploadModal(true);
     e.target.value = '';
-  }, []);
+  }, [shopList]);
 
   const handleUploadConfirm = useCallback(() => {
     if (!pendingFile) return;
@@ -1667,9 +1735,13 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
       const opts = uploadMode === 'station' && uploadStation ? { stationId: uploadStation } : {};
       placeObject(pendingFile, name, selectedLayoutId, opts);
     }
+    // Initialise sliders to preset values (or defaults)
+    const _p = getModelPreset(name);
     setShowObjPanel(true);
-    setScaleVal(1.0);
-    setRotX(0); setRotY(0); setRotZ(0);
+    setScaleVal(_p ? (_p.scale || 1.0) : 1.0);
+    setRotX(_p ? (_p.rotX || 0) : 0);
+    setRotY(_p ? (_p.rotY || 0) : 0);
+    setRotZ(_p ? (_p.rotZ || 0) : 0);
     setAnimFromStation('');
     setAnimToStation('');
     setAnimPlaying(false);
@@ -2042,6 +2114,15 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                   title="Reset rotation"
                   onClick={() => { setRotX(0); setRotY(0); setRotZ(0); setGroupRotation(selectedId, 0, 0, 0); }}
                 >↺ Reset</button>
+                <button
+                  type="button" className="z3d-preset-save"
+                  title="Save scale & rotation as default for this model name"
+                  onClick={() => {
+                    if (!currentSelected) return;
+                    saveModelPreset(currentSelected.name, { scale: scaleVal, rotX, rotY, rotZ });
+                    alert(`Preset saved for "${currentSelected.name}"`);
+                  }}
+                >💾 Save as default</button>
               </div>
             )}
 
