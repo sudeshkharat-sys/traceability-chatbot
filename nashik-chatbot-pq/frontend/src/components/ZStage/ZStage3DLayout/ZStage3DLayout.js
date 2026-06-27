@@ -30,6 +30,18 @@ function getModelPreset(modelName) {
   return loadModelPresets()[modelName.toLowerCase().trim()] || null;
 }
 
+// Module-level GLB template cache — keyed by model name (lowercase).
+// Once a model is loaded this session, subsequent layouts skip the download
+// entirely and clone directly from the cached Three.js scene.
+const _modelTemplateCache = new Map(); // name → THREE.Object3D
+
+function getCachedTemplate(name) {
+  return _modelTemplateCache.get(name.toLowerCase()) || null;
+}
+function setCachedTemplate(name, template) {
+  _modelTemplateCache.set(name.toLowerCase(), template);
+}
+
 // Single shared DRACOLoader — decoder is downloaded and initialised once,
 // then reused for every upload. Saves 1-3 s per upload vs creating a new one each time.
 const _sharedDraco = new DRACOLoader();
@@ -748,8 +760,13 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         };
 
         const onTemplate = (template) => {
+          setCachedTemplate(modelName, template);
           records.forEach((record, idx) => applyRecord(template, record, idx === 0));
         };
+
+        // If already loaded this session → skip download entirely
+        const cached = getCachedTemplate(modelName);
+        if (cached) { onTemplate(cached); return; }
 
         // Fetch library entry to get ext, then load the model
         z3dModelApi.getLibraryModel(modelName).then(libRes => {
@@ -768,7 +785,6 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
             }
           } catch {}
         }).catch(() => {
-          // fallback: assume glb
           makeGLTFLoader().load(downloadUrl, g => onTemplate(g.scene), undefined,
             err => console.error('[Z3D] GLB reload failed:', modelName, err));
         });
@@ -936,6 +952,9 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       clearInterval(_ticker);
       onConvertEnd && onConvertEnd();
       URL.revokeObjectURL(url);
+
+      // Cache this template so other layouts can clone it without re-downloading
+      setCachedTemplate(name, obj);
 
       // Strip any existing text/label children from the loaded model
       obj.traverse(child => {
@@ -1231,6 +1250,9 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       clearInterval(_lticker);
       onConvertEnd && onConvertEnd();
       URL.revokeObjectURL(url);
+
+      // Cache so other layouts (or reuse-from-library) skip the download
+      setCachedTemplate(name, template);
 
       // Measure auto-scale from a clean template at origin
       template.position.set(0, 0, 0);
@@ -1717,7 +1739,9 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
       setShowUploadModal(false); setPendingFile(null); setSelectedLibraryModel(null);
     };
 
-    // Reuse an existing library model (fetch blob, then call doPlace)
+    // Reuse an existing library model — if already cached this session, still need a
+    // File blob for placeObject (it creates a blob URL internally), so fetch from server.
+    // The template cache inside placeObject/placeObjectForLine will then skip re-parsing.
     if (selectedLibraryModel) {
       const libName = selectedLibraryModel.name;
       const ext = selectedLibraryModel.ext || 'glb';
