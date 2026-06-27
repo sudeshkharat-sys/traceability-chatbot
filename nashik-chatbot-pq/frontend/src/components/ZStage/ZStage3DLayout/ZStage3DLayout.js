@@ -1472,6 +1472,8 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [uploadShop,        setUploadShop]        = useState('');
   const [uploadStation,     setUploadStation]     = useState('');
   const [uploadLine,        setUploadLine]        = useState('');
+  const [libraryModels,     setLibraryModels]     = useState([]);   // global library list
+  const [selectedLibraryModel, setSelectedLibraryModel] = useState(null); // reuse-from-library
   // Per-object scale and rotation
   const [scaleVal,          setScaleVal]          = useState(1.0);
   const [rotX,              setRotX]              = useState(0);
@@ -1686,38 +1688,53 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
       }
     }).catch(() => {}); // not in library yet — that's fine
 
+    // Fetch global library so modal can show "Recent Uploads"
+    setSelectedLibraryModel(null);
+    z3dModelApi.listLibrary().then(res => setLibraryModels(res.data || [])).catch(() => {});
+
     setShowUploadModal(true);
     e.target.value = '';
   }, [shopList]);
 
   const handleUploadConfirm = useCallback(() => {
-    if (!pendingFile) return;
-    const name = pendingFile.name.replace(/\.[^/.]+$/, '');
-    if (uploadMode === 'line' && uploadLine) {
-      const lineStations = stationList.filter(s => s.shop === uploadLine).map(s => s.id);
-      console.log('[Upload] line mode, line=', uploadLine, 'stations=', lineStations);
-      if (lineStations.length === 0) {
-        alert(`No stations found for line "${uploadLine}". Please check the layout.`);
-        return;
+    // Helper to place after we have the file (real upload or blob fetched from library)
+    const doPlace = (file, name) => {
+      if (uploadMode === 'line' && uploadLine) {
+        const lineStations = stationList.filter(s => s.shop === uploadLine).map(s => s.id);
+        if (lineStations.length === 0) { alert(`No stations found for line "${uploadLine}".`); return; }
+        placeObjectForLine(file, name, selectedLayoutId, lineStations);
+      } else {
+        const opts = uploadMode === 'station' && uploadStation ? { stationId: uploadStation } : {};
+        placeObject(file, name, selectedLayoutId, opts);
       }
-      placeObjectForLine(pendingFile, name, selectedLayoutId, lineStations);
-    } else {
-      const opts = uploadMode === 'station' && uploadStation ? { stationId: uploadStation } : {};
-      placeObject(pendingFile, name, selectedLayoutId, opts);
+      const _p = getModelPreset(name);
+      setShowObjPanel(true);
+      setScaleVal(_p ? (_p.scale || 1.0) : 1.0);
+      setRotX(_p ? (_p.rotX || 0) : 0);
+      setRotY(_p ? (_p.rotY || 0) : 0);
+      setRotZ(_p ? (_p.rotZ || 0) : 0);
+      setAnimFromStation(''); setAnimToStation(''); setAnimPlaying(false);
+      setShowUploadModal(false); setPendingFile(null); setSelectedLibraryModel(null);
+    };
+
+    // Reuse an existing library model (fetch blob, then call doPlace)
+    if (selectedLibraryModel) {
+      const libName = selectedLibraryModel.name;
+      const ext = selectedLibraryModel.ext || 'glb';
+      const url = z3dModelApi.getDownloadUrl(libName);
+      fetch(url)
+        .then(r => { if (!r.ok) throw new Error('Download failed'); return r.blob(); })
+        .then(blob => {
+          const file = new File([blob], `${libName}.${ext}`, { type: blob.type || 'model/gltf-binary' });
+          doPlace(file, libName);
+        })
+        .catch(err => alert('Failed to load library model: ' + err.message));
+      return;
     }
-    // Initialise sliders to preset values (or defaults)
-    const _p = getModelPreset(name);
-    setShowObjPanel(true);
-    setScaleVal(_p ? (_p.scale || 1.0) : 1.0);
-    setRotX(_p ? (_p.rotX || 0) : 0);
-    setRotY(_p ? (_p.rotY || 0) : 0);
-    setRotZ(_p ? (_p.rotZ || 0) : 0);
-    setAnimFromStation('');
-    setAnimToStation('');
-    setAnimPlaying(false);
-    setShowUploadModal(false);
-    setPendingFile(null);
-  }, [pendingFile, uploadMode, uploadStation, uploadLine, stationList, placeObject, placeObjectForLine, selectedLayoutId]);
+
+    if (!pendingFile) return;
+    doPlace(pendingFile, pendingFile.name.replace(/\.[^/.]+$/, ''));
+  }, [pendingFile, selectedLibraryModel, uploadMode, uploadStation, uploadLine, stationList, placeObject, placeObjectForLine, selectedLayoutId]);
 
   const handleModeChange = useCallback((mode) => {
     setTransformModeState(mode);
@@ -2186,10 +2203,40 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
       </div>
 
       {showUploadModal && (
-        <div className="z3d-modal-overlay" onClick={() => { setShowUploadModal(false); setPendingFile(null); }}>
+        <div className="z3d-modal-overlay" onClick={() => { setShowUploadModal(false); setPendingFile(null); setSelectedLibraryModel(null); }}>
           <div className="z3d-modal-box" onClick={e => e.stopPropagation()}>
             <div className="z3d-modal-title">Upload 3D Object</div>
-            <div className="z3d-modal-filename">{pendingFile?.name}</div>
+
+            {/* ── Library picks: reuse an already-uploaded model ── */}
+            {libraryModels.length > 0 && (
+              <div className="z3d-library-section">
+                <div className="z3d-library-section-title">Recent Uploads (click to reuse)</div>
+                <div className="z3d-library-picks">
+                  {libraryModels.map(m => (
+                    <button
+                      key={m.name}
+                      type="button"
+                      className={`z3d-library-chip${selectedLibraryModel?.name === m.name ? ' selected' : ''}`}
+                      onClick={() => setSelectedLibraryModel(selectedLibraryModel?.name === m.name ? null : m)}
+                      title={`Reuse "${m.name}" from library`}
+                    >
+                      {m.name}
+                    </button>
+                  ))}
+                </div>
+                {selectedLibraryModel && (
+                  <div className="z3d-library-notice">
+                    Using saved model: <strong>{selectedLibraryModel.name}</strong>
+                    <span className="z3d-library-or"> — or upload a new file below</span>
+                  </div>
+                )}
+                <div className="z3d-library-divider"><span>— or upload new file —</span></div>
+              </div>
+            )}
+
+            {!selectedLibraryModel && (
+              <div className="z3d-modal-filename">{pendingFile?.name}</div>
+            )}
 
             <div className="z3d-upload-mode-tabs">
               <button type="button"
@@ -2266,12 +2313,16 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             )}
 
             <div className="z3d-modal-actions">
-              <button type="button" className="z3d-modal-cancel" onClick={() => { setShowUploadModal(false); setPendingFile(null); }}>Cancel</button>
+              <button type="button" className="z3d-modal-cancel" onClick={() => { setShowUploadModal(false); setPendingFile(null); setSelectedLibraryModel(null); }}>Cancel</button>
               <button type="button"
                 className="z3d-modal-confirm"
-                disabled={(uploadMode === 'station' && !uploadStation) || (uploadMode === 'line' && !uploadLine)}
+                disabled={
+                  (!selectedLibraryModel && !pendingFile) ||
+                  (uploadMode === 'station' && !uploadStation) ||
+                  (uploadMode === 'line' && !uploadLine)
+                }
                 onClick={handleUploadConfirm}
-              >Upload</button>
+              >{selectedLibraryModel ? 'Place' : 'Upload'}</button>
             </div>
           </div>
         </div>

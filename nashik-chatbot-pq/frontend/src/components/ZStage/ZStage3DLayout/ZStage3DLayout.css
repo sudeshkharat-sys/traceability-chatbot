@@ -774,6 +774,67 @@
 }
 .z3d-preset-save:hover { background: #1158c7; color: #fff; }
 
+/* ── Library picks (Recent Uploads in upload modal) ─────────── */
+.z3d-library-section {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+}
+.z3d-library-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8b949e;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+.z3d-library-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 96px;
+  overflow-y: auto;
+  padding: 2px 0;
+}
+.z3d-library-chip {
+  padding: 4px 10px;
+  border-radius: 12px;
+  border: 1px solid #30363d;
+  background: #21262d;
+  color: #c9d1d9;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.z3d-library-chip:hover { background: #2d333b; border-color: #58a6ff; color: #58a6ff; }
+.z3d-library-chip.selected { background: #0d419d; border-color: #1f6feb; color: #fff; }
+.z3d-library-notice {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #3fb950;
+}
+.z3d-library-or { color: #8b949e; }
+.z3d-library-divider {
+  margin-top: 10px;
+  text-align: center;
+  position: relative;
+  font-size: 11px;
+  color: #8b949e;
+}
+.z3d-library-divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0; right: 0;
+  height: 1px;
+  background: #30363d;
+}
+.z3d-library-divider span {
+  position: relative;
+  background: #161b22;
+  padding: 0 8px;
+}
+
 /* ── Animation section ──────────────────────────────────────── */
 .z3d-anim-section {
   display: flex; flex-direction: column; gap: 6px;
