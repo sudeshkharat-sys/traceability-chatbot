@@ -669,13 +669,14 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           const targets = sel.lineGroupId
             ? placedRef.current.filter(p => p.lineGroupId === sel.lineGroupId)
             : [sel];
-          targets.forEach(({ mesh, id, name, lineGroupId }) => {
+          targets.forEach(({ mesh, id, name, lineGroupId }, idx) => {
             z3dPut({
               key: `${layoutIdRef.current}_${id}`,
               layoutId: layoutIdRef.current,
               id, name,
               ext: mesh.userData.objExt || 'glb',
-              fileBlob: blobCacheRef.current[id] || undefined,
+              // Only the first entry in a group carries the blob to avoid quota exhaustion
+              fileBlob: (idx === 0 || !lineGroupId) ? (blobCacheRef.current[id] || undefined) : undefined,
               lineGroupId: lineGroupId || null,
               px: mesh.position.x, py: mesh.position.y, pz: mesh.position.z,
               rx: mesh.rotation.x, ry: mesh.rotation.y, rz: mesh.rotation.z,
@@ -720,7 +721,8 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       });
 
       groups.forEach(records => {
-        const first = records[0];
+        // Find the record that actually carries the blob (idx=0 of the group)
+        const first = records.find(r => r.fileBlob) || records[0];
         const blob  = first.fileBlob;
         if (!blob) return;
         const ext = first.ext || 'glb';
@@ -1128,7 +1130,9 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     });
     const deleteIds = new Set(targets.map(t => t.id));
     placedRef.current = placedRef.current.filter(p => !deleteIds.has(p.id));
-    if (layoutIdRef.current) z3dDel(`${layoutIdRef.current}_${id}`);
+    if (layoutIdRef.current) {
+      deleteIds.forEach(did => z3dDel(`${layoutIdRef.current}_${did}`));
+    }
     onObjectsChange([...placedRef.current]);
   }, [onObjectsChange]);
 
@@ -1304,16 +1308,19 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       placedRef.current = [...placedRef.current, ...newEntries];
       onObjectsChange([...placedRef.current]);
 
-      // Persist each clone to IDB with its file blob cached
+      // Persist each clone to IDB — store fileBlob ONLY in the first entry so we
+      // don't save N × fileSize bytes (a 70 MB model × 20 stations = 1.4 GB which
+      // exceeds browser quota and silently fails, losing all data).
+      // The restore code groups by lineGroupId and reads blob from records[0] only.
       if (layoutId) {
         file.arrayBuffer().then(buf => {
           const fileBlob = new Blob([buf], { type: file.type || 'application/octet-stream' });
-          newEntries.forEach((entry) => {
+          newEntries.forEach((entry, idx) => {
             blobCacheRef.current[entry.id] = fileBlob;
             z3dPut({
               key: `${layoutId}_${entry.id}`,
               layoutId, id: entry.id, name, ext,
-              fileBlob,
+              fileBlob: idx === 0 ? fileBlob : undefined, // only first entry holds the blob
               lineGroupId: groupId,
               px: entry.mesh.position.x, py: entry.mesh.position.y, pz: entry.mesh.position.z,
               rx: entry.mesh.rotation.x, ry: entry.mesh.rotation.y, rz: entry.mesh.rotation.z,
