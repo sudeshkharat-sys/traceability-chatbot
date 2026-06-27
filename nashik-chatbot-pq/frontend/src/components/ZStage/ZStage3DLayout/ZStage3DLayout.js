@@ -321,16 +321,6 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     floor.position.set(cellCX, 0.06, cellCZ);
     floor.userData.stationId = stnId;
     group.add(floor);
-    // Blue border line around the floor perimeter
-    const hw = floorW / 2, hd = floorD / 2, by = 0.13;
-    const borderGeo = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(cellCX - hw, by, cellCZ - hd),
-      new THREE.Vector3(cellCX + hw, by, cellCZ - hd),
-      new THREE.Vector3(cellCX + hw, by, cellCZ + hd),
-      new THREE.Vector3(cellCX - hw, by, cellCZ + hd),
-      new THREE.Vector3(cellCX - hw, by, cellCZ - hd),
-    ]);
-    group.add(new THREE.Line(borderGeo, new THREE.LineBasicMaterial({ color: 0x1976d2 })));
 
     // Green center path strip running through middle of this station
     buildZebraCrossing(cellCX, originZ, group);
@@ -353,6 +343,17 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     sign.position.set(cellCX, HEIGHT, originZ + DEPTH);
     group.add(sign);
   }
+
+  // ── Blue border around the entire line (all stations in this box) ──
+  const by = 0.14;
+  const lineBoxGeo = new THREE.BufferGeometry().setFromPoints([
+    new THREE.Vector3(originX,          by, originZ),
+    new THREE.Vector3(originX + totalW, by, originZ),
+    new THREE.Vector3(originX + totalW, by, originZ + DEPTH),
+    new THREE.Vector3(originX,          by, originZ + DEPTH),
+    new THREE.Vector3(originX,          by, originZ),
+  ]);
+  group.add(new THREE.Line(lineBoxGeo, new THREE.LineBasicMaterial({ color: 0x1976d2, linewidth: 2 })));
 
   // ── Box name boards on outer face of end columns, hanging from top beam ──
   // White bg + navy text; top edge flush with top beam at HEIGHT
