@@ -735,10 +735,13 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           obj.position.set(record.px ?? 0, record.py ?? 0, record.pz ?? 0);
           obj.rotation.set(record.rx ?? 0, record.ry ?? 0, record.rz ?? 0);
           obj.scale.set(record.sx ?? 1,    record.sy ?? 1,    record.sz ?? 1);
-          obj.userData.isPlaced   = true;
-          obj.userData.objId      = record.id;
-          obj.userData.objName    = record.name;
-          obj.userData.objExt     = ext;
+          obj.userData.isPlaced         = true;
+          obj.userData.objId            = record.id;
+          obj.userData.objName          = record.name;
+          obj.userData.objExt           = ext;
+          // Restore baseScale + floorOffsetAtBase so scale slider re-snaps correctly
+          obj.userData.baseScale        = record.sx ?? 1;
+          obj.userData.floorOffsetAtBase = (record.py ?? 0) / (record.sx ?? 1);
           blobCacheRef.current[record.id] = blob;
           scene.add(obj); dirtyRef.current = true;
           const entry = {
