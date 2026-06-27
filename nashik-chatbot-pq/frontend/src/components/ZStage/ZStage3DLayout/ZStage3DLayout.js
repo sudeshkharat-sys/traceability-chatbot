@@ -463,7 +463,7 @@ class WalkController {
 }
 
 // ── Three.js scene hook ────────────────────────────────────────────────────────
-function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, onObjectsChange, onConvertStart, onConvertEnd, onStationClick, isActive, onSceneReady) {
+function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, onObjectsChange, onConvertStart, onConvertEnd, onStationClick, isActive, onSceneReady, viewCubeCanvasRef, panMode) {
   // Keep latest statusMap/zeMap in refs so scene reads current values
   // without triggering a full scene rebuild on every API response
   const statusMapRef = useRef(statusMapProp);
@@ -487,6 +487,10 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
   const animationsRef  = useRef([]);     // active tweens
   const blobCacheRef   = useRef({});     // objId → Blob — keeps file data alive across IDB updates
   const dirtyRef       = useRef(true);   // render dirty flag — set true whenever scene changes
+  const cubeRendererRef = useRef(null);
+  const cubeMeshRef     = useRef(null);
+  const cubeCameraRef   = useRef(null);
+  const cubeSceneRef    = useRef(null);
   useEffect(() => { walkModeRef.current = walkMode; }, [walkMode]);
 
   useEffect(() => {
@@ -742,6 +746,51 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     // Signal that the scene is built and ready to display
     onSceneReady && onSceneReady();
 
+    // ── ViewCube setup ────────────────────────────────────────────────────────────
+    const cubeCanvas = viewCubeCanvasRef?.current;
+    if (cubeCanvas) {
+      const cubeRenderer = new THREE.WebGLRenderer({ canvas: cubeCanvas, antialias: true, alpha: true });
+      cubeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      cubeRenderer.setSize(100, 100);
+      cubeRendererRef.current = cubeRenderer;
+
+      const cubeScene = new THREE.Scene();
+      cubeSceneRef.current = cubeScene;
+      const cubeCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+      cubeCamera.position.set(0, 0, 3.5);
+      cubeCameraRef.current = cubeCamera;
+
+      // Per-face canvas textures — order: +X, -X, +Y, -Y, +Z, -Z
+      const FACES = [
+        { label: 'RIGHT', bg: '#c0392b' }, { label: 'LEFT',   bg: '#e74c3c' },
+        { label: 'TOP',   bg: '#1565c0' }, { label: 'BOTTOM', bg: '#1976d2' },
+        { label: 'FRONT', bg: '#1b5e20' }, { label: 'BACK',   bg: '#2e7d32' },
+      ];
+      const faceMaterials = FACES.map(({ label, bg }) => {
+        const fc = document.createElement('canvas');
+        fc.width = 128; fc.height = 128;
+        const ctx = fc.getContext('2d');
+        ctx.fillStyle = bg;
+        ctx.fillRect(0, 0, 128, 128);
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+        ctx.lineWidth = 6; ctx.strokeRect(3, 3, 122, 122);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 20px Arial';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(label, 64, 64);
+        return new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(fc) });
+      });
+      const cubeGeo  = new THREE.BoxGeometry(1.6, 1.6, 1.6);
+      const cubeMesh = new THREE.Mesh(cubeGeo, faceMaterials);
+      cubeSceneRef.current.add(cubeMesh);
+      cubeMeshRef.current = cubeMesh;
+
+      // White edge lines for AutoCAD-style outline
+      const edgesGeo = new THREE.EdgesGeometry(cubeGeo);
+      const edgesMat = new THREE.LineBasicMaterial({ color: 0xffffff });
+      cubeMesh.add(new THREE.LineSegments(edgesGeo, edgesMat));
+    }
+
     // Only re-render when something changes — saves GPU when user is idle
     dirtyRef.current = true;
     orbit.addEventListener('change', () => { dirtyRef.current = true; });
@@ -773,6 +822,11 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           renderer.render(scene, camera);
           dirtyRef.current = false;
         }
+        // ViewCube always renders (it must track camera rotation continuously)
+        if (cubeMeshRef.current && cubeRendererRef.current && cubeCameraRef.current && cubeSceneRef.current) {
+          cubeMeshRef.current.quaternion.copy(camera.quaternion).invert();
+          cubeRendererRef.current.render(cubeSceneRef.current, cubeCameraRef.current);
+        }
       } catch (err) {
         console.error('[Z3D animate error]', err);
       }
@@ -786,6 +840,8 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       tc.dispose();
       orbit.dispose();
       renderer.dispose();
+      if (cubeRendererRef.current) { cubeRendererRef.current.dispose(); cubeRendererRef.current = null; }
+      cubeMeshRef.current = null; cubeCameraRef.current = null; cubeSceneRef.current = null;
       placedRef.current = [];
       selectedRef.current = null;
     };
@@ -1324,6 +1380,35 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     }
   }, []);
 
+  // Pan mode — swap left-button between Rotate and Pan
+  useEffect(() => {
+    const orbit = orbitRef.current;
+    if (!orbit) return;
+    orbit.mouseButtons.LEFT = panMode ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
+  }, [panMode]);
+
+  // ViewCube click — raycast against cube faces and snap main camera to matching view
+  const handleCubeClick = useCallback((e) => {
+    const cubeCanvas = viewCubeCanvasRef?.current;
+    const cubeMesh   = cubeMeshRef.current;
+    const cubeCamera = cubeCameraRef.current;
+    if (!cubeCanvas || !cubeMesh || !cubeCamera) return;
+    const rect = cubeCanvas.getBoundingClientRect();
+    const mouse = new THREE.Vector2(
+      ((e.clientX - rect.left) / rect.width)  *  2 - 1,
+      ((e.clientY - rect.top)  / rect.height) * -2 + 1,
+    );
+    const ray = new THREE.Raycaster();
+    ray.setFromCamera(mouse, cubeCamera);
+    const hits = ray.intersectObject(cubeMesh, false);
+    if (!hits.length) return;
+    // BoxGeometry face groups: 0=+X(RIGHT), 1=-X(LEFT), 2=+Y(TOP), 3=-Y(BOTTOM), 4=+Z(FRONT), 5=-Z(BACK)
+    const faceIndex = Math.floor(hits[0].faceIndex / 2);
+    const viewMap   = ['right', 'left', 'top', 'top', 'front', 'back'];
+    const view = viewMap[faceIndex];
+    if (view) snapView(view);
+  }, [snapView, viewCubeCanvasRef]);
+
   // Label follows mesh position — reuse cached height offset to avoid
   // expensive Box3.setFromObject() calls every 50 ms per object
   useEffect(() => {
@@ -1342,7 +1427,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     return () => clearInterval(tid);
   }, []);
 
-  return { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation };
+  return { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, handleCubeClick };
 }
 
 // ── Compute Z/E status per station from input records (mirrors ZStageDashboard logic) ──
@@ -1420,12 +1505,14 @@ async function z3dDel(key) {
 // ── Main component ─────────────────────────────────────────────────────────────
 function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive }) {
   const canvasRef          = useRef(null);
+  const viewCubeCanvasRef  = useRef(null);
   const fileInputRef       = useRef(null);
   const [selectedLayoutId, setSelectedLayoutId] = useState(null);
   const [layout,    setLayout]    = useState(null);
   const [statusMap, setStatusMap] = useState({});
   const [zeMap,     setZeMap]     = useState({});
   const [walkMode,  setWalkMode]  = useState(false);
+  const [panMode,   setPanMode]   = useState(false);
   const [placedObjects, setPlacedObjects] = useState([]);
   const [selectedId,    setSelectedId]    = useState(null);
   const [transformMode, setTransformModeState] = useState('translate');
@@ -1598,8 +1685,8 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setSceneReady(true);
   }, []);
 
-  const { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation } =
-    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady);
+  const { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, handleCubeClick } =
+    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady, viewCubeCanvasRef, panMode);
 
   const runPreset = useCallback((preset) => {
     // Resolve current object ID by name (objId changes after page refresh)
@@ -1732,8 +1819,13 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             </button>
 
             {/* Walk mode */}
-            <button type="button" className={`z3d-walk-btn${walkMode ? ' z3d-walk-btn--active' : ''}`} onClick={() => setWalkMode(v => !v)}>
+            <button type="button" className={`z3d-walk-btn${walkMode ? ' z3d-walk-btn--active' : ''}`} onClick={() => { setWalkMode(v => !v); setPanMode(false); }}>
               {walkMode ? '🧍 Exit Walk' : '🚶 Walk Mode'}
+            </button>
+
+            {/* Pan mode */}
+            <button type="button" className={`z3d-walk-btn${panMode ? ' z3d-walk-btn--active' : ''}`} onClick={() => { setPanMode(v => !v); setWalkMode(false); }} title="Pan mode — left-drag to pan the camera">
+              {panMode ? '✋ Exit Pan' : '🖐 Pan Mode'}
             </button>
 
             {/* Play All / Stop All presets */}
@@ -2083,6 +2175,8 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
           ) : (
             <>
               <canvas ref={canvasRef} className="z3d-canvas" onClick={handleCanvasClick} onDoubleClick={handleCanvasDblClick} />
+              {/* ViewCube — AutoCAD-style orientation cube */}
+              <canvas ref={viewCubeCanvasRef} className="z3d-viewcube" width={100} height={100} onClick={handleCubeClick} title="Click a face to snap to that view" />
               {!sceneReady && (
                 <div className="z3d-scene-loading">
                   <div className="z3d-scene-loading-box">
@@ -2109,9 +2203,11 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
               <div className="z3d-walk-hint">
                 {walkMode
                   ? 'WASD / Arrow keys to move · Mouse to look · Click canvas to capture mouse'
-                  : currentSelected
-                    ? 'Drag handles to move · Click empty space to deselect'
-                    : 'Left drag to orbit · Scroll to zoom · Click object to select'}
+                  : panMode
+                    ? 'Left drag to pan · Scroll to zoom · Click cube to snap view · Exit Pan to rotate'
+                    : currentSelected
+                      ? 'Drag handles to move · Click empty space to deselect'
+                      : 'Left drag to orbit · Scroll to zoom · Click cube to snap view · Click object to select'}
               </div>
             </>
           )}
