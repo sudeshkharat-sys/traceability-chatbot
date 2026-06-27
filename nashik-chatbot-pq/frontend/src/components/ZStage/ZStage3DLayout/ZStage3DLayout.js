@@ -316,7 +316,7 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     const floorW = CELL_W - 0.05, floorD = DEPTH - 0.05;
     const floor  = new THREE.Mesh(
       new THREE.BoxGeometry(floorW, 0.12, floorD),
-      new THREE.MeshPhongMaterial({ color: 0xdde3ea, specular: 0xc5cdd6, shininess: 15 })
+      new THREE.MeshPhongMaterial({ color: 0xa8b4be, specular: 0x8fa0aa, shininess: 15 })
     );
     floor.position.set(cellCX, 0.06, cellCZ);
     floor.userData.stationId = stnId;
