@@ -723,6 +723,35 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     // even if it's placed at 20 stations).
     z3dModelApi.listPlacements(layout.id).then(res => {
       const placements = res.data || [];
+
+      // For lines that have NO placements in this layout yet, auto-seed from
+      // the most recently saved placement for that line in any other layout.
+      const placedLineGroups = new Set(placements.map(p => p.line_group_id).filter(Boolean));
+      // box.name is the line/shop name — same value stored as line_group_id when using placeObjectForLine
+      const allLineGroups = (layout.station_boxes || []).map(b => b.name).filter(Boolean);
+      const unseededLines = allLineGroups.filter(lg => !placedLineGroups.has(lg));
+
+      const seedPromises = unseededLines.map(lineGroupId =>
+        z3dModelApi.getPlacementsByLineGroup(lineGroupId).then(r => {
+          const crossRecords = r.data || [];
+          if (crossRecords.length === 0) return;
+          // Re-create placement records for this layout, inheriting scale/rotation
+          return Promise.all(crossRecords.map(rec =>
+            z3dModelApi.createPlacement({
+              layoutId: layout.id,
+              modelName: rec.model_name,
+              lineGroupId: rec.line_group_id,
+              stationId: rec.station_id,
+              px: rec.px, py: rec.py, pz: rec.pz,
+              rx: rec.rx, ry: rec.ry, rz: rec.rz,
+              sx: rec.sx, sy: rec.sy, sz: rec.sz,
+            }).then(cr => ({ ...rec, id: cr.data.id, layout_id: layout.id }))
+          ));
+        }).then(seeded => seeded && seeded.forEach(p => placements.push(p)))
+          .catch(() => {})
+      );
+
+      Promise.all(seedPromises).then(() => {
       // Group by model_name so we download each file only once
       const byName = new Map();
       placements.forEach(p => {
@@ -789,6 +818,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
             err => console.error('[Z3D] GLB reload failed:', modelName, err));
         });
       });
+      }); // end Promise.all(seedPromises)
     }).catch(err => console.error('[Z3D] Failed to load saved models:', err));
 
     // Signal that the scene is built and ready to display
@@ -1232,11 +1262,13 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
   // Place one file at every station in the given stationIds array (line placement).
   // Loads the file once then deep-clones the resulting object per station — same
   // code path as placeObject so it's proven to work.
-  const placeObjectForLine = useCallback((file, name, layoutId, stationIds) => {
+  const placeObjectForLine = useCallback((file, name, layoutId, stationIds, lineName) => {
     const scene = sceneRef.current;
     if (!scene || !stationIds?.length) return;
     const ext  = file.name.split('.').pop().toLowerCase();
-    const groupId = `line_${Date.now()}`;
+    // Use line name as group ID so the same line across layouts shares the same key.
+    // Fall back to a timestamp-based ID only if no line name is provided.
+    const groupId = lineName ? lineName : `line_${Date.now()}`;
     const url  = URL.createObjectURL(file);
 
     let _lpct = 10;
@@ -1724,7 +1756,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
       if (uploadMode === 'line' && uploadLine) {
         const lineStations = stationList.filter(s => s.shop === uploadLine).map(s => s.id);
         if (lineStations.length === 0) { alert(`No stations found for line "${uploadLine}".`); return; }
-        placeObjectForLine(file, name, selectedLayoutId, lineStations);
+        placeObjectForLine(file, name, selectedLayoutId, lineStations, uploadLine);
       } else {
         const opts = uploadMode === 'station' && uploadStation ? { stationId: uploadStation } : {};
         placeObject(file, name, selectedLayoutId, opts);

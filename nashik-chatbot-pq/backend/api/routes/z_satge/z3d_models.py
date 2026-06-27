@@ -190,6 +190,19 @@ def delete_placement(placement_id: int, connector: StateDBConnector = Depends(ge
     connector.execute_update(Z3DPlacementQueries.DELETE, {"placement_id": placement_id})
 
 
+@router.get("/placements/by-line-group/{line_group_id}")
+def get_placements_by_line_group(
+    line_group_id: str,
+    connector: StateDBConnector = Depends(get_connector),
+):
+    """Return the latest saved transforms for a line group across all layouts."""
+    rows = connector.execute_query(
+        Z3DPlacementQueries.LIST_LATEST_BY_LINE_GROUP,
+        {"line_group_id": line_group_id},
+    )
+    return [_row(r) for r in rows]
+
+
 @router.delete("/placements/group/{layout_id}/{line_group_id}", status_code=204)
 def delete_placement_group(
     layout_id: int, line_group_id: str,

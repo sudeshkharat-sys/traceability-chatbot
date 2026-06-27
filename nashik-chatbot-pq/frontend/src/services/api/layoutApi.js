@@ -176,6 +176,7 @@ export const z3dModelApi = {
 
   // ── Per-layout placements ───────────────────────────────────────────────────
   listPlacements: (layoutId) => api.get(`/3d-models/placements/layout/${layoutId}`),
+  getPlacementsByLineGroup: (lineGroupId) => api.get(`/3d-models/placements/by-line-group/${encodeURIComponent(lineGroupId)}`),
 
   createPlacement: ({ layoutId, modelName, lineGroupId, stationId, px, py, pz, rx, ry, rz, sx, sy, sz }) => {
     const fd = new FormData();
