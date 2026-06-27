@@ -746,49 +746,79 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     // Signal that the scene is built and ready to display
     onSceneReady && onSceneReady();
 
-    // ── ViewCube setup ────────────────────────────────────────────────────────────
+    // ── ViewCube setup (AutoCAD-style) ───────────────────────────────────────────
     const cubeCanvas = viewCubeCanvasRef?.current;
     if (cubeCanvas) {
       const cubeRenderer = new THREE.WebGLRenderer({ canvas: cubeCanvas, antialias: true, alpha: true });
       cubeRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-      cubeRenderer.setSize(100, 100);
+      cubeRenderer.setSize(120, 120);
       cubeRendererRef.current = cubeRenderer;
 
       const cubeScene = new THREE.Scene();
       cubeSceneRef.current = cubeScene;
-      const cubeCamera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-      cubeCamera.position.set(0, 0, 3.5);
+
+      // Lighting — gives the cube a solid 3D shaded look like AutoCAD
+      cubeScene.add(new THREE.AmbientLight(0xffffff, 0.65));
+      const cl1 = new THREE.DirectionalLight(0xffffff, 0.7);
+      cl1.position.set(3, 4, 5); cubeScene.add(cl1);
+      const cl2 = new THREE.DirectionalLight(0xc8d8e8, 0.25);
+      cl2.position.set(-3, -2, -3); cubeScene.add(cl2);
+
+      const cubeCamera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+      cubeCamera.position.set(0, 0, 4);
       cubeCameraRef.current = cubeCamera;
 
-      // Per-face canvas textures — order: +X, -X, +Y, -Y, +Z, -Z
-      const FACES = [
-        { label: 'RIGHT', bg: '#c0392b' }, { label: 'LEFT',   bg: '#e74c3c' },
-        { label: 'TOP',   bg: '#1565c0' }, { label: 'BOTTOM', bg: '#1976d2' },
-        { label: 'FRONT', bg: '#1b5e20' }, { label: 'BACK',   bg: '#2e7d32' },
+      // Face textures — neutral steel-blue palette, dark labels, AutoCAD feel
+      // BoxGeometry face order: +X(RIGHT), -X(LEFT), +Y(TOP), -Y(BOTTOM), +Z(FRONT), -Z(BACK)
+      const FACE_DEFS = [
+        { label: 'RIGHT',  bg: '#b0bec5', border: '#78909c' },
+        { label: 'LEFT',   bg: '#b0bec5', border: '#78909c' },
+        { label: 'TOP',    bg: '#90a4ae', border: '#546e7a' },
+        { label: 'BOTTOM', bg: '#b0bec5', border: '#78909c' },
+        { label: 'FRONT',  bg: '#90a4ae', border: '#546e7a' },
+        { label: 'BACK',   bg: '#b0bec5', border: '#78909c' },
       ];
-      const faceMaterials = FACES.map(({ label, bg }) => {
+      const faceMaterials = FACE_DEFS.map(({ label, bg, border }) => {
         const fc = document.createElement('canvas');
         fc.width = 128; fc.height = 128;
         const ctx = fc.getContext('2d');
         ctx.fillStyle = bg;
         ctx.fillRect(0, 0, 128, 128);
-        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-        ctx.lineWidth = 6; ctx.strokeRect(3, 3, 122, 122);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 20px Arial';
+        // Inner border — gives each face a recessed panel look
+        ctx.strokeStyle = border;
+        ctx.lineWidth = 5;
+        ctx.strokeRect(4, 4, 120, 120);
+        ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(6, 6, 116, 116);
+        // Label
+        ctx.fillStyle = '#1e2d3d';
+        ctx.font = 'bold 18px "Segoe UI", Arial, sans-serif';
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
         ctx.fillText(label, 64, 64);
-        return new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(fc) });
+        return new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(fc), roughness: 0.75, metalness: 0.05 });
       });
-      const cubeGeo  = new THREE.BoxGeometry(1.6, 1.6, 1.6);
+
+      const CUBE_SIZE = 1.7;
+      const cubeGeo  = new THREE.BoxGeometry(CUBE_SIZE, CUBE_SIZE, CUBE_SIZE);
       const cubeMesh = new THREE.Mesh(cubeGeo, faceMaterials);
       cubeSceneRef.current.add(cubeMesh);
       cubeMeshRef.current = cubeMesh;
 
-      // White edge lines for AutoCAD-style outline
+      // Dark thin edge lines — crisp AutoCAD outline
       const edgesGeo = new THREE.EdgesGeometry(cubeGeo);
-      const edgesMat = new THREE.LineBasicMaterial({ color: 0xffffff });
-      cubeMesh.add(new THREE.LineSegments(edgesGeo, edgesMat));
+      cubeMesh.add(new THREE.LineSegments(edgesGeo, new THREE.LineBasicMaterial({ color: 0x37474f })));
+
+      // Corner spheres — small dark spheres at all 8 corners, clickable
+      const HALF = CUBE_SIZE / 2;
+      const cornerGeo = new THREE.SphereGeometry(0.09, 8, 8);
+      const cornerMat = new THREE.MeshStandardMaterial({ color: 0x263238, roughness: 0.4 });
+      [[-1,-1,-1],[-1,-1,1],[-1,1,-1],[-1,1,1],[1,-1,-1],[1,-1,1],[1,1,-1],[1,1,1]].forEach(([cx,cy,cz]) => {
+        const sphere = new THREE.Mesh(cornerGeo, cornerMat);
+        sphere.position.set(cx * HALF, cy * HALF, cz * HALF);
+        sphere.userData.isCorner = true;
+        cubeMesh.add(sphere);
+      });
     }
 
     // Only re-render when something changes — saves GPU when user is idle
@@ -878,25 +908,46 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     return () => clearTimeout(tid);
   }, [isActive, canvasRef]); // eslint-disable-line
 
-  // Snap view
+  // Snap view — accepts any combination of: top|bottom, front|back, left|right, 3d
+  // e.g. 'top', 'front', 'top-front', 'top-front-right' (edge and corner views)
   const snapView = useCallback((view) => {
     const camera = cameraRef.current, orbit = orbitRef.current;
     if (!camera || !orbit) return;
-    const c = sceneCenterRef.current, span = sceneSpanRef.current, d = span * 0.9;
-    const presets = {
-      top:   { pos: [c.x,     d * 1.4, c.z      ], up: [0, 0, -1] },
-      front: { pos: [c.x,     d * 0.4, c.z + d  ], up: [0, 1,  0] },
-      back:  { pos: [c.x,     d * 0.4, c.z - d  ], up: [0, 1,  0] },
-      left:  { pos: [c.x - d, d * 0.4, c.z      ], up: [0, 1,  0] },
-      right: { pos: [c.x + d, d * 0.4, c.z      ], up: [0, 1,  0] },
-      '3d':  { pos: [c.x + d * 0.8, d * 0.8, c.z + d * 0.9], up: [0, 1, 0] },
-    };
-    const p = presets[view]; if (!p) return;
-    camera.position.set(...p.pos);
-    camera.up.set(...p.up);
-    orbit.target.copy(c);
+    const c = sceneCenterRef.current, span = sceneSpanRef.current;
+    const d = span * 0.9;
+    const cx = c.x, cz = c.z;
+    const v = (view || '').toLowerCase();
+
+    let px, py, pz, up;
+    if (v === '3d') {
+      px = cx + d * 0.8; py = d * 0.8; pz = cz + d * 0.9; up = [0, 1, 0];
+    } else {
+      const hasTop    = v.includes('top');
+      const hasBot    = v.includes('bottom');
+      const hasFront  = v.includes('front');
+      const hasBack   = v.includes('back');
+      const hasRight  = v.includes('right');
+      const hasLeft   = v.includes('left');
+      const isOnlyTop = hasTop && !hasFront && !hasBack && !hasRight && !hasLeft;
+      const isOnlyBot = hasBot && !hasFront && !hasBack && !hasRight && !hasLeft;
+
+      px = cx + (hasRight ? d : hasLeft ? -d : 0);
+      pz = cz + (hasFront ? d : hasBack  ? -d : 0);
+      if (isOnlyTop) {
+        py = d * 1.4; up = [0, 0, -1];
+      } else if (isOnlyBot) {
+        py = -d * 1.0; up = [0, 0, 1];
+      } else {
+        py = hasTop ? d * 0.75 : hasBot ? 0 : d * 0.35;
+        up = [0, 1, 0];
+      }
+    }
+    camera.position.set(px, py, pz);
+    camera.up.set(...up);
+    orbit.target.set(cx, 0, cz);
     orbit.update();
-    camera.lookAt(c);
+    camera.lookAt(cx, 0, cz);
+    dirtyRef.current = true;
   }, []);
 
   // Set transform mode (translate / rotate / scale)
@@ -1387,7 +1438,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     orbit.mouseButtons.LEFT = panMode ? THREE.MOUSE.PAN : THREE.MOUSE.ROTATE;
   }, [panMode]);
 
-  // ViewCube click — raycast against cube faces and snap main camera to matching view
+  // ViewCube click — detects face, edge, or corner zone and snaps camera accordingly
   const handleCubeClick = useCallback((e) => {
     const cubeCanvas = viewCubeCanvasRef?.current;
     const cubeMesh   = cubeMeshRef.current;
@@ -1400,13 +1451,31 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     );
     const ray = new THREE.Raycaster();
     ray.setFromCamera(mouse, cubeCamera);
-    const hits = ray.intersectObject(cubeMesh, false);
+    // intersectObject(cubeMesh, true) — recursive so corner spheres are also hit
+    const hits = ray.intersectObject(cubeMesh, true);
     if (!hits.length) return;
-    // BoxGeometry face groups: 0=+X(RIGHT), 1=-X(LEFT), 2=+Y(TOP), 3=-Y(BOTTOM), 4=+Z(FRONT), 5=-Z(BACK)
-    const faceIndex = Math.floor(hits[0].faceIndex / 2);
-    const viewMap   = ['right', 'left', 'top', 'top', 'front', 'back'];
-    const view = viewMap[faceIndex];
-    if (view) snapView(view);
+
+    // Get hit point in cube's LOCAL space — tells us which direction was clicked
+    const localPt = cubeMesh.worldToLocal(hits[0].point.clone());
+    const HALF    = 0.85;   // cube half-size (slightly larger than geometry to include spheres)
+    // If |coord| / HALF > EDGE_ZONE → this axis is "near the edge"
+    const EDGE_ZONE = 0.48;
+
+    const snap = (v) => (Math.abs(v) / HALF > EDGE_ZONE ? Math.sign(v) : 0);
+    const dx = snap(localPt.x);   // +1=right, -1=left, 0=center
+    const dy = snap(localPt.y);   // +1=top,   -1=bottom, 0=center
+    const dz = snap(localPt.z);   // +1=front, -1=back,  0=center
+
+    // Build view name from active direction axes (e.g. top + front + right = corner)
+    const parts = [];
+    if (dy > 0) parts.push('top');
+    if (dy < 0) parts.push('bottom');
+    if (dz > 0) parts.push('front');
+    if (dz < 0) parts.push('back');
+    if (dx > 0) parts.push('right');
+    if (dx < 0) parts.push('left');
+
+    snapView(parts.length ? parts.join('-') : '3d');
   }, [snapView, viewCubeCanvasRef]);
 
   // Label follows mesh position — reuse cached height offset to avoid
@@ -2176,7 +2245,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             <>
               <canvas ref={canvasRef} className="z3d-canvas" onClick={handleCanvasClick} onDoubleClick={handleCanvasDblClick} />
               {/* ViewCube — AutoCAD-style orientation cube */}
-              <canvas ref={viewCubeCanvasRef} className="z3d-viewcube" width={100} height={100} onClick={handleCubeClick} title="Click a face to snap to that view" />
+              <canvas ref={viewCubeCanvasRef} className="z3d-viewcube" width={120} height={120} onClick={handleCubeClick} title="Click face · edge · corner to snap view" />
               {!sceneReady && (
                 <div className="z3d-scene-loading">
                   <div className="z3d-scene-loading-box">
