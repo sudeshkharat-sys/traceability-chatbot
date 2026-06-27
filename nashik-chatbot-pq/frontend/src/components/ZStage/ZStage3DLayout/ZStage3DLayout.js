@@ -19,7 +19,6 @@ import './ZStage3DLayout.css';
 // then reused for every upload. Saves 1-3 s per upload vs creating a new one each time.
 const _sharedDraco = new DRACOLoader();
 _sharedDraco.setDecoderPath('/draco/');
-_sharedDraco.setDecoderConfig({ type: 'js' });
 _sharedDraco.preload(); // start downloading decoder immediately on page load
 
 function makeGLTFLoader() {
