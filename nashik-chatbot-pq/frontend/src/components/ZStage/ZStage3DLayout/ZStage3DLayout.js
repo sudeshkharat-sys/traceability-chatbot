@@ -8,7 +8,7 @@ import { VRMLLoader } from 'three/examples/jsm/loaders/VRMLLoader';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
 import { RefreshCw } from 'lucide-react';
-import { layoutApi, inputApi } from '../../../services/api/layoutApi';
+import { layoutApi, inputApi, z3dModelApi } from '../../../services/api/layoutApi';
 import { layeredAuditApi } from '../../../services/api/layoutApi';
 import { StationDetailModal, MONTHLY_KEYS } from '../ZStageDashboard/ZStageDashboard';
 import '../ZStageDashboard/ZStageDashboard.css';
@@ -663,25 +663,20 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       } else if (!e.value) {
         leaderDragStart = null;
         memberDragStarts.clear();
-        // Drag finished — persist all group members to IDB
-        if (selectedRef.current && layoutIdRef.current) {
+        // Drag finished — persist updated transforms to server
+        if (selectedRef.current) {
           const sel = selectedRef.current;
           const targets = sel.lineGroupId
             ? placedRef.current.filter(p => p.lineGroupId === sel.lineGroupId)
             : [sel];
-          targets.forEach(({ mesh, id, name, lineGroupId }, idx) => {
-            z3dPut({
-              key: `${layoutIdRef.current}_${id}`,
-              layoutId: layoutIdRef.current,
-              id, name,
-              ext: mesh.userData.objExt || 'glb',
-              // Only the first entry in a group carries the blob to avoid quota exhaustion
-              fileBlob: (idx === 0 || !lineGroupId) ? (blobCacheRef.current[id] || undefined) : undefined,
-              lineGroupId: lineGroupId || null,
+          targets.forEach(({ mesh }) => {
+            const sid = mesh.userData.serverModelId;
+            if (!sid) return;
+            z3dModelApi.updateTransform(sid, {
               px: mesh.position.x, py: mesh.position.y, pz: mesh.position.z,
               rx: mesh.rotation.x, ry: mesh.rotation.y, rz: mesh.rotation.z,
               sx: mesh.scale.x,    sy: mesh.scale.y,    sz: mesh.scale.z,
-            });
+            }).catch(err => console.error('[Z3D] Transform update failed:', err));
           });
         }
       }
@@ -707,69 +702,64 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     // Track current layoutId for IDB saves inside event handlers
     layoutIdRef.current = layout.id;
 
-    // Reload previously saved placed objects from IDB.
-    // Group records by lineGroupId (or individual id) so each unique GLB blob
-    // is parsed only ONCE, then shallow-cloned for every station — avoids
-    // parsing a 70 MB file N times for a line-placement group.
-    z3dGetAll(layout.id).then(saved => {
-      // Build groups: lineGroupId -> [record, ...] or individual records
+    // Reload previously saved placed objects from server.
+    // Group records by line_group_id so each unique GLB file is downloaded
+    // only ONCE, then shallow-cloned per station — one download even for a
+    // 20-station line placement.
+    z3dModelApi.list(layout.id).then(res => {
+      const saved = res.data || [];
       const groups = new Map();
       saved.forEach(record => {
-        const gKey = record.lineGroupId || record.id;
+        const gKey = record.line_group_id || String(record.id);
         if (!groups.has(gKey)) groups.set(gKey, []);
         groups.get(gKey).push(record);
       });
 
       groups.forEach(records => {
-        // Find the record that actually carries the blob (idx=0 of the group)
-        const first = records.find(r => r.fileBlob) || records[0];
-        const blob  = first.fileBlob;
-        if (!blob) return;
-        const ext = first.ext || 'glb';
-        const url = URL.createObjectURL(blob);
+        // Find the leader record (has a file saved on server)
+        const leader = records.find(r => r.file_path) || records[0];
+        const downloadUrl = z3dModelApi.getDownloadUrl(leader.id);
+        const ext = leader.ext || 'glb';
 
         const applyRecord = (template, record) => {
-          // Clone for every record after the first so geometry buffers are shared
-          const obj = record === first ? template : sharedClone(template);
+          const obj = record === leader ? template : sharedClone(template);
           obj.traverse(child => {
             if (child.isSprite || (child.material && child.material.map === null && child.isLine)) child.visible = false;
           });
           obj.position.set(record.px ?? 0, record.py ?? 0, record.pz ?? 0);
           obj.rotation.set(record.rx ?? 0, record.ry ?? 0, record.rz ?? 0);
           obj.scale.set(record.sx ?? 1,    record.sy ?? 1,    record.sz ?? 1);
-          obj.userData.isPlaced         = true;
-          obj.userData.objId            = record.id;
-          obj.userData.objName          = record.name;
-          obj.userData.objExt           = ext;
-          // Restore baseScale + floorOffsetAtBase so scale slider re-snaps correctly
-          obj.userData.baseScale        = record.sx ?? 1;
+          obj.userData.isPlaced          = true;
+          obj.userData.objId             = String(record.id);
+          obj.userData.serverModelId     = record.id;
+          obj.userData.objName           = record.name;
+          obj.userData.objExt            = ext;
+          obj.userData.baseScale         = record.sx ?? 1;
           obj.userData.floorOffsetAtBase = (record.py ?? 0) / (record.sx ?? 1);
-          blobCacheRef.current[record.id] = blob;
           scene.add(obj); dirtyRef.current = true;
           const entry = {
-            id: record.id, mesh: obj, label: null, name: record.name,
-            stationId: record.stationId || null,
-            lineGroupId: record.lineGroupId || null,
+            id: String(record.id), mesh: obj, label: null, name: record.name,
+            stationId: record.station_id || null,
+            lineGroupId: record.line_group_id || null,
           };
           placedRef.current = [...placedRef.current, entry];
           onObjectsChange([...placedRef.current]);
         };
 
         const onTemplate = (template) => {
-          URL.revokeObjectURL(url);
           records.forEach(record => applyRecord(template, record));
         };
 
         try {
-          if (ext === 'glb' || ext === 'gltf') makeGLTFLoader().load(url, g => onTemplate(g.scene), undefined, (err) => console.error('[Z3D] GLB reload failed:', err));
-          else if (ext === 'obj') new OBJLoader().load(url, onTemplate);
-          else if (ext === 'stl') new STLLoader().load(url, geo => {
+          if (ext === 'glb' || ext === 'gltf') makeGLTFLoader().load(downloadUrl, g => onTemplate(g.scene), undefined, err => console.error('[Z3D] GLB reload failed:', err));
+          else if (ext === 'obj') new OBJLoader().load(downloadUrl, onTemplate);
+          else if (ext === 'stl') new STLLoader().load(downloadUrl, geo => {
             geo.computeVertexNormals();
             onTemplate(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x90a4ae })));
           });
         } catch {}
       });
-    });
+    }).catch(err => console.error('[Z3D] Failed to load saved models:', err));
 
     // Signal that the scene is built and ready to display
     onSceneReady && onSceneReady();
@@ -994,20 +984,25 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       const entry = { id: objId, mesh: obj, label: null, name, stationId: options.stationId || null };
       placedRef.current = [...placedRef.current, entry];
 
-      // Persist to IDB (file blob + initial transform) and cache blob for later updates
+      // Upload to server — server saves file on disk, transform in DB
       if (layoutId) {
-        file.arrayBuffer().then(buf => {
-          const blob = new Blob([buf], { type: file.type || 'application/octet-stream' });
-          blobCacheRef.current[objId] = blob;
-          z3dPut({
-            key: `${layoutId}_${objId}`,
-            layoutId, id: objId, name, ext,
-            fileBlob: blob,
-            px: obj.position.x, py: obj.position.y, pz: obj.position.z,
-            rx: obj.rotation.x, ry: obj.rotation.y, rz: obj.rotation.z,
-            sx: obj.scale.x,    sy: obj.scale.y,    sz: obj.scale.z,
-          });
-        }).catch(() => {});
+        z3dModelApi.upload(file, {
+          layoutId, userId: undefined,
+          name, lineGroupId: null,
+          stationId: options.stationId || null,
+          isGroupLeader: true,
+          px: obj.position.x, py: obj.position.y, pz: obj.position.z,
+          rx: obj.rotation.x, ry: obj.rotation.y, rz: obj.rotation.z,
+          sx: obj.scale.x,    sy: obj.scale.y,    sz: obj.scale.z,
+        }).then(res => {
+          // Store server-assigned ID so transform updates hit the right row
+          obj.userData.serverModelId = res.data.id;
+          const entry = placedRef.current.find(p => p.id === objId);
+          if (entry) {
+            // Update entry id to server id so future deletes/updates work
+            entry.serverModelId = res.data.id;
+          }
+        }).catch(err => console.error('[Z3D] Failed to save model to server:', err));
       }
 
       // Select immediately and set mode to translate
@@ -1130,9 +1125,11 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     });
     const deleteIds = new Set(targets.map(t => t.id));
     placedRef.current = placedRef.current.filter(p => !deleteIds.has(p.id));
-    if (layoutIdRef.current) {
-      deleteIds.forEach(did => z3dDel(`${layoutIdRef.current}_${did}`));
-    }
+    // Delete from server using server-assigned IDs
+    targets.forEach(t => {
+      const sid = t.mesh.userData.serverModelId;
+      if (sid) z3dModelApi.delete(sid).catch(() => {});
+    });
     onObjectsChange([...placedRef.current]);
   }, [onObjectsChange]);
 
@@ -1167,18 +1164,13 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       if (t.mesh.userData.floorOffsetAtBase !== undefined) {
         t.mesh.position.y = t.mesh.userData.floorOffsetAtBase * newScale;
       }
-      if (layoutIdRef.current) {
-        z3dPut({
-          key: `${layoutIdRef.current}_${t.id}`,
-          layoutId: layoutIdRef.current,
-          id: t.id, name: t.name,
-          ext: t.mesh.userData.objExt || 'glb',
-          fileBlob: blobCacheRef.current[t.id] || undefined,
-          lineGroupId: t.lineGroupId || null,
+      const sid = t.mesh.userData.serverModelId;
+      if (sid) {
+        z3dModelApi.updateTransform(sid, {
           px: t.mesh.position.x, py: t.mesh.position.y, pz: t.mesh.position.z,
           rx: t.mesh.rotation.x, ry: t.mesh.rotation.y, rz: t.mesh.rotation.z,
           sx: t.mesh.scale.x,    sy: t.mesh.scale.y,    sz: t.mesh.scale.z,
-        });
+        }).catch(() => {});
       }
     });
   }, []);
@@ -1196,18 +1188,13 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         (ry * Math.PI) / 180,
         (rz * Math.PI) / 180
       );
-      if (layoutIdRef.current) {
-        z3dPut({
-          key: `${layoutIdRef.current}_${t.id}`,
-          layoutId: layoutIdRef.current,
-          id: t.id, name: t.name,
-          ext: t.mesh.userData.objExt || 'glb',
-          fileBlob: blobCacheRef.current[t.id] || undefined,
-          lineGroupId: t.lineGroupId || null,
+      const sid = t.mesh.userData.serverModelId;
+      if (sid) {
+        z3dModelApi.updateTransform(sid, {
           px: t.mesh.position.x, py: t.mesh.position.y, pz: t.mesh.position.z,
           rx: t.mesh.rotation.x, ry: t.mesh.rotation.y, rz: t.mesh.rotation.z,
           sx: t.mesh.scale.x,    sy: t.mesh.scale.y,    sz: t.mesh.scale.z,
-        });
+        }).catch(() => {});
       }
     });
   }, []);
@@ -1308,26 +1295,23 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       placedRef.current = [...placedRef.current, ...newEntries];
       onObjectsChange([...placedRef.current]);
 
-      // Persist each clone to IDB — store fileBlob ONLY in the first entry so we
-      // don't save N × fileSize bytes (a 70 MB model × 20 stations = 1.4 GB which
-      // exceeds browser quota and silently fails, losing all data).
-      // The restore code groups by lineGroupId and reads blob from records[0] only.
+      // Upload to server — first clone uploads the actual file (is_group_leader=true),
+      // rest just register their transforms (is_group_leader=false, server skips file write).
       if (layoutId) {
-        file.arrayBuffer().then(buf => {
-          const fileBlob = new Blob([buf], { type: file.type || 'application/octet-stream' });
-          newEntries.forEach((entry, idx) => {
-            blobCacheRef.current[entry.id] = fileBlob;
-            z3dPut({
-              key: `${layoutId}_${entry.id}`,
-              layoutId, id: entry.id, name, ext,
-              fileBlob: idx === 0 ? fileBlob : undefined, // only first entry holds the blob
-              lineGroupId: groupId,
-              px: entry.mesh.position.x, py: entry.mesh.position.y, pz: entry.mesh.position.z,
-              rx: entry.mesh.rotation.x, ry: entry.mesh.rotation.y, rz: entry.mesh.rotation.z,
-              sx: entry.mesh.scale.x,    sy: entry.mesh.scale.y,    sz: entry.mesh.scale.z,
-            });
-          });
-        }).catch(() => {});
+        newEntries.forEach((entry, idx) => {
+          z3dModelApi.upload(idx === 0 ? file : new File([], file.name, { type: file.type }), {
+            layoutId, userId: undefined,
+            name, lineGroupId: groupId,
+            stationId: entry.stationId || null,
+            isGroupLeader: idx === 0,
+            px: entry.mesh.position.x, py: entry.mesh.position.y, pz: entry.mesh.position.z,
+            rx: entry.mesh.rotation.x, ry: entry.mesh.rotation.y, rz: entry.mesh.rotation.z,
+            sx: entry.mesh.scale.x,    sy: entry.mesh.scale.y,    sz: entry.mesh.scale.z,
+          }).then(res => {
+            entry.mesh.userData.serverModelId = res.data.id;
+            entry.serverModelId = res.data.id;
+          }).catch(err => console.error('[Z3D] Failed to save line model clone to server:', err));
+        });
       }
     };
 
@@ -1447,52 +1431,7 @@ function computeZeMap(records) {
   return map;
 }
 
-// ── IndexedDB helpers for placed-object persistence ───────────────────────────
-const Z3D_DB   = 'z3d_placed_v1';
-const Z3D_STORE = 'objects';
-
-function z3dOpen() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(Z3D_DB, 1);
-    req.onupgradeneeded = (e) => e.target.result.createObjectStore(Z3D_STORE, { keyPath: 'key' });
-    req.onsuccess = (e) => resolve(e.target.result);
-    req.onerror   = (e) => reject(e.target.error);
-  });
-}
-async function z3dGetAll(layoutId) {
-  try {
-    const db  = await z3dOpen();
-    const all = await new Promise((res) => {
-      const req = db.transaction(Z3D_STORE, 'readonly').objectStore(Z3D_STORE).getAll();
-      req.onsuccess = () => res(req.result || []);
-      req.onerror   = () => res([]);
-    });
-    db.close();
-    return all.filter(r => r.layoutId === layoutId);
-  } catch { return []; }
-}
-async function z3dPut(record) {
-  try {
-    const db = await z3dOpen();
-    await new Promise((res, rej) => {
-      const tx = db.transaction(Z3D_STORE, 'readwrite');
-      tx.objectStore(Z3D_STORE).put(record);
-      tx.oncomplete = res; tx.onerror = () => rej(tx.error);
-    });
-    db.close();
-  } catch {}
-}
-async function z3dDel(key) {
-  try {
-    const db = await z3dOpen();
-    await new Promise((res) => {
-      const tx = db.transaction(Z3D_STORE, 'readwrite');
-      tx.objectStore(Z3D_STORE).delete(key);
-      tx.oncomplete = res; tx.onerror = res;
-    });
-    db.close();
-  } catch {}
-}
+// (IndexedDB removed — models are now persisted server-side via z3dModelApi)
 
 // ── Main component ─────────────────────────────────────────────────────────────
 function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive }) {

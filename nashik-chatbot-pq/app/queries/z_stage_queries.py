@@ -444,3 +444,61 @@ class StationDocumentQueries:
     DELETE = "DELETE FROM station_documents WHERE id = :doc_id"
 
     CHECK_EXISTS = "SELECT id FROM station_documents WHERE id = :doc_id"
+
+
+# ── Z3D placed models queries ─────────────────────────────────────────────────
+
+class Z3DModelQueries:
+    COLS = """
+        id, layout_id, user_id, name, ext, file_path, file_size,
+        line_group_id, station_id,
+        px, py, pz, rx, ry, rz, sx, sy, sz,
+        created_at, updated_at
+    """
+
+    LIST_BY_LAYOUT = f"""
+        SELECT {COLS}
+        FROM z3d_placed_models
+        WHERE layout_id = :layout_id
+        ORDER BY id
+    """
+
+    GET_BY_ID = f"""
+        SELECT {COLS}
+        FROM z3d_placed_models
+        WHERE id = :model_id
+    """
+
+    CREATE = f"""
+        INSERT INTO z3d_placed_models
+            (layout_id, user_id, name, ext, file_path, file_size,
+             line_group_id, station_id,
+             px, py, pz, rx, ry, rz, sx, sy, sz,
+             created_at, updated_at)
+        VALUES
+            (:layout_id, :user_id, :name, :ext, :file_path, :file_size,
+             :line_group_id, :station_id,
+             :px, :py, :pz, :rx, :ry, :rz, :sx, :sy, :sz,
+             NOW(), NOW())
+        RETURNING {COLS}
+    """
+
+    UPDATE_TRANSFORM = """
+        UPDATE z3d_placed_models
+        SET px = :px, py = :py, pz = :pz,
+            rx = :rx, ry = :ry, rz = :rz,
+            sx = :sx, sy = :sy, sz = :sz,
+            updated_at = NOW()
+        WHERE id = :model_id
+        RETURNING id
+    """
+
+    DELETE = "DELETE FROM z3d_placed_models WHERE id = :model_id"
+
+    CHECK_EXISTS = "SELECT id FROM z3d_placed_models WHERE id = :model_id"
+
+    LIST_GROUP = f"""
+        SELECT {COLS}
+        FROM z3d_placed_models
+        WHERE line_group_id = :line_group_id AND layout_id = :layout_id
+    """

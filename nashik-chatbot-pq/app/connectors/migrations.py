@@ -66,6 +66,32 @@ COLUMN_MIGRATIONS = [
     "CREATE INDEX IF NOT EXISTS idx_station_docs_station_id ON station_documents (station_id)",
     "CREATE INDEX IF NOT EXISTS idx_station_docs_layout_id ON station_documents (layout_id)",
     "CREATE INDEX IF NOT EXISTS idx_station_docs_concern_id ON station_documents (concern_id)",
+    # z3d placed 3-D models (GLB files stored on disk, transforms in DB)
+    """
+    CREATE TABLE IF NOT EXISTS z3d_placed_models (
+        id SERIAL PRIMARY KEY,
+        layout_id INTEGER NOT NULL REFERENCES layouts(id) ON DELETE CASCADE,
+        user_id INTEGER,
+        name VARCHAR(500) NOT NULL,
+        ext VARCHAR(20) NOT NULL DEFAULT 'glb',
+        file_path VARCHAR(1000),
+        file_size INTEGER,
+        line_group_id VARCHAR(100),
+        station_id VARCHAR(100),
+        px FLOAT NOT NULL DEFAULT 0,
+        py FLOAT NOT NULL DEFAULT 0,
+        pz FLOAT NOT NULL DEFAULT 0,
+        rx FLOAT NOT NULL DEFAULT 0,
+        ry FLOAT NOT NULL DEFAULT 0,
+        rz FLOAT NOT NULL DEFAULT 0,
+        sx FLOAT NOT NULL DEFAULT 1,
+        sy FLOAT NOT NULL DEFAULT 1,
+        sz FLOAT NOT NULL DEFAULT 1,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_z3d_models_layout_id ON z3d_placed_models (layout_id)",
     # buyoff icon label
     "ALTER TABLE buyoff_icons ADD COLUMN IF NOT EXISTS name VARCHAR(255) DEFAULT ''",
     # canvas text labels stored as JSON array in the layout row
