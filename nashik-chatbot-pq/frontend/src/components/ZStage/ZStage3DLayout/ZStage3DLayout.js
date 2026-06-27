@@ -887,9 +887,18 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     }
 
     const url  = URL.createObjectURL(file);
-    onConvertStart && onConvertStart(10); // show loading overlay while GLB is being parsed
+
+    // Fake progress ticker — blob URLs have no Content-Length so xhr.total is always 0.
+    // This keeps the progress bar moving so the user knows something is happening.
+    let _pct = 10;
+    onConvertStart && onConvertStart(_pct);
+    const _ticker = setInterval(() => {
+      _pct = Math.min(_pct + (_pct < 60 ? 4 : _pct < 85 ? 1.5 : 0.4), 92);
+      onConvertStart && onConvertStart(Math.round(_pct));
+    }, 300);
 
     const onLoaded = (obj) => {
+      clearInterval(_ticker);
       onConvertEnd && onConvertEnd();
       URL.revokeObjectURL(url);
 
@@ -971,6 +980,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         (gltf) => onLoaded(gltf.scene),
         (xhr) => { if (xhr.total) onConvertStart && onConvertStart(Math.round(xhr.loaded / xhr.total * 90)); },
         (err) => {
+          clearInterval(_ticker);
           onConvertEnd && onConvertEnd();
           console.error('[Z3D] GLB upload failed:', err);
           alert('Failed to load GLB: ' + (err?.message || err));
@@ -1159,9 +1169,15 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     const groupId = `line_${Date.now()}`;
     const url  = URL.createObjectURL(file);
 
-    onConvertStart && onConvertStart(10); // show loading overlay while parsing GLB
+    let _lpct = 10;
+    onConvertStart && onConvertStart(_lpct);
+    const _lticker = setInterval(() => {
+      _lpct = Math.min(_lpct + (_lpct < 60 ? 4 : _lpct < 85 ? 1.5 : 0.4), 92);
+      onConvertStart && onConvertStart(Math.round(_lpct));
+    }, 300);
 
     const onTemplateLoaded = (template) => {
+      clearInterval(_lticker);
       onConvertEnd && onConvertEnd();
       URL.revokeObjectURL(url);
 
@@ -1240,7 +1256,13 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     };
 
     if (ext === 'glb' || ext === 'gltf') {
-      makeGLTFLoader().load(url, (gltf) => onTemplateLoaded(gltf.scene), undefined, (err) => console.error('[Z3D] GLB line-load failed:', err));
+      makeGLTFLoader().load(url, (gltf) => onTemplateLoaded(gltf.scene), undefined, (err) => {
+        clearInterval(_lticker);
+        URL.revokeObjectURL(url);
+        onConvertEnd && onConvertEnd(false);
+        console.error('[Z3D] GLB line-load failed:', err);
+        alert('Failed to load GLB: ' + (err?.message || err));
+      });
     } else if (ext === 'obj') {
       new OBJLoader().load(url, onTemplateLoaded);
     } else if (ext === 'stl') {
