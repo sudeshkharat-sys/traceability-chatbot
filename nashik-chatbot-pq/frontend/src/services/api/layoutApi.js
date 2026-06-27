@@ -155,26 +155,45 @@ export const docApi = {
   deleteDoc: (docId) => api.delete(`/docs/${docId}`),
 };
 export const z3dModelApi = {
-  list: (layoutId) => api.get(`/3d-models/layout/${layoutId}`),
+  // ── Global library ──────────────────────────────────────────────────────────
+  listLibrary: () => api.get('/3d-models/library'),
 
-  upload: (file, { layoutId, userId, name, lineGroupId, stationId, isGroupLeader, px, py, pz, rx, ry, rz, sx, sy, sz }) => {
+  getLibraryModel: (name) => api.get(`/3d-models/library/${encodeURIComponent(name)}`),
+
+  uploadToLibrary: (file, { name, defaultSx = 1, defaultSy = 1, defaultSz = 1, defaultRx = 0, defaultRy = 0, defaultRz = 0 }) => {
     const fd = new FormData();
     fd.append('file', file);
-    fd.append('layout_id', layoutId);
-    if (userId != null) fd.append('user_id', userId);
     fd.append('name', name);
+    fd.append('default_sx', defaultSx); fd.append('default_sy', defaultSy); fd.append('default_sz', defaultSz);
+    fd.append('default_rx', defaultRx); fd.append('default_ry', defaultRy); fd.append('default_rz', defaultRz);
+    return axios.post(`${BASE_URL}/3d-models/library/upload`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+  },
+
+  saveDefaults: (name, { sx, sy, sz, rx, ry, rz }) =>
+    api.put(`/3d-models/library/${encodeURIComponent(name)}/defaults`, { sx, sy, sz, rx, ry, rz }),
+
+  getDownloadUrl: (name) => `${BASE_URL}/3d-models/library/${encodeURIComponent(name)}/download`,
+
+  // ── Per-layout placements ───────────────────────────────────────────────────
+  listPlacements: (layoutId) => api.get(`/3d-models/placements/layout/${layoutId}`),
+
+  createPlacement: ({ layoutId, modelName, lineGroupId, stationId, px, py, pz, rx, ry, rz, sx, sy, sz }) => {
+    const fd = new FormData();
+    fd.append('layout_id', layoutId);
+    fd.append('model_name', modelName);
     if (lineGroupId) fd.append('line_group_id', lineGroupId);
-    if (stationId) fd.append('station_id', stationId);
-    fd.append('is_group_leader', isGroupLeader ? 'true' : 'false');
+    if (stationId)   fd.append('station_id', stationId);
     fd.append('px', px ?? 0); fd.append('py', py ?? 0); fd.append('pz', pz ?? 0);
     fd.append('rx', rx ?? 0); fd.append('ry', ry ?? 0); fd.append('rz', rz ?? 0);
     fd.append('sx', sx ?? 1); fd.append('sy', sy ?? 1); fd.append('sz', sz ?? 1);
-    return axios.post(`${BASE_URL}/3d-models/upload`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+    return axios.post(`${BASE_URL}/3d-models/placements`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
 
-  getDownloadUrl: (modelId) => `${BASE_URL}/3d-models/${modelId}/download`,
+  updateTransform: (placementId, transform) =>
+    api.put(`/3d-models/placements/${placementId}/transform`, transform),
 
-  updateTransform: (modelId, transform) => api.put(`/3d-models/${modelId}/transform`, transform),
+  deletePlacement: (placementId) => api.delete(`/3d-models/placements/${placementId}`),
 
-  delete: (modelId) => api.delete(`/3d-models/${modelId}`),
+  deleteGroup: (layoutId, lineGroupId) =>
+    api.delete(`/3d-models/placements/group/${layoutId}/${encodeURIComponent(lineGroupId)}`),
 };

@@ -706,23 +706,24 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     // Group records by line_group_id so each unique GLB file is downloaded
     // only ONCE, then shallow-cloned per station — one download even for a
     // 20-station line placement.
-    z3dModelApi.list(layout.id).then(res => {
-      const saved = res.data || [];
-      const groups = new Map();
-      saved.forEach(record => {
-        const gKey = record.line_group_id || String(record.id);
-        if (!groups.has(gKey)) groups.set(gKey, []);
-        groups.get(gKey).push(record);
+    // Restore placed models: fetch placements for this layout, then download
+    // each unique model from the global library (one download per model name,
+    // even if it's placed at 20 stations).
+    z3dModelApi.listPlacements(layout.id).then(res => {
+      const placements = res.data || [];
+      // Group by model_name so we download each file only once
+      const byName = new Map();
+      placements.forEach(p => {
+        if (!byName.has(p.model_name)) byName.set(p.model_name, []);
+        byName.get(p.model_name).push(p);
       });
 
-      groups.forEach(records => {
-        // Find the leader record (has a file saved on server)
-        const leader = records.find(r => r.file_path) || records[0];
-        const downloadUrl = z3dModelApi.getDownloadUrl(leader.id);
-        const ext = leader.ext || 'glb';
+      byName.forEach((records, modelName) => {
+        const downloadUrl = z3dModelApi.getDownloadUrl(modelName);
+        const ext = (records[0].model_name || 'glb').split('.').pop(); // fallback
 
-        const applyRecord = (template, record) => {
-          const obj = record === leader ? template : sharedClone(template);
+        const applyRecord = (template, record, isFirst) => {
+          const obj = isFirst ? template : sharedClone(template);
           obj.traverse(child => {
             if (child.isSprite || (child.material && child.material.map === null && child.isLine)) child.visible = false;
           });
@@ -732,13 +733,13 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           obj.userData.isPlaced          = true;
           obj.userData.objId             = String(record.id);
           obj.userData.serverModelId     = record.id;
-          obj.userData.objName           = record.name;
-          obj.userData.objExt            = ext;
+          obj.userData.objName           = record.model_name;
+          obj.userData.objExt            = record.model_name.split('.').pop() || 'glb';
           obj.userData.baseScale         = record.sx ?? 1;
-          obj.userData.floorOffsetAtBase = (record.py ?? 0) / (record.sx ?? 1);
+          obj.userData.floorOffsetAtBase = (record.py ?? 0) / ((record.sx ?? 1) || 1);
           scene.add(obj); dirtyRef.current = true;
           const entry = {
-            id: String(record.id), mesh: obj, label: null, name: record.name,
+            id: String(record.id), mesh: obj, label: null, name: record.model_name,
             stationId: record.station_id || null,
             lineGroupId: record.line_group_id || null,
           };
@@ -747,17 +748,30 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         };
 
         const onTemplate = (template) => {
-          records.forEach(record => applyRecord(template, record));
+          records.forEach((record, idx) => applyRecord(template, record, idx === 0));
         };
 
-        try {
-          if (ext === 'glb' || ext === 'gltf') makeGLTFLoader().load(downloadUrl, g => onTemplate(g.scene), undefined, err => console.error('[Z3D] GLB reload failed:', err));
-          else if (ext === 'obj') new OBJLoader().load(downloadUrl, onTemplate);
-          else if (ext === 'stl') new STLLoader().load(downloadUrl, geo => {
-            geo.computeVertexNormals();
-            onTemplate(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x90a4ae })));
-          });
-        } catch {}
+        // Fetch library entry to get ext, then load the model
+        z3dModelApi.getLibraryModel(modelName).then(libRes => {
+          const libExt = libRes.data?.ext || 'glb';
+          try {
+            if (libExt === 'glb' || libExt === 'gltf') {
+              makeGLTFLoader().load(downloadUrl, g => onTemplate(g.scene), undefined,
+                err => console.error('[Z3D] GLB reload failed:', modelName, err));
+            } else if (libExt === 'obj') {
+              new OBJLoader().load(downloadUrl, onTemplate);
+            } else if (libExt === 'stl') {
+              new STLLoader().load(downloadUrl, geo => {
+                geo.computeVertexNormals();
+                onTemplate(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x90a4ae })));
+              });
+            }
+          } catch {}
+        }).catch(() => {
+          // fallback: assume glb
+          makeGLTFLoader().load(downloadUrl, g => onTemplate(g.scene), undefined,
+            err => console.error('[Z3D] GLB reload failed:', modelName, err));
+        });
       });
     }).catch(err => console.error('[Z3D] Failed to load saved models:', err));
 
@@ -984,24 +998,21 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       const entry = { id: objId, mesh: obj, label: null, name, stationId: options.stationId || null };
       placedRef.current = [...placedRef.current, entry];
 
-      // Upload to server — server saves file on disk, transform in DB
+      // Save to server: upload file to global library (reuses if name exists),
+      // then create a per-layout placement record with the transform.
       if (layoutId) {
-        z3dModelApi.upload(file, {
-          layoutId, userId: undefined,
-          name, lineGroupId: null,
-          stationId: options.stationId || null,
-          isGroupLeader: true,
-          px: obj.position.x, py: obj.position.y, pz: obj.position.z,
-          rx: obj.rotation.x, ry: obj.rotation.y, rz: obj.rotation.z,
-          sx: obj.scale.x,    sy: obj.scale.y,    sz: obj.scale.z,
-        }).then(res => {
-          // Store server-assigned ID so transform updates hit the right row
+        z3dModelApi.uploadToLibrary(file, { name }).then(() =>
+          z3dModelApi.createPlacement({
+            layoutId, modelName: name,
+            lineGroupId: null, stationId: options.stationId || null,
+            px: obj.position.x, py: obj.position.y, pz: obj.position.z,
+            rx: obj.rotation.x, ry: obj.rotation.y, rz: obj.rotation.z,
+            sx: obj.scale.x,    sy: obj.scale.y,    sz: obj.scale.z,
+          })
+        ).then(res => {
           obj.userData.serverModelId = res.data.id;
           const entry = placedRef.current.find(p => p.id === objId);
-          if (entry) {
-            // Update entry id to server id so future deletes/updates work
-            entry.serverModelId = res.data.id;
-          }
+          if (entry) entry.serverModelId = res.data.id;
         }).catch(err => console.error('[Z3D] Failed to save model to server:', err));
       }
 
@@ -1128,7 +1139,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     // Delete from server using server-assigned IDs
     targets.forEach(t => {
       const sid = t.mesh.userData.serverModelId;
-      if (sid) z3dModelApi.delete(sid).catch(() => {});
+      if (sid) z3dModelApi.deletePlacement(sid).catch(() => {});
     });
     onObjectsChange([...placedRef.current]);
   }, [onObjectsChange]);
@@ -1295,23 +1306,22 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       placedRef.current = [...placedRef.current, ...newEntries];
       onObjectsChange([...placedRef.current]);
 
-      // Upload to server — first clone uploads the actual file (is_group_leader=true),
-      // rest just register their transforms (is_group_leader=false, server skips file write).
+      // Upload file once to global library, then create one placement per station.
       if (layoutId) {
-        newEntries.forEach((entry, idx) => {
-          z3dModelApi.upload(idx === 0 ? file : new File([], file.name, { type: file.type }), {
-            layoutId, userId: undefined,
-            name, lineGroupId: groupId,
-            stationId: entry.stationId || null,
-            isGroupLeader: idx === 0,
-            px: entry.mesh.position.x, py: entry.mesh.position.y, pz: entry.mesh.position.z,
-            rx: entry.mesh.rotation.x, ry: entry.mesh.rotation.y, rz: entry.mesh.rotation.z,
-            sx: entry.mesh.scale.x,    sy: entry.mesh.scale.y,    sz: entry.mesh.scale.z,
-          }).then(res => {
-            entry.mesh.userData.serverModelId = res.data.id;
-            entry.serverModelId = res.data.id;
-          }).catch(err => console.error('[Z3D] Failed to save line model clone to server:', err));
-        });
+        z3dModelApi.uploadToLibrary(file, { name }).then(() =>
+          Promise.all(newEntries.map(entry =>
+            z3dModelApi.createPlacement({
+              layoutId, modelName: name,
+              lineGroupId: groupId, stationId: entry.stationId || null,
+              px: entry.mesh.position.x, py: entry.mesh.position.y, pz: entry.mesh.position.z,
+              rx: entry.mesh.rotation.x, ry: entry.mesh.rotation.y, rz: entry.mesh.rotation.z,
+              sx: entry.mesh.scale.x,    sy: entry.mesh.scale.y,    sz: entry.mesh.scale.z,
+            }).then(res => {
+              entry.mesh.userData.serverModelId = res.data.id;
+              entry.serverModelId = res.data.id;
+            })
+          ))
+        ).catch(err => console.error('[Z3D] Failed to save line model to server:', err));
       }
     };
 
@@ -1651,7 +1661,8 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setPendingFile(file);
 
     // Auto-detect line from filename — fuzzy match against shopList
-    const baseName = file.name.replace(/\.[^/.]+$/, '').toLowerCase().replace(/[-_\s]+/g, ' ');
+    const modelName = file.name.replace(/\.[^/.]+$/, '');
+    const baseName = modelName.toLowerCase().replace(/[-_\s]+/g, ' ');
     const matched = shopList.find(shop => {
       const s = shop.toLowerCase().replace(/[-_\s]+/g, ' ');
       return baseName.includes(s) || s.includes(baseName);
@@ -1665,6 +1676,16 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     }
     setUploadShop('');
     setUploadStation('');
+
+    // Check server library for saved defaults — apply if found
+    z3dModelApi.getLibraryModel(modelName).then(res => {
+      const lib = res.data;
+      if (lib) {
+        const scale = lib.default_sx || 1;
+        saveModelPreset(modelName, { scale, rotX: lib.default_rx || 0, rotY: lib.default_ry || 0, rotZ: lib.default_rz || 0 });
+      }
+    }).catch(() => {}); // not in library yet — that's fine
+
     setShowUploadModal(true);
     e.target.value = '';
   }, [shopList]);
@@ -2068,8 +2089,12 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                   title="Save scale & rotation as default for this model name"
                   onClick={() => {
                     if (!currentSelected) return;
-                    saveModelPreset(currentSelected.name, { scale: scaleVal, rotX, rotY, rotZ });
-                    alert(`Preset saved for "${currentSelected.name}"`);
+                    const n = currentSelected.name;
+                    // Save to localStorage for fast access + server library for cross-user persistence
+                    saveModelPreset(n, { scale: scaleVal, rotX, rotY, rotZ });
+                    z3dModelApi.saveDefaults(n, { sx: scaleVal, sy: scaleVal, sz: scaleVal, rx: rotX, ry: rotY, rz: rotZ })
+                      .catch(() => {});
+                    alert(`Preset saved for "${n}"`);
                   }}
                 >💾 Save as default</button>
               </div>

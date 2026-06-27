@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 from app.connectors.state_db_connector import StateDBConnector
 from app.connectors.database import get_connector
-from app.queries import Z3DModelQueries
+from app.queries import Z3DLibraryQueries, Z3DPlacementQueries
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/3d-models", tags=["z3d_models"])
@@ -38,104 +38,146 @@ class TransformUpdate(BaseModel):
     sx: float = 1; sy: float = 1; sz: float = 1
 
 
-# ── Endpoints ──────────────────────────────────────────────────────────────────
+class DefaultsUpdate(BaseModel):
+    rx: float = 0; ry: float = 0; rz: float = 0
+    sx: float = 1; sy: float = 1; sz: float = 1
 
-@router.get("/layout/{layout_id}")
-def list_models(layout_id: int, connector: StateDBConnector = Depends(get_connector)):
-    rows = connector.execute_query(Z3DModelQueries.LIST_BY_LAYOUT, {"layout_id": layout_id})
+
+# ── Library endpoints ──────────────────────────────────────────────────────────
+
+@router.get("/library")
+def list_library(connector: StateDBConnector = Depends(get_connector)):
+    """List all models in the global library."""
+    rows = connector.execute_query(Z3DLibraryQueries.LIST_ALL, {})
     return [_row(r) for r in rows]
 
 
-@router.post("/upload", status_code=201)
-async def upload_model(
+@router.get("/library/{name}")
+def get_library_model(name: str, connector: StateDBConnector = Depends(get_connector)):
+    """Check if a model exists in the library by name."""
+    rows = connector.execute_query(Z3DLibraryQueries.GET_BY_NAME, {"name": name})
+    if not rows:
+        raise HTTPException(status_code=404, detail="Model not in library")
+    return _row(rows[0])
+
+
+@router.post("/library/upload", status_code=201)
+async def upload_to_library(
     file: UploadFile = File(...),
-    layout_id: int = Form(...),
-    user_id: Optional[int] = Form(None),
     name: str = Form(...),
-    line_group_id: Optional[str] = Form(None),
-    station_id: Optional[str] = Form(None),
-    is_group_leader: bool = Form(True),
-    px: float = Form(0), py: float = Form(0), pz: float = Form(0),
-    rx: float = Form(0), ry: float = Form(0), rz: float = Form(0),
-    sx: float = Form(1), sy: float = Form(1), sz: float = Form(1),
+    default_sx: float = Form(1), default_sy: float = Form(1), default_sz: float = Form(1),
+    default_rx: float = Form(0), default_ry: float = Form(0), default_rz: float = Form(0),
     connector: StateDBConnector = Depends(get_connector),
 ):
+    """Upload a GLB to the global library (or update defaults if name already exists)."""
     ext = (file.filename or "").rsplit(".", 1)[-1].lower()
     if ext not in ALLOWED_EXT:
         raise HTTPException(status_code=400, detail=f"Unsupported file type: {ext}")
 
-    # Only the group leader (first clone) uploads the actual file; clones reuse file_path=None
+    # Check if model already exists — reuse existing file if so
+    existing = connector.execute_query(Z3DLibraryQueries.GET_BY_NAME, {"name": name})
     file_path = None
     file_size = 0
-    if is_group_leader:
+
+    data = await file.read()
+    if data:  # new file provided
         upload_dir = _upload_dir()
-        safe_name = "".join(c if c.isalnum() or c in "-_." else "_" for c in (file.filename or "model.glb"))
-        dest = upload_dir / f"layout{layout_id}_{safe_name}"
+        safe = "".join(c if c.isalnum() or c in "-_." else "_" for c in (file.filename or f"{name}.glb"))
+        dest = upload_dir / safe
         counter = 1
         stem, sfx = dest.stem, dest.suffix
-        while dest.exists():
+        while dest.exists() and not (existing and _row(existing[0]).get("file_path") == str(dest)):
             dest = upload_dir / f"{stem}_{counter}{sfx}"
             counter += 1
-        data = await file.read()
         dest.write_bytes(data)
         file_path = str(dest)
         file_size = len(data)
-    else:
-        await file.read()  # consume to avoid connection issues
+    elif existing:
+        rec = _row(existing[0])
+        file_path = rec.get("file_path")
+        file_size = rec.get("file_size", 0)
 
-    row = connector.execute_query(Z3DModelQueries.CREATE, {
-        "layout_id": layout_id, "user_id": user_id,
+    rows = connector.execute_query(Z3DLibraryQueries.UPSERT, {
         "name": name, "ext": ext,
         "file_path": file_path, "file_size": file_size,
-        "line_group_id": line_group_id, "station_id": station_id,
-        "px": px, "py": py, "pz": pz,
-        "rx": rx, "ry": ry, "rz": rz,
-        "sx": sx, "sy": sy, "sz": sz,
+        "default_sx": default_sx, "default_sy": default_sy, "default_sz": default_sz,
+        "default_rx": default_rx, "default_ry": default_ry, "default_rz": default_rz,
     })
-    if not row:
-        raise HTTPException(status_code=500, detail="Failed to save model record")
-    return _row(row[0])
+    return _row(rows[0])
 
 
-@router.get("/{model_id}/download")
-def download_model(model_id: int, connector: StateDBConnector = Depends(get_connector)):
-    rows = connector.execute_query(Z3DModelQueries.GET_BY_ID, {"model_id": model_id})
+@router.put("/library/{name}/defaults")
+def update_defaults(
+    name: str,
+    body: DefaultsUpdate,
+    connector: StateDBConnector = Depends(get_connector),
+):
+    """Save default scale/rotation for a model name."""
+    rows = connector.execute_query(Z3DLibraryQueries.UPDATE_DEFAULTS, {
+        "name": name,
+        "sx": body.sx, "sy": body.sy, "sz": body.sz,
+        "rx": body.rx, "ry": body.ry, "rz": body.rz,
+    })
     if not rows:
-        raise HTTPException(status_code=404, detail="Model not found")
+        raise HTTPException(status_code=404, detail="Model not in library")
+    return _row(rows[0])
+
+
+@router.get("/library/{name}/download")
+def download_library_model(name: str, connector: StateDBConnector = Depends(get_connector)):
+    rows = connector.execute_query(Z3DLibraryQueries.GET_BY_NAME, {"name": name})
+    if not rows:
+        raise HTTPException(status_code=404, detail="Model not in library")
     rec = _row(rows[0])
-
-    # Walk the group to find the leader's file_path if this clone has none
     fp = rec.get("file_path")
-    if not fp and rec.get("line_group_id"):
-        group_rows = connector.execute_query(Z3DModelQueries.LIST_GROUP, {
-            "line_group_id": rec["line_group_id"], "layout_id": rec["layout_id"]
-        })
-        for gr in group_rows:
-            gd = _row(gr)
-            if gd.get("file_path"):
-                fp = gd["file_path"]
-                break
-
     if not fp or not Path(fp).exists():
         raise HTTPException(status_code=404, detail="File not found on server")
-
     ext = rec.get("ext", "glb")
     mime = {"glb": "model/gltf-binary", "gltf": "model/gltf+json",
             "obj": "text/plain", "stl": "application/octet-stream"}.get(ext, "application/octet-stream")
     return FileResponse(path=fp, filename=f"{rec['name']}.{ext}", media_type=mime)
 
 
-@router.put("/{model_id}/transform", status_code=200)
-def update_transform(
-    model_id: int,
+# ── Placement endpoints ────────────────────────────────────────────────────────
+
+@router.get("/placements/layout/{layout_id}")
+def list_placements(layout_id: int, connector: StateDBConnector = Depends(get_connector)):
+    """List all placed models for a layout."""
+    rows = connector.execute_query(Z3DPlacementQueries.LIST_BY_LAYOUT, {"layout_id": layout_id})
+    return [_row(r) for r in rows]
+
+
+@router.post("/placements", status_code=201)
+def create_placement(
+    layout_id: int = Form(...),
+    model_name: str = Form(...),
+    line_group_id: Optional[str] = Form(None),
+    station_id: Optional[str] = Form(None),
+    px: float = Form(0), py: float = Form(0), pz: float = Form(0),
+    rx: float = Form(0), ry: float = Form(0), rz: float = Form(0),
+    sx: float = Form(1), sy: float = Form(1), sz: float = Form(1),
+    connector: StateDBConnector = Depends(get_connector),
+):
+    rows = connector.execute_query(Z3DPlacementQueries.CREATE, {
+        "layout_id": layout_id, "model_name": model_name,
+        "line_group_id": line_group_id, "station_id": station_id,
+        "px": px, "py": py, "pz": pz,
+        "rx": rx, "ry": ry, "rz": rz,
+        "sx": sx, "sy": sy, "sz": sz,
+    })
+    if not rows:
+        raise HTTPException(status_code=500, detail="Failed to create placement")
+    return _row(rows[0])
+
+
+@router.put("/placements/{placement_id}/transform")
+def update_placement_transform(
+    placement_id: int,
     body: TransformUpdate,
     connector: StateDBConnector = Depends(get_connector),
 ):
-    rows = connector.execute_query(Z3DModelQueries.CHECK_EXISTS, {"model_id": model_id})
-    if not rows:
-        raise HTTPException(status_code=404, detail="Model not found")
-    connector.execute_update(Z3DModelQueries.UPDATE_TRANSFORM, {
-        "model_id": model_id,
+    connector.execute_update(Z3DPlacementQueries.UPDATE_TRANSFORM, {
+        "placement_id": placement_id,
         "px": body.px, "py": body.py, "pz": body.pz,
         "rx": body.rx, "ry": body.ry, "rz": body.rz,
         "sx": body.sx, "sy": body.sy, "sz": body.sz,
@@ -143,16 +185,15 @@ def update_transform(
     return {"ok": True}
 
 
-@router.delete("/{model_id}", status_code=204)
-def delete_model(model_id: int, connector: StateDBConnector = Depends(get_connector)):
-    rows = connector.execute_query(Z3DModelQueries.GET_BY_ID, {"model_id": model_id})
-    if not rows:
-        return  # already gone
-    rec = _row(rows[0])
-    fp = rec.get("file_path")
-    if fp and Path(fp).exists():
-        try:
-            Path(fp).unlink()
-        except Exception as e:
-            logger.warning(f"Could not delete 3D model file {fp}: {e}")
-    connector.execute_update(Z3DModelQueries.DELETE, {"model_id": model_id})
+@router.delete("/placements/{placement_id}", status_code=204)
+def delete_placement(placement_id: int, connector: StateDBConnector = Depends(get_connector)):
+    connector.execute_update(Z3DPlacementQueries.DELETE, {"placement_id": placement_id})
+
+
+@router.delete("/placements/group/{layout_id}/{line_group_id}", status_code=204)
+def delete_placement_group(
+    layout_id: int, line_group_id: str,
+    connector: StateDBConnector = Depends(get_connector),
+):
+    connector.execute_update(Z3DPlacementQueries.DELETE_BY_GROUP,
+                             {"line_group_id": line_group_id, "layout_id": layout_id})

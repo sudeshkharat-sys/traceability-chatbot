@@ -11,7 +11,7 @@ from app.queries.dataloader_queries import DataloaderQueries
 from app.queries.auth_queries import AuthQueries
 from app.queries.query_validator import QueryValidator
 from app.queries.part_labeler_queries import PartLabelerQueries
-from app.queries.z_stage_queries import LayoutQueries, BuyoffIconQueries, BypassIconQueries, CommonQueries, DatabaseQueries, StationBoxQueries, SnapshotQueries, ConnectionQueries, InputRecordQueries, LayeredAuditQueries, LayeredAuditAdherenceQueries, StationDocumentQueries, Z3DModelQueries
+from app.queries.z_stage_queries import LayoutQueries, BuyoffIconQueries, BypassIconQueries, CommonQueries, DatabaseQueries, StationBoxQueries, SnapshotQueries, ConnectionQueries, InputRecordQueries, LayeredAuditQueries, LayeredAuditAdherenceQueries, StationDocumentQueries, Z3DModelQueries, Z3DLibraryQueries, Z3DPlacementQueries
 
 __all__ = [
     "ChatQueries",
@@ -33,4 +33,6 @@ __all__ = [
     "LayeredAuditAdherenceQueries",
     "StationDocumentQueries",
     "Z3DModelQueries",
+    "Z3DLibraryQueries",
+    "Z3DPlacementQueries",
 ]

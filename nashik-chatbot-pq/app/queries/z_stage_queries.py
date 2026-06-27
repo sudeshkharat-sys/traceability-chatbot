@@ -446,59 +446,97 @@ class StationDocumentQueries:
     CHECK_EXISTS = "SELECT id FROM station_documents WHERE id = :doc_id"
 
 
-# ── Z3D placed models queries ─────────────────────────────────────────────────
+# ── Z3D global model library ──────────────────────────────────────────────────
 
-class Z3DModelQueries:
-    COLS = """
-        id, layout_id, user_id, name, ext, file_path, file_size,
-        line_group_id, station_id,
+class Z3DLibraryQueries:
+    LIB_COLS = """
+        id, name, ext, file_path, file_size,
+        default_sx, default_sy, default_sz,
+        default_rx, default_ry, default_rz,
+        created_at, updated_at
+    """
+
+    GET_BY_NAME = f"""
+        SELECT {LIB_COLS} FROM z3d_model_library
+        WHERE LOWER(name) = LOWER(:name)
+    """
+
+    LIST_ALL = f"""
+        SELECT {LIB_COLS} FROM z3d_model_library ORDER BY name
+    """
+
+    UPSERT = f"""
+        INSERT INTO z3d_model_library
+            (name, ext, file_path, file_size,
+             default_sx, default_sy, default_sz,
+             default_rx, default_ry, default_rz,
+             created_at, updated_at)
+        VALUES
+            (:name, :ext, :file_path, :file_size,
+             :default_sx, :default_sy, :default_sz,
+             :default_rx, :default_ry, :default_rz,
+             NOW(), NOW())
+        ON CONFLICT (name) DO UPDATE SET
+            ext        = EXCLUDED.ext,
+            file_path  = COALESCE(EXCLUDED.file_path, z3d_model_library.file_path),
+            file_size  = COALESCE(EXCLUDED.file_size, z3d_model_library.file_size),
+            updated_at = NOW()
+        RETURNING {LIB_COLS}
+    """
+
+    UPDATE_DEFAULTS = f"""
+        UPDATE z3d_model_library
+        SET default_sx = :sx, default_sy = :sy, default_sz = :sz,
+            default_rx = :rx, default_ry = :ry, default_rz = :rz,
+            updated_at = NOW()
+        WHERE LOWER(name) = LOWER(:name)
+        RETURNING {LIB_COLS}
+    """
+
+
+# ── Z3D per-layout placements ─────────────────────────────────────────────────
+
+class Z3DPlacementQueries:
+    PL_COLS = """
+        id, layout_id, model_name, line_group_id, station_id,
         px, py, pz, rx, ry, rz, sx, sy, sz,
         created_at, updated_at
     """
 
     LIST_BY_LAYOUT = f"""
-        SELECT {COLS}
-        FROM z3d_placed_models
+        SELECT {PL_COLS} FROM z3d_layout_placements
         WHERE layout_id = :layout_id
         ORDER BY id
     """
 
-    GET_BY_ID = f"""
-        SELECT {COLS}
-        FROM z3d_placed_models
-        WHERE id = :model_id
-    """
-
     CREATE = f"""
-        INSERT INTO z3d_placed_models
-            (layout_id, user_id, name, ext, file_path, file_size,
-             line_group_id, station_id,
+        INSERT INTO z3d_layout_placements
+            (layout_id, model_name, line_group_id, station_id,
              px, py, pz, rx, ry, rz, sx, sy, sz,
              created_at, updated_at)
         VALUES
-            (:layout_id, :user_id, :name, :ext, :file_path, :file_size,
-             :line_group_id, :station_id,
+            (:layout_id, :model_name, :line_group_id, :station_id,
              :px, :py, :pz, :rx, :ry, :rz, :sx, :sy, :sz,
              NOW(), NOW())
-        RETURNING {COLS}
+        RETURNING {PL_COLS}
     """
 
-    UPDATE_TRANSFORM = """
-        UPDATE z3d_placed_models
+    UPDATE_TRANSFORM = f"""
+        UPDATE z3d_layout_placements
         SET px = :px, py = :py, pz = :pz,
             rx = :rx, ry = :ry, rz = :rz,
             sx = :sx, sy = :sy, sz = :sz,
             updated_at = NOW()
-        WHERE id = :model_id
+        WHERE id = :placement_id
         RETURNING id
     """
 
-    DELETE = "DELETE FROM z3d_placed_models WHERE id = :model_id"
+    DELETE = "DELETE FROM z3d_layout_placements WHERE id = :placement_id"
 
-    CHECK_EXISTS = "SELECT id FROM z3d_placed_models WHERE id = :model_id"
-
-    LIST_GROUP = f"""
-        SELECT {COLS}
-        FROM z3d_placed_models
+    DELETE_BY_GROUP = """
+        DELETE FROM z3d_layout_placements
         WHERE line_group_id = :line_group_id AND layout_id = :layout_id
     """
+
+# keep old name as alias so existing import doesn't break during transition
+Z3DModelQueries = Z3DPlacementQueries

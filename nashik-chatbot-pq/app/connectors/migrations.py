@@ -66,16 +66,30 @@ COLUMN_MIGRATIONS = [
     "CREATE INDEX IF NOT EXISTS idx_station_docs_station_id ON station_documents (station_id)",
     "CREATE INDEX IF NOT EXISTS idx_station_docs_layout_id ON station_documents (layout_id)",
     "CREATE INDEX IF NOT EXISTS idx_station_docs_concern_id ON station_documents (concern_id)",
-    # z3d placed 3-D models (GLB files stored on disk, transforms in DB)
+    # z3d global model library — one row per unique model name, file stored once on disk
     """
-    CREATE TABLE IF NOT EXISTS z3d_placed_models (
+    CREATE TABLE IF NOT EXISTS z3d_model_library (
         id SERIAL PRIMARY KEY,
-        layout_id INTEGER NOT NULL REFERENCES layouts(id) ON DELETE CASCADE,
-        user_id INTEGER,
-        name VARCHAR(500) NOT NULL,
+        name VARCHAR(500) NOT NULL UNIQUE,
         ext VARCHAR(20) NOT NULL DEFAULT 'glb',
         file_path VARCHAR(1000),
         file_size INTEGER,
+        default_sx FLOAT NOT NULL DEFAULT 1,
+        default_sy FLOAT NOT NULL DEFAULT 1,
+        default_sz FLOAT NOT NULL DEFAULT 1,
+        default_rx FLOAT NOT NULL DEFAULT 0,
+        default_ry FLOAT NOT NULL DEFAULT 0,
+        default_rz FLOAT NOT NULL DEFAULT 0,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+    """,
+    # z3d per-layout placements — just transforms, file comes from library
+    """
+    CREATE TABLE IF NOT EXISTS z3d_layout_placements (
+        id SERIAL PRIMARY KEY,
+        layout_id INTEGER NOT NULL REFERENCES layouts(id) ON DELETE CASCADE,
+        model_name VARCHAR(500) NOT NULL,
         line_group_id VARCHAR(100),
         station_id VARCHAR(100),
         px FLOAT NOT NULL DEFAULT 0,
@@ -91,7 +105,7 @@ COLUMN_MIGRATIONS = [
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     )
     """,
-    "CREATE INDEX IF NOT EXISTS idx_z3d_models_layout_id ON z3d_placed_models (layout_id)",
+    "CREATE INDEX IF NOT EXISTS idx_z3d_placements_layout_id ON z3d_layout_placements (layout_id)",
     # buyoff icon label
     "ALTER TABLE buyoff_icons ADD COLUMN IF NOT EXISTS name VARCHAR(255) DEFAULT ''",
     # canvas text labels stored as JSON array in the layout row
