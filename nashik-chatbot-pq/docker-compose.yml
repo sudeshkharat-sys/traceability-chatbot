@@ -200,6 +200,7 @@ services:
       - ./documents:/app/documents:ro
       - ~/.cache/docling/models:/app/docling_models:ro # Mount local models using home expansion
       - frontend-build:/app/frontend/build
+      - uploads_data:/app/uploads  # Persists uploaded files (GLB models, station docs) across rebuilds
     depends_on:
       postgres:
         condition: service_healthy
@@ -266,4 +267,6 @@ volumes:
   opensearch_data:
     driver: local
   frontend-build:
+    driver: local
+  uploads_data:
     driver: local
