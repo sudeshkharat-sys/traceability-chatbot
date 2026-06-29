@@ -864,16 +864,38 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           obj.traverse(child => {
             if (child.isSprite || (child.material && child.material.map === null && child.isLine)) child.visible = false;
           });
-          obj.position.set(record.px ?? 0, record.py ?? 0, record.pz ?? 0);
+
+          // Auto-scale the raw template to ~2m so baseScale is correct
+          obj.position.set(0, 0, 0);
+          obj.rotation.set(0, 0, 0);
+          obj.scale.set(1, 1, 1);
+          const _bbox = new THREE.Box3().setFromObject(obj);
+          const _size = new THREE.Vector3(); _bbox.getSize(_size);
+          const _maxDim = Math.max(_size.x, _size.y, _size.z);
+          const autoScale = _maxDim > 0 ? 2.0 / _maxDim : 1;
+          obj.userData.baseScale = autoScale;
+
+          // Apply saved scale (stored as absolute sx) relative to autoScale
+          const sx = record.sx ?? 1;
+          obj.scale.setScalar(sx);
+          // Floor-snap: compute ratio from autoScale, apply to current scale
+          const _bbox2 = new THREE.Box3().setFromObject(obj);
+          const floorY = -_bbox2.min.y;
+          obj.userData.floorOffsetAtBase = floorY / sx;
+          obj.position.y = floorY;
+
+          // X/Z: prefer live station position over stored px/pz (station may have moved)
+          const stnPos = record.station_id ? localPosMap[record.station_id] : null;
+          obj.position.x = stnPos ? stnPos.x : (record.px ?? sceneCenterRef.current.x);
+          obj.position.z = stnPos ? stnPos.z : (record.pz ?? sceneCenterRef.current.z);
+
           obj.rotation.set(record.rx ?? 0, record.ry ?? 0, record.rz ?? 0);
-          obj.scale.set(record.sx ?? 1,    record.sy ?? 1,    record.sz ?? 1);
+
           obj.userData.isPlaced          = true;
           obj.userData.objId             = String(record.id);
           obj.userData.serverModelId     = record.id;
           obj.userData.objName           = record.model_name;
           obj.userData.objExt            = record.model_name.split('.').pop() || 'glb';
-          obj.userData.baseScale         = record.sx ?? 1;
-          obj.userData.floorOffsetAtBase = (record.py ?? 0) / ((record.sx ?? 1) || 1);
           scene.add(obj); dirtyRef.current = true;
           const entry = {
             id: String(record.id), mesh: obj, label: null, name: record.model_name,
@@ -886,7 +908,15 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
 
         const onTemplate = (template) => {
           setCachedTemplate(modelName, template);
-          records.forEach((record, idx) => applyRecord(template, record, idx === 0));
+          // Deduplicate: skip any record whose station_id is already placed in the scene
+          const renderedStations = new Set(placedRef.current.map(p => p.stationId).filter(Boolean));
+          const dedupedRecords = records.filter(r => {
+            if (!r.station_id) return true; // free-placed, no station, always show
+            if (renderedStations.has(r.station_id)) return false; // already in scene
+            renderedStations.add(r.station_id); // mark as handled
+            return true;
+          });
+          dedupedRecords.forEach((record, idx) => applyRecord(template, record, idx === 0));
         };
 
         // If already loaded this session → skip download entirely
