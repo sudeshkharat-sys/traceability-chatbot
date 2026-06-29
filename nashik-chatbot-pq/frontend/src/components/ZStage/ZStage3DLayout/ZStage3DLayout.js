@@ -880,27 +880,31 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           const autoScale = _maxDim > 0 ? 2.0 / _maxDim : 1;
           obj.userData.baseScale = autoScale;
 
-          // Apply saved scale (stored as absolute sx) relative to autoScale
+          // Apply saved scale and rotation first
           const sx = record.sx ?? 1;
           obj.scale.setScalar(sx);
-          // Floor-snap: compute ratio from autoScale, apply to current scale
+          obj.rotation.set(record.rx ?? 0, record.ry ?? 0, record.rz ?? 0);
+
+          // Floor-snap: compute AFTER rotation so bbox accounts for rotated shape
           const _bbox2 = new THREE.Box3().setFromObject(obj);
           const floorY = -_bbox2.min.y;
           obj.userData.floorOffsetAtBase = floorY / sx;
-          obj.position.y = floorY;
 
-          // Center in X only (station width direction) — compensates for mesh origin offset.
-          // Z is placed exactly at station center depth; shifting Z causes unexpected drift.
+          // Use saved py if user manually lifted the model above floor, else use floor-snap
+          const savedPy = record.py ?? 0;
+          const finalY = savedPy > floorY ? savedPy : floorY;
+          obj.position.y = finalY;
+
+          // Center in X only — compensates for mesh origin offset.
+          // Z is exactly at station center; Y uses saved height or floor-snap.
           const stnPos = record.station_id ? localPosMap[record.station_id] : null;
           const targetX = stnPos ? stnPos.x : (record.px ?? sceneCenterRef.current.x);
           const targetZ = stnPos ? stnPos.z : (record.pz ?? sceneCenterRef.current.z);
-          obj.position.set(0, obj.position.y, 0);
+          obj.position.set(0, finalY, 0);
           const _bboxXZ = new THREE.Box3().setFromObject(obj);
           const xOff = (_bboxXZ.min.x + _bboxXZ.max.x) / 2;
           obj.position.x = targetX - xOff;
-          obj.position.z = targetZ; // Z: use station center directly, no offset
-
-          obj.rotation.set(record.rx ?? 0, record.ry ?? 0, record.rz ?? 0);
+          obj.position.z = targetZ;
 
           obj.userData.isPlaced          = true;
           obj.userData.objId             = String(record.id);
