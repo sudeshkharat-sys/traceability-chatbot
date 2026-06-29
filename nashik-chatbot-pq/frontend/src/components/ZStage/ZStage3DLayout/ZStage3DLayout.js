@@ -533,7 +533,7 @@ class WalkController {
 }
 
 // ── Three.js scene hook ────────────────────────────────────────────────────────
-function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, onObjectsChange, onConvertStart, onConvertEnd, onStationClick, isActive, onSceneReady) {
+function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, onObjectsChange, onConvertStart, onConvertEnd, onStationClick, isActive, onSceneReady, onModelProgress) {
   // Keep latest statusMap/zeMap in refs so scene reads current values
   // without triggering a full scene rebuild on every API response
   const statusMapRef = useRef(statusMapProp);
@@ -855,6 +855,10 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         byName.get(p.model_name).push(p);
       });
 
+      const totalModels = byName.size;
+      let loadedModels = 0;
+      onModelProgress && onModelProgress(0, totalModels);
+
       byName.forEach((records, modelName) => {
         const downloadUrl = z3dModelApi.getDownloadUrl(modelName);
         const ext = (records[0].model_name || 'glb').split('.').pop(); // fallback
@@ -923,6 +927,8 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
             return true;
           });
           dedupedRecords.forEach((record, idx) => applyRecord(template, record, idx === 0));
+          loadedModels += 1;
+          onModelProgress && onModelProgress(loadedModels, totalModels);
         };
 
         // If already loaded this session → skip download entirely
@@ -1682,6 +1688,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [adherenceRecords,  setAdherenceRecords]  = useState([]);
   const [sceneReady,        setSceneReady]        = useState(false);
   const [refreshing,        setRefreshing]        = useState(false);
+  const [modelLoadCount,    setModelLoadCount]    = useState({ loaded: 0, total: 0 });
   // Upload modal
   const [showUploadModal,   setShowUploadModal]   = useState(false);
   const [pendingFile,       setPendingFile]       = useState(null);
@@ -1731,6 +1738,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   useEffect(() => {
     if (!selectedLayoutId) return;
     setSceneReady(false);
+    setModelLoadCount({ loaded: 0, total: 0 });
     layoutApi.getLayout(selectedLayoutId).then(res => setLayout(res.data)).catch(() => {});
   }, [selectedLayoutId]);
 
@@ -1843,8 +1851,12 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setSceneReady(true);
   }, []);
 
+  const handleModelProgress = useCallback((loaded, total) => {
+    setModelLoadCount({ loaded, total });
+  }, []);
+
   const { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation } =
-    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady);
+    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady, handleModelProgress);
 
   const runPreset = useCallback((preset) => {
     // Resolve current object ID by name (objId changes after page refresh)
@@ -2381,10 +2393,28 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                 <div className="z3d-scene-loading">
                   <div className="z3d-scene-loading-box">
                     <div className="z3d-scene-loading-spinner" />
-                    <div className="z3d-scene-loading-text">Building 3D scene…</div>
-                    <div className="z3d-scene-loading-bar-track">
-                      <div className="z3d-scene-loading-bar-fill" />
+                    <div className="z3d-scene-loading-text">
+                      {modelLoadCount.total === 0
+                        ? 'Preparing scene…'
+                        : modelLoadCount.loaded < modelLoadCount.total
+                          ? `Loading models… (${modelLoadCount.loaded} of ${modelLoadCount.total})`
+                          : 'Placing models…'}
                     </div>
+                    <div className="z3d-scene-loading-bar-track">
+                      {modelLoadCount.total > 0 ? (
+                        <div
+                          className="z3d-scene-loading-bar-fill z3d-scene-loading-bar-fill--progress"
+                          style={{ width: `${Math.round((modelLoadCount.loaded / modelLoadCount.total) * 100)}%` }}
+                        />
+                      ) : (
+                        <div className="z3d-scene-loading-bar-fill" />
+                      )}
+                    </div>
+                    {modelLoadCount.total > 0 && (
+                      <div className="z3d-scene-loading-pct">
+                        {Math.round((modelLoadCount.loaded / modelLoadCount.total) * 100)}%
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

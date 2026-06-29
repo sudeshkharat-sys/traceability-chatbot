@@ -702,9 +702,22 @@
   border-radius: 4px;
   animation: z3d-shimmer 1.4s ease-in-out infinite;
 }
+.z3d-scene-loading-bar-fill--progress {
+  animation: none;
+  background: linear-gradient(90deg, #2b6cb0, #63b3ed);
+  background-size: 100% 100%;
+  transition: width 0.3s ease;
+}
 @keyframes z3d-shimmer {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+.z3d-scene-loading-pct {
+  font-size: 11px;
+  color: #63b3ed;
+  margin-top: 6px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
 }
 
 /* ── Upload Modal ───────────────────────────────────────────── */
