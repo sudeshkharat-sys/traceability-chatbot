@@ -190,6 +190,13 @@ def delete_placement(placement_id: int, connector: StateDBConnector = Depends(ge
     connector.execute_update(Z3DPlacementQueries.DELETE, {"placement_id": placement_id})
 
 
+@router.get("/placements/line-groups")
+def list_all_line_groups(connector: StateDBConnector = Depends(get_connector)):
+    """Return all distinct line_group_ids that have saved placements."""
+    rows = connector.execute_query(Z3DPlacementQueries.LIST_ALL_LINE_GROUPS, {})
+    return [r._mapping["line_group_id"] for r in rows]
+
+
 @router.get("/placements/by-line-group/{line_group_id}")
 def get_placements_by_line_group(
     line_group_id: str,

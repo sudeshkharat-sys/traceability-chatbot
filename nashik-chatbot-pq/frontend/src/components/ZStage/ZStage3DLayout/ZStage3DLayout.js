@@ -30,6 +30,37 @@ function getModelPreset(modelName) {
   return loadModelPresets()[modelName.toLowerCase().trim()] || null;
 }
 
+// ── Line name fuzzy matcher ────────────────────────────────────────────────────
+// Handles variations like "Trim 1" / "Trim Line" / "trim", "U/B" / "Under Break Line"
+function _normLine(name) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, ' ')          // non-alphanumeric → space
+    .replace(/\b(line|lines|no|num|number|the)\b/g, '') // strip noise words
+    .replace(/\b\d+\b/g, '')             // strip lone numbers (1, 2, 3…)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function _abbrev(normalized) {
+  // First letter of each word, eg. "under break" → "ub"
+  return normalized.split(' ').filter(Boolean).map(w => w[0]).join('');
+}
+function lineNamesMatch(a, b) {
+  if (!a || !b) return false;
+  const na = _normLine(a);
+  const nb = _normLine(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  if (na.includes(nb) || nb.includes(na)) return true;
+  // abbreviation: "U/B" → "ub" matches "under break" → "ub"
+  const abba = _abbrev(na);
+  const abbb = _abbrev(nb);
+  if (abba && abba === nb) return true;
+  if (abbb && abbb === na) return true;
+  if (abba && abbb && abba === abbb) return true;
+  return false;
+}
+
 // Module-level GLB template cache — keyed by model name (lowercase).
 // Once a model is loaded this session, subsequent layouts skip the download
 // entirely and clone directly from the cached Three.js scene.
@@ -746,45 +777,50 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         localStationsByLine[box.name] = ids;
       });
 
-      const seedPromises = unseededLines.map(lineGroupId =>
-        z3dModelApi.getPlacementsByLineGroup(lineGroupId).then(r => {
-          const crossRecords = r.data || [];
-          if (crossRecords.length === 0) return;
+      // Fetch all known line group IDs from DB, then fuzzy-match each unseeded
+      // line in this layout against them (handles "Trim 1" ↔ "Trim Line" ↔ "trim")
+      const seedPromises = z3dModelApi.listAllLineGroups().catch(() => ({ data: [] })).then(lgRes => {
+        const knownLineGroups = lgRes.data || [];
+        return Promise.all(unseededLines.map(lineGroupId => {
+          // Fuzzy-match this layout's line name against all known line group IDs in DB
+          // eg. "Trim 1" matches "Trim Line", "U/B" matches "Under Break Line"
+          const matchedId = knownLineGroups.find(kg => lineNamesMatch(kg, lineGroupId));
+          if (!matchedId) return;
 
-          // Take model name + scale + rotation from the first cross-layout record
-          // (all records for the same line+model should share the same scale/rotation)
-          const tmpl = crossRecords[0];
-          const modelName = tmpl.model_name;
-          const sx = tmpl.sx ?? 1, sy = tmpl.sy ?? 1, sz = tmpl.sz ?? 1;
-          const rx = tmpl.rx ?? 0, ry = tmpl.ry ?? 0, rz = tmpl.rz ?? 0;
-          const py = tmpl.py ?? 0; // floor-snapped Y height — same regardless of layout
+          return z3dModelApi.getPlacementsByLineGroup(matchedId).then(r => {
+            const crossRecords = r.data || [];
+            if (crossRecords.length === 0) return;
 
-          // Stations for this line IN THE CURRENT LAYOUT
-          const lineStationIds = localStationsByLine[lineGroupId] || [];
-          if (lineStationIds.length === 0) return;
+            // Take model name + scale + rotation from the cross-layout record
+            const tmpl = crossRecords[0];
+            const modelName = tmpl.model_name;
+            const sx = tmpl.sx ?? 1, sy = tmpl.sy ?? 1, sz = tmpl.sz ?? 1;
+            const rx = tmpl.rx ?? 0, ry = tmpl.ry ?? 0, rz = tmpl.rz ?? 0;
+            const py = tmpl.py ?? 0;
 
-          // Create one placement per station using this layout's X/Z positions
-          return Promise.all(lineStationIds.map(stationId => {
-            const pos = localPosMap[stationId] || { x: 0, z: 0 };
-            return z3dModelApi.createPlacement({
-              layoutId: layout.id,
-              modelName,
-              lineGroupId,
-              stationId,
-              px: pos.x, py, pz: pos.z,
-              rx, ry, rz,
-              sx, sy, sz,
-            }).then(cr => ({
-              id: cr.data.id, layout_id: layout.id,
-              model_name: modelName, line_group_id: lineGroupId, station_id: stationId,
-              px: pos.x, py, pz: pos.z, rx, ry, rz, sx, sy, sz,
-            }));
-          }));
-        }).then(seeded => seeded && seeded.forEach(p => placements.push(p)))
-          .catch(() => {})
-      );
+            // All stations for this line in the CURRENT layout
+            const lineStationIds = localStationsByLine[lineGroupId] || [];
+            if (lineStationIds.length === 0) return;
 
-      Promise.all(seedPromises).then(() => {
+            // Create one placement per station using THIS layout's X/Z positions
+            return Promise.all(lineStationIds.map(stationId => {
+              const pos = localPosMap[stationId] || { x: 0, z: 0 };
+              return z3dModelApi.createPlacement({
+                layoutId: layout.id, modelName,
+                lineGroupId, stationId,
+                px: pos.x, py, pz: pos.z,
+                rx, ry, rz, sx, sy, sz,
+              }).then(cr => ({
+                id: cr.data.id, layout_id: layout.id,
+                model_name: modelName, line_group_id: lineGroupId, station_id: stationId,
+                px: pos.x, py, pz: pos.z, rx, ry, rz, sx, sy, sz,
+              }));
+            })).then(seeded => seeded && seeded.forEach(p => placements.push(p)));
+          }).catch(() => {});
+        }));
+      });
+
+      seedPromises.then(() => {
       // Group by model_name so we download each file only once
       const byName = new Map();
       placements.forEach(p => {
