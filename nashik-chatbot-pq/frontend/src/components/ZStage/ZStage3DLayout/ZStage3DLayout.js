@@ -884,19 +884,16 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           obj.userData.floorOffsetAtBase = floorY / sx;
           obj.position.y = floorY;
 
-          // X/Z: center the model's bounding box exactly at station center.
-          // Model mesh origins are rarely at visual center, so we compute the
-          // X/Z offset between origin and bbox center and compensate.
+          // Center in X only (station width direction) — compensates for mesh origin offset.
+          // Z is placed exactly at station center depth; shifting Z causes unexpected drift.
           const stnPos = record.station_id ? localPosMap[record.station_id] : null;
           const targetX = stnPos ? stnPos.x : (record.px ?? sceneCenterRef.current.x);
           const targetZ = stnPos ? stnPos.z : (record.pz ?? sceneCenterRef.current.z);
-          // Measure bbox center at rotation=0 (rotation is applied after centering)
           obj.position.set(0, obj.position.y, 0);
           const _bboxXZ = new THREE.Box3().setFromObject(obj);
-          const xOff = (_bboxXZ.min.x + _bboxXZ.max.x) / 2; // how far origin is from visual center
-          const zOff = (_bboxXZ.min.z + _bboxXZ.max.z) / 2;
+          const xOff = (_bboxXZ.min.x + _bboxXZ.max.x) / 2;
           obj.position.x = targetX - xOff;
-          obj.position.z = targetZ - zOff;
+          obj.position.z = targetZ; // Z: use station center directly, no offset
 
           obj.rotation.set(record.rx ?? 0, record.ry ?? 0, record.rz ?? 0);
 
@@ -1168,9 +1165,8 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       obj.rotation.set(0, 0, 0);
       const _bboxC = new THREE.Box3().setFromObject(obj);
       const xOff = (_bboxC.min.x + _bboxC.max.x) / 2;
-      const zOff = (_bboxC.min.z + _bboxC.max.z) / 2;
       obj.position.x = targetX - xOff;
-      obj.position.z = targetZ - zOff;
+      obj.position.z = targetZ; // Z: station center directly, no offset
       // Restore preset rotation after centering
       if (_preset) obj.rotation.set(
         ((_preset.rotX || 0) * Math.PI) / 180,
@@ -1498,8 +1494,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         obj.position.set(0, effectiveFloorY, 0);
         const _bboxLine = new THREE.Box3().setFromObject(obj);
         const _xOff = (_bboxLine.min.x + _bboxLine.max.x) / 2;
-        const _zOff = (_bboxLine.min.z + _bboxLine.max.z) / 2;
-        obj.position.set(stnPos.x - _xOff, effectiveFloorY, stnPos.z - _zOff);
+        obj.position.set(stnPos.x - _xOff, effectiveFloorY, stnPos.z); // Z: station center directly
         obj.userData.baseScale           = effectiveScale;
         obj.userData.floorOffsetAtBase   = effectiveFloorY / effectiveScale;
         obj.userData.isPlaced         = true;
