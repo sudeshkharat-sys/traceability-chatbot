@@ -858,6 +858,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       const totalModels = byName.size;
       let loadedModels = 0;
       onModelProgress && onModelProgress(0, totalModels);
+      if (totalModels === 0) { onSceneReady && onSceneReady(); }
 
       byName.forEach((records, modelName) => {
         const downloadUrl = z3dModelApi.getDownloadUrl(modelName);
@@ -929,6 +930,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           dedupedRecords.forEach((record, idx) => applyRecord(template, record, idx === 0));
           loadedModels += 1;
           onModelProgress && onModelProgress(loadedModels, totalModels);
+          if (loadedModels === totalModels) { onSceneReady && onSceneReady(); }
         };
 
         // If already loaded this session → skip download entirely
@@ -957,10 +959,10 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         });
       });
       }); // end Promise.all(seedPromises)
-    }).catch(err => console.error('[Z3D] Failed to load saved models:', err));
-
-    // Signal that the scene is built and ready to display
-    onSceneReady && onSceneReady();
+    }).catch(err => {
+      console.error('[Z3D] Failed to load saved models:', err);
+      onSceneReady && onSceneReady(); // unblock overlay on error
+    });
 
     // Only re-render when something changes — saves GPU when user is idle
     dirtyRef.current = true;
