@@ -884,10 +884,19 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           obj.userData.floorOffsetAtBase = floorY / sx;
           obj.position.y = floorY;
 
-          // X/Z: prefer live station position over stored px/pz (station may have moved)
+          // X/Z: center the model's bounding box exactly at station center.
+          // Model mesh origins are rarely at visual center, so we compute the
+          // X/Z offset between origin and bbox center and compensate.
           const stnPos = record.station_id ? localPosMap[record.station_id] : null;
-          obj.position.x = stnPos ? stnPos.x : (record.px ?? sceneCenterRef.current.x);
-          obj.position.z = stnPos ? stnPos.z : (record.pz ?? sceneCenterRef.current.z);
+          const targetX = stnPos ? stnPos.x : (record.px ?? sceneCenterRef.current.x);
+          const targetZ = stnPos ? stnPos.z : (record.pz ?? sceneCenterRef.current.z);
+          // Measure bbox center at rotation=0 (rotation is applied after centering)
+          obj.position.set(0, obj.position.y, 0);
+          const _bboxXZ = new THREE.Box3().setFromObject(obj);
+          const xOff = (_bboxXZ.min.x + _bboxXZ.max.x) / 2; // how far origin is from visual center
+          const zOff = (_bboxXZ.min.z + _bboxXZ.max.z) / 2;
+          obj.position.x = targetX - xOff;
+          obj.position.z = targetZ - zOff;
 
           obj.rotation.set(record.rx ?? 0, record.ry ?? 0, record.rz ?? 0);
 
@@ -1150,16 +1159,24 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         );
       }
 
-      // Place at station centre or scene centre
+      // Place at station centre or scene centre, compensating for mesh origin offset
       const stnPos = options.stationId ? stationPosRef.current[options.stationId] : null;
-      if (options.stationId) {
-        console.log('[Z3D] place stationId=', options.stationId,
-          'posMap keys=', Object.keys(stationPosRef.current),
-          'found=', stnPos);
-      }
       const c = sceneCenterRef.current;
-      obj.position.x = stnPos ? stnPos.x : c.x;
-      obj.position.z = stnPos ? stnPos.z : c.z;
+      const targetX = stnPos ? stnPos.x : c.x;
+      const targetZ = stnPos ? stnPos.z : c.z;
+      // Compute X/Z bbox center at rotation=0 so origin-offset is cancelled out
+      obj.rotation.set(0, 0, 0);
+      const _bboxC = new THREE.Box3().setFromObject(obj);
+      const xOff = (_bboxC.min.x + _bboxC.max.x) / 2;
+      const zOff = (_bboxC.min.z + _bboxC.max.z) / 2;
+      obj.position.x = targetX - xOff;
+      obj.position.z = targetZ - zOff;
+      // Restore preset rotation after centering
+      if (_preset) obj.rotation.set(
+        ((_preset.rotX || 0) * Math.PI) / 180,
+        ((_preset.rotY || 0) * Math.PI) / 180,
+        ((_preset.rotZ || 0) * Math.PI) / 180
+      );
 
       const objId = Date.now().toString();
       obj.userData.isPlaced       = true;
@@ -1477,7 +1494,12 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         // so GPU memory stays ~1× instead of N× for a 70 MB model
         const obj = idx === 0 ? template : sharedClone(template);
 
-        obj.position.set(stnPos.x, effectiveFloorY, stnPos.z);
+        // Center model's bounding box visual center at station center (X/Z)
+        obj.position.set(0, effectiveFloorY, 0);
+        const _bboxLine = new THREE.Box3().setFromObject(obj);
+        const _xOff = (_bboxLine.min.x + _bboxLine.max.x) / 2;
+        const _zOff = (_bboxLine.min.z + _bboxLine.max.z) / 2;
+        obj.position.set(stnPos.x - _xOff, effectiveFloorY, stnPos.z - _zOff);
         obj.userData.baseScale           = effectiveScale;
         obj.userData.floorOffsetAtBase   = effectiveFloorY / effectiveScale;
         obj.userData.isPlaced         = true;
