@@ -779,44 +779,58 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
 
       // Fetch all known line group IDs from DB, then fuzzy-match each unseeded
       // line in this layout against them (handles "Trim 1" ↔ "Trim Line" ↔ "trim")
-      const seedPromises = z3dModelApi.listAllLineGroups().catch(() => ({ data: [] })).then(lgRes => {
+      // Helper: given a template record + line name, place at all stations of that line
+      const seedFromTemplate = (tmpl, lineGroupId) => {
+        const modelName = tmpl.model_name;
+        const sx = tmpl.sx ?? 1, sy = tmpl.sy ?? 1, sz = tmpl.sz ?? 1;
+        const rx = tmpl.rx ?? 0, ry = tmpl.ry ?? 0, rz = tmpl.rz ?? 0;
+        const py = tmpl.py ?? 0;
+        const lineStationIds = localStationsByLine[lineGroupId] || [];
+        if (lineStationIds.length === 0) return Promise.resolve();
+        return Promise.all(lineStationIds.map(stationId => {
+          const pos = localPosMap[stationId] || { x: 0, z: 0 };
+          return z3dModelApi.createPlacement({
+            layoutId: layout.id, modelName, lineGroupId, stationId,
+            px: pos.x, py, pz: pos.z, rx, ry, rz, sx, sy, sz,
+          }).then(cr => ({
+            id: cr.data.id, layout_id: layout.id,
+            model_name: modelName, line_group_id: lineGroupId, station_id: stationId,
+            px: pos.x, py, pz: pos.z, rx, ry, rz, sx, sy, sz,
+          }));
+        })).then(seeded => seeded.forEach(p => placements.push(p)));
+      };
+
+      // Also fetch all library model names for fuzzy model-name fallback
+      const seedPromises = Promise.all([
+        z3dModelApi.listAllLineGroups().catch(() => ({ data: [] })),
+        z3dModelApi.listLibrary().catch(() => ({ data: [] })),
+      ]).then(([lgRes, libRes]) => {
         const knownLineGroups = lgRes.data || [];
+        const libraryModels = libRes.data || [];  // [{name, ext, ...}]
+
         return Promise.all(unseededLines.map(lineGroupId => {
-          // Fuzzy-match this layout's line name against all known line group IDs in DB
-          // eg. "Trim 1" matches "Trim Line", "U/B" matches "Under Break Line"
-          const matchedId = knownLineGroups.find(kg => lineNamesMatch(kg, lineGroupId));
-          if (!matchedId) return;
+          // Strategy 1: fuzzy match against line_group_id values in DB
+          const matchedLineGroupId = knownLineGroups.find(kg => lineNamesMatch(kg, lineGroupId));
+          if (matchedLineGroupId) {
+            return z3dModelApi.getPlacementsByLineGroup(matchedLineGroupId)
+              .then(r => {
+                const recs = r.data || [];
+                if (recs.length === 0) return;
+                return seedFromTemplate(recs[0], lineGroupId);
+              }).catch(() => {});
+          }
 
-          return z3dModelApi.getPlacementsByLineGroup(matchedId).then(r => {
-            const crossRecords = r.data || [];
-            if (crossRecords.length === 0) return;
-
-            // Take model name + scale + rotation from the cross-layout record
-            const tmpl = crossRecords[0];
-            const modelName = tmpl.model_name;
-            const sx = tmpl.sx ?? 1, sy = tmpl.sy ?? 1, sz = tmpl.sz ?? 1;
-            const rx = tmpl.rx ?? 0, ry = tmpl.ry ?? 0, rz = tmpl.rz ?? 0;
-            const py = tmpl.py ?? 0;
-
-            // All stations for this line in the CURRENT layout
-            const lineStationIds = localStationsByLine[lineGroupId] || [];
-            if (lineStationIds.length === 0) return;
-
-            // Create one placement per station using THIS layout's X/Z positions
-            return Promise.all(lineStationIds.map(stationId => {
-              const pos = localPosMap[stationId] || { x: 0, z: 0 };
-              return z3dModelApi.createPlacement({
-                layoutId: layout.id, modelName,
-                lineGroupId, stationId,
-                px: pos.x, py, pz: pos.z,
-                rx, ry, rz, sx, sy, sz,
-              }).then(cr => ({
-                id: cr.data.id, layout_id: layout.id,
-                model_name: modelName, line_group_id: lineGroupId, station_id: stationId,
-                px: pos.x, py, pz: pos.z, rx, ry, rz, sx, sy, sz,
-              }));
-            })).then(seeded => seeded && seeded.forEach(p => placements.push(p)));
-          }).catch(() => {});
+          // Strategy 2 (fallback): fuzzy match line name against model names in library
+          // Handles case where user uploaded via station/free mode (line_group_id = null)
+          const matchedModel = libraryModels.find(m => lineNamesMatch(m.name, lineGroupId));
+          if (matchedModel) {
+            return z3dModelApi.getPlacementsByModelName(matchedModel.name)
+              .then(r => {
+                const recs = r.data || [];
+                if (recs.length === 0) return;
+                return seedFromTemplate(recs[0], lineGroupId);
+              }).catch(() => {});
+          }
         }));
       });
 
@@ -1113,7 +1127,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
 
       scene.add(obj); dirtyRef.current = true;
 
-      const entry = { id: objId, mesh: obj, label: null, name, stationId: options.stationId || null };
+      const entry = { id: objId, mesh: obj, label: null, name, stationId: options.stationId || null, lineGroupId: options.lineGroupId || null };
       placedRef.current = [...placedRef.current, entry];
 
       // Save to server: upload file to global library (reuses if name exists),
@@ -1122,7 +1136,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         z3dModelApi.uploadToLibrary(file, { name }).then(() =>
           z3dModelApi.createPlacement({
             layoutId, modelName: name,
-            lineGroupId: null, stationId: options.stationId || null,
+            lineGroupId: options.lineGroupId || null, stationId: options.stationId || null,
             px: obj.position.x, py: obj.position.y, pz: obj.position.z,
             rx: obj.rotation.x, ry: obj.rotation.y, rz: obj.rotation.z,
             sx: obj.scale.x,    sy: obj.scale.y,    sz: obj.scale.z,
@@ -1847,7 +1861,10 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
         if (lineStations.length === 0) { alert(`No stations found for line "${uploadLine}".`); return; }
         placeObjectForLine(file, name, selectedLayoutId, lineStations, uploadLine);
       } else {
-        const opts = uploadMode === 'station' && uploadStation ? { stationId: uploadStation } : {};
+        // Pass the shop/line as lineGroupId so cross-layout seeding can find this model
+        const opts = uploadMode === 'station' && uploadStation
+          ? { stationId: uploadStation, lineGroupId: uploadShop || null }
+          : {};
         placeObject(file, name, selectedLayoutId, opts);
       }
       const _p = getModelPreset(name);

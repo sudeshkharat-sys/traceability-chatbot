@@ -538,6 +538,16 @@ class Z3DPlacementQueries:
         WHERE line_group_id = :line_group_id AND layout_id = :layout_id
     """
 
+    # Latest placements for a given model_name across all layouts (used as fallback
+    # when line_group_id is NULL — match by model name instead of line group).
+    LIST_LATEST_BY_MODEL_NAME = f"""
+        SELECT DISTINCT ON (station_id)
+            {PL_COLS}
+        FROM z3d_layout_placements
+        WHERE model_name = :model_name
+        ORDER BY station_id, updated_at DESC
+    """
+
     # All distinct line_group_ids that have at least one placement (any layout).
     LIST_ALL_LINE_GROUPS = """
         SELECT DISTINCT line_group_id
