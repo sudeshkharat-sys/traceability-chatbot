@@ -758,9 +758,22 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       // For lines that have NO placements in this layout yet, auto-seed from
       // the most recently saved placement for that line in any other layout.
       const placedLineGroups = new Set(placements.map(p => p.line_group_id).filter(Boolean));
-      // box.name is the line/shop name — same value stored as line_group_id when using placeObjectForLine
+      // Also track which station IDs already have a placement (covers NULL line_group_id records)
+      const placedStationIds = new Set(placements.map(p => p.station_id).filter(Boolean));
+
       const allLineGroups = (layout.station_boxes || []).map(b => b.name).filter(Boolean);
-      const unseededLines = allLineGroups.filter(lg => !placedLineGroups.has(lg));
+
+      // A line is unseeded only if:
+      // 1. Its line_group_id is not in placedLineGroups, AND
+      // 2. None of its station IDs already have a placement in this layout
+      // This prevents duplicate seeding when old records have line_group_id = NULL
+      const unseededLines = allLineGroups.filter(lg => {
+        if (placedLineGroups.has(lg)) return false;
+        const lineStationIds = (layout.station_boxes || [])
+          .find(b => b.name === lg)
+          ?.station_ids?.split(',').map(s => s.trim()).filter(Boolean) || [];
+        return !lineStationIds.some(sid => placedStationIds.has(sid));
+      });
 
       // Build a local station-id → 3D-position map for THIS layout
       // (stationPosRef is already populated by the box-building loop above)
