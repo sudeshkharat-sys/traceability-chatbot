@@ -1213,7 +1213,17 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           obj.userData.serverModelId = res.data.id;
           const entry = placedRef.current.find(p => p.id === objId);
           if (entry) entry.serverModelId = res.data.id;
-        }).catch(err => console.error('[Z3D] Failed to save model to server:', err));
+        }).catch(err => {
+          console.error('[Z3D] Failed to save model to server:', err);
+          const status = err?.response?.status;
+          const reason = status === 413
+            ? 'File is too large for the server to accept.'
+            : (err?.message || 'Unknown error');
+          alert(
+            `"${name}" is visible now, but failed to save to the server (${reason}).\n` +
+            `It will disappear on refresh and won't be available in other layouts.`
+          );
+        });
       }
 
       // Select immediately and set mode to translate
@@ -1550,7 +1560,17 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
               entry.serverModelId = res.data.id;
             })
           ))
-        ).catch(err => console.error('[Z3D] Failed to save line model to server:', err));
+        ).catch(err => {
+          console.error('[Z3D] Failed to save line model to server:', err);
+          const status = err?.response?.status;
+          const reason = status === 413
+            ? 'File is too large for the server to accept.'
+            : (err?.message || 'Unknown error');
+          alert(
+            `"${name}" is visible now, but failed to save to the server (${reason}).\n` +
+            `It will disappear on refresh and won't be available in other layouts.`
+          );
+        });
       }
     };
 
