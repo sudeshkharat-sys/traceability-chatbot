@@ -424,8 +424,16 @@ function buildStationShell(box, statusMap, zeMap, scene) {
   bc.beginPath(); bc.roundRect(0, 0, bW, bH, 14); bc.fill();
   bc.strokeStyle = '#1a237e'; bc.lineWidth = 6;
   bc.beginPath(); bc.roundRect(5, 5, bW - 10, bH - 10, 10); bc.stroke();
-  bc.fillStyle = '#1a237e'; bc.font = 'bold 68px Arial';
+  bc.fillStyle = '#1a237e';
   bc.textAlign = 'center'; bc.textBaseline = 'middle';
+  // Auto-shrink font so long line names stay inside the board instead of overflowing
+  const maxTextW = bW - 40; // padding on both sides
+  let boxFontSize = 68;
+  bc.font = `bold ${boxFontSize}px Arial`;
+  while (bc.measureText(boxLabel).width > maxTextW && boxFontSize > 20) {
+    boxFontSize -= 2;
+    bc.font = `bold ${boxFontSize}px Arial`;
+  }
   bc.fillText(boxLabel, bW / 2, bH / 2);
   const boardW3d = 3.5;
   const boardH3d = boardW3d * (bH / bW);
