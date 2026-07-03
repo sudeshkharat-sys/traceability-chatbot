@@ -8,9 +8,10 @@ import { conversationService } from "../services/api";
 import FeedbackModal from "./FeedbackModal";
 import ChartComponent from "./ChartComponent";
 import CitationsTable from "./CitationsTable";
+import ThinkingStepsDisplay from "./ThinkingStepsDisplay";
 import { fixMarkdownTables } from "../utils/markdownUtils";
 
-const ChatMessage = ({ message, conversationId, thinkingSteps, onOpenPdf }) => {
+const ChatMessage = ({ message, conversationId, onOpenPdf }) => {
   const isUser = message.sender === "user";
   const [feedback, setFeedback] = useState(null);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -118,10 +119,23 @@ const ChatMessage = ({ message, conversationId, thinkingSteps, onOpenPdf }) => {
                   </div>
 
                   {/* Render citations table if available */}
-                  <CitationsTable 
-                    citations={message.citations || message.similar_docs} 
+                  <CitationsTable
+                    citations={message.citations || message.similar_docs}
                     onOpenPdf={onOpenPdf}
                   />
+
+                  {/* Reasoning/SQL steps for this turn — collapsed by default,
+                      so users can inspect what query the agent actually ran */}
+                  {message.thinkingSteps && message.thinkingSteps.length > 0 && (
+                    <details className="message-reasoning-details">
+                      <summary>Show reasoning</summary>
+                      <ThinkingStepsDisplay
+                        steps={message.thinkingSteps}
+                        isStreaming={false}
+                        currentStep=""
+                      />
+                    </details>
+                  )}
                 </>
               ) : (
                 <div className="typing-indicator">

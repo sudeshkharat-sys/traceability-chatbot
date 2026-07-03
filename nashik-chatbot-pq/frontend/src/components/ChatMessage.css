@@ -692,3 +692,31 @@
     font-size: 12px;
   }
 }
+.message-reasoning-details {
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.message-reasoning-details summary {
+  cursor: pointer;
+  color: #8892a4;
+  font-weight: 500;
+  padding: 4px 0;
+  list-style: none;
+}
+
+.message-reasoning-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.message-reasoning-details summary::before {
+  content: "▸ ";
+}
+
+.message-reasoning-details[open] summary::before {
+  content: "▾ ";
+}
+
+.message-reasoning-details[open] summary {
+  color: #cbd5e1;
+}

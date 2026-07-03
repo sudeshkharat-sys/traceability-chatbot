@@ -569,6 +569,11 @@ function ChatPage() {
       });
     } else if (data.type === "complete" || data.type === "final") {
       setIsLoading(false);
+      // Keep a copy of this turn's reasoning steps so it can be attached to
+      // the finalized message and re-opened later — the live state is
+      // cleared here (used only for the "in progress" panel above the
+      // pending message) but the steps themselves aren't lost.
+      const finalThinkingSteps = thinkingSteps;
       setThinkingSteps([]);
       setCurrentThinkingStep("");
 
@@ -587,6 +592,8 @@ function ChatPage() {
             ...(data.chart_data && { chart_data: data.chart_data }),
             // Include citations if present
             ...(data.citations && { citations: data.citations }),
+            // Persist this turn's reasoning/SQL steps for later review
+            ...(finalThinkingSteps.length > 0 && { thinkingSteps: finalThinkingSteps }),
           };
         } else {
           // Fallback: create new message
@@ -603,6 +610,8 @@ function ChatPage() {
             ...(data.chart_data && { chart_data: data.chart_data }),
             // Include citations if present
             ...(data.citations && { citations: data.citations }),
+            // Persist this turn's reasoning/SQL steps for later review
+            ...(finalThinkingSteps.length > 0 && { thinkingSteps: finalThinkingSteps }),
           });
         }
 
