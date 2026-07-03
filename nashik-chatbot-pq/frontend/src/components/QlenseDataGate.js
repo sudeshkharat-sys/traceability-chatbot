@@ -195,8 +195,11 @@ function MappingModal({ headers, sourceKey, onConfirm, onCancel }) {
     if (submitting) return;
     setSubmitting(true);
     try {
+      // Only keep selections that match a real column — a typed value
+      // that doesn't match any header (searchable input, not a locked
+      // dropdown) would otherwise be sent and silently ignored server-side.
       const filtered = Object.fromEntries(
-        Object.entries(mapping).filter(([, v]) => v !== "")
+        Object.entries(mapping).filter(([, v]) => v !== "" && headers.includes(v))
       );
       await onConfirm(filtered);
     } finally {
@@ -215,21 +218,29 @@ function MappingModal({ headers, sourceKey, onConfirm, onCancel }) {
         </div>
 
         <div className="qdg-mapping-grid">
-          {targets.map((target) => (
-            <div key={target} className="qdg-mapping-row">
-              <span className="qdg-mapping-target">{target}</span>
-              <select
-                className="qdg-mapping-select"
-                value={mapping[target]}
-                onChange={(e) => handleChange(target, e.target.value)}
-              >
-                <option value="">— skip —</option>
-                {headers.map((h) => (
-                  <option key={h} value={h}>{h}</option>
-                ))}
-              </select>
-            </div>
-          ))}
+          {targets.map((target) => {
+            const listId = `qdg-headers-${sourceKey}-${target}`;
+            const isValidSelection = mapping[target] === "" || headers.includes(mapping[target]);
+            return (
+              <div key={target} className="qdg-mapping-row">
+                <span className="qdg-mapping-target">{target}</span>
+                <input
+                  type="text"
+                  list={listId}
+                  className="qdg-mapping-select"
+                  style={!isValidSelection ? { borderColor: "#f87171" } : undefined}
+                  placeholder="Type to search columns, or leave blank to skip"
+                  value={mapping[target]}
+                  onChange={(e) => handleChange(target, e.target.value)}
+                />
+                <datalist id={listId}>
+                  {headers.map((h) => (
+                    <option key={h} value={h} />
+                  ))}
+                </datalist>
+              </div>
+            );
+          })}
         </div>
 
         <div className="qdg-mapping-actions">
