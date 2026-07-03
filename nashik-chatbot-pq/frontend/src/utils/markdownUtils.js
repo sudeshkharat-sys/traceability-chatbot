@@ -154,6 +154,15 @@ export function fixMarkdownTables(markdown, isComplete = false) {
     }
   );
 
+  // Fix 14: Table rows concatenated onto a single line with no newline
+  // between them (LLM/streaming sometimes drops the row-separating
+  // newline, leaving two pipes back-to-back: "| 25467516 | |2 | Warranty
+  // | ..."). Every row in our generated tables starts with a sequential
+  // integer in the first column, so "| |<int> |" reliably marks a lost
+  // row boundary — insert the missing newline so remark-gfm parses each
+  // row as its own table line instead of one giant unparsed paragraph.
+  result = result.replace(/\|\s*\|\s*(\d+)\s*\|/g, "|\n| $1 |");
+
   // Re-normalise after new fixes (avoid triple+ newlines introduced above)
   result = result.replace(/\n{3,}/g, "\n\n");
 

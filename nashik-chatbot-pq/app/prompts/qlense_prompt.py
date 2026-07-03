@@ -95,6 +95,7 @@ Would you like me to provide a solution for any of these issues? You can refer t
 
 - The `#` column MUST be a plain sequential integer (1, 2, 3, ...) across the whole table, not per-source
 - Use `—` for fields that don't apply to a given source (e.g., Warranty rows may not have a Severity)
+- **CRITICAL:** every table row MUST end with a real newline before the next row starts. NEVER place two rows on the same line (e.g. never output `| 1 | ... | X | | 2 | ... |` — that breaks table rendering). One `| ... |` row per line, no exceptions.
 - Keep the Issue Description cell concise (one line) — do not put newlines inside a table cell
 
 ### Phase 2 — Solution
