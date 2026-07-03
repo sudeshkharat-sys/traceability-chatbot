@@ -341,19 +341,41 @@ class QLenseAgent:
             # Yield citations at end (Phase 2 only — empty in Phase 1).
             # search_standards always returns its top-k *closest* vector
             # matches even when none are truly relevant, so citations are
-            # captured unconditionally above from every tool call. If the
-            # agent's own answer explicitly declared no real match was
-            # found (per the anti-fabrication Phase 2 prompt rules),
-            # showing those irrelevant chunks as "Sources & Citations"
-            # would contradict the answer text — so suppress them here.
-            response_text = "".join(response_tokens).lower()
-            no_solution_found = "no documented solution was found" in response_text
-            if citations and not no_solution_found:
-                logger.info(f"Yielding {len(citations)} citations")
-                yield {"type": "citations", "citations": citations}
-            elif citations and no_solution_found:
+            # captured unconditionally above from every tool call — this
+            # list is NOT the same as "documents the answer is based on".
+            response_text = "".join(response_tokens)
+            response_text_lower = response_text.lower()
+            no_solution_found = "no documented solution was found" in response_text_lower
+
+            # If the agent explicitly declared no real match was found (per
+            # the anti-fabrication Phase 2 prompt rules), showing those
+            # irrelevant chunks as "Sources & Citations" would contradict the
+            # answer text — suppress them entirely.
+            #
+            # Otherwise, only keep citations whose document name is actually
+            # named in the answer text (e.g. its "**Source:**" line) — a
+            # document merely being in the top-k vector search results
+            # doesn't mean the answer is based on it (see e.g. issue 56,
+            # which cited 2 pages of the correct doc plus one unrelated
+            # document the answer never referenced).
+            used_citations = []
+            for c in citations:
+                doc_name = (c.get("metadata") or {}).get("doc_name", "")
+                doc_name_stripped = doc_name[:-4] if doc_name.lower().endswith(".pdf") else doc_name
+                if doc_name_stripped and doc_name_stripped.lower() in response_text_lower:
+                    used_citations.append(c)
+
+            if no_solution_found:
+                if citations:
+                    logger.info(
+                        f"Suppressing {len(citations)} citations — agent reported no relevant solution found"
+                    )
+            elif used_citations:
+                logger.info(f"Yielding {len(used_citations)}/{len(citations)} citations actually referenced in the answer")
+                yield {"type": "citations", "citations": used_citations}
+            elif citations:
                 logger.info(
-                    f"Suppressing {len(citations)} citations — agent reported no relevant solution found"
+                    f"Suppressing {len(citations)} citations — none of their document names appear in the answer text"
                 )
 
             # Yield the full, unabridged issue table at end (Phase 1 only —

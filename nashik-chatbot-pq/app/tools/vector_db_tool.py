@@ -50,10 +50,10 @@ def search_standards(query: str, top_k: int = 5) -> str:
 
         logger.info(f"search_standards: returned {len(formatted)} chunks for query '{query[:80]}…'")
         for r in formatted:
-            source = r.get("metadata", {}).get("source", "unknown")
+            doc_name = r.get("metadata", {}).get("doc_name", "unknown")
             snippet = r["content"][:150].replace("\n", " ")
             logger.info(
-                f"  rank={r['rank']} score={r['relevance_score']} source={source!r} content={snippet!r}…"
+                f"  rank={r['rank']} score={r['relevance_score']} doc_name={doc_name!r} content={snippet!r}…"
             )
 
         return json.dumps({"found": True, "count": len(formatted), "results": formatted})
