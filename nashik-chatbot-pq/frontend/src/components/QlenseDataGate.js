@@ -172,12 +172,18 @@ function QlenseDataGate({ userId, onReady }) {
 // bound as a SQL named parameter that the INSERT statement never references.
 // mfg_month/mfg_quarter are always derived server-side from the raw date
 // column below, so the date column (not mfg_month) must be the mapping target.
+// "claim_desc"/"defect"/"defect_name"/"concern_description" are the real
+// free-text defect columns QLense needs for a meaningful Issue Description.
+// Without them mapped here, that data is never captured in Postgres at
+// all — QLense's SQL falls back to a category column, which for some
+// sources (e.g. Warranty's claim_type) is a generic bucket like
+// "AS-Normal Warranty", not a defect description.
 const SOURCE_TARGET_COLUMNS = {
-  warranty: ["complaint_code_desc", "material_description", "manufac_yr_mon", "base_model", "mis_bucket", "claim_date"],
-  rpt:      ["defect_category", "model", "date_col", "attribute_name", "shift"],
-  gnovac:   ["pointer", "model_code", "audit_date", "concern_type_name", "pca"],
+  warranty: ["claim_desc", "complaint_code_desc", "material_description", "manufac_yr_mon", "base_model", "mis_bucket", "claim_date"],
+  rpt:      ["defect", "defect_category", "model", "date_col", "attribute_name", "shift"],
+  gnovac:   ["defect_name", "pointer", "model_code", "audit_date", "concern_type_name", "pca"],
   rfi:      ["defect_name", "model_name", "date_col", "severity_name"],
-  esqa:     ["concern_category", "vehicle_model", "concern_report_date", "vendor_name"],
+  esqa:     ["concern_description", "concern_category", "vehicle_model", "concern_report_date", "vendor_name"],
 };
 
 function MappingModal({ headers, sourceKey, onConfirm, onCancel }) {
