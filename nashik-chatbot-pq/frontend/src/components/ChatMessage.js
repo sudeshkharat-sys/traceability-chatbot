@@ -8,8 +8,10 @@ import { conversationService } from "../services/api";
 import FeedbackModal from "./FeedbackModal";
 import ChartComponent from "./ChartComponent";
 import CitationsTable from "./CitationsTable";
+import QueryResultsTable from "./QueryResultsTable";
 import ThinkingStepsDisplay from "./ThinkingStepsDisplay";
 import { fixMarkdownTables } from "../utils/markdownUtils";
+import { extractQueryResultsTable } from "../utils/queryTableUtils";
 
 const ChatMessage = ({ message, conversationId, onOpenPdf }) => {
   const isUser = message.sender === "user";
@@ -18,14 +20,22 @@ const ChatMessage = ({ message, conversationId, onOpenPdf }) => {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [feedbackType, setFeedbackType] = useState(null);
 
+  // If the response contains a fenced ```json result block (QLense Phase 1
+  // issue table), pull it out as structured rows for a real <table> and
+  // strip it from the text so it isn't also shown as a raw code block.
+  const { rows: queryResultRows, strippedText } = useMemo(
+    () => extractQueryResultsTable(message.text),
+    [message.text]
+  );
+
   // Fix markdown tables before rendering
   // Only apply strict fixes when message is complete (has messageId)
   // During streaming, use lenient mode to avoid breaking incomplete tables
   const fixedMarkdown = useMemo(() => {
-    if (!message.text) return "";
+    if (!strippedText) return "";
     const isComplete = !!message.messageId;
-    return fixMarkdownTables(message.text, isComplete);
-  }, [message.text, message.messageId]);
+    return fixMarkdownTables(strippedText, isComplete);
+  }, [strippedText, message.messageId]);
 
   const handleFeedback = async (type) => {
     if (!conversationId || !message.messageId) return;
@@ -117,6 +127,9 @@ const ChatMessage = ({ message, conversationId, onOpenPdf }) => {
                       {fixedMarkdown}
                     </ReactMarkdown>
                   </div>
+
+                  {/* Render QLense's structured issue-list table, if present */}
+                  <QueryResultsTable rows={queryResultRows} />
 
                   {/* Render citations table if available */}
                   <CitationsTable
