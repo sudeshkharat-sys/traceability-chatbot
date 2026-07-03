@@ -285,6 +285,9 @@ function ChatPage() {
             similar_docs: response?.similar_docs || response?.citations,
             // Include chart_data if present in historical message
             ...(response?.chart_data && { chart_data: response.chart_data }),
+            // Include QLense's saved reasoning/query-results, if present
+            ...(response?.thinking_steps && { thinkingSteps: response.thinking_steps }),
+            ...(response?.query_results && { queryResults: response.query_results }),
           });
         });
       } else {

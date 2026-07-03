@@ -97,6 +97,8 @@ class ConversationService:
             full_response: list[str] = []
             chart_data = None
             citations_data: list = []
+            thinking_steps_data: list = []
+            query_results_data: list = []
 
             with self.agent_pool.get_agent(
                 conversation_id, agent_type, user_id=getattr(payload, "user_id", 1)
@@ -131,6 +133,12 @@ class ConversationService:
                             token_count += 1
                         elif etype == "thinking":
                             thinking_count += 1
+                            thinking_steps_data.append(
+                                {
+                                    "step": event.get("step", "Reasoning"),
+                                    "content": event.get("content", ""),
+                                }
+                            )
                         elif etype == "chart":
                             chart_data = event.get("chart_data")
                             logger.info(
@@ -140,6 +148,9 @@ class ConversationService:
                         elif etype == "citations":
                             citations_data = event.get("citations", [])
                             logger.info(f"Captured {len(citations_data)} citations")
+                        elif etype == "query_results":
+                            query_results_data = event.get("rows", [])
+                            logger.info(f"Captured {len(query_results_data)} query result rows")
 
                     # Decide whether to retry
                     if token_count > 0:
@@ -161,6 +172,10 @@ class ConversationService:
                     }
                     if chart_data:
                         response_data["chart_data"] = chart_data
+                    if thinking_steps_data:
+                        response_data["thinking_steps"] = thinking_steps_data
+                    if query_results_data:
+                        response_data["query_results"] = query_results_data
 
                     message_id = self.chat_manager.save_message(
                         conversation_id=conversation_id,
@@ -188,6 +203,8 @@ class ConversationService:
                     }
                     if chart_data:
                         final_data["chart_data"] = chart_data
+                    if query_results_data:
+                        final_data["query_results"] = query_results_data
 
                     yield f"data: {json.dumps(final_data)}\n\n"
                     logger.info(
