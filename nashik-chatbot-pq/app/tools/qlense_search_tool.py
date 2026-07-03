@@ -160,6 +160,17 @@ def make_search_quality_issues_tool(user_id: int, limit_per_table: int = 100):
             except Exception as e:
                 logger.error(f"search_quality_issues: error querying {cfg['table']}: {e}")
 
+        # Number rows here, in the tool's own return value, so the LLM sees
+        # an explicit "num" it can look up directly in its conversation
+        # history. Without this, the only numbering ever existed in the
+        # frontend's rendered table (added post-hoc in qlense_agent.py after
+        # the ToolMessage was already added to the LLM's context) — the LLM
+        # had to manually count array position across all rows to answer
+        # "give me solution for issue N", which it got wrong on runs with
+        # a couple hundred rows (e.g. picked row 54's data for "issue 56").
+        for i, row in enumerate(all_rows, start=1):
+            row["num"] = i
+
         return json.dumps(
             {"success": True, "row_count": len(all_rows), "data": all_rows},
             default=str,
