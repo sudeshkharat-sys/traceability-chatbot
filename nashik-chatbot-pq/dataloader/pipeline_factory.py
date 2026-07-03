@@ -23,9 +23,14 @@ _configured_path = Path(settings.DOCLING_ARTIFACTS_PATH)
 ARTIFACTS_PATH = _configured_path if _configured_path.exists() else None
 VLM_MODEL_FOLDER = settings.DOCLING_VLM_MODEL
 
-# Set environment variable for Docling only when path is valid
+# Set environment variable for Docling only when path is valid; otherwise
+# make sure a stale value (e.g. leaked from .env via load_dotenv() in tasks.py)
+# doesn't override the None fallback, since Docling's own options read this
+# env var directly.
 if ARTIFACTS_PATH is not None:
     os.environ["DOCLING_ARTIFACTS_PATH"] = str(ARTIFACTS_PATH)
+else:
+    os.environ.pop("DOCLING_ARTIFACTS_PATH", None)
 
 # Configuration flags (override via environment variables)
 ENABLE_VLM = os.environ.get('ENABLE_VLM', 'false').lower() == 'true'
