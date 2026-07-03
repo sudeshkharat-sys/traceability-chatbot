@@ -17,8 +17,8 @@ class QLenseAgent:
     Two-phase quality intelligence agent.
 
     Phase 1 — Issue Discovery:
-        Tools: think, get_part_labeler_schema, execute_read_query
-        Presents a numbered list of DB issues; asks user if they want a solution.
+        Tools: think, search_quality_issues (fixed SQL, not LLM-written)
+        Presents a table of DB issues; asks user if they want a solution.
 
     Phase 2 — Solution Retrieval (user-confirmed only):
         Tools: think, search_standards
@@ -32,6 +32,7 @@ class QLenseAgent:
         self,
         thread_id: str = "default",
         checkpointer=None,
+        user_id: int = 1,
         enable_summarization: bool = True,
         summarization_trigger_tokens: int = 100000,
         keep_recent_messages: int = 20,
@@ -41,6 +42,7 @@ class QLenseAgent:
         self.llm = ModelFactory.get_analyst_model()
         self.thread_id = thread_id
         self.checkpointer = checkpointer
+        self.user_id = user_id
         self.enable_summarization = enable_summarization
         self.summarization_trigger_tokens = summarization_trigger_tokens
         self.keep_recent_messages = keep_recent_messages
@@ -50,8 +52,7 @@ class QLenseAgent:
     def _initialize_agent(self):
         """Initialize the LangChain agent with DB, vector-search, and think tools."""
         try:
-            from app.tools.pg_schema_tool import get_part_labeler_schema
-            from app.tools.pg_query_tool import execute_read_query
+            from app.tools.qlense_search_tool import make_search_quality_issues_tool
             from app.tools.vector_db_tool import search_standards
             from app.tools.think_tool import think
             from app.services.prompt_manager import (
@@ -66,9 +67,14 @@ class QLenseAgent:
 
             prompt = get_qlense_prompt()
 
+            # Bound to this instance's user_id so the LLM never has to know
+            # or supply it — removes a whole class of "forgot to filter by
+            # user_id" / wrong-value errors.
+            search_quality_issues = make_search_quality_issues_tool(self.user_id)
+
             agent_kwargs = {
                 "model": self.llm,
-                "tools": [get_part_labeler_schema, execute_read_query, think, search_standards],
+                "tools": [search_quality_issues, think, search_standards],
                 "system_prompt": prompt,
                 "name": "qlense_agent",
             }
@@ -246,21 +252,20 @@ class QLenseAgent:
                                     except Exception as e:
                                         logger.warning(f"Error parsing search_standards output: {e}")
 
-                                # Capture structured issue rows from execute_read_query (Phase 1).
-                                # The SQL SELECT aliases columns to the display schema
-                                # (source/description/model/date/severity/ref), so rows are
-                                # forwarded to the frontend as-is — the LLM never has to
-                                # retype query results into its own answer, which removes
-                                # any need to cap row count to what fits in an LLM response.
-                                if tool_name == "execute_read_query":
+                                # Capture structured issue rows from search_quality_issues
+                                # (Phase 1). Column selection is fixed in that tool's own
+                                # code (not LLM-written SQL), so rows are forwarded to the
+                                # frontend as-is — the LLM never retypes query results into
+                                # its own answer.
+                                if tool_name == "search_quality_issues":
                                     try:
                                         data = json.loads(tool_content) if isinstance(tool_content, str) else tool_content
                                         if isinstance(data, dict) and data.get("success"):
                                             rows = data.get("data", [])
                                             query_result_rows.extend(rows)
-                                            logger.info(f"Captured {len(rows)} rows from execute_read_query")
+                                            logger.info(f"Captured {len(rows)} rows from search_quality_issues")
                                     except Exception as e:
-                                        logger.warning(f"Error parsing execute_read_query output: {e}")
+                                        logger.warning(f"Error parsing search_quality_issues output: {e}")
 
                                 # Emit todo updates from tool results
                                 if tool_name in ("write_todos", "todo_write", "write_todo_list", "todo_list") and tool_content:

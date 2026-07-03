@@ -101,6 +101,7 @@ class AgentPool:
                 agent = QLenseAgent(
                     thread_id=thread_id,
                     checkpointer=self.checkpointer,
+                    user_id=kwargs.get("user_id", 1),
                 )
             else:
                 raise ValueError(f"Unknown agent type: {agent_type}")
@@ -146,13 +147,14 @@ class AgentPool:
             checkpointer=self.checkpointer,
         )
 
-    def get_qlense_agent(self, thread_id: str = "default"):
+    def get_qlense_agent(self, thread_id: str = "default", user_id: int = 1):
         """Get a standalone QLense agent instance."""
         from app.agents.qlense_agent import QLenseAgent
 
         return QLenseAgent(
             thread_id=thread_id,
             checkpointer=self.checkpointer,
+            user_id=user_id,
         )
 
     def get_active_agent_count(self) -> int:
