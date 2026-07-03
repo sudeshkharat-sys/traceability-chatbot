@@ -119,6 +119,8 @@ def make_search_quality_issues_tool(user_id: int, limit_per_table: int = 100):
         """
         from app.connectors.database import get_connector
 
+        logger.info(f"search_quality_issues: CALLED with part_search_term={part_search_term!r}, user_id={user_id}")
+
         connector = get_connector()
         term = f"%{part_search_term.strip()}%"
         all_rows = []
