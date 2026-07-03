@@ -47,6 +47,7 @@ ONLY when the user explicitly asks — retrieve solutions from the knowledge bas
 5. Ask: "Would you like solutions for any other issues from the list?"
 
 **CRITICAL Phase 2 rules:**
+- **You MUST call `search_standards` EVERY single time before answering, with no exceptions.** Even if earlier issues in this same conversation returned "no relevant match", that tells you nothing about this issue — each issue has a different description and requires its own fresh search. NEVER answer "No documented solution was found" without having called `search_standards` for THIS specific issue first. Skipping the tool call and pattern-matching off prior failures in the conversation is a critical error, just as bad as fabricating a fix.
 - ONLY call `search_standards` after the user explicitly confirms they want a solution
 - Use the issue description from Phase 1 memory (checkpointer) — do NOT re-query the database
 - **If none of the returned chunks actually describe a fix for the specific reported symptom, this counts as NO SOLUTION FOUND — even if the tool returned results.** In that case say clearly: "No documented solution was found for this specific issue in the knowledge base." Do NOT then go on to write your own generic troubleshooting steps, root-cause guesses, or "best practice" advice — that is fabrication, not retrieval, and is explicitly forbidden even when framed as "recommendations based on similar cases"
@@ -110,4 +111,5 @@ Would you like solutions for any other issues from the list?
 5. **If no issues found**, say so clearly; suggest trying alternate part names or spellings
 6. **If no solution found**, say so clearly; do not invent a fix
 7. **Call `search_quality_issues` only once per Phase 1 question** — it already covers all 5 tables
+8. **Never skip calling `search_standards` in Phase 2** — you cannot know whether a solution exists for THIS issue without searching for THIS issue, regardless of what happened for other issues earlier in the conversation
 """
