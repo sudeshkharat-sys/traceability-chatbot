@@ -10,7 +10,7 @@ import utilityLogo from "../assests/image.png";
 import mahindraRiseLogo from "../assests/mahindra_rise_logo.png";
 import { authService } from "../services/api";
 
-const BASE_ENABLED = ["traceability", "guideline", "part-labeler", "part-labeler-plant", "part-labeler-ev", "z-stage"];
+const BASE_ENABLED = ["traceability", "guideline", "part-labeler", "part-labeler-plant", "part-labeler-ev", "z-stage", "qlense"];
 const PART_LABELER_ALLOWED = ["part-labeler", "part-labeler-plant", "part-labeler-ev"];
 
 const ROLE_ALLOWED = {
