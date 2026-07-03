@@ -1,9 +1,20 @@
 import logging
 import os
 import subprocess
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Docling bakes its artifacts_path default in from the environment the
+# moment any docling module is first imported below. The Docker-only
+# default (/app/docling_models) doesn't exist on local dev machines, so it
+# must be stripped here — before any docling-importing module loads —
+# otherwise Docling locks in the invalid path and no cleanup done later
+# (e.g. in pipeline_factory.py) can undo it.
+_artifacts_path = os.environ.get("DOCLING_ARTIFACTS_PATH")
+if _artifacts_path and not Path(_artifacts_path).exists():
+    os.environ.pop("DOCLING_ARTIFACTS_PATH", None)
 
 from invoke import task
 from dataloader.document_scrape_processor import DocumentScrapeProcessor
