@@ -169,19 +169,22 @@ function QlenseDataGate({ userId, onReady }) {
 // bound as a SQL named parameter that the INSERT statement never references.
 // mfg_month/mfg_quarter are always derived server-side from the raw date
 // column below, so the date column (not mfg_month) must be the mapping target.
-// "claim_desc"/"defect"/"defect_name"/"concern_description" are the real
-// free-text defect columns QLense needs for a meaningful Issue Description.
-// Without them mapped here, that data is never captured in Postgres at
-// all — QLense's SQL falls back to a category column, which for some
-// sources (e.g. Warranty's claim_type) is a generic bucket like
-// "AS-Normal Warranty", not a defect description.
+//
+// Warranty's "claim_desc" is deliberately NOT mapped: verified against the
+// real source data, it only ever holds 4 fixed values ("AS-Normal
+// Warranty", "AS-PDI Warranty Claim", ...) — despite its name it's a claim
+// category, not a defect description. "dealer_verbatim" is the real
+// free-text complaint field (2931/2999 distinct values sampled);
+// "complaint_code_desc" is the next-best fallback (320 distinct,
+// standardized-but-specific labels).
+//
 // This must stay in sync with app/tools/qlense_search_tool.py's _TABLE_CONFIG —
 // every search_cols/desc_cols/ref_cols/severity_col/model_col/date_col entry
 // referenced there needs to actually be captured here, or that column is
 // silently empty in Postgres forever and QLense falls back to a blanker/less
 // useful field no matter how correct the search tool's SQL is.
 const SOURCE_TARGET_COLUMNS = {
-  warranty: ["part", "claim_desc", "dealer_verbatim", "complaint_code_desc", "material_description", "manufac_yr_mon", "base_model", "mis_bucket", "claim_date", "sap_claim_no", "serial_no"],
+  warranty: ["part", "dealer_verbatim", "complaint_code_desc", "material_description", "manufac_yr_mon", "base_model", "mis_bucket", "claim_date", "sap_claim_no", "serial_no"],
   rpt:      ["part", "defect", "part_defect", "defect_category", "model", "date_col", "attribute_name", "shift", "severity_name", "vin_number", "body_sr_no"],
   gnovac:   ["part_name", "defect_name", "pointer", "model_code", "audit_date", "concern_type_name", "pca", "vin_no", "body_no"],
   rfi:      ["part_name", "defect_name", "defect_type_name", "model_name", "date_col", "severity_name", "vin_no", "biw_no"],

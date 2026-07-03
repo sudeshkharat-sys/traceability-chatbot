@@ -28,8 +28,15 @@ _TABLE_CONFIG = [
     {
         "table": "raw_warranty_data",
         "source": "Warranty",
-        "search_cols": ["material_description", "part", "claim_desc", "complaint_code_desc"],
-        "desc_cols": ["claim_desc", "dealer_verbatim", "complaint_code_desc"],
+        # claim_desc deliberately excluded: verified against the real data
+        # (data_qlense/excel_data) it only ever holds 4 fixed values
+        # ("AS-Normal Warranty", "AS-PDI Warranty Claim", ...) — it's a
+        # claim-type category, not a defect description, despite its name.
+        # dealer_verbatim is the real free-text complaint (2931/2999
+        # distinct values sampled); complaint_code_desc is next-best
+        # (320 distinct, standardized-but-specific defect labels).
+        "search_cols": ["material_description", "part", "complaint_code_desc", "dealer_verbatim"],
+        "desc_cols": ["dealer_verbatim", "complaint_code_desc"],
         "model_col": "base_model",
         "date_col": "claim_date",
         "severity_col": None,
