@@ -92,7 +92,7 @@ export function fixMarkdownTables(markdown, isComplete = false) {
   // Only matches when lowercase letter is IMMEDIATELY followed by capitalized sentence-start word
   // (no space between = concatenation, not natural heading text)
   result = result.replace(
-    /(^#{1,6}\s+[^\n]+?[a-z])((?:Here (?:is|are)|The |This |Based on|Below |Above |I (?:traced|found|identified|analyzed|will)|Let me|Looking at|We |It |A |An )[^\n]*)/gm,
+    /(^#{1,6}\s+[^\n]+?[a-z])((?:Here (?:is|are)|The |This |Based on|Below |Above |I (?:traced|found|identified|analyzed|will)|Let me|Looking at|We |It |A |An |No (?:documented|exact|solution|match))[^\n]*)/gm,
     "$1\n\n$2"
   );
 
