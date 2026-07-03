@@ -1,6 +1,15 @@
 import React from "react";
 import "./QueryResultsTable.css";
 
+// Postgres timestamp/date values come back as e.g. "2025-04-24T00:00:00"
+// or "2025-04-24 00:00:00" — the time is always midnight (these are date
+// columns, not real timestamps), so trim it for display.
+const formatDate = (value) => {
+  if (typeof value !== "string") return value;
+  const match = value.match(/^(\d{4}-\d{2}-\d{2})[T ]00:00:00/);
+  return match ? match[1] : value;
+};
+
 // Renders QLense Phase-1 SQL results as a real HTML table, fed by
 // structured JSON (parsed out of the response by queryTableUtils.js)
 // instead of relying on the LLM's markdown table formatting.
@@ -38,7 +47,7 @@ const QueryResultsTable = ({ rows }) => {
               <tr key={index}>
                 {columns.map((col) => (
                   <td key={col.key} className={col.key === "num" ? "num-cell" : undefined}>
-                    {row[col.key] ?? "—"}
+                    {col.key === "date" ? formatDate(row[col.key]) : row[col.key] ?? "—"}
                   </td>
                 ))}
               </tr>

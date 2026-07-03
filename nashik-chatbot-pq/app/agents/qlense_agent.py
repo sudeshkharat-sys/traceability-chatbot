@@ -147,6 +147,7 @@ class QLenseAgent:
             response_started = False
             thinking_step_count = 0
             citations = []
+            query_result_rows = []
 
             for stream_mode, chunk in self.agent.stream(
                 inputs, config, stream_mode=["custom", "messages", "updates"]
@@ -245,6 +246,22 @@ class QLenseAgent:
                                     except Exception as e:
                                         logger.warning(f"Error parsing search_standards output: {e}")
 
+                                # Capture structured issue rows from execute_read_query (Phase 1).
+                                # The SQL SELECT aliases columns to the display schema
+                                # (source/description/model/date/severity/ref), so rows are
+                                # forwarded to the frontend as-is — the LLM never has to
+                                # retype query results into its own answer, which removes
+                                # any need to cap row count to what fits in an LLM response.
+                                if tool_name == "execute_read_query":
+                                    try:
+                                        data = json.loads(tool_content) if isinstance(tool_content, str) else tool_content
+                                        if isinstance(data, dict) and data.get("success"):
+                                            rows = data.get("data", [])
+                                            query_result_rows.extend(rows)
+                                            logger.info(f"Captured {len(rows)} rows from execute_read_query")
+                                    except Exception as e:
+                                        logger.warning(f"Error parsing execute_read_query output: {e}")
+
                                 # Emit todo updates from tool results
                                 if tool_name in ("write_todos", "todo_write", "write_todo_list", "todo_list") and tool_content:
                                     try:
@@ -318,6 +335,15 @@ class QLenseAgent:
             if citations:
                 logger.info(f"Yielding {len(citations)} citations")
                 yield {"type": "citations", "citations": citations}
+
+            # Yield the full, unabridged issue table at end (Phase 1 only —
+            # empty in Phase 2). Numbered sequentially here rather than by
+            # the LLM, since rows accumulate across multiple table queries.
+            if query_result_rows:
+                for i, row in enumerate(query_result_rows, start=1):
+                    row["num"] = i
+                logger.info(f"Yielding {len(query_result_rows)} query result rows")
+                yield {"type": "query_results", "rows": query_result_rows}
 
         except Exception as e:
             logger.error(f"Error in QLense streaming: {e}", exc_info=True)

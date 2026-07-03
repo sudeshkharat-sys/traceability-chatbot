@@ -20,13 +20,17 @@ const ChatMessage = ({ message, conversationId, onOpenPdf }) => {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [feedbackType, setFeedbackType] = useState(null);
 
-  // If the response contains a fenced ```json result block (QLense Phase 1
-  // issue table), pull it out as structured rows for a real <table> and
-  // strip it from the text so it isn't also shown as a raw code block.
-  const { rows: queryResultRows, strippedText } = useMemo(
-    () => extractQueryResultsTable(message.text),
-    [message.text]
-  );
+  // Prefer QLense's server-captured SQL result rows (message.queryResults —
+  // taken directly from the tool call output, so it's never limited by
+  // what the LLM could fit/retype in its own text). Fall back to parsing a
+  // fenced ```json block out of the text for any older/other response
+  // shape that still embeds it inline.
+  const { rows: queryResultRows, strippedText } = useMemo(() => {
+    if (message.queryResults && message.queryResults.length > 0) {
+      return { rows: message.queryResults, strippedText: message.text };
+    }
+    return extractQueryResultsTable(message.text);
+  }, [message.queryResults, message.text]);
 
   // Fix markdown tables before rendering
   // Only apply strict fixes when message is complete (has messageId)

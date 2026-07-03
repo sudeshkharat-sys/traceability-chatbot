@@ -567,6 +567,25 @@ function ChatPage() {
         messagesRef.current = out;
         return out;
       });
+    } else if (data.type === "query_results") {
+      // Handle QLense's structured SQL result rows (Phase 1 issue table),
+      // captured server-side from the tool call output — same pattern as
+      // citations, so the LLM never has to retype rows into its answer.
+      setMessages((prev) => {
+        if (!prev.length) return prev;
+        const out = [...prev];
+        const idx = out.length - 1;
+
+        if (out[idx].sender === "bot" && !out[idx].messageId) {
+          out[idx] = {
+            ...out[idx],
+            queryResults: data.rows,
+          };
+        }
+
+        messagesRef.current = out;
+        return out;
+      });
     } else if (data.type === "complete" || data.type === "final") {
       setIsLoading(false);
       // Keep a copy of this turn's reasoning steps so it can be attached to
