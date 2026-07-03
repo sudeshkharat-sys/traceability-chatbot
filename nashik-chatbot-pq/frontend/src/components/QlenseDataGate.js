@@ -179,16 +179,23 @@ function MappingModal({ headers, sourceKey, onConfirm, onCancel }) {
   const [mapping, setMapping] = useState(() =>
     Object.fromEntries(targets.map((t) => [t, ""]))
   );
+  const [submitting, setSubmitting] = useState(false);
 
   const handleChange = (target, value) => {
     setMapping((prev) => ({ ...prev, [target]: value }));
   };
 
-  const handleSubmit = () => {
-    const filtered = Object.fromEntries(
-      Object.entries(mapping).filter(([, v]) => v !== "")
-    );
-    onConfirm(filtered);
+  const handleSubmit = async () => {
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      const filtered = Object.fromEntries(
+        Object.entries(mapping).filter(([, v]) => v !== "")
+      );
+      await onConfirm(filtered);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -220,8 +227,10 @@ function MappingModal({ headers, sourceKey, onConfirm, onCancel }) {
         </div>
 
         <div className="qdg-mapping-actions">
-          <button className="qdg-cancel-btn" onClick={onCancel}>Cancel</button>
-          <button className="qdg-confirm-btn" onClick={handleSubmit}>Confirm &amp; Load</button>
+          <button className="qdg-cancel-btn" onClick={onCancel} disabled={submitting}>Cancel</button>
+          <button className="qdg-confirm-btn" onClick={handleSubmit} disabled={submitting}>
+            {submitting ? "Processing…" : "Confirm & Load"}
+          </button>
         </div>
       </div>
     </div>
