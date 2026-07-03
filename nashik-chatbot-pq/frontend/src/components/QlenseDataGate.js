@@ -166,12 +166,18 @@ function QlenseDataGate({ userId, onReady }) {
   );
 }
 
+// Target keys must match a real column in the corresponding
+// process_mapped_*_data() all_cols list in part_labeler_service.py — any
+// name that isn't a real column is silently dropped (no error) since it's
+// bound as a SQL named parameter that the INSERT statement never references.
+// mfg_month/mfg_quarter are always derived server-side from the raw date
+// column below, so the date column (not mfg_month) must be the mapping target.
 const SOURCE_TARGET_COLUMNS = {
   warranty: ["complaint_code_desc", "material_description", "manufac_yr_mon", "base_model", "mis_bucket", "claim_date"],
-  rpt:      ["defect_category", "model", "mfg_month", "attribute_name", "shift"],
-  gnovac:   ["pointer", "model_code", "mfg_month", "concern", "action"],
-  rfi:      ["defect_description", "model_name", "mfg_month", "severity_name"],
-  esqa:     ["concern_category", "vehicle_model", "mfg_month", "supplier_name"],
+  rpt:      ["defect_category", "model", "date_col", "attribute_name", "shift"],
+  gnovac:   ["pointer", "model_code", "audit_date", "concern_type_name", "pca"],
+  rfi:      ["defect_name", "model_name", "date_col", "severity_name"],
+  esqa:     ["concern_category", "vehicle_model", "concern_report_date", "vendor_name"],
 };
 
 function MappingModal({ headers, sourceKey, onConfirm, onCancel }) {
