@@ -34,30 +34,30 @@ The UI renders Phase 1 results as a real table directly from your SQL query's ow
 
 `source, description, model, date, severity, ref`
 
-Use `COALESCE(NULLIF(col, ''), fallback_col)` to prefer the real defect-text column over empty values, and NEVER alias a category/classification column as `description` (it describes what *kind* of record it is, not what broke):
+**A `description` or `ref` cell must NEVER render blank.** Every alias below uses a 3-level `COALESCE(NULLIF(a,''), NULLIF(b,''), c)` fallback chain, ending in a column that is essentially always populated (falling back to the category/classification column as the last resort only — never as the first choice):
 
-| Table | description (prefer) | description (do NOT use) | model | date | severity | ref |
-|---|---|---|---|---|---|---|
-| raw_warranty_data | `claim_desc` (fallback `dealer_verbatim`) | `claim_type` (e.g. "AS-Normal Warranty" — a claim category, not what broke) | `base_model` | `claim_date` | `'—'` (no severity column) | `sap_claim_no` |
-| raw_rpt_data | `defect` (fallback `part_defect`) | — | `model` | `date_col` | `severity_name` | `vin_number` |
-| raw_gnovac_data | `defect_name` | `pointer` (a classification code, not a description) | `model_code` | `audit_date` | `'—'` (no severity column) | `vin_no` |
-| raw_rfi_data | `defect_name` | — | `model_name` | `date_col` | `severity_name` | `vin_no` |
-| raw_esqa_data | `concern_description` | `concern_category` (a category, not a description) | `vehicle_model` | `concern_report_date` | `concern_severity` | `concern_number` |
+| Table | description alias | ref alias | model | date | severity |
+|---|---|---|---|---|---|
+| raw_warranty_data | `COALESCE(NULLIF(claim_desc,''), NULLIF(dealer_verbatim,''), claim_type)` | `COALESCE(NULLIF(sap_claim_no,''), serial_no)` | `base_model` | `claim_date` | `'—'` |
+| raw_rpt_data | `COALESCE(NULLIF(defect,''), NULLIF(part_defect,''), defect_category)` | `COALESCE(NULLIF(vin_number,''), body_sr_no)` | `model` | `date_col` | `severity_name` |
+| raw_gnovac_data | `COALESCE(NULLIF(defect_name,''), pointer)` | `COALESCE(NULLIF(vin_no,''), body_no)` | `model_code` | `audit_date` | `'—'` |
+| raw_rfi_data | `COALESCE(NULLIF(defect_name,''), defect_type_name)` | `COALESCE(NULLIF(vin_no,''), biw_no)` | `model_name` | `date_col` | `severity_name` |
+| raw_esqa_data | `COALESCE(NULLIF(concern_description,''), concern_category)` | `COALESCE(NULLIF(concern_number,''), esqa_number)` | `vehicle_model` | `concern_report_date` | `concern_severity` |
 
-**Example query (Warranty):**
+**Example query (Warranty) — copy this exact fallback pattern for the other 4 tables:**
 ```sql
 SELECT 'Warranty' AS source,
-       COALESCE(NULLIF(claim_desc, ''), dealer_verbatim) AS description,
+       COALESCE(NULLIF(claim_desc, ''), NULLIF(dealer_verbatim, ''), claim_type) AS description,
        base_model AS model,
        claim_date AS date,
        '—' AS severity,
-       sap_claim_no AS ref
+       COALESCE(NULLIF(sap_claim_no, ''), serial_no) AS ref
 FROM raw_warranty_data
 WHERE user_id = <user_id>
   AND (material_description ILIKE '%head lamp%' OR part ILIKE '%head lamp%' OR claim_desc ILIKE '%head lamp%')
 LIMIT 100
 ```
-Write the equivalent aliased query for each of the other 4 tables, swapping in the correct source table/columns from the table above.
+Write the equivalent aliased query for each of the other 4 tables using the fallback chains from the table above — never a bare single column for `description` or `ref`, always the full `COALESCE` chain.
 
 ---
 
@@ -159,4 +159,5 @@ Would you like solutions for any other issues from the list?
 7. **If no solution found**, say so clearly; do not invent a fix
 8. **Always query all 5 tables in Phase 1** — never skip one because you assume it has no matches
 9. **Use real defect-text columns for `description`** — never a category/classification column (see SQL COLUMN ALIASING)
+10. **Never leave `description` or `ref` blank** — always use the full 3-level `COALESCE` fallback chain from SQL COLUMN ALIASING, not a bare column, so every row has something to show
 """
