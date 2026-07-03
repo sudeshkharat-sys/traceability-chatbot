@@ -135,17 +135,14 @@ function QlenseDataGate({ userId, onReady }) {
                   </div>
                 </div>
                 <div className="qdg-source-action">
-                  {uploaded ? (
-                    <span className="qdg-row-count">{rowCount.toLocaleString()} rows</span>
-                  ) : (
-                    <button
-                      className="qdg-upload-btn"
-                      onClick={() => handleUploadClick(src.key)}
-                      disabled={isUploading}
-                    >
-                      {isUploading ? "Uploading…" : "Upload"}
-                    </button>
-                  )}
+                  {uploaded && <span className="qdg-row-count">{rowCount.toLocaleString()} rows</span>}
+                  <button
+                    className="qdg-upload-btn"
+                    onClick={() => handleUploadClick(src.key)}
+                    disabled={isUploading}
+                  >
+                    {isUploading ? "Uploading…" : uploaded ? "Re-upload" : "Upload"}
+                  </button>
                 </div>
               </div>
             );
