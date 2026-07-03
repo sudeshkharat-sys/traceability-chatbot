@@ -1,6 +1,10 @@
 import logging
 import os
 import subprocess
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from invoke import task
 from dataloader.document_scrape_processor import DocumentScrapeProcessor
 from dataloader.document_embedding_processor import DocumentEmbeddingProcessor
