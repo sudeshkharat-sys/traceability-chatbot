@@ -154,6 +154,7 @@ class QLenseAgent:
             thinking_step_count = 0
             citations = []
             query_result_rows = []
+            response_tokens = []
 
             for stream_mode, chunk in self.agent.stream(
                 inputs, config, stream_mode=["custom", "messages", "updates"]
@@ -323,6 +324,7 @@ class QLenseAgent:
                                 "step_count": thinking_step_count,
                                 "detail": "Generating response…",
                             }
+                        response_tokens.append(token_content)
                         yield {
                             "type": "token",
                             "content": token_content,
@@ -336,10 +338,23 @@ class QLenseAgent:
                         just_finished_thinking = True
                         continue
 
-            # Yield citations at end (Phase 2 only — empty in Phase 1)
-            if citations:
+            # Yield citations at end (Phase 2 only — empty in Phase 1).
+            # search_standards always returns its top-k *closest* vector
+            # matches even when none are truly relevant, so citations are
+            # captured unconditionally above from every tool call. If the
+            # agent's own answer explicitly declared no real match was
+            # found (per the anti-fabrication Phase 2 prompt rules),
+            # showing those irrelevant chunks as "Sources & Citations"
+            # would contradict the answer text — so suppress them here.
+            response_text = "".join(response_tokens).lower()
+            no_solution_found = "no documented solution was found" in response_text
+            if citations and not no_solution_found:
                 logger.info(f"Yielding {len(citations)} citations")
                 yield {"type": "citations", "citations": citations}
+            elif citations and no_solution_found:
+                logger.info(
+                    f"Suppressing {len(citations)} citations — agent reported no relevant solution found"
+                )
 
             # Yield the full, unabridged issue table at end (Phase 1 only —
             # empty in Phase 2). Numbered sequentially here rather than by
