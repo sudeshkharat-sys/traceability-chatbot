@@ -87,12 +87,17 @@ export function fixMarkdownTables(markdown, isComplete = false) {
   // Pattern: ### Heading\n| Column | -> ### Heading\n\n| Column |
   result = result.replace(/(^#{1,6}\s+[^\n]+)\n(\|[^\n]+\|)/gm, "$1\n\n$2");
 
-  // Fix 6: Split heading text that runs into body text without a line break
-  // Pattern: "### January2025 Warranty ConcernHere is the January2025..."
+  // Fix 6: Split text that runs into a new sentence without a line break
+  // Pattern: "### January2025 Warranty ConcernHere is the January2025..." or
+  // mid-paragraph "...Tail lamp areaBased on the knowledge base..."
   // Only matches when lowercase letter is IMMEDIATELY followed by capitalized sentence-start word
-  // (no space between = concatenation, not natural heading text)
+  // (no space/period between = concatenation, not natural text — a real
+  // sentence boundary always has a space or newline before the capital
+  // letter, so this can't misfire on legitimately-formatted prose). Not
+  // anchored to headings: the same run-on happens between two body
+  // sentences just as often as right after a heading.
   result = result.replace(
-    /(^#{1,6}\s+[^\n]+?[a-z])((?:Here (?:is|are)|The |This |Based on|Below |Above |I (?:traced|found|identified|analyzed|will)|Let me|Looking at|We |It |A |An |No (?:documented|exact|solution|match))[^\n]*)/gm,
+    /([a-z])((?:Here (?:is|are)|The |This |Based on|Below |Above |I (?:traced|found|identified|analyzed|will)|Let me|Looking at|We |It |A |An |No (?:documented|exact|solution|match))[^\n]*)/g,
     "$1\n\n$2"
   );
 
