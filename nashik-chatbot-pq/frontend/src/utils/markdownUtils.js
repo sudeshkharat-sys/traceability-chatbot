@@ -154,6 +154,16 @@ export function fixMarkdownTables(markdown, isComplete = false) {
     }
   );
 
+  // Fix 14b: The Phase 2 "no solution found" boilerplate sentence run
+  // straight into the preceding text with no separator (e.g. "...ALL
+  // TIMENo documented solution was found..."). This can happen anywhere
+  // in the response, not just right after a heading (Fix 6 only covers
+  // the heading case), so match the exact sentence globally.
+  result = result.replace(
+    /([^\n])(No documented solution was found for this specific issue in the knowledge base\.)/g,
+    "$1\n\n$2"
+  );
+
   // Fix 14: Table rows concatenated onto a single line with no newline
   // between them (LLM/streaming sometimes drops the row-separating
   // newline, leaving two pipes back-to-back: "| 25467516 | |2 | Warranty
