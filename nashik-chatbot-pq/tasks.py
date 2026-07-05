@@ -126,8 +126,9 @@ def ingest_problem_solved(ctx):
     """
     Ingest Problem_Solved PDFs into OpenSearch for the QLense Agent knowledge base.
 
-    Scans data_qlense/Problem_Solved/, registers new files in scraped_docs,
-    then embeds them into OpenSearch so search_standards can retrieve solutions.
+    Scans data_qlense/Problem_Solved/ (inside this repo, next to tasks.py),
+    registers new files in scraped_docs, then embeds them into OpenSearch so
+    search_standards can retrieve solutions.
 
     Usage: invoke ingest-problem-solved
     """
@@ -138,8 +139,13 @@ def ingest_problem_solved(ctx):
     from dataloader.scraper.file_system_scraper import FileScraper
     from app.connectors.state_db_connector import StateDBConnector
 
+    # data_qlense lives inside this repo (nashik-chatbot-pq/data_qlense) so it
+    # travels with a normal git/Bitbucket sync — no separate file transfer to
+    # the deploy server needed. Resolved relative to tasks.py's own directory
+    # (not its parent) so this works identically whether tasks.py runs from
+    # the repo checkout directly or from /app inside the Docker container.
     root = Path(__file__).resolve().parent
-    problem_solved_dir = root.parent / "data_qlense" / "Problem_Solved"
+    problem_solved_dir = root / "data_qlense" / "Problem_Solved"
     setting = get_settings()
     index_name = setting.OPENSEARCH_INDEX_NAME
 
