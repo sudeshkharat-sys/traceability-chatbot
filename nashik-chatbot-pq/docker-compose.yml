@@ -198,6 +198,7 @@ services:
       - ./.env:/app/app/config/.env:ro
       - ../csv_output:/app/csv_output:ro
       - ./documents:/app/documents:ro
+      - ../data_qlense:/data_qlense:ro  # QLense source PDFs for `invoke ingest-problem-solved` — tasks.py resolves this path relative to the repo root, so it must be mounted at the container's filesystem root
       - ~/.cache/docling/models:/app/docling_models:ro # Mount local models using home expansion
       - frontend-build:/app/frontend/build
       - uploads_data:/app/uploads  # Persists uploaded files (GLB models, station docs) across rebuilds
