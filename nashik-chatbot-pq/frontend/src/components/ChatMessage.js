@@ -135,11 +135,20 @@ const ChatMessage = ({ message, conversationId, onOpenPdf }) => {
                   {/* Render QLense's structured issue-list table, if present */}
                   <QueryResultsTable rows={queryResultRows} />
 
-                  {/* Render citations table if available */}
-                  <CitationsTable
-                    citations={message.citations || message.similar_docs}
-                    onOpenPdf={onOpenPdf}
-                  />
+                  {/* Sources & Citations — collapsed by default, same
+                      pattern as "Show reasoning" below, so the PDF list
+                      doesn't clutter the answer unless the user wants to
+                      verify it */}
+                  {(() => {
+                    const citationsData = message.citations || message.similar_docs;
+                    if (!citationsData || citationsData.length === 0) return null;
+                    return (
+                      <details className="message-citations-details">
+                        <summary>Sources & Citations ({citationsData.length})</summary>
+                        <CitationsTable citations={citationsData} onOpenPdf={onOpenPdf} />
+                      </details>
+                    );
+                  })()}
 
                   {/* Reasoning/SQL steps for this turn — collapsed by default,
                       so users can inspect what query the agent actually ran */}

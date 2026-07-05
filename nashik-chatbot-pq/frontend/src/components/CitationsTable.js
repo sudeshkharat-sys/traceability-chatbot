@@ -65,7 +65,6 @@ const CitationsTable = ({ citations, onOpenPdf }) => {
 
   return (
     <div className="citations-container">
-      <h4 className="citations-title">Sources & Citations</h4>
       <div className="citations-table-wrapper">
         <table className="citations-table">
           <thead>

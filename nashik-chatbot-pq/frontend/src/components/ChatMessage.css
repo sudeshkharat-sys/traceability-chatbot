@@ -720,3 +720,38 @@
 .message-reasoning-details[open] summary {
   color: #cbd5e1;
 }
+
+.message-citations-details {
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.message-citations-details summary {
+  cursor: pointer;
+  color: #8892a4;
+  font-weight: 500;
+  padding: 4px 0;
+  list-style: none;
+}
+
+.message-citations-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.message-citations-details summary::before {
+  content: "▸ ";
+}
+
+.message-citations-details[open] summary::before {
+  content: "▾ ";
+}
+
+.message-citations-details[open] summary {
+  color: #333;
+}
+
+.message-citations-details .citations-container {
+  margin-top: 0.5rem;
+  padding-top: 0;
+  border-top: none;
+}
