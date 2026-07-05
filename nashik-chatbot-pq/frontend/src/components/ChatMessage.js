@@ -13,7 +13,7 @@ import ThinkingStepsDisplay from "./ThinkingStepsDisplay";
 import { fixMarkdownTables } from "../utils/markdownUtils";
 import { extractQueryResultsTable } from "../utils/queryTableUtils";
 
-const ChatMessage = ({ message, conversationId, onOpenPdf }) => {
+const ChatMessage = ({ message, conversationId }) => {
   const isUser = message.sender === "user";
   const [feedback, setFeedback] = useState(null);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -145,7 +145,7 @@ const ChatMessage = ({ message, conversationId, onOpenPdf }) => {
                     return (
                       <details className="message-citations-details">
                         <summary>Sources & Citations ({citationsData.length})</summary>
-                        <CitationsTable citations={citationsData} onOpenPdf={onOpenPdf} />
+                        <CitationsTable citations={citationsData} />
                       </details>
                     );
                   })()}
