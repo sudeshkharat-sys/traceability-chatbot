@@ -307,6 +307,79 @@ function makeCantileverSign(stnId, ze, zeStatus) {
   return group;
 }
 
+// ── Shared glow-halo texture (radial gradient, white → transparent) ────────────
+// One canvas texture reused by every andon beacon — cheap, no per-instance cost.
+let _glowTex = null;
+function getGlowTexture() {
+  if (_glowTex) return _glowTex;
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  grad.addColorStop(0,    'rgba(255,255,255,0.9)');
+  grad.addColorStop(0.4,  'rgba(255,255,255,0.35)');
+  grad.addColorStop(1,    'rgba(255,255,255,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
+  _glowTex = new THREE.CanvasTexture(canvas);
+  return _glowTex;
+}
+
+// ── Shared floor texture — baked concrete speckle + soft AO vignette ───────────
+// Faking ambient occlusion in the texture itself costs nothing at render time
+// (no shadow maps), and one texture instance is shared across every station floor.
+let _floorTex = null;
+function getFloorTexture() {
+  if (_floorTex) return _floorTex;
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#aab4bd';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 900; i++) {
+    const x = Math.random() * size, y = Math.random() * size;
+    const shade = Math.random() * 30 - 15;
+    ctx.fillStyle = `rgba(${128 + shade},${138 + shade},${148 + shade},0.5)`;
+    ctx.fillRect(x, y, 1.5, 1.5);
+  }
+  const vignette = ctx.createRadialGradient(size / 2, size / 2, size * 0.25, size / 2, size / 2, size * 0.72);
+  vignette.addColorStop(0, 'rgba(0,0,0,0)');
+  vignette.addColorStop(1, 'rgba(0,0,0,0.22)');
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, size, size);
+  _floorTex = new THREE.CanvasTexture(canvas);
+  return _floorTex;
+}
+
+// ── Andon status beacon — glowing R/Y/G light above each station cell ──────────
+// Mimics the andon stack-lights used on real assembly lines. MeshBasicMaterial
+// is unlit (ignores scene lights) so the bulb always reads as "self-lit", and
+// the additive-blended halo sprite fakes a bloom glow with zero extra render cost.
+const _beaconGeo = new THREE.SphereGeometry(0.16, 8, 6);
+const _poleGeo   = new THREE.CylinderGeometry(0.03, 0.03, 0.35, 6);
+const _poleMat   = new THREE.MeshBasicMaterial({ color: 0x37474f });
+function makeAndonBeacon(hexColor) {
+  const group = new THREE.Group();
+
+  const bulb = new THREE.Mesh(_beaconGeo, new THREE.MeshBasicMaterial({ color: hexColor }));
+  group.add(bulb);
+
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: getGlowTexture(), color: hexColor, transparent: true,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  }));
+  halo.scale.set(0.9, 0.9, 1);
+  group.add(halo);
+
+  const pole = new THREE.Mesh(_poleGeo, _poleMat);
+  pole.position.y = -0.35 / 2 - 0.16;
+  group.add(pole);
+
+  return group;
+}
+
 // ── Station shell ──────────────────────────────────────────────────────────────
 function buildStationShell(box, statusMap, zeMap, scene) {
   const group   = new THREE.Group();
@@ -370,15 +443,20 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     const stnId  = stationIds[i] || `STN-${i + 1}`;
     const color  = STATUS_HEX[statusMap[stnId] || null] ?? STATUS_HEX.null;
 
-    // Light gray floor with blue border line
+    // Concrete-look floor (baked texture, shared across all stations) with blue border line
     const floorW = CELL_W - 0.05, floorD = DEPTH - 0.05;
     const floor  = new THREE.Mesh(
       new THREE.BoxGeometry(floorW, 0.12, floorD),
-      new THREE.MeshPhongMaterial({ color: 0xa8b4be, specular: 0x8fa0aa, shininess: 15 })
+      new THREE.MeshPhongMaterial({ map: getFloorTexture(), specular: 0x8fa0aa, shininess: 15 })
     );
     floor.position.set(cellCX, 0.06, cellCZ);
     floor.userData.stationId = stnId;
     group.add(floor);
+
+    // Andon status beacon above the cell — same R/Y/G colour as the station status
+    const beacon = makeAndonBeacon(color);
+    beacon.position.set(cellCX, HEIGHT + 0.55, cellCZ);
+    group.add(beacon);
 
     // Green center path strip running through middle of this station
     buildZebraCrossing(cellCX, originZ, group);
@@ -414,17 +492,18 @@ function buildStationShell(box, statusMap, zeMap, scene) {
   group.add(new THREE.Line(lineBoxGeo, new THREE.LineBasicMaterial({ color: 0x1976d2, linewidth: 2 })));
 
   // ── Box name boards on outer face of end columns, hanging from top beam ──
-  // White bg + navy text; top edge flush with top beam at HEIGHT
+  // White bg + Mahindra-red border/text; top edge flush with top beam at HEIGHT
   const boxLabel = box.name || 'Box';
+  const BRAND_RED = '#C8102E';
   const bW = 512, bH = 128;
   const bCanvas = document.createElement('canvas');
   bCanvas.width = bW; bCanvas.height = bH;
   const bc = bCanvas.getContext('2d');
   bc.fillStyle = '#ffffff';
   bc.beginPath(); bc.roundRect(0, 0, bW, bH, 14); bc.fill();
-  bc.strokeStyle = '#1a237e'; bc.lineWidth = 6;
+  bc.strokeStyle = BRAND_RED; bc.lineWidth = 6;
   bc.beginPath(); bc.roundRect(5, 5, bW - 10, bH - 10, 10); bc.stroke();
-  bc.fillStyle = '#1a237e';
+  bc.fillStyle = BRAND_RED;
   bc.textAlign = 'center'; bc.textBaseline = 'middle';
   // Auto-shrink font so long line names stay inside the board instead of overflowing
   const maxTextW = bW - 40; // padding on both sides
@@ -588,7 +667,10 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     const camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 300);
     cameraRef.current = camera;
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    // Hemisphere light — cheap sky/ground colour bounce (one extra light, no
+    // shadow or PBR cost), gives a more natural indoor-factory feel than flat ambient
+    scene.add(new THREE.HemisphereLight(0xdfe9ff, 0x54544a, 0.65));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.30));
     const dir = new THREE.DirectionalLight(0xffffff, 1.1);
     dir.position.set(20, 40, 25); scene.add(dir);
     // Fill light from opposite side to reduce harsh shadows
