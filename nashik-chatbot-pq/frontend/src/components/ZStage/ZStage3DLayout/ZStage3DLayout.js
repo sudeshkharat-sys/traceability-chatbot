@@ -479,20 +479,19 @@ function getFloorTexture() {
   const canvas = document.createElement('canvas');
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d');
-  // Light sky-blue base (iPhone 15 Blue finish) — most placed equipment
-  // models are grey, so a grey floor made everything blend together. A
-  // brighter, clearly-blue floor keeps models visually distinct instead of
-  // camouflaging into the ground.
-  ctx.fillStyle = '#d6ecfb';
+  // Off-white base — most placed equipment models are grey, so a grey floor
+  // made everything blend together. A lighter, neutral floor keeps models
+  // visually distinct instead of camouflaging into the ground.
+  ctx.fillStyle = '#f0ede7';
   ctx.fillRect(0, 0, size, size);
   for (let i = 0; i < 900; i++) {
     const x = Math.random() * size, y = Math.random() * size;
     const shade = Math.random() * 22 - 11;
-    ctx.fillStyle = `rgba(${214 + shade},${236 + shade},${251 + shade},0.4)`;
+    ctx.fillStyle = `rgba(${240 + shade},${237 + shade},${231 + shade},0.4)`;
     ctx.fillRect(x, y, 1.5, 1.5);
   }
-  // Soft sky-blue veining — a few faint curved strokes, not a repeating pattern
-  ctx.strokeStyle = 'rgba(130,190,225,0.2)';
+  // Soft warm-grey veining — a few faint curved strokes, not a repeating pattern
+  ctx.strokeStyle = 'rgba(200,195,185,0.2)';
   ctx.lineWidth = 1.5;
   for (let i = 0; i < 4; i++) {
     const x0 = Math.random() * size, y0 = Math.random() * size;
