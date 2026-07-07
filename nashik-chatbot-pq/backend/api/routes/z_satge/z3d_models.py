@@ -135,7 +135,14 @@ def download_library_model(name: str, connector: StateDBConnector = Depends(get_
     ext = rec.get("ext", "glb")
     mime = {"glb": "model/gltf-binary", "gltf": "model/gltf+json",
             "obj": "text/plain", "stl": "application/octet-stream"}.get(ext, "application/octet-stream")
-    return FileResponse(path=fp, filename=f"{rec['name']}.{ext}", media_type=mime)
+    # Library models rarely change after upload, so let the browser cache the
+    # file for a day instead of re-downloading it on every layout open.
+    # Starlette's FileResponse already sets ETag/Last-Modified from the file's
+    # mtime, so must-revalidate still catches a re-upload overwriting the same
+    # path once the day passes — this isn't a "cache forever and risk staleness"
+    # header, just a "don't hit the network every single time" one.
+    headers = {"Cache-Control": "public, max-age=86400, must-revalidate"}
+    return FileResponse(path=fp, filename=f"{rec['name']}.{ext}", media_type=mime, headers=headers)
 
 
 # ── Placement endpoints ────────────────────────────────────────────────────────
