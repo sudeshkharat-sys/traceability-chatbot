@@ -492,18 +492,17 @@ function buildStationShell(box, statusMap, zeMap, scene) {
   group.add(new THREE.Line(lineBoxGeo, new THREE.LineBasicMaterial({ color: 0x1976d2, linewidth: 2 })));
 
   // ── Box name boards on outer face of end columns, hanging from top beam ──
-  // White bg + Mahindra-red border/text; top edge flush with top beam at HEIGHT
+  // White bg + navy text; top edge flush with top beam at HEIGHT
   const boxLabel = box.name || 'Box';
-  const BRAND_RED = '#C8102E';
   const bW = 512, bH = 128;
   const bCanvas = document.createElement('canvas');
   bCanvas.width = bW; bCanvas.height = bH;
   const bc = bCanvas.getContext('2d');
   bc.fillStyle = '#ffffff';
   bc.beginPath(); bc.roundRect(0, 0, bW, bH, 14); bc.fill();
-  bc.strokeStyle = BRAND_RED; bc.lineWidth = 6;
+  bc.strokeStyle = '#1a237e'; bc.lineWidth = 6;
   bc.beginPath(); bc.roundRect(5, 5, bW - 10, bH - 10, 10); bc.stroke();
-  bc.fillStyle = BRAND_RED;
+  bc.fillStyle = '#1a237e';
   bc.textAlign = 'center'; bc.textBaseline = 'middle';
   // Auto-shrink font so long line names stay inside the board instead of overflowing
   const maxTextW = bW - 40; // padding on both sides
