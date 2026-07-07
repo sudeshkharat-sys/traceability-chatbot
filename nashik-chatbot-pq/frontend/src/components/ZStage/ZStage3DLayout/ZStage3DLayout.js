@@ -977,16 +977,17 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         localStationsByLine[box.name] = ids;
       });
 
-      // Fetch all known line group IDs from DB, then fuzzy-match each unseeded
-      // line in this layout against them (handles "Trim 1" ↔ "Trim Line" ↔ "trim")
-      // Helper: given a template record + line name, place at all stations of that line
+      // Helper: given a template record + line name, place at all stations of
+      // that line. Returns the new records instead of mutating a shared array,
+      // so each seeded line's models can start downloading the moment its own
+      // seed data resolves — not gated behind every other line finishing.
       const seedFromTemplate = (tmpl, lineGroupId) => {
         const modelName = tmpl.model_name;
         const sx = tmpl.sx ?? 1, sy = tmpl.sy ?? 1, sz = tmpl.sz ?? 1;
         const rx = tmpl.rx ?? 0, ry = tmpl.ry ?? 0, rz = tmpl.rz ?? 0;
         const py = tmpl.py ?? 0;
         const lineStationIds = localStationsByLine[lineGroupId] || [];
-        if (lineStationIds.length === 0) return Promise.resolve();
+        if (lineStationIds.length === 0) return Promise.resolve([]);
         return Promise.all(lineStationIds.map(stationId => {
           const pos = localPosMap[stationId] || { x: 0, z: 0 };
           return z3dModelApi.createPlacement({
@@ -997,159 +998,184 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
             model_name: modelName, line_group_id: lineGroupId, station_id: stationId,
             px: pos.x, py, pz: pos.z, rx, ry, rz, sx, sy, sz,
           }));
-        })).then(seeded => seeded.forEach(p => placements.push(p)));
+        }));
       };
 
-      // Also fetch all library model names for fuzzy model-name fallback
-      const seedPromises = Promise.all([
-        z3dModelApi.listAllLineGroups().catch(() => ({ data: [] })),
-        z3dModelApi.listLibrary().catch(() => ({ data: [] })),
-      ]).then(([lgRes, libRes]) => {
-        const knownLineGroups = lgRes.data || [];
-        const libraryModels = libRes.data || [];  // [{name, ext, ...}]
+      // Places one loaded template at every record that shares its model_name.
+      // Defined once outside the per-model-name loop since it doesn't close
+      // over anything model-specific.
+      const applyRecord = (template, record, isFirst) => {
+        const obj = isFirst ? template : sharedClone(template);
+        obj.traverse(child => {
+          if (child.isSprite || (child.material && child.material.map === null && child.isLine)) child.visible = false;
+        });
 
-        return Promise.all(unseededLines.map(lineGroupId => {
-          // Strategy 1: fuzzy match against line_group_id values in DB
-          const matchedLineGroupId = knownLineGroups.find(kg => lineNamesMatch(kg, lineGroupId));
-          if (matchedLineGroupId) {
-            return z3dModelApi.getPlacementsByLineGroup(matchedLineGroupId)
-              .then(r => {
-                const recs = r.data || [];
-                if (recs.length === 0) return;
-                return seedFromTemplate(recs[0], lineGroupId);
-              }).catch(() => {});
-          }
+        // Auto-scale the raw template to ~2m so baseScale is correct
+        obj.position.set(0, 0, 0);
+        obj.rotation.set(0, 0, 0);
+        obj.scale.set(1, 1, 1);
+        const _bbox = new THREE.Box3().setFromObject(obj);
+        const _size = new THREE.Vector3(); _bbox.getSize(_size);
+        const _maxDim = Math.max(_size.x, _size.y, _size.z);
+        const autoScale = _maxDim > 0 ? 2.0 / _maxDim : 1;
+        obj.userData.baseScale = autoScale;
 
-          // Strategy 2 (fallback): fuzzy match line name against model names in library
-          // Handles case where user uploaded via station/free mode (line_group_id = null)
-          const matchedModel = libraryModels.find(m => lineNamesMatch(m.name, lineGroupId));
-          if (matchedModel) {
-            return z3dModelApi.getPlacementsByModelName(matchedModel.name)
-              .then(r => {
-                const recs = r.data || [];
-                if (recs.length === 0) return;
-                return seedFromTemplate(recs[0], lineGroupId);
-              }).catch(() => {});
-          }
-        }));
-      });
+        // Apply saved scale and rotation first
+        const sx = record.sx ?? 1;
+        obj.scale.setScalar(sx);
+        obj.rotation.set(record.rx ?? 0, record.ry ?? 0, record.rz ?? 0);
 
-      seedPromises.then(() => {
-      // Group by model_name so we download each file only once
-      const byName = new Map();
-      placements.forEach(p => {
-        if (!byName.has(p.model_name)) byName.set(p.model_name, []);
-        byName.get(p.model_name).push(p);
-      });
+        // Floor-snap: compute AFTER rotation so bbox accounts for rotated shape
+        const _bbox2 = new THREE.Box3().setFromObject(obj);
+        const floorY = -_bbox2.min.y;
+        obj.userData.floorOffsetAtBase = floorY / sx;
 
-      const totalModels = byName.size;
-      let loadedModels = 0;
-      onModelProgress && onModelProgress(0, totalModels);
-      if (totalModels === 0) { onSceneReady && onSceneReady(); }
+        // Use saved py if user manually lifted the model above floor, else use floor-snap
+        const savedPy = record.py ?? 0;
+        const finalY = savedPy > floorY ? savedPy : floorY;
+        obj.position.y = finalY;
 
-      byName.forEach((records, modelName) => {
-        const downloadUrl = z3dModelApi.getDownloadUrl(modelName);
-        const ext = (records[0].model_name || 'glb').split('.').pop(); // fallback
+        // Center in X only — compensates for mesh origin offset.
+        // Z is exactly at station center; Y uses saved height or floor-snap.
+        const stnPos = record.station_id ? localPosMap[record.station_id] : null;
+        const targetX = stnPos ? stnPos.x : (record.px ?? sceneCenterRef.current.x);
+        const targetZ = stnPos ? stnPos.z : (record.pz ?? sceneCenterRef.current.z);
+        obj.position.set(0, finalY, 0);
+        const _bboxXZ = new THREE.Box3().setFromObject(obj);
+        const xOff = (_bboxXZ.min.x + _bboxXZ.max.x) / 2;
+        obj.position.x = targetX - xOff;
+        obj.position.z = targetZ;
 
-        const applyRecord = (template, record, isFirst) => {
-          const obj = isFirst ? template : sharedClone(template);
-          obj.traverse(child => {
-            if (child.isSprite || (child.material && child.material.map === null && child.isLine)) child.visible = false;
-          });
+        obj.userData.isPlaced          = true;
+        obj.userData.objId             = String(record.id);
+        obj.userData.serverModelId     = record.id;
+        obj.userData.objName           = record.model_name;
+        obj.userData.objExt            = record.model_name.split('.').pop() || 'glb';
+        scene.add(obj); addContactShadow(obj); dirtyRef.current = true;
+        const entry = {
+          id: String(record.id), mesh: obj, label: null, name: record.model_name,
+          stationId: record.station_id || null,
+          lineGroupId: record.line_group_id || null,
+        };
+        placedRef.current = [...placedRef.current, entry];
+        onObjectsChange([...placedRef.current]);
+      };
 
-          // Auto-scale the raw template to ~2m so baseScale is correct
-          obj.position.set(0, 0, 0);
-          obj.rotation.set(0, 0, 0);
-          obj.scale.set(1, 1, 1);
-          const _bbox = new THREE.Box3().setFromObject(obj);
-          const _size = new THREE.Vector3(); _bbox.getSize(_size);
-          const _maxDim = Math.max(_size.x, _size.y, _size.z);
-          const autoScale = _maxDim > 0 ? 2.0 / _maxDim : 1;
-          obj.userData.baseScale = autoScale;
+      // Overall progress tracking across every batch (the initial placements
+      // batch plus one batch per seeded line) — "ready" only fires once every
+      // batch has resolved AND every model within them has finished loading.
+      let totalModels = 0, loadedModels = 0, batchesResolved = 0;
+      const totalBatches = 1 + unseededLines.length;
+      const checkDone = () => {
+        if (batchesResolved >= totalBatches && loadedModels >= totalModels) {
+          onSceneReady && onSceneReady();
+        }
+      };
 
-          // Apply saved scale and rotation first
-          const sx = record.sx ?? 1;
-          obj.scale.setScalar(sx);
-          obj.rotation.set(record.rx ?? 0, record.ry ?? 0, record.rz ?? 0);
+      // Downloads+places one batch of records, grouped by model_name so each
+      // unique GLB is only fetched once regardless of station count. Called
+      // once immediately for the placements we already know about, and again
+      // for each line as soon as ITS seed data resolves — no batch waits on
+      // any other batch to start downloading.
+      const loadAndPlace = (records) => {
+        const byName = new Map();
+        records.forEach(p => {
+          if (!byName.has(p.model_name)) byName.set(p.model_name, []);
+          byName.get(p.model_name).push(p);
+        });
+        totalModels += byName.size;
+        onModelProgress && onModelProgress(loadedModels, totalModels);
 
-          // Floor-snap: compute AFTER rotation so bbox accounts for rotated shape
-          const _bbox2 = new THREE.Box3().setFromObject(obj);
-          const floorY = -_bbox2.min.y;
-          obj.userData.floorOffsetAtBase = floorY / sx;
+        byName.forEach((recs, modelName) => {
+          const downloadUrl = z3dModelApi.getDownloadUrl(modelName);
+          // Extension comes straight from the filename — avoids an extra
+          // getLibraryModel round-trip per unique model before download starts.
+          const ext = (recs[0].model_name || 'glb').split('.').pop().toLowerCase();
 
-          // Use saved py if user manually lifted the model above floor, else use floor-snap
-          const savedPy = record.py ?? 0;
-          const finalY = savedPy > floorY ? savedPy : floorY;
-          obj.position.y = finalY;
-
-          // Center in X only — compensates for mesh origin offset.
-          // Z is exactly at station center; Y uses saved height or floor-snap.
-          const stnPos = record.station_id ? localPosMap[record.station_id] : null;
-          const targetX = stnPos ? stnPos.x : (record.px ?? sceneCenterRef.current.x);
-          const targetZ = stnPos ? stnPos.z : (record.pz ?? sceneCenterRef.current.z);
-          obj.position.set(0, finalY, 0);
-          const _bboxXZ = new THREE.Box3().setFromObject(obj);
-          const xOff = (_bboxXZ.min.x + _bboxXZ.max.x) / 2;
-          obj.position.x = targetX - xOff;
-          obj.position.z = targetZ;
-
-          obj.userData.isPlaced          = true;
-          obj.userData.objId             = String(record.id);
-          obj.userData.serverModelId     = record.id;
-          obj.userData.objName           = record.model_name;
-          obj.userData.objExt            = record.model_name.split('.').pop() || 'glb';
-          scene.add(obj); addContactShadow(obj); dirtyRef.current = true;
-          const entry = {
-            id: String(record.id), mesh: obj, label: null, name: record.model_name,
-            stationId: record.station_id || null,
-            lineGroupId: record.line_group_id || null,
+          const onTemplate = (template) => {
+            setCachedTemplate(modelName, template);
+            // Deduplicate: skip any record whose station_id is already placed in the scene
+            const renderedStations = new Set(placedRef.current.map(p => p.stationId).filter(Boolean));
+            const dedupedRecords = recs.filter(r => {
+              if (!r.station_id) return true; // free-placed, no station, always show
+              if (renderedStations.has(r.station_id)) return false; // already in scene
+              renderedStations.add(r.station_id); // mark as handled
+              return true;
+            });
+            dedupedRecords.forEach((record, idx) => applyRecord(template, record, idx === 0));
+            loadedModels += 1;
+            onModelProgress && onModelProgress(loadedModels, totalModels);
+            checkDone();
           };
-          placedRef.current = [...placedRef.current, entry];
-          onObjectsChange([...placedRef.current]);
-        };
 
-        const onTemplate = (template) => {
-          setCachedTemplate(modelName, template);
-          // Deduplicate: skip any record whose station_id is already placed in the scene
-          const renderedStations = new Set(placedRef.current.map(p => p.stationId).filter(Boolean));
-          const dedupedRecords = records.filter(r => {
-            if (!r.station_id) return true; // free-placed, no station, always show
-            if (renderedStations.has(r.station_id)) return false; // already in scene
-            renderedStations.add(r.station_id); // mark as handled
-            return true;
-          });
-          dedupedRecords.forEach((record, idx) => applyRecord(template, record, idx === 0));
-          loadedModels += 1;
-          onModelProgress && onModelProgress(loadedModels, totalModels);
-          if (loadedModels === totalModels) { onSceneReady && onSceneReady(); }
-        };
+          // If already loaded this session → skip download entirely
+          const cached = getCachedTemplate(modelName);
+          if (cached) { onTemplate(cached); return; }
 
-        // If already loaded this session → skip download entirely
-        const cached = getCachedTemplate(modelName);
-        if (cached) { onTemplate(cached); return; }
-
-        // Fetch library entry to get ext, then load the model
-        z3dModelApi.getLibraryModel(modelName).then(libRes => {
-          const libExt = libRes.data?.ext || 'glb';
           try {
-            if (libExt === 'glb' || libExt === 'gltf') {
-              makeGLTFLoader().load(downloadUrl, g => onTemplate(g.scene), undefined,
-                err => console.error('[Z3D] GLB reload failed:', modelName, err));
-            } else if (libExt === 'obj') {
+            if (ext === 'obj') {
               new OBJLoader().load(downloadUrl, onTemplate);
-            } else if (libExt === 'stl') {
+            } else if (ext === 'stl') {
               new STLLoader().load(downloadUrl, geo => {
                 geo.computeVertexNormals();
                 onTemplate(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x90a4ae })));
               });
+            } else {
+              // glb/gltf, or unrecognized extension — GLTFLoader is the common case
+              makeGLTFLoader().load(downloadUrl, g => onTemplate(g.scene), undefined,
+                err => console.error('[Z3D] GLB reload failed:', modelName, err));
             }
           } catch {}
-        }).catch(() => {
-          makeGLTFLoader().load(downloadUrl, g => onTemplate(g.scene), undefined,
-            err => console.error('[Z3D] GLB reload failed:', modelName, err));
         });
-      });
-      }); // end Promise.all(seedPromises)
+      };
+
+      // Batch 1: whatever is already placed in this layout — starts downloading
+      // immediately, doesn't wait on the seeding lookups below.
+      batchesResolved += 1;
+      loadAndPlace(placements);
+      checkDone();
+
+      // Remaining batches: one per unseeded line. All unseeded lines share a
+      // single listAllLineGroups/listLibrary fetch (only made at all if there's
+      // something to seed), but each line's own seed lookup + download proceeds
+      // independently as soon as it resolves.
+      if (unseededLines.length > 0) {
+        const lineGroupsAndLibrary = Promise.all([
+          z3dModelApi.listAllLineGroups().catch(() => ({ data: [] })),
+          z3dModelApi.listLibrary().catch(() => ({ data: [] })),
+        ]);
+
+        unseededLines.forEach(lineGroupId => {
+          lineGroupsAndLibrary.then(([lgRes, libRes]) => {
+            const knownLineGroups = lgRes.data || [];
+            const libraryModels = libRes.data || [];  // [{name, ext, ...}]
+
+            // Strategy 1: fuzzy match against line_group_id values in DB
+            const matchedLineGroupId = knownLineGroups.find(kg => lineNamesMatch(kg, lineGroupId));
+            const templateFetch = matchedLineGroupId
+              ? z3dModelApi.getPlacementsByLineGroup(matchedLineGroupId)
+              : (() => {
+                  // Strategy 2 (fallback): fuzzy match line name against model
+                  // names in library — handles station/free-mode uploads
+                  // where line_group_id was never set.
+                  const matchedModel = libraryModels.find(m => lineNamesMatch(m.name, lineGroupId));
+                  return matchedModel
+                    ? z3dModelApi.getPlacementsByModelName(matchedModel.name)
+                    : Promise.resolve({ data: [] });
+                })();
+
+            return templateFetch.then(r => {
+              const recs = r.data || [];
+              if (recs.length === 0) return [];
+              return seedFromTemplate(recs[0], lineGroupId);
+            }).catch(() => []);
+          }).then(newRecords => {
+            batchesResolved += 1;
+            if (newRecords.length > 0) loadAndPlace(newRecords);
+            checkDone();
+          });
+        });
+      }
     }).catch(err => {
       console.error('[Z3D] Failed to load saved models:', err);
       onSceneReady && onSceneReady(); // unblock overlay on error
