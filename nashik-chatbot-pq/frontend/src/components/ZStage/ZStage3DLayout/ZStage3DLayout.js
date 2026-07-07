@@ -479,19 +479,20 @@ function getFloorTexture() {
   const canvas = document.createElement('canvas');
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d');
-  // Pearl-white marble base — most placed equipment models are grey, so a
-  // grey floor made everything blend together. A lighter floor keeps models
-  // visually distinct instead of camouflaging into the ground.
-  ctx.fillStyle = '#eeece6';
+  // Light pastel blue base (iPhone 15 Blue-style finish) — most placed
+  // equipment models are grey, so a grey floor made everything blend
+  // together. A lighter, tinted floor keeps models visually distinct
+  // instead of camouflaging into the ground.
+  ctx.fillStyle = '#c3d9e6';
   ctx.fillRect(0, 0, size, size);
   for (let i = 0; i < 900; i++) {
     const x = Math.random() * size, y = Math.random() * size;
     const shade = Math.random() * 22 - 11;
-    ctx.fillStyle = `rgba(${205 + shade},${202 + shade},${195 + shade},0.4)`;
+    ctx.fillStyle = `rgba(${175 + shade},${203 + shade},${217 + shade},0.4)`;
     ctx.fillRect(x, y, 1.5, 1.5);
   }
-  // Soft grey marble veining — a few faint curved strokes, not a repeating pattern
-  ctx.strokeStyle = 'rgba(150,148,142,0.25)';
+  // Soft blue-grey veining — a few faint curved strokes, not a repeating pattern
+  ctx.strokeStyle = 'rgba(130,158,175,0.25)';
   ctx.lineWidth = 1.5;
   for (let i = 0; i < 4; i++) {
     const x0 = Math.random() * size, y0 = Math.random() * size;
