@@ -373,57 +373,6 @@ function makeHazardBase() {
   return mesh;
 }
 
-// ── Overhead light fixture — hangs from the top beam above each station cell ───
-// Unlit bright lens + darker housing box, plus an additive-blended glow sprite
-// behind the lens so it reads as a lit fixture instead of a flat grey bar.
-// Purely visual — no extra THREE.Light, so it doesn't add real lighting cost.
-const _fixtureHousingGeo = new THREE.BoxGeometry(1, 0.06, 0.34);
-const _fixtureHousingMat = new THREE.MeshBasicMaterial({ color: 0x455a64 });
-const _fixtureLensGeo    = new THREE.BoxGeometry(1, 0.04, 0.28);
-const _fixtureLensMat    = new THREE.MeshBasicMaterial({ color: 0xfffdf0 });
-
-let _fixtureGlowTex = null;
-function getFixtureGlowTexture() {
-  if (_fixtureGlowTex) return _fixtureGlowTex;
-  const w = 128, h = 64;
-  const canvas = document.createElement('canvas');
-  canvas.width = w; canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  const grad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
-  grad.addColorStop(0,   'rgba(255,250,220,0.9)');
-  grad.addColorStop(0.5, 'rgba(255,250,220,0.35)');
-  grad.addColorStop(1,   'rgba(255,250,220,0)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, w, h);
-  _fixtureGlowTex = new THREE.CanvasTexture(canvas);
-  return _fixtureGlowTex;
-}
-let _fixtureGlowMat = null;
-function getFixtureGlowMaterial() {
-  if (_fixtureGlowMat) return _fixtureGlowMat;
-  _fixtureGlowMat = new THREE.SpriteMaterial({
-    map: getFixtureGlowTexture(), transparent: true,
-    blending: THREE.AdditiveBlending, depthWrite: false,
-  });
-  return _fixtureGlowMat;
-}
-
-function makeLightFixture(width) {
-  const group = new THREE.Group();
-  const housing = new THREE.Mesh(_fixtureHousingGeo, _fixtureHousingMat);
-  housing.scale.x = width;
-  group.add(housing);
-  const lens = new THREE.Mesh(_fixtureLensGeo, _fixtureLensMat);
-  lens.scale.x = width;
-  lens.position.y = -0.045;
-  group.add(lens);
-  const glow = new THREE.Sprite(getFixtureGlowMaterial());
-  glow.scale.set(width * 0.9, width * 0.9 * 0.45, 1);
-  glow.position.y = -0.1;
-  group.add(glow);
-  return group;
-}
-
 // ── Contact shadow — soft blob under each placed 3D model ──────────────────────
 // Fakes grounding without real shadow maps: a transparent radial-gradient plane
 // parented to the model so it inherits its position/rotation/scale for free.
@@ -582,11 +531,6 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     floor.userData.stationId = stnId;
     floor.receiveShadow = true;
     group.add(floor);
-
-    // Overhead light fixture hanging from the top beam above this cell
-    const fixture = makeLightFixture(CELL_W * 0.7);
-    fixture.position.set(cellCX, HEIGHT - 0.1, cellCZ);
-    group.add(fixture);
 
     // Green center path strip running through middle of this station
     buildZebraCrossing(cellCX, originZ, group);
