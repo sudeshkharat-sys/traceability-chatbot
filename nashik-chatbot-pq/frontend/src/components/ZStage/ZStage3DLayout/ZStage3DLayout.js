@@ -1072,6 +1072,16 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         }
       };
 
+      // Byte-level download progress per in-flight model (0..1), so the
+      // loading bar moves continuously instead of sitting frozen at "0 of 2"
+      // for however long the biggest file takes to transfer.
+      const downloadFractions = new Map(); // modelName → 0..1
+      const reportProgress = () => {
+        let inFlight = 0;
+        downloadFractions.forEach(f => { inFlight += f; });
+        onModelProgress && onModelProgress(loadedModels + inFlight, totalModels, loadedModels);
+      };
+
       // Downloads+places one batch of records, grouped by model_name so each
       // unique GLB is only fetched once regardless of station count. Called
       // once immediately for the placements we already know about, and again
@@ -1084,7 +1094,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           byName.get(p.model_name).push(p);
         });
         totalModels += byName.size;
-        onModelProgress && onModelProgress(loadedModels, totalModels);
+        reportProgress();
 
         byName.forEach((recs, modelName) => {
           const downloadUrl = z3dModelApi.getDownloadUrl(modelName);
@@ -1092,8 +1102,16 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           // getLibraryModel round-trip per unique model before download starts.
           const ext = (recs[0].model_name || 'glb').split('.').pop().toLowerCase();
 
+          const onDownloadProgress = (evt) => {
+            if (evt.total > 0) {
+              downloadFractions.set(modelName, evt.loaded / evt.total);
+              reportProgress();
+            }
+          };
+
           const onTemplate = (template) => {
             setCachedTemplate(modelName, template);
+            downloadFractions.delete(modelName);
             // Deduplicate: skip any record whose station_id is already placed in the scene
             const renderedStations = new Set(placedRef.current.map(p => p.stationId).filter(Boolean));
             const dedupedRecords = recs.filter(r => {
@@ -1104,7 +1122,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
             });
             dedupedRecords.forEach((record, idx) => applyRecord(template, record, idx === 0));
             loadedModels += 1;
-            onModelProgress && onModelProgress(loadedModels, totalModels);
+            reportProgress();
             checkDone();
           };
 
@@ -1114,15 +1132,15 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
 
           try {
             if (ext === 'obj') {
-              new OBJLoader().load(downloadUrl, onTemplate);
+              new OBJLoader().load(downloadUrl, onTemplate, onDownloadProgress);
             } else if (ext === 'stl') {
               new STLLoader().load(downloadUrl, geo => {
                 geo.computeVertexNormals();
                 onTemplate(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x90a4ae })));
-              });
+              }, onDownloadProgress);
             } else {
               // glb/gltf, or unrecognized extension — GLTFLoader is the common case
-              makeGLTFLoader().load(downloadUrl, g => onTemplate(g.scene), undefined,
+              makeGLTFLoader().load(downloadUrl, g => onTemplate(g.scene), onDownloadProgress,
                 err => console.error('[Z3D] GLB reload failed:', modelName, err));
             }
           } catch {}
@@ -1977,7 +1995,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   useEffect(() => {
     if (!selectedLayoutId) return;
     setSceneReady(false);
-    setModelLoadCount({ loaded: 0, total: 0 });
+    setModelLoadCount({ loaded: 0, total: 0, completed: 0 });
     layoutApi.getLayout(selectedLayoutId).then(res => setLayout(res.data)).catch(() => {});
   }, [selectedLayoutId]);
 
@@ -2090,8 +2108,8 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setSceneReady(true);
   }, []);
 
-  const handleModelProgress = useCallback((loaded, total) => {
-    setModelLoadCount({ loaded, total });
+  const handleModelProgress = useCallback((loaded, total, completed) => {
+    setModelLoadCount({ loaded, total, completed });
   }, []);
 
   const { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation } =
@@ -2628,22 +2646,27 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
           ) : (
             <>
               <canvas ref={canvasRef} className="z3d-canvas" onClick={handleCanvasClick} onDoubleClick={handleCanvasDblClick} />
-              {!sceneReady && (
+              {!sceneReady && (() => {
+                const pct = modelLoadCount.total > 0
+                  ? Math.min(100, Math.round((modelLoadCount.loaded / modelLoadCount.total) * 100))
+                  : 0;
+                const completed = modelLoadCount.completed ?? 0;
+                return (
                 <div className="z3d-scene-loading">
                   <div className="z3d-scene-loading-box">
                     <div className="z3d-scene-loading-spinner" />
                     <div className="z3d-scene-loading-text">
                       {modelLoadCount.total === 0
                         ? 'Preparing scene…'
-                        : modelLoadCount.loaded < modelLoadCount.total
-                          ? `Loading models… (${modelLoadCount.loaded} of ${modelLoadCount.total})`
+                        : completed < modelLoadCount.total
+                          ? `Downloading models… (${completed} of ${modelLoadCount.total} done)`
                           : 'Placing models…'}
                     </div>
                     <div className="z3d-scene-loading-bar-track">
                       {modelLoadCount.total > 0 ? (
                         <div
                           className="z3d-scene-loading-bar-fill z3d-scene-loading-bar-fill--progress"
-                          style={{ width: `${Math.round((modelLoadCount.loaded / modelLoadCount.total) * 100)}%` }}
+                          style={{ width: `${pct}%` }}
                         />
                       ) : (
                         <div className="z3d-scene-loading-bar-fill" />
@@ -2651,12 +2674,13 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                     </div>
                     {modelLoadCount.total > 0 && (
                       <div className="z3d-scene-loading-pct">
-                        {Math.round((modelLoadCount.loaded / modelLoadCount.total) * 100)}%
+                        {pct}%
                       </div>
                     )}
                   </div>
                 </div>
-              )}
+                );
+              })()}
               {converting && (
                 <div className="z3d-convert-overlay">
                   <div className="z3d-convert-box">
