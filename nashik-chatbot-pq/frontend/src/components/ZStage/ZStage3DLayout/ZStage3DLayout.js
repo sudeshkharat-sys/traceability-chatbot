@@ -402,8 +402,8 @@ function getContactShadowTexture() {
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d');
   const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  grad.addColorStop(0,   'rgba(0,0,0,0.45)');
-  grad.addColorStop(0.6, 'rgba(0,0,0,0.20)');
+  grad.addColorStop(0,   'rgba(0,0,0,0.28)');
+  grad.addColorStop(0.6, 'rgba(0,0,0,0.12)');
   grad.addColorStop(1,   'rgba(0,0,0,0)');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, size, size);
@@ -506,7 +506,7 @@ function getFloorTexture() {
   }
   const vignette = ctx.createRadialGradient(size / 2, size / 2, size * 0.25, size / 2, size / 2, size * 0.72);
   vignette.addColorStop(0, 'rgba(0,0,0,0)');
-  vignette.addColorStop(1, 'rgba(0,0,0,0.08)');
+  vignette.addColorStop(1, 'rgba(0,0,0,0.05)');
   ctx.fillStyle = vignette;
   ctx.fillRect(0, 0, size, size);
   _floorTex = new THREE.CanvasTexture(canvas);
@@ -862,17 +862,20 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 300);
       cameraRef.current = camera;
 
-      scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+      // More ambient / less directional than before — keeps shadows visible
+      // (for grounding/depth) without them going dark enough to read as a
+      // stain on the floor color.
+      scene.add(new THREE.AmbientLight(0xffffff, 0.7));
       // "Sun" — the one shadow-casting light. Shadow camera frustum is sized to
       // the actual layout span further down, once we know how big the scene is.
-      const dir = new THREE.DirectionalLight(0xffffff, 1.1);
+      const dir = new THREE.DirectionalLight(0xffffff, 0.85);
       dir.position.set(20, 40, 25); scene.add(dir);
       dir.castShadow = true;
       dir.shadow.mapSize.set(1024, 1024);
       dir.shadow.bias = -0.0015;
       scene.add(dir.target);
       // Fill light from opposite side to reduce harsh shadows — does not cast shadows
-      const fill = new THREE.DirectionalLight(0xdce8ff, 0.35);
+      const fill = new THREE.DirectionalLight(0xdce8ff, 0.4);
       fill.position.set(-20, 10, -20); scene.add(fill);
       scene.add(new THREE.GridHelper(200, 100, 0xb0bec5, 0xdde1e7));
 
