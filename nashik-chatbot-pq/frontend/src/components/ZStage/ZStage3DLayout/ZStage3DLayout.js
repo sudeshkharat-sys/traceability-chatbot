@@ -73,6 +73,14 @@ function setCachedTemplate(name, template) {
   _modelTemplateCache.set(name.toLowerCase(), template);
 }
 
+// Bounding-box measurements (autoScale, floor offset, centering offset,
+// footprint) only depend on a model's geometry + its rotation/scale — not on
+// where it's placed. Box3().setFromObject() traverses every vertex, so doing
+// it 3x per station adds up fast on a line with many stations sharing the
+// same model/rotation/scale (the common auto-seeded case). Cache it once per
+// (model, scale, rotation) combo instead of recomputing per station.
+const _placementGeoCache = new Map();
+
 // Single shared DRACOLoader — decoder is downloaded and initialised once,
 // then reused for every upload. Saves 1-3 s per upload vs creating a new one each time.
 const _sharedDraco = new DRACOLoader();
@@ -420,6 +428,32 @@ function addContactShadow(obj) {
   shadow.position.copy(obj.worldToLocal(worldPos));
   shadow.quaternion.copy(parentQuat.invert().multiply(worldQuat));
   shadow.scale.set(footprintW / worldScale.x, footprintD / worldScale.z, 1);
+
+  obj.add(shadow);
+  obj.userData.contactShadow = shadow;
+}
+
+// Fast path for the layout-restore loop: when the caller already knows the
+// object's world center/floor-Y/footprint (from the cached placement-geo
+// lookup in applyRecord), skip the Box3().setFromObject() traversal entirely
+// instead of re-measuring geometry that's already been measured for this
+// model/scale/rotation combo.
+function addContactShadowFast(obj, { centerX, centerZ, minY, footprintW, footprintD }) {
+  const w = Math.max(footprintW, 0.4) * 1.15;
+  const d = Math.max(footprintD, 0.4) * 1.15;
+
+  const shadow = new THREE.Mesh(_contactShadowGeo, getContactShadowMaterial());
+  shadow.renderOrder = -1;
+
+  obj.updateMatrixWorld(true);
+  const worldPos    = new THREE.Vector3(centerX, minY + 0.015, centerZ);
+  const worldQuat   = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+  const parentQuat  = obj.getWorldQuaternion(new THREE.Quaternion());
+  const worldScale  = obj.getWorldScale(new THREE.Vector3());
+
+  shadow.position.copy(obj.worldToLocal(worldPos));
+  shadow.quaternion.copy(parentQuat.invert().multiply(worldQuat));
+  shadow.scale.set(w / worldScale.x, d / worldScale.z, 1);
 
   obj.add(shadow);
   obj.userData.contactShadow = shadow;
@@ -1010,48 +1044,72 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           if (child.isSprite || (child.material && child.material.map === null && child.isLine)) child.visible = false;
         });
 
-        // Auto-scale the raw template to ~2m so baseScale is correct
-        obj.position.set(0, 0, 0);
-        obj.rotation.set(0, 0, 0);
-        obj.scale.set(1, 1, 1);
-        const _bbox = new THREE.Box3().setFromObject(obj);
-        const _size = new THREE.Vector3(); _bbox.getSize(_size);
-        const _maxDim = Math.max(_size.x, _size.y, _size.z);
-        const autoScale = _maxDim > 0 ? 2.0 / _maxDim : 1;
-        obj.userData.baseScale = autoScale;
-
-        // Apply saved scale and rotation first
         const sx = record.sx ?? 1;
-        obj.scale.setScalar(sx);
-        obj.rotation.set(record.rx ?? 0, record.ry ?? 0, record.rz ?? 0);
+        const rx = record.rx ?? 0, ry = record.ry ?? 0, rz = record.rz ?? 0;
+        // autoScale/floor-offset/centering only depend on model+scale+rotation,
+        // not on which station it ends up at — cache per unique combo so a
+        // 20-station line measures geometry once instead of 20 times.
+        const geoKey = `${record.model_name}::${sx}::${rx}::${ry}::${rz}`;
+        let geo = _placementGeoCache.get(geoKey);
 
-        // Floor-snap: compute AFTER rotation so bbox accounts for rotated shape
-        const _bbox2 = new THREE.Box3().setFromObject(obj);
-        const floorY = -_bbox2.min.y;
-        obj.userData.floorOffsetAtBase = floorY / sx;
+        if (!geo) {
+          // Auto-scale the raw template to ~2m so baseScale is correct
+          obj.position.set(0, 0, 0);
+          obj.rotation.set(0, 0, 0);
+          obj.scale.set(1, 1, 1);
+          const _bbox = new THREE.Box3().setFromObject(obj);
+          const _size = new THREE.Vector3(); _bbox.getSize(_size);
+          const _maxDim = Math.max(_size.x, _size.y, _size.z);
+          const autoScale = _maxDim > 0 ? 2.0 / _maxDim : 1;
+
+          // Floor-snap: compute AFTER rotation so bbox accounts for rotated shape
+          obj.scale.setScalar(sx);
+          obj.rotation.set(rx, ry, rz);
+          const _bbox2 = new THREE.Box3().setFromObject(obj);
+          const floorY = -_bbox2.min.y;
+
+          // Centering offsets — compensates for mesh origin offset from its bbox center
+          obj.position.set(0, floorY, 0);
+          const _bboxXZ = new THREE.Box3().setFromObject(obj);
+
+          geo = {
+            autoScale,
+            floorOffsetAtBase: floorY / sx,
+            xOff: (_bboxXZ.min.x + _bboxXZ.max.x) / 2,
+            zOff: (_bboxXZ.min.z + _bboxXZ.max.z) / 2,
+            footprintW: _bboxXZ.max.x - _bboxXZ.min.x,
+            footprintD: _bboxXZ.max.z - _bboxXZ.min.z,
+          };
+          _placementGeoCache.set(geoKey, geo);
+        } else {
+          obj.scale.setScalar(sx);
+          obj.rotation.set(rx, ry, rz);
+        }
+        obj.userData.baseScale = geo.autoScale;
+        obj.userData.floorOffsetAtBase = geo.floorOffsetAtBase;
 
         // Use saved py if user manually lifted the model above floor, else use floor-snap
+        const floorY = geo.floorOffsetAtBase * sx;
         const savedPy = record.py ?? 0;
         const finalY = savedPy > floorY ? savedPy : floorY;
-        obj.position.y = finalY;
 
-        // Center in X only — compensates for mesh origin offset.
-        // Z is exactly at station center; Y uses saved height or floor-snap.
+        // Z is exactly at station center; X compensates for mesh origin offset.
         const stnPos = record.station_id ? localPosMap[record.station_id] : null;
         const targetX = stnPos ? stnPos.x : (record.px ?? sceneCenterRef.current.x);
         const targetZ = stnPos ? stnPos.z : (record.pz ?? sceneCenterRef.current.z);
-        obj.position.set(0, finalY, 0);
-        const _bboxXZ = new THREE.Box3().setFromObject(obj);
-        const xOff = (_bboxXZ.min.x + _bboxXZ.max.x) / 2;
-        obj.position.x = targetX - xOff;
-        obj.position.z = targetZ;
+        obj.position.set(targetX - geo.xOff, finalY, targetZ);
 
         obj.userData.isPlaced          = true;
         obj.userData.objId             = String(record.id);
         obj.userData.serverModelId     = record.id;
         obj.userData.objName           = record.model_name;
         obj.userData.objExt            = record.model_name.split('.').pop() || 'glb';
-        scene.add(obj); addContactShadow(obj); dirtyRef.current = true;
+        scene.add(obj);
+        addContactShadowFast(obj, {
+          centerX: targetX, centerZ: targetZ + geo.zOff, minY: finalY - floorY,
+          footprintW: geo.footprintW, footprintD: geo.footprintD,
+        });
+        dirtyRef.current = true;
         const entry = {
           id: String(record.id), mesh: obj, label: null, name: record.model_name,
           stationId: record.station_id || null,
