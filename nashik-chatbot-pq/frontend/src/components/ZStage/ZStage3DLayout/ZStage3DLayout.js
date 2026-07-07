@@ -479,17 +479,33 @@ function getFloorTexture() {
   const canvas = document.createElement('canvas');
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#aab4bd';
+  // Pearl-white marble base — most placed equipment models are grey, so a
+  // grey floor made everything blend together. A lighter floor keeps models
+  // visually distinct instead of camouflaging into the ground.
+  ctx.fillStyle = '#eeece6';
   ctx.fillRect(0, 0, size, size);
   for (let i = 0; i < 900; i++) {
     const x = Math.random() * size, y = Math.random() * size;
-    const shade = Math.random() * 30 - 15;
-    ctx.fillStyle = `rgba(${128 + shade},${138 + shade},${148 + shade},0.5)`;
+    const shade = Math.random() * 22 - 11;
+    ctx.fillStyle = `rgba(${205 + shade},${202 + shade},${195 + shade},0.4)`;
     ctx.fillRect(x, y, 1.5, 1.5);
+  }
+  // Soft grey marble veining — a few faint curved strokes, not a repeating pattern
+  ctx.strokeStyle = 'rgba(150,148,142,0.25)';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 4; i++) {
+    const x0 = Math.random() * size, y0 = Math.random() * size;
+    const x1 = x0 + (Math.random() - 0.5) * size, y1 = y0 + (Math.random() - 0.5) * size;
+    const cx = (x0 + x1) / 2 + (Math.random() - 0.5) * size * 0.4;
+    const cy = (y0 + y1) / 2 + (Math.random() - 0.5) * size * 0.4;
+    ctx.beginPath();
+    ctx.moveTo(x0, y0);
+    ctx.quadraticCurveTo(cx, cy, x1, y1);
+    ctx.stroke();
   }
   const vignette = ctx.createRadialGradient(size / 2, size / 2, size * 0.25, size / 2, size / 2, size * 0.72);
   vignette.addColorStop(0, 'rgba(0,0,0,0)');
-  vignette.addColorStop(1, 'rgba(0,0,0,0.22)');
+  vignette.addColorStop(1, 'rgba(0,0,0,0.15)');
   ctx.fillStyle = vignette;
   ctx.fillRect(0, 0, size, size);
   _floorTex = new THREE.CanvasTexture(canvas);
@@ -820,6 +836,19 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       const c = cachedScene.center, span = cachedScene.span;
       camera.position.set(c.x, span * 0.8, c.z + span * 0.9);
       camera.lookAt(c.x, 0, c.z);
+
+      // The shadow map render target is tied to the WebGL context of the
+      // renderer that created it — and that renderer got disposed when we
+      // left this layout. Reusing the stale render target with a brand new
+      // renderer/context is what renders shadow-receiving surfaces (floor,
+      // beams) solid black. Clearing it forces the new renderer to build a
+      // fresh one on the next frame, exactly like a first-time build would.
+      scene.traverse(obj => {
+        if (obj.isDirectionalLight && obj.shadow && obj.shadow.map) {
+          obj.shadow.map.dispose();
+          obj.shadow.map = null;
+        }
+      });
 
       onObjectsChange([...placedRef.current]);
     } else {
