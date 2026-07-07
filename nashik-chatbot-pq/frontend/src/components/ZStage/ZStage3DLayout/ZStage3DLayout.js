@@ -67,9 +67,11 @@ function lineNamesMatch(a, b) {
 const _modelTemplateCache = new Map(); // name → THREE.Object3D
 
 function getCachedTemplate(name) {
+  if (!name) return null;
   return _modelTemplateCache.get(name.toLowerCase()) || null;
 }
 function setCachedTemplate(name, template) {
+  if (!name) return;
   _modelTemplateCache.set(name.toLowerCase(), template);
 }
 
@@ -1148,6 +1150,12 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       const loadAndPlace = (records) => {
         const byName = new Map();
         records.forEach(p => {
+          // A placement with no model_name has nothing to download — skip it
+          // instead of crashing later trying to fetch/cache an undefined name.
+          if (!p.model_name) {
+            console.error('[Z3D] Skipping placement with no model_name:', p);
+            return;
+          }
           if (!byName.has(p.model_name)) byName.set(p.model_name, []);
           byName.get(p.model_name).push(p);
         });
