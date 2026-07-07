@@ -1262,26 +1262,36 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           lineGroupsAndLibrary.then(([lgRes, libRes]) => {
             const knownLineGroups = lgRes.data || [];
             const libraryModels = libRes.data || [];  // [{name, ext, ...}]
+            const matchedModel = libraryModels.find(m => lineNamesMatch(m.name, lineGroupId));
 
-            // Strategy 1: fuzzy match against line_group_id values in DB
+            // Strategy 2: fuzzy match line name directly against library model
+            // names — handles station/free-mode uploads where line_group_id
+            // was never set, and also serves as the fallback below.
+            const trySeedFromLibrary = () => {
+              if (!matchedModel) return Promise.resolve([]);
+              return z3dModelApi.getPlacementsByModelName(matchedModel.name).then(r => {
+                const recs = r.data || [];
+                if (recs.length === 0) return [];
+                return seedFromTemplate(recs[0], lineGroupId);
+              }).catch(() => []);
+            };
+
+            // Strategy 1: fuzzy match against line_group_id values in DB. If
+            // this finds a line-group match but its placement turns out to be
+            // invalid/corrupt (seedFromTemplate returns nothing), fall through
+            // to Strategy 2 instead of giving up — the model may still exist
+            // cleanly in the library even if every placement referencing it
+            // for a similarly-named line is broken.
             const matchedLineGroupId = knownLineGroups.find(kg => lineNamesMatch(kg, lineGroupId));
-            const templateFetch = matchedLineGroupId
-              ? z3dModelApi.getPlacementsByLineGroup(matchedLineGroupId)
-              : (() => {
-                  // Strategy 2 (fallback): fuzzy match line name against model
-                  // names in library — handles station/free-mode uploads
-                  // where line_group_id was never set.
-                  const matchedModel = libraryModels.find(m => lineNamesMatch(m.name, lineGroupId));
-                  return matchedModel
-                    ? z3dModelApi.getPlacementsByModelName(matchedModel.name)
-                    : Promise.resolve({ data: [] });
-                })();
+            if (!matchedLineGroupId) return trySeedFromLibrary();
 
-            return templateFetch.then(r => {
+            return z3dModelApi.getPlacementsByLineGroup(matchedLineGroupId).then(r => {
               const recs = r.data || [];
-              if (recs.length === 0) return [];
-              return seedFromTemplate(recs[0], lineGroupId);
-            }).catch(() => []);
+              if (recs.length === 0) return trySeedFromLibrary();
+              return seedFromTemplate(recs[0], lineGroupId).then(seeded =>
+                seeded.length > 0 ? seeded : trySeedFromLibrary()
+              );
+            }).catch(() => trySeedFromLibrary());
           }).then(newRecords => {
             batchesResolved += 1;
             if (newRecords.length > 0) loadAndPlace(newRecords);
