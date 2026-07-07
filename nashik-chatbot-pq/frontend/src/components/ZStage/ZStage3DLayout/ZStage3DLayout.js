@@ -483,16 +483,16 @@ function getFloorTexture() {
   // models are grey, so a grey floor made everything blend together. A
   // brighter, clearly-blue floor keeps models visually distinct instead of
   // camouflaging into the ground.
-  ctx.fillStyle = '#a9d6f5';
+  ctx.fillStyle = '#d6ecfb';
   ctx.fillRect(0, 0, size, size);
   for (let i = 0; i < 900; i++) {
     const x = Math.random() * size, y = Math.random() * size;
     const shade = Math.random() * 22 - 11;
-    ctx.fillStyle = `rgba(${169 + shade},${214 + shade},${245 + shade},0.4)`;
+    ctx.fillStyle = `rgba(${214 + shade},${236 + shade},${251 + shade},0.4)`;
     ctx.fillRect(x, y, 1.5, 1.5);
   }
   // Soft sky-blue veining — a few faint curved strokes, not a repeating pattern
-  ctx.strokeStyle = 'rgba(90,160,210,0.25)';
+  ctx.strokeStyle = 'rgba(130,190,225,0.2)';
   ctx.lineWidth = 1.5;
   for (let i = 0; i < 4; i++) {
     const x0 = Math.random() * size, y0 = Math.random() * size;
@@ -506,7 +506,7 @@ function getFloorTexture() {
   }
   const vignette = ctx.createRadialGradient(size / 2, size / 2, size * 0.25, size / 2, size / 2, size * 0.72);
   vignette.addColorStop(0, 'rgba(0,0,0,0)');
-  vignette.addColorStop(1, 'rgba(0,0,0,0.15)');
+  vignette.addColorStop(1, 'rgba(0,0,0,0.08)');
   ctx.fillStyle = vignette;
   ctx.fillRect(0, 0, size, size);
   _floorTex = new THREE.CanvasTexture(canvas);
