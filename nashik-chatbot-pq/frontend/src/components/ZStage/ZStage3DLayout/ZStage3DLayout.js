@@ -1152,8 +1152,13 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         records.forEach(p => {
           // A placement with no model_name has nothing to download — skip it
           // instead of crashing later trying to fetch/cache an undefined name.
+          // Also delete it server-side: a dead placement like this makes the
+          // station look "already seeded", which permanently blocks the
+          // auto-copy-from-another-layout feature from ever running for this
+          // line. Removing it lets that line self-heal on the next page load.
           if (!p.model_name) {
-            console.error('[Z3D] Skipping placement with no model_name:', p);
+            console.error('[Z3D] Removing placement with no model_name:', p);
+            if (p.id) z3dModelApi.deletePlacement(p.id).catch(() => {});
             return;
           }
           if (!byName.has(p.model_name)) byName.set(p.model_name, []);
