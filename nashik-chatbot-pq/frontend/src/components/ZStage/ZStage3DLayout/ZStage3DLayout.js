@@ -178,7 +178,10 @@ function makeIBeam(length, mat, orientation) {
   if (orientation === 'vertical')     geo = new THREE.BoxGeometry(COL_W, length, COL_W);
   else if (orientation === 'horizontal-x') geo = new THREE.BoxGeometry(length, COL_H, COL_W);
   else                                geo = new THREE.BoxGeometry(COL_W, COL_H, length);
-  return new THREE.Mesh(geo, mat);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
 }
 
 // ── Green center strip inside each station cell ────────────────────────────────
@@ -359,22 +362,52 @@ function getHazardStripeTexture() {
   _hazardTex = tex;
   return tex;
 }
-const HAZARD_H = 0.55;
+const HAZARD_H = 0.12; // matches floor slab thickness so the base sits flush, no visible step
 const _hazardGeo = new THREE.BoxGeometry(COL_W + 0.02, HAZARD_H, COL_W + 0.02);
 const _hazardMat = new THREE.MeshBasicMaterial({ map: getHazardStripeTexture() });
 function makeHazardBase() {
   const mesh = new THREE.Mesh(_hazardGeo, _hazardMat);
   mesh.position.y = HAZARD_H / 2;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
   return mesh;
 }
 
 // ── Overhead light fixture — hangs from the top beam above each station cell ───
-// Unlit bright lens + darker housing box: purely visual (no extra THREE.Light),
-// but reads as ceiling-mounted factory lighting so the ceiling isn't empty.
+// Unlit bright lens + darker housing box, plus an additive-blended glow sprite
+// behind the lens so it reads as a lit fixture instead of a flat grey bar.
+// Purely visual — no extra THREE.Light, so it doesn't add real lighting cost.
 const _fixtureHousingGeo = new THREE.BoxGeometry(1, 0.06, 0.34);
 const _fixtureHousingMat = new THREE.MeshBasicMaterial({ color: 0x455a64 });
-const _fixtureLensGeo    = new THREE.BoxGeometry(1, 0.03, 0.26);
-const _fixtureLensMat    = new THREE.MeshBasicMaterial({ color: 0xfffef2 });
+const _fixtureLensGeo    = new THREE.BoxGeometry(1, 0.04, 0.28);
+const _fixtureLensMat    = new THREE.MeshBasicMaterial({ color: 0xfffdf0 });
+
+let _fixtureGlowTex = null;
+function getFixtureGlowTexture() {
+  if (_fixtureGlowTex) return _fixtureGlowTex;
+  const w = 128, h = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+  grad.addColorStop(0,   'rgba(255,250,220,0.9)');
+  grad.addColorStop(0.5, 'rgba(255,250,220,0.35)');
+  grad.addColorStop(1,   'rgba(255,250,220,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w, h);
+  _fixtureGlowTex = new THREE.CanvasTexture(canvas);
+  return _fixtureGlowTex;
+}
+let _fixtureGlowMat = null;
+function getFixtureGlowMaterial() {
+  if (_fixtureGlowMat) return _fixtureGlowMat;
+  _fixtureGlowMat = new THREE.SpriteMaterial({
+    map: getFixtureGlowTexture(), transparent: true,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  return _fixtureGlowMat;
+}
+
 function makeLightFixture(width) {
   const group = new THREE.Group();
   const housing = new THREE.Mesh(_fixtureHousingGeo, _fixtureHousingMat);
@@ -384,6 +417,10 @@ function makeLightFixture(width) {
   lens.scale.x = width;
   lens.position.y = -0.045;
   group.add(lens);
+  const glow = new THREE.Sprite(getFixtureGlowMaterial());
+  glow.scale.set(width * 0.9, width * 0.9 * 0.45, 1);
+  glow.position.y = -0.1;
+  group.add(glow);
   return group;
 }
 
@@ -543,6 +580,7 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     );
     floor.position.set(cellCX, 0.06, cellCZ);
     floor.userData.stationId = stnId;
+    floor.receiveShadow = true;
     group.add(floor);
 
     // Overhead light fixture hanging from the top beam above this cell
@@ -747,6 +785,11 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     // Guard against 0×0 when tab is hidden — ResizeObserver will correct once visible
     renderer.setSize(Math.max(1, canvas.clientWidth), Math.max(1, canvas.clientHeight));
     renderer.setClearColor(0xf0f2f5);
+    // Shadows scoped to the sun light only — structure + floor cast/receive,
+    // placed models don't (they already have cheap contact-shadow blobs),
+    // which keeps the shadow-map cost from scaling with station count.
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     rendererRef.current = renderer;
 
     const scene = new THREE.Scene();
@@ -759,9 +802,15 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     cameraRef.current = camera;
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+    // "Sun" — the one shadow-casting light. Shadow camera frustum is sized to
+    // the actual layout span further down, once we know how big the scene is.
     const dir = new THREE.DirectionalLight(0xffffff, 1.1);
     dir.position.set(20, 40, 25); scene.add(dir);
-    // Fill light from opposite side to reduce harsh shadows
+    dir.castShadow = true;
+    dir.shadow.mapSize.set(1024, 1024);
+    dir.shadow.bias = -0.0015;
+    scene.add(dir.target);
+    // Fill light from opposite side to reduce harsh shadows — does not cast shadows
     const fill = new THREE.DirectionalLight(0xdce8ff, 0.35);
     fill.position.set(-20, 10, -20); scene.add(fill);
     scene.add(new THREE.GridHelper(200, 100, 0xb0bec5, 0xdde1e7));
@@ -829,6 +878,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       if (x0 < minX) minX = x0; if (x1 > maxX) maxX = x1;
       if (z0 < minZ) minZ = z0; if (z1 > maxZ) maxZ = z1;
     });
+    let sunCX = 0, sunCZ = 0, sunSpan = 20;
     if (boxes.length) {
       const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
       const span = Math.max(maxX - minX, maxZ - minZ, 10);
@@ -836,9 +886,24 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       sceneSpanRef.current = span;
       camera.position.set(cx, span * 0.8, cz + span * 0.9);
       camera.lookAt(cx, 0, cz);
+      sunCX = cx; sunCZ = cz; sunSpan = span;
     } else {
       camera.position.set(0, 20, 30); camera.lookAt(0, 0, 0);
     }
+
+    // Fit the sun's shadow-camera frustum to the actual layout size — a fixed
+    // frustum would either waste shadow-map resolution on a small layout or
+    // clip shadows on a large one.
+    const sunDist = sunSpan * 1.2;
+    dir.position.set(sunCX + sunDist * 0.5, sunDist * 0.9, sunCZ + sunDist * 0.4);
+    dir.target.position.set(sunCX, 0, sunCZ);
+    dir.target.updateMatrixWorld();
+    const shadowHalf = sunSpan * 0.75;
+    Object.assign(dir.shadow.camera, {
+      left: -shadowHalf, right: shadowHalf, top: shadowHalf, bottom: -shadowHalf,
+      near: 1, far: sunDist * 2.5,
+    });
+    dir.shadow.camera.updateProjectionMatrix();
 
     const orbit = new OrbitControls(camera, renderer.domElement);
     orbit.enableDamping = true; orbit.dampingFactor = 0.08;
