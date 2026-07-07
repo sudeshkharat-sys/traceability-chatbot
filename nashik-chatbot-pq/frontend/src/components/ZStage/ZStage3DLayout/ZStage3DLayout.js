@@ -761,6 +761,14 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
   const animationsRef  = useRef([]);     // active tweens
   const blobCacheRef   = useRef({});     // objId → Blob — keeps file data alive across IDB updates
   const dirtyRef       = useRef(true);   // render dirty flag — set true whenever scene changes
+  // Last-2 built scenes, keyed by layout id — lets switching back to a
+  // recently-viewed layout skip the full structure-build + model-download
+  // pipeline entirely. Invalidated per-entry whenever the layout's station
+  // boxes/connections/Z-E data actually differ from what's cached, so a real
+  // edit is never hidden behind a stale cached scene. Renderer/camera/controls
+  // are still created fresh every time (untouched, same as before this
+  // change) — only the expensive scene *content* is what gets reused.
+  const layoutSceneCacheRef = useRef(new Map()); // layoutId → { scene, signature, stationPosMap, center, span, placedEntries }
   useEffect(() => { walkModeRef.current = walkMode; }, [walkMode]);
 
   useEffect(() => {
@@ -780,118 +788,154 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     rendererRef.current = renderer;
 
-    const scene = new THREE.Scene();
-    scene.fog = new THREE.Fog(0xf0f2f5, 80, 250);
-    sceneRef.current = scene;
-
-    const aspect = canvas.clientWidth && canvas.clientHeight
-      ? canvas.clientWidth / canvas.clientHeight : 1;
-    const camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 300);
-    cameraRef.current = camera;
-
-    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
-    // "Sun" — the one shadow-casting light. Shadow camera frustum is sized to
-    // the actual layout span further down, once we know how big the scene is.
-    const dir = new THREE.DirectionalLight(0xffffff, 1.1);
-    dir.position.set(20, 40, 25); scene.add(dir);
-    dir.castShadow = true;
-    dir.shadow.mapSize.set(1024, 1024);
-    dir.shadow.bias = -0.0015;
-    scene.add(dir.target);
-    // Fill light from opposite side to reduce harsh shadows — does not cast shadows
-    const fill = new THREE.DirectionalLight(0xdce8ff, 0.35);
-    fill.position.set(-20, 10, -20); scene.add(fill);
-    scene.add(new THREE.GridHelper(200, 100, 0xb0bec5, 0xdde1e7));
-
-    const boxes = layout.station_boxes || [];
-
-    // Scale 2D canvas positions proportionally into 3D, but enforce a minimum
-    // gap of 2 × CELL_W (two station-id cells) between any two adjacent boxes.
-    const GRID_2D  = 40;
-    const BOX_H_2D = 5 * GRID_2D; // 200px
-    const scaleX   = CELL_W / (GRID_2D * 1.5);  // ~0.10 — compressed to bring boxes closer in x
-    const scaleZ   = DEPTH  / BOX_H_2D; // 0.03
-    const MIN_GAP  = CELL_W * 1.5;  // minimum clearance = 1.5 station-id cell widths
-
-    // Group boxes into rows using floor(position_y / BOX_H_2D) — any two boxes
-    // within the same 200px band (one box-height) are treated as the same row.
-    // This is more robust than snapping to 40px grid which fails when boxes in
-    // the same visual row differ by more than 20px in position_y.
-    const rowBand  = v => Math.floor((v || 0) / BOX_H_2D);
-    // Representative y for each band = band index * BOX_H_2D
-    const bandSet  = [...new Set(boxes.map(b => rowBand(b.position_y)))].sort((a, b) => a - b);
-
-    const zMap = {};   // keyed by band index
-    let curZ = 0;
-    bandSet.forEach((band, i) => {
-      zMap[band] = curZ;
-      if (i < bandSet.length - 1) {
-        const scaledStep = (bandSet[i + 1] - band) * BOX_H_2D * scaleZ; // = (bandDiff) * DEPTH
-        curZ += Math.max(scaledStep, DEPTH + MIN_GAP);
-      }
+    // Try to reuse a previously-built scene for this exact layout instead of
+    // redoing the full structure-build + model-download pipeline. Invalidated
+    // whenever the layout's boxes/connections/Z-E data actually differ from
+    // what's cached, so a real edit always gets a fresh, correct rebuild
+    // rather than a stale cached view.
+    const sceneSignature = JSON.stringify({
+      boxes: (layout.station_boxes || []).map(b => ({
+        id: b.id, name: b.name, count: b.station_count,
+        ids: b.station_ids, x: b.position_x, y: b.position_y, data: b.station_data,
+      })),
+      conns: (layout.connections || []).map(c => [c.from_box_id, c.to_box_id]),
+      ze: zeMapRef.current,
     });
+    const cachedScene   = layoutSceneCacheRef.current.get(layout.id);
+    const canReuseScene = !!cachedScene && cachedScene.signature === sceneSignature;
 
-    const layoutBoxes = boxes.map(b => ({
-      ...b,
-      _x3d: (b.position_x || 0) * scaleX,
-      _z3d: zMap[rowBand(b.position_y)] ?? 0,
-    }));
+    let scene, camera;
+    if (canReuseScene) {
+      scene = cachedScene.scene;
+      sceneRef.current = scene;
+      stationPosRef.current = cachedScene.stationPosMap;
+      placedRef.current = cachedScene.placedEntries;
+      sceneCenterRef.current.copy(cachedScene.center);
+      sceneSpanRef.current = cachedScene.span;
 
-    layoutBoxes.forEach(box => buildStationShell(box, statusMapRef.current, zeMapRef.current, scene));
+      const aspect = canvas.clientWidth && canvas.clientHeight
+        ? canvas.clientWidth / canvas.clientHeight : 1;
+      camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 300);
+      cameraRef.current = camera;
+      const c = cachedScene.center, span = cachedScene.span;
+      camera.position.set(c.x, span * 0.8, c.z + span * 0.9);
+      camera.lookAt(c.x, 0, c.z);
 
-    // Build station-position lookup for snap placement & animation waypoints
-    const stationPosMap = {};
-    layoutBoxes.forEach(box => {
-      const cnt    = box.station_count || 1;
-      const oX     = box._x3d;
-      const oZ     = box._z3d;
-      const stnIds = (box.station_ids || '').split(',').map(s => s.trim()).filter(Boolean);
-      for (let i = 0; i < cnt; i++) {
-        const sid = stnIds[i] || `STN-${i + 1}`;
-        stationPosMap[sid] = { x: oX + i * CELL_W + CELL_W / 2, z: oZ + DEPTH / 2, shopName: box.name || '' };
-      }
-    });
-    stationPosRef.current = stationPosMap;
-
-    (layout.connections || []).forEach(conn => {
-      const f = layoutBoxes.find(b => b.id === conn.from_box_id);
-      const t = layoutBoxes.find(b => b.id === conn.to_box_id);
-      if (f && t) buildWalkingPath(f, t, scene);
-    });
-
-    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-    layoutBoxes.forEach(b => {
-      const x0 = b._x3d, x1 = x0 + (b.station_count || 1) * CELL_W;
-      const z0 = b._z3d, z1 = z0 + DEPTH;
-      if (x0 < minX) minX = x0; if (x1 > maxX) maxX = x1;
-      if (z0 < minZ) minZ = z0; if (z1 > maxZ) maxZ = z1;
-    });
-    let sunCX = 0, sunCZ = 0, sunSpan = 20;
-    if (boxes.length) {
-      const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
-      const span = Math.max(maxX - minX, maxZ - minZ, 10);
-      sceneCenterRef.current.set(cx, 0, cz);
-      sceneSpanRef.current = span;
-      camera.position.set(cx, span * 0.8, cz + span * 0.9);
-      camera.lookAt(cx, 0, cz);
-      sunCX = cx; sunCZ = cz; sunSpan = span;
+      onObjectsChange([...placedRef.current]);
     } else {
-      camera.position.set(0, 20, 30); camera.lookAt(0, 0, 0);
-    }
+      scene = new THREE.Scene();
+      scene.fog = new THREE.Fog(0xf0f2f5, 80, 250);
+      sceneRef.current = scene;
 
-    // Fit the sun's shadow-camera frustum to the actual layout size — a fixed
-    // frustum would either waste shadow-map resolution on a small layout or
-    // clip shadows on a large one.
-    const sunDist = sunSpan * 1.2;
-    dir.position.set(sunCX + sunDist * 0.5, sunDist * 0.9, sunCZ + sunDist * 0.4);
-    dir.target.position.set(sunCX, 0, sunCZ);
-    dir.target.updateMatrixWorld();
-    const shadowHalf = sunSpan * 0.75;
-    Object.assign(dir.shadow.camera, {
-      left: -shadowHalf, right: shadowHalf, top: shadowHalf, bottom: -shadowHalf,
-      near: 1, far: sunDist * 2.5,
-    });
-    dir.shadow.camera.updateProjectionMatrix();
+      const aspect = canvas.clientWidth && canvas.clientHeight
+        ? canvas.clientWidth / canvas.clientHeight : 1;
+      camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 300);
+      cameraRef.current = camera;
+
+      scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+      // "Sun" — the one shadow-casting light. Shadow camera frustum is sized to
+      // the actual layout span further down, once we know how big the scene is.
+      const dir = new THREE.DirectionalLight(0xffffff, 1.1);
+      dir.position.set(20, 40, 25); scene.add(dir);
+      dir.castShadow = true;
+      dir.shadow.mapSize.set(1024, 1024);
+      dir.shadow.bias = -0.0015;
+      scene.add(dir.target);
+      // Fill light from opposite side to reduce harsh shadows — does not cast shadows
+      const fill = new THREE.DirectionalLight(0xdce8ff, 0.35);
+      fill.position.set(-20, 10, -20); scene.add(fill);
+      scene.add(new THREE.GridHelper(200, 100, 0xb0bec5, 0xdde1e7));
+
+      const boxes = layout.station_boxes || [];
+
+      // Scale 2D canvas positions proportionally into 3D, but enforce a minimum
+      // gap of 2 × CELL_W (two station-id cells) between any two adjacent boxes.
+      const GRID_2D  = 40;
+      const BOX_H_2D = 5 * GRID_2D; // 200px
+      const scaleX   = CELL_W / (GRID_2D * 1.5);  // ~0.10 — compressed to bring boxes closer in x
+      const scaleZ   = DEPTH  / BOX_H_2D; // 0.03
+      const MIN_GAP  = CELL_W * 1.5;  // minimum clearance = 1.5 station-id cell widths
+
+      // Group boxes into rows using floor(position_y / BOX_H_2D) — any two boxes
+      // within the same 200px band (one box-height) are treated as the same row.
+      // This is more robust than snapping to 40px grid which fails when boxes in
+      // the same visual row differ by more than 20px in position_y.
+      const rowBand  = v => Math.floor((v || 0) / BOX_H_2D);
+      // Representative y for each band = band index * BOX_H_2D
+      const bandSet  = [...new Set(boxes.map(b => rowBand(b.position_y)))].sort((a, b) => a - b);
+
+      const zMap = {};   // keyed by band index
+      let curZ = 0;
+      bandSet.forEach((band, i) => {
+        zMap[band] = curZ;
+        if (i < bandSet.length - 1) {
+          const scaledStep = (bandSet[i + 1] - band) * BOX_H_2D * scaleZ; // = (bandDiff) * DEPTH
+          curZ += Math.max(scaledStep, DEPTH + MIN_GAP);
+        }
+      });
+
+      const layoutBoxes = boxes.map(b => ({
+        ...b,
+        _x3d: (b.position_x || 0) * scaleX,
+        _z3d: zMap[rowBand(b.position_y)] ?? 0,
+      }));
+
+      layoutBoxes.forEach(box => buildStationShell(box, statusMapRef.current, zeMapRef.current, scene));
+
+      // Build station-position lookup for snap placement & animation waypoints
+      const stationPosMap = {};
+      layoutBoxes.forEach(box => {
+        const cnt    = box.station_count || 1;
+        const oX     = box._x3d;
+        const oZ     = box._z3d;
+        const stnIds = (box.station_ids || '').split(',').map(s => s.trim()).filter(Boolean);
+        for (let i = 0; i < cnt; i++) {
+          const sid = stnIds[i] || `STN-${i + 1}`;
+          stationPosMap[sid] = { x: oX + i * CELL_W + CELL_W / 2, z: oZ + DEPTH / 2, shopName: box.name || '' };
+        }
+      });
+      stationPosRef.current = stationPosMap;
+
+      (layout.connections || []).forEach(conn => {
+        const f = layoutBoxes.find(b => b.id === conn.from_box_id);
+        const t = layoutBoxes.find(b => b.id === conn.to_box_id);
+        if (f && t) buildWalkingPath(f, t, scene);
+      });
+
+      let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+      layoutBoxes.forEach(b => {
+        const x0 = b._x3d, x1 = x0 + (b.station_count || 1) * CELL_W;
+        const z0 = b._z3d, z1 = z0 + DEPTH;
+        if (x0 < minX) minX = x0; if (x1 > maxX) maxX = x1;
+        if (z0 < minZ) minZ = z0; if (z1 > maxZ) maxZ = z1;
+      });
+      let sunCX = 0, sunCZ = 0, sunSpan = 20;
+      if (boxes.length) {
+        const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+        const span = Math.max(maxX - minX, maxZ - minZ, 10);
+        sceneCenterRef.current.set(cx, 0, cz);
+        sceneSpanRef.current = span;
+        camera.position.set(cx, span * 0.8, cz + span * 0.9);
+        camera.lookAt(cx, 0, cz);
+        sunCX = cx; sunCZ = cz; sunSpan = span;
+      } else {
+        camera.position.set(0, 20, 30); camera.lookAt(0, 0, 0);
+      }
+
+      // Fit the sun's shadow-camera frustum to the actual layout size — a fixed
+      // frustum would either waste shadow-map resolution on a small layout or
+      // clip shadows on a large one.
+      const sunDist = sunSpan * 1.2;
+      dir.position.set(sunCX + sunDist * 0.5, sunDist * 0.9, sunCZ + sunDist * 0.4);
+      dir.target.position.set(sunCX, 0, sunCZ);
+      dir.target.updateMatrixWorld();
+      const shadowHalf = sunSpan * 0.75;
+      Object.assign(dir.shadow.camera, {
+        left: -shadowHalf, right: shadowHalf, top: shadowHalf, bottom: -shadowHalf,
+        near: 1, far: sunDist * 2.5,
+      });
+      dir.shadow.camera.updateProjectionMatrix();
+    }
 
     const orbit = new OrbitControls(camera, renderer.domElement);
     orbit.enableDamping = true; orbit.dampingFactor = 0.08;
@@ -976,13 +1020,18 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     // Track current layoutId for IDB saves inside event handlers
     layoutIdRef.current = layout.id;
 
-    // Reload previously saved placed objects from server.
+    // Reload previously saved placed objects from server — skipped entirely
+    // when a cached scene was reused above, since its placements are already
+    // in placedRef.current and nothing needs downloading again.
     // Group records by line_group_id so each unique GLB file is downloaded
     // only ONCE, then shallow-cloned per station — one download even for a
     // 20-station line placement.
     // Restore placed models: fetch placements for this layout, then download
     // each unique model from the global library (one download per model name,
     // even if it's placed at 20 stations).
+    if (canReuseScene) {
+      onSceneReady && onSceneReady();
+    } else {
     z3dModelApi.listPlacements(layout.id).then(res => {
       const placements = res.data || [];
 
@@ -1140,6 +1189,24 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       const totalBatches = 1 + unseededLines.length;
       const checkDone = () => {
         if (batchesResolved >= totalBatches && loadedModels >= totalModels) {
+          // Cache this freshly-built scene so switching away and back to this
+          // exact layout (same structure/Z-E signature) can skip straight to
+          // reuse next time, instead of redoing this whole pipeline. Capped
+          // at 2 entries (LRU) to bound GPU memory — evicted entries are just
+          // dropped, not explicitly disposed, since their placed-model
+          // geometry is shared with the module-level template cache and must
+          // not be destroyed out from under it.
+          const cache = layoutSceneCacheRef.current;
+          cache.delete(layout.id); // re-insert at the end → most-recently-used
+          cache.set(layout.id, {
+            scene, signature: sceneSignature,
+            stationPosMap: { ...stationPosRef.current },
+            placedEntries: [...placedRef.current],
+            center: sceneCenterRef.current.clone(),
+            span: sceneSpanRef.current,
+          });
+          while (cache.size > 2) cache.delete(cache.keys().next().value);
+
           onSceneReady && onSceneReady();
         }
       };
@@ -1303,6 +1370,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       console.error('[Z3D] Failed to load saved models:', err);
       onSceneReady && onSceneReady(); // unblock overlay on error
     });
+    }
 
     // Only re-render when something changes — saves GPU when user is idle
     dirtyRef.current = true;
@@ -1345,6 +1413,12 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       cancelAnimationFrame(rafRef.current);
       ro.disconnect();
       walk.destroy();
+      // A cached scene can outlive this effect run (reused on a later layout
+      // switch) — tc.dispose() alone doesn't remove it from the scene graph,
+      // so without this it would silently accumulate one orphaned
+      // TransformControls per revisit instead of being thrown away with a
+      // fresh scene like before.
+      scene.remove(tc);
       tc.dispose();
       orbit.dispose();
       renderer.dispose();
@@ -1533,6 +1607,9 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
 
       const entry = { id: objId, mesh: obj, label: null, name, stationId: options.stationId || null, lineGroupId: options.lineGroupId || null };
       placedRef.current = [...placedRef.current, entry];
+      // A newly-placed model makes any cached scene snapshot for this layout
+      // stale (its placedEntries wouldn't include this new one) — drop it.
+      layoutSceneCacheRef.current.delete(layoutIdRef.current);
 
       // Save to server: upload file to global library (reuses if name exists),
       // then create a per-layout placement record with the transform.
@@ -1688,6 +1765,10 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       if (sid) z3dModelApi.deletePlacement(sid).catch(() => {});
     });
     onObjectsChange([...placedRef.current]);
+    // The cached scene's placedEntries snapshot is now stale — drop it so the
+    // next visit to this layout rebuilds fresh instead of showing a deleted
+    // model back in the side list.
+    layoutSceneCacheRef.current.delete(layoutIdRef.current);
   }, [onObjectsChange]);
 
   // Rename label by id
@@ -1880,6 +1961,9 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
 
       placedRef.current = [...placedRef.current, ...newEntries];
       onObjectsChange([...placedRef.current]);
+      // Same reasoning as the single-object placement path — new entries mean
+      // any cached scene snapshot for this layout is now out of date.
+      layoutSceneCacheRef.current.delete(layoutIdRef.current);
 
       // Upload file once to global library, then create one placement per station.
       if (layoutId) {
