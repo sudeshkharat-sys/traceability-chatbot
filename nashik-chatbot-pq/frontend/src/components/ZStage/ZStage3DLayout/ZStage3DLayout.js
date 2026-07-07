@@ -197,8 +197,6 @@ function makeIBeam(length, mat, orientation) {
   else if (orientation === 'horizontal-x') geo = new THREE.BoxGeometry(length, COL_H, COL_W);
   else                                geo = new THREE.BoxGeometry(COL_W, COL_H, length);
   const mesh = new THREE.Mesh(geo, mat);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
   return mesh;
 }
 
@@ -386,87 +384,7 @@ const _hazardMat = new THREE.MeshBasicMaterial({ map: getHazardStripeTexture() }
 function makeHazardBase() {
   const mesh = new THREE.Mesh(_hazardGeo, _hazardMat);
   mesh.position.y = HAZARD_H / 2;
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
   return mesh;
-}
-
-// ── Contact shadow — soft blob under each placed 3D model ──────────────────────
-// Fakes grounding without real shadow maps: a transparent radial-gradient plane
-// parented to the model so it inherits its position/rotation/scale for free.
-let _contactShadowTex = null;
-function getContactShadowTexture() {
-  if (_contactShadowTex) return _contactShadowTex;
-  const size = 128;
-  const canvas = document.createElement('canvas');
-  canvas.width = size; canvas.height = size;
-  const ctx = canvas.getContext('2d');
-  const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  grad.addColorStop(0,   'rgba(0,0,0,0.28)');
-  grad.addColorStop(0.6, 'rgba(0,0,0,0.12)');
-  grad.addColorStop(1,   'rgba(0,0,0,0)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, size, size);
-  _contactShadowTex = new THREE.CanvasTexture(canvas);
-  return _contactShadowTex;
-}
-const _contactShadowGeo = new THREE.PlaneGeometry(1, 1);
-let _contactShadowMat = null;
-function getContactShadowMaterial() {
-  if (_contactShadowMat) return _contactShadowMat;
-  _contactShadowMat = new THREE.MeshBasicMaterial({
-    map: getContactShadowTexture(), transparent: true, depthWrite: false,
-  });
-  return _contactShadowMat;
-}
-function addContactShadow(obj) {
-  const bbox = new THREE.Box3().setFromObject(obj);
-  const size = new THREE.Vector3(); bbox.getSize(size);
-  const center = new THREE.Vector3(); bbox.getCenter(center);
-  const footprintW = Math.max(size.x, 0.4) * 1.15;
-  const footprintD = Math.max(size.z, 0.4) * 1.15;
-
-  const shadow = new THREE.Mesh(_contactShadowGeo, getContactShadowMaterial());
-  shadow.renderOrder = -1;
-
-  obj.updateMatrixWorld(true);
-  const worldPos    = new THREE.Vector3(center.x, bbox.min.y + 0.015, center.z);
-  const worldQuat   = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
-  const parentQuat  = obj.getWorldQuaternion(new THREE.Quaternion());
-  const worldScale  = obj.getWorldScale(new THREE.Vector3());
-
-  shadow.position.copy(obj.worldToLocal(worldPos));
-  shadow.quaternion.copy(parentQuat.invert().multiply(worldQuat));
-  shadow.scale.set(footprintW / worldScale.x, footprintD / worldScale.z, 1);
-
-  obj.add(shadow);
-  obj.userData.contactShadow = shadow;
-}
-
-// Fast path for the layout-restore loop: when the caller already knows the
-// object's world center/floor-Y/footprint (from the cached placement-geo
-// lookup in applyRecord), skip the Box3().setFromObject() traversal entirely
-// instead of re-measuring geometry that's already been measured for this
-// model/scale/rotation combo.
-function addContactShadowFast(obj, { centerX, centerZ, minY, footprintW, footprintD }) {
-  const w = Math.max(footprintW, 0.4) * 1.15;
-  const d = Math.max(footprintD, 0.4) * 1.15;
-
-  const shadow = new THREE.Mesh(_contactShadowGeo, getContactShadowMaterial());
-  shadow.renderOrder = -1;
-
-  obj.updateMatrixWorld(true);
-  const worldPos    = new THREE.Vector3(centerX, minY + 0.015, centerZ);
-  const worldQuat   = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
-  const parentQuat  = obj.getWorldQuaternion(new THREE.Quaternion());
-  const worldScale  = obj.getWorldScale(new THREE.Vector3());
-
-  shadow.position.copy(obj.worldToLocal(worldPos));
-  shadow.quaternion.copy(parentQuat.invert().multiply(worldQuat));
-  shadow.scale.set(w / worldScale.x, d / worldScale.z, 1);
-
-  obj.add(shadow);
-  obj.userData.contactShadow = shadow;
 }
 
 // ── Shared floor texture — baked concrete speckle + soft AO vignette ───────────
@@ -504,11 +422,6 @@ function getFloorTexture() {
     ctx.quadraticCurveTo(cx, cy, x1, y1);
     ctx.stroke();
   }
-  const vignette = ctx.createRadialGradient(size / 2, size / 2, size * 0.25, size / 2, size / 2, size * 0.72);
-  vignette.addColorStop(0, 'rgba(0,0,0,0)');
-  vignette.addColorStop(1, 'rgba(0,0,0,0.05)');
-  ctx.fillStyle = vignette;
-  ctx.fillRect(0, 0, size, size);
   _floorTex = new THREE.CanvasTexture(canvas);
   return _floorTex;
 }
@@ -590,7 +503,6 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     );
     floor.position.set(cellCX, 0.06, cellCZ);
     floor.userData.stationId = stnId;
-    floor.receiveShadow = true;
     group.add(floor);
 
     // Green center path strip running through middle of this station
@@ -798,11 +710,6 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     // Guard against 0×0 when tab is hidden — ResizeObserver will correct once visible
     renderer.setSize(Math.max(1, canvas.clientWidth), Math.max(1, canvas.clientHeight));
     renderer.setClearColor(0xf0f2f5);
-    // Shadows scoped to the sun light only — structure + floor cast/receive,
-    // placed models don't (they already have cheap contact-shadow blobs),
-    // which keeps the shadow-map cost from scaling with station count.
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     rendererRef.current = renderer;
 
     // Try to reuse a previously-built scene for this exact layout instead of
@@ -838,19 +745,6 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       camera.position.set(c.x, span * 0.8, c.z + span * 0.9);
       camera.lookAt(c.x, 0, c.z);
 
-      // The shadow map render target is tied to the WebGL context of the
-      // renderer that created it — and that renderer got disposed when we
-      // left this layout. Reusing the stale render target with a brand new
-      // renderer/context is what renders shadow-receiving surfaces (floor,
-      // beams) solid black. Clearing it forces the new renderer to build a
-      // fresh one on the next frame, exactly like a first-time build would.
-      scene.traverse(obj => {
-        if (obj.isDirectionalLight && obj.shadow && obj.shadow.map) {
-          obj.shadow.map.dispose();
-          obj.shadow.map = null;
-        }
-      });
-
       onObjectsChange([...placedRef.current]);
     } else {
       scene = new THREE.Scene();
@@ -862,19 +756,12 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 300);
       cameraRef.current = camera;
 
-      // More ambient / less directional than before — keeps shadows visible
-      // (for grounding/depth) without them going dark enough to read as a
-      // stain on the floor color.
       scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-      // "Sun" — the one shadow-casting light. Shadow camera frustum is sized to
-      // the actual layout span further down, once we know how big the scene is.
+      // "Sun" — no shadow casting, just directional highlight/modeling light.
       const dir = new THREE.DirectionalLight(0xffffff, 0.85);
       dir.position.set(20, 40, 25); scene.add(dir);
-      dir.castShadow = true;
-      dir.shadow.mapSize.set(1024, 1024);
-      dir.shadow.bias = -0.0015;
       scene.add(dir.target);
-      // Fill light from opposite side to reduce harsh shadows — does not cast shadows
+      // Fill light from opposite side to soften the sun's highlight
       const fill = new THREE.DirectionalLight(0xdce8ff, 0.4);
       fill.position.set(-20, 10, -20); scene.add(fill);
       scene.add(new THREE.GridHelper(200, 100, 0xb0bec5, 0xdde1e7));
@@ -955,19 +842,10 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         camera.position.set(0, 20, 30); camera.lookAt(0, 0, 0);
       }
 
-      // Fit the sun's shadow-camera frustum to the actual layout size — a fixed
-      // frustum would either waste shadow-map resolution on a small layout or
-      // clip shadows on a large one.
       const sunDist = sunSpan * 1.2;
       dir.position.set(sunCX + sunDist * 0.5, sunDist * 0.9, sunCZ + sunDist * 0.4);
       dir.target.position.set(sunCX, 0, sunCZ);
       dir.target.updateMatrixWorld();
-      const shadowHalf = sunSpan * 0.75;
-      Object.assign(dir.shadow.camera, {
-        left: -shadowHalf, right: shadowHalf, top: shadowHalf, bottom: -shadowHalf,
-        near: 1, far: sunDist * 2.5,
-      });
-      dir.shadow.camera.updateProjectionMatrix();
     }
 
     const orbit = new OrbitControls(camera, renderer.domElement);
@@ -1201,10 +1079,6 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         obj.userData.objName           = record.model_name;
         obj.userData.objExt            = record.model_name.split('.').pop() || 'glb';
         scene.add(obj);
-        addContactShadowFast(obj, {
-          centerX: targetX, centerZ: targetZ + geo.zOff, minY: finalY - floorY,
-          footprintW: geo.footprintW, footprintD: geo.footprintD,
-        });
         dirtyRef.current = true;
         const entry = {
           id: String(record.id), mesh: obj, label: null, name: record.model_name,
@@ -1636,7 +1510,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       obj.userData.objExt         = ext;
       obj.userData.assignedStation = options.stationId || null;
 
-      scene.add(obj); addContactShadow(obj); dirtyRef.current = true;
+      scene.add(obj); dirtyRef.current = true;
 
       const entry = { id: objId, mesh: obj, label: null, name, stationId: options.stationId || null, lineGroupId: options.lineGroupId || null };
       placedRef.current = [...placedRef.current, entry];
@@ -1976,7 +1850,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         obj.userData.assignedStation  = stationId;
         obj.userData.lineGroupId      = groupId;
 
-        scene.add(obj); addContactShadow(obj); dirtyRef.current = true;
+        scene.add(obj); dirtyRef.current = true;
         newEntries.push({
           id: obj.userData.objId, mesh: obj,
           label: null, name, stationId, lineGroupId: groupId,
