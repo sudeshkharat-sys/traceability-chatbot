@@ -307,23 +307,136 @@ function makeCantileverSign(stnId, ze, zeStatus) {
   return group;
 }
 
-// ── Shared glow-halo texture (radial gradient, white → transparent) ────────────
-// One canvas texture reused by every andon beacon — cheap, no per-instance cost.
-let _glowTex = null;
-function getGlowTexture() {
-  if (_glowTex) return _glowTex;
+// ── Shared brushed-steel texture for the structural frame ──────────────────────
+// Horizontal streak variation baked into one small texture, tiled — reads as
+// brushed metal instead of a flat plastic color, no extra material cost.
+let _steelTex = null;
+function getSteelTexture() {
+  if (_steelTex) return _steelTex;
+  const w = 32, h = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#546e7a';
+  ctx.fillRect(0, 0, w, h);
+  for (let y = 0; y < h; y++) {
+    const delta = (Math.random() - 0.5) * 40;
+    ctx.fillStyle = delta >= 0 ? `rgba(255,255,255,${delta / 255})` : `rgba(0,0,0,${-delta / 255})`;
+    ctx.fillRect(0, y, w, 1);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(1, 4);
+  _steelTex = tex;
+  return tex;
+}
+
+// ── Shared hazard-stripe texture + base sleeve for column feet ─────────────────
+// Classic yellow/black caution striping, baked once and tiled on a short box
+// mesh mounted at the base of every column — a cheap, instantly-readable
+// factory-floor safety cue.
+let _hazardTex = null;
+function getHazardStripeTexture() {
+  if (_hazardTex) return _hazardTex;
+  const size = 64;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#f5c400';
+  ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = '#1a1a1a';
+  ctx.save();
+  ctx.translate(size / 2, size / 2);
+  ctx.rotate(Math.PI / 4);
+  const stripeW = size / 4;
+  for (let x = -size * 1.5; x < size * 1.5; x += stripeW * 2) {
+    ctx.fillRect(x, -size * 1.5, stripeW, size * 3);
+  }
+  ctx.restore();
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(1, 1.5);
+  _hazardTex = tex;
+  return tex;
+}
+const HAZARD_H = 0.55;
+const _hazardGeo = new THREE.BoxGeometry(COL_W + 0.02, HAZARD_H, COL_W + 0.02);
+const _hazardMat = new THREE.MeshBasicMaterial({ map: getHazardStripeTexture() });
+function makeHazardBase() {
+  const mesh = new THREE.Mesh(_hazardGeo, _hazardMat);
+  mesh.position.y = HAZARD_H / 2;
+  return mesh;
+}
+
+// ── Overhead light fixture — hangs from the top beam above each station cell ───
+// Unlit bright lens + darker housing box: purely visual (no extra THREE.Light),
+// but reads as ceiling-mounted factory lighting so the ceiling isn't empty.
+const _fixtureHousingGeo = new THREE.BoxGeometry(1, 0.06, 0.34);
+const _fixtureHousingMat = new THREE.MeshBasicMaterial({ color: 0x455a64 });
+const _fixtureLensGeo    = new THREE.BoxGeometry(1, 0.03, 0.26);
+const _fixtureLensMat    = new THREE.MeshBasicMaterial({ color: 0xfffef2 });
+function makeLightFixture(width) {
+  const group = new THREE.Group();
+  const housing = new THREE.Mesh(_fixtureHousingGeo, _fixtureHousingMat);
+  housing.scale.x = width;
+  group.add(housing);
+  const lens = new THREE.Mesh(_fixtureLensGeo, _fixtureLensMat);
+  lens.scale.x = width;
+  lens.position.y = -0.045;
+  group.add(lens);
+  return group;
+}
+
+// ── Contact shadow — soft blob under each placed 3D model ──────────────────────
+// Fakes grounding without real shadow maps: a transparent radial-gradient plane
+// parented to the model so it inherits its position/rotation/scale for free.
+let _contactShadowTex = null;
+function getContactShadowTexture() {
+  if (_contactShadowTex) return _contactShadowTex;
   const size = 128;
   const canvas = document.createElement('canvas');
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d');
   const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
-  grad.addColorStop(0,    'rgba(255,255,255,0.9)');
-  grad.addColorStop(0.4,  'rgba(255,255,255,0.35)');
-  grad.addColorStop(1,    'rgba(255,255,255,0)');
+  grad.addColorStop(0,   'rgba(0,0,0,0.45)');
+  grad.addColorStop(0.6, 'rgba(0,0,0,0.20)');
+  grad.addColorStop(1,   'rgba(0,0,0,0)');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, size, size);
-  _glowTex = new THREE.CanvasTexture(canvas);
-  return _glowTex;
+  _contactShadowTex = new THREE.CanvasTexture(canvas);
+  return _contactShadowTex;
+}
+const _contactShadowGeo = new THREE.PlaneGeometry(1, 1);
+let _contactShadowMat = null;
+function getContactShadowMaterial() {
+  if (_contactShadowMat) return _contactShadowMat;
+  _contactShadowMat = new THREE.MeshBasicMaterial({
+    map: getContactShadowTexture(), transparent: true, depthWrite: false,
+  });
+  return _contactShadowMat;
+}
+function addContactShadow(obj) {
+  const bbox = new THREE.Box3().setFromObject(obj);
+  const size = new THREE.Vector3(); bbox.getSize(size);
+  const center = new THREE.Vector3(); bbox.getCenter(center);
+  const footprintW = Math.max(size.x, 0.4) * 1.15;
+  const footprintD = Math.max(size.z, 0.4) * 1.15;
+
+  const shadow = new THREE.Mesh(_contactShadowGeo, getContactShadowMaterial());
+  shadow.renderOrder = -1;
+
+  obj.updateMatrixWorld(true);
+  const worldPos    = new THREE.Vector3(center.x, bbox.min.y + 0.015, center.z);
+  const worldQuat   = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+  const parentQuat  = obj.getWorldQuaternion(new THREE.Quaternion());
+  const worldScale  = obj.getWorldScale(new THREE.Vector3());
+
+  shadow.position.copy(obj.worldToLocal(worldPos));
+  shadow.quaternion.copy(parentQuat.invert().multiply(worldQuat));
+  shadow.scale.set(footprintW / worldScale.x, footprintD / worldScale.z, 1);
+
+  obj.add(shadow);
+  obj.userData.contactShadow = shadow;
 }
 
 // ── Shared floor texture — baked concrete speckle + soft AO vignette ───────────
@@ -353,33 +466,6 @@ function getFloorTexture() {
   return _floorTex;
 }
 
-// ── Andon status beacon — glowing R/Y/G light above each station cell ──────────
-// Mimics the andon stack-lights used on real assembly lines. MeshBasicMaterial
-// is unlit (ignores scene lights) so the bulb always reads as "self-lit", and
-// the additive-blended halo sprite fakes a bloom glow with zero extra render cost.
-const _beaconGeo = new THREE.SphereGeometry(0.16, 8, 6);
-const _poleGeo   = new THREE.CylinderGeometry(0.03, 0.03, 0.35, 6);
-const _poleMat   = new THREE.MeshBasicMaterial({ color: 0x37474f });
-function makeAndonBeacon(hexColor) {
-  const group = new THREE.Group();
-
-  const bulb = new THREE.Mesh(_beaconGeo, new THREE.MeshBasicMaterial({ color: hexColor }));
-  group.add(bulb);
-
-  const halo = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: getGlowTexture(), color: hexColor, transparent: true,
-    blending: THREE.AdditiveBlending, depthWrite: false,
-  }));
-  halo.scale.set(0.9, 0.9, 1);
-  group.add(halo);
-
-  const pole = new THREE.Mesh(_poleGeo, _poleMat);
-  pole.position.y = -0.35 / 2 - 0.16;
-  group.add(pole);
-
-  return group;
-}
-
 // ── Station shell ──────────────────────────────────────────────────────────────
 function buildStationShell(box, statusMap, zeMap, scene) {
   const group   = new THREE.Group();
@@ -387,18 +473,21 @@ function buildStationShell(box, statusMap, zeMap, scene) {
   const totalW  = count * CELL_W;
   const originX = box._x3d ?? (box.position_x || 0) * SCALE;
   const originZ = box._z3d ?? (box.position_y || 0) * SCALE;
-  // Steel-look: dark blue-grey with specular highlight via Phong
+  // Steel-look: brushed-metal texture with specular highlight via Phong
   const structMat = new THREE.MeshPhongMaterial({
-    color: 0x546e7a, specular: 0x90a4ae, shininess: 60,
+    map: getSteelTexture(), specular: 0x90a4ae, shininess: 60,
   });
 
-  // ── 4 corner columns ──
+  // ── 4 corner columns (+ hazard-stripe base) ──
   [[originX, originZ], [originX + totalW, originZ],
    [originX, originZ + DEPTH], [originX + totalW, originZ + DEPTH]]
     .forEach(([cx, cz]) => {
       const col = makeIBeam(HEIGHT, structMat, 'vertical');
       col.position.set(cx, HEIGHT / 2, cz);
       group.add(col);
+      const hazard = makeHazardBase();
+      hazard.position.set(cx, 0, cz);
+      group.add(hazard);
     });
 
   // ── Middle columns on FRONT and BACK faces only (door-frame look) ──
@@ -409,6 +498,9 @@ function buildStationShell(box, statusMap, zeMap, scene) {
       const col = makeIBeam(HEIGHT, structMat, 'vertical');
       col.position.set(mx, HEIGHT / 2, cz);
       group.add(col);
+      const hazard = makeHazardBase();
+      hazard.position.set(mx, 0, cz);
+      group.add(hazard);
     });
   }
 
@@ -453,10 +545,10 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     floor.userData.stationId = stnId;
     group.add(floor);
 
-    // Andon status beacon above the cell — same R/Y/G colour as the station status
-    const beacon = makeAndonBeacon(color);
-    beacon.position.set(cellCX, HEIGHT + 0.55, cellCZ);
-    group.add(beacon);
+    // Overhead light fixture hanging from the top beam above this cell
+    const fixture = makeLightFixture(CELL_W * 0.7);
+    fixture.position.set(cellCX, HEIGHT - 0.1, cellCZ);
+    group.add(fixture);
 
     // Green center path strip running through middle of this station
     buildZebraCrossing(cellCX, originZ, group);
@@ -666,10 +758,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     const camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 300);
     cameraRef.current = camera;
 
-    // Hemisphere light — cheap sky/ground colour bounce (one extra light, no
-    // shadow or PBR cost), gives a more natural indoor-factory feel than flat ambient
-    scene.add(new THREE.HemisphereLight(0xdfe9ff, 0x54544a, 0.65));
-    scene.add(new THREE.AmbientLight(0xffffff, 0.30));
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
     const dir = new THREE.DirectionalLight(0xffffff, 1.1);
     dir.position.set(20, 40, 25); scene.add(dir);
     // Fill light from opposite side to reduce harsh shadows
@@ -1000,7 +1089,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           obj.userData.serverModelId     = record.id;
           obj.userData.objName           = record.model_name;
           obj.userData.objExt            = record.model_name.split('.').pop() || 'glb';
-          scene.add(obj); dirtyRef.current = true;
+          scene.add(obj); addContactShadow(obj); dirtyRef.current = true;
           const entry = {
             id: String(record.id), mesh: obj, label: null, name: record.model_name,
             stationId: record.station_id || null,
@@ -1282,7 +1371,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       obj.userData.objExt         = ext;
       obj.userData.assignedStation = options.stationId || null;
 
-      scene.add(obj); dirtyRef.current = true;
+      scene.add(obj); addContactShadow(obj); dirtyRef.current = true;
 
       const entry = { id: objId, mesh: obj, label: null, name, stationId: options.stationId || null, lineGroupId: options.lineGroupId || null };
       placedRef.current = [...placedRef.current, entry];
@@ -1615,7 +1704,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         obj.userData.assignedStation  = stationId;
         obj.userData.lineGroupId      = groupId;
 
-        scene.add(obj); dirtyRef.current = true;
+        scene.add(obj); addContactShadow(obj); dirtyRef.current = true;
         newEntries.push({
           id: obj.userData.objId, mesh: obj,
           label: null, name, stationId, lineGroupId: groupId,
