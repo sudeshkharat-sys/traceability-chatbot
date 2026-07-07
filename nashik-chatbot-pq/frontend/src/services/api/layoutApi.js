@@ -181,6 +181,12 @@ export const z3dModelApi = {
   getPlacementsByLineGroup: (lineGroupId) => api.get(`/3d-models/placements/by-line-group/${encodeURIComponent(lineGroupId)}`),
 
   createPlacement: ({ layoutId, modelName, lineGroupId, stationId, px, py, pz, rx, ry, rz, sx, sy, sz }) => {
+    // FormData.append() silently stringifies a missing value into the literal
+    // text "undefined"/"null", which then gets saved to the DB as if it were
+    // a real model name — fail loudly here instead of writing garbage data.
+    if (!modelName) {
+      return Promise.reject(new Error('createPlacement: modelName is required'));
+    }
     const fd = new FormData();
     fd.append('layout_id', layoutId);
     fd.append('model_name', modelName);

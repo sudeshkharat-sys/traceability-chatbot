@@ -61,17 +61,25 @@ function lineNamesMatch(a, b) {
   return false;
 }
 
+// A real model name, not missing/empty and not the literal string "undefined"
+// or "null" — FormData.append() silently stringifies a JS undefined/null
+// value passed to it into that exact text, so a genuinely-missing model_name
+// can end up stored as a real (garbage) 4-9 character string, not a falsy one.
+function isValidModelName(name) {
+  return !!name && name !== 'undefined' && name !== 'null';
+}
+
 // Module-level GLB template cache — keyed by model name (lowercase).
 // Once a model is loaded this session, subsequent layouts skip the download
 // entirely and clone directly from the cached Three.js scene.
 const _modelTemplateCache = new Map(); // name → THREE.Object3D
 
 function getCachedTemplate(name) {
-  if (!name) return null;
+  if (!isValidModelName(name)) return null;
   return _modelTemplateCache.get(name.toLowerCase()) || null;
 }
 function setCachedTemplate(name, template) {
-  if (!name) return;
+  if (!isValidModelName(name)) return;
   _modelTemplateCache.set(name.toLowerCase(), template);
 }
 
@@ -1019,6 +1027,10 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       // seed data resolves — not gated behind every other line finishing.
       const seedFromTemplate = (tmpl, lineGroupId) => {
         const modelName = tmpl.model_name;
+        // Don't propagate a broken template — copying an already-invalid
+        // model_name (e.g. the literal string "undefined") just creates more
+        // of the same garbage on the new line instead of fixing anything.
+        if (!isValidModelName(modelName)) return Promise.resolve([]);
         const sx = tmpl.sx ?? 1, sy = tmpl.sy ?? 1, sz = tmpl.sz ?? 1;
         const rx = tmpl.rx ?? 0, ry = tmpl.ry ?? 0, rz = tmpl.rz ?? 0;
         const py = tmpl.py ?? 0;
@@ -1156,8 +1168,8 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           // station look "already seeded", which permanently blocks the
           // auto-copy-from-another-layout feature from ever running for this
           // line. Removing it lets that line self-heal on the next page load.
-          if (!p.model_name) {
-            console.error('[Z3D] Removing placement with no model_name:', p);
+          if (!isValidModelName(p.model_name)) {
+            console.error('[Z3D] Removing placement with invalid model_name:', p);
             if (p.id) z3dModelApi.deletePlacement(p.id).catch(() => {});
             return;
           }
