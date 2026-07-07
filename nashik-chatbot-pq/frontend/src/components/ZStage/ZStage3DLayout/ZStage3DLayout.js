@@ -479,19 +479,20 @@ function getFloorTexture() {
   const canvas = document.createElement('canvas');
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d');
-  // Off-white base — most placed equipment models are grey, so a grey floor
-  // made everything blend together. A lighter, neutral floor keeps models
-  // visually distinct instead of camouflaging into the ground.
-  ctx.fillStyle = '#f0ede7';
+  // Warm sand/beige base — most placed equipment models are grey, and both
+  // the previous blue and off-white shades ended up reading too close to
+  // that grey on screen. A warm tan (common warehouse epoxy-floor color)
+  // gives clear hue contrast against grey models instead of blending in.
+  ctx.fillStyle = '#e8dcc8';
   ctx.fillRect(0, 0, size, size);
   for (let i = 0; i < 900; i++) {
     const x = Math.random() * size, y = Math.random() * size;
     const shade = Math.random() * 22 - 11;
-    ctx.fillStyle = `rgba(${240 + shade},${237 + shade},${231 + shade},0.4)`;
+    ctx.fillStyle = `rgba(${232 + shade},${220 + shade},${200 + shade},0.4)`;
     ctx.fillRect(x, y, 1.5, 1.5);
   }
-  // Soft warm-grey veining — a few faint curved strokes, not a repeating pattern
-  ctx.strokeStyle = 'rgba(200,195,185,0.2)';
+  // Soft warm-brown veining — a few faint curved strokes, not a repeating pattern
+  ctx.strokeStyle = 'rgba(180,155,120,0.22)';
   ctx.lineWidth = 1.5;
   for (let i = 0; i < 4; i++) {
     const x0 = Math.random() * size, y0 = Math.random() * size;
