@@ -1188,20 +1188,32 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           const cached = getCachedTemplate(modelName);
           if (cached) { onTemplate(cached); return; }
 
+          // A failed/hanging model must not freeze the loading overlay forever —
+          // count it toward loadedModels so the rest of the scene still becomes
+          // ready even if this one file is broken, missing, or blocked.
+          const onError = (err) => {
+            console.error('[Z3D] Model load failed:', modelName, err);
+            downloadFractions.delete(modelName);
+            loadedModels += 1;
+            reportProgress();
+            checkDone();
+          };
+
           try {
             if (ext === 'obj') {
-              new OBJLoader().load(downloadUrl, onTemplate, onDownloadProgress);
+              new OBJLoader().load(downloadUrl, onTemplate, onDownloadProgress, onError);
             } else if (ext === 'stl') {
               new STLLoader().load(downloadUrl, geo => {
                 geo.computeVertexNormals();
                 onTemplate(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x90a4ae })));
-              }, onDownloadProgress);
+              }, onDownloadProgress, onError);
             } else {
               // glb/gltf, or unrecognized extension — GLTFLoader is the common case
-              makeGLTFLoader().load(downloadUrl, g => onTemplate(g.scene), onDownloadProgress,
-                err => console.error('[Z3D] GLB reload failed:', modelName, err));
+              makeGLTFLoader().load(downloadUrl, g => onTemplate(g.scene), onDownloadProgress, onError);
             }
-          } catch {}
+          } catch (err) {
+            onError(err);
+          }
         });
       };
 
