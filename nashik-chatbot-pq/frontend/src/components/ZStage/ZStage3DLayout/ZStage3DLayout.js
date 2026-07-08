@@ -486,6 +486,31 @@ function makeHazardBase() {
   return mesh;
 }
 
+// One flat hazard-stripe segment used to build the line-perimeter border —
+// same diagonal yellow/black texture as the column-base stripe, but each
+// segment gets its own cloned texture so its repeat can be scaled to its own
+// length (the shared _hazardTex/_hazardMat repeat is tuned for the tiny
+// column base and would look wrong stretched across a long station edge).
+const BORDER_T = 0.12; // border ribbon thickness (footprint)
+const BORDER_H = 0.05; // border ribbon height above floor
+const _borderGeoCache = new Map(); // "alongX:length" -> BoxGeometry
+function makeHazardBorderSegment(length, alongX) {
+  const key = `${alongX}:${length}`;
+  let geo = _borderGeoCache.get(key);
+  if (!geo) {
+    geo = alongX
+      ? new THREE.BoxGeometry(length, BORDER_H, BORDER_T)
+      : new THREE.BoxGeometry(BORDER_T, BORDER_H, length);
+    _borderGeoCache.set(key, geo);
+  }
+  const tex = getHazardStripeTexture().clone();
+  tex.needsUpdate = true;
+  const period = 0.5; // world units per stripe repeat cycle
+  tex.repeat.set(Math.max(1, Math.round(length / period)), 1);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex }));
+  return mesh;
+}
+
 // ── Shared floor texture — baked concrete speckle + soft AO vignette ───────────
 // Faking ambient occlusion in the texture itself costs nothing at render time
 // (no shadow maps), and one texture instance is shared across every station floor.
@@ -663,16 +688,22 @@ function buildStationShell(box, statusMap, zeMap, scene, structStyle) {
     group.add(sign);
   }
 
-  // ── Blue border around the entire line (all stations in this box) ──
-  const by = 0.14;
-  const lineBoxGeo = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(originX,          by, originZ),
-    new THREE.Vector3(originX + totalW, by, originZ),
-    new THREE.Vector3(originX + totalW, by, originZ + DEPTH),
-    new THREE.Vector3(originX,          by, originZ + DEPTH),
-    new THREE.Vector3(originX,          by, originZ),
-  ]);
-  group.add(new THREE.Line(lineBoxGeo, new THREE.LineBasicMaterial({ color: 0x1976d2, linewidth: 2 })));
+  // ── Yellow/black hazard-stripe border around the entire line ──────────────────
+  // Same stripe treatment as the column-base safety markers, run around the
+  // whole line perimeter instead of a plain blue line.
+  const borderY = 0.03;
+  const frontBorder = makeHazardBorderSegment(totalW, true);
+  frontBorder.position.set(originX + totalW / 2, borderY, originZ);
+  group.add(frontBorder);
+  const backBorder = makeHazardBorderSegment(totalW, true);
+  backBorder.position.set(originX + totalW / 2, borderY, originZ + DEPTH);
+  group.add(backBorder);
+  const leftBorder = makeHazardBorderSegment(DEPTH, false);
+  leftBorder.position.set(originX, borderY, originZ + DEPTH / 2);
+  group.add(leftBorder);
+  const rightBorder = makeHazardBorderSegment(DEPTH, false);
+  rightBorder.position.set(originX + totalW, borderY, originZ + DEPTH / 2);
+  group.add(rightBorder);
 
   // ── Box name boards on outer face of end columns, hanging from top beam ──
   // White bg + navy text; top edge flush with top beam at HEIGHT
