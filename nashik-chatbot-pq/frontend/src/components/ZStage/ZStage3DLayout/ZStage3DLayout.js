@@ -490,28 +490,45 @@ function makeHazardBase() {
 // Faking ambient occlusion in the texture itself costs nothing at render time
 // (no shadow maps), and one texture instance is shared across every station floor.
 let _floorTex = null;
-function getFloorTexture() {
-  if (_floorTex) return _floorTex;
-  const size = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = size; canvas.height = size;
-  const ctx = canvas.getContext('2d');
+let _floorRoughTex = null;
+function buildFloorTextures() {
+  const size = 512; // doubled from 256 — floor tile covers a 6x6 unit area, low-res read blurry/flat up close
+  const colorCanvas = document.createElement('canvas');
+  colorCanvas.width = size; colorCanvas.height = size;
+  const ctx = colorCanvas.getContext('2d');
   // Warm sand/beige base — most placed equipment models are grey, and both
   // the previous blue and off-white shades ended up reading too close to
   // that grey on screen. A warm tan (common warehouse epoxy-floor color)
   // gives clear hue contrast against grey models instead of blending in.
   ctx.fillStyle = '#c9b48c';
   ctx.fillRect(0, 0, size, size);
-  for (let i = 0; i < 900; i++) {
+
+  // Roughness variation painted in parallel (dark = glossier/sealed epoxy,
+  // light = duller/worn) so the PBR material picks up real sheen variation
+  // instead of a uniform plastic-flat shine across the whole floor.
+  const roughCanvas = document.createElement('canvas');
+  roughCanvas.width = size; roughCanvas.height = size;
+  const rctx = roughCanvas.getContext('2d');
+  rctx.fillStyle = '#8c8c8c'; // mid roughness base
+  rctx.fillRect(0, 0, size, size);
+
+  // Two-tone aggregate speckle — darker flecks + lighter flecks, reads more
+  // like a real terrazzo/epoxy floor than single-tone noise.
+  const speckleCount = size * size * 0.014;
+  for (let i = 0; i < speckleCount; i++) {
     const x = Math.random() * size, y = Math.random() * size;
-    const shade = Math.random() * 22 - 11;
-    ctx.fillStyle = `rgba(${201 + shade},${180 + shade},${140 + shade},0.4)`;
-    ctx.fillRect(x, y, 1.5, 1.5);
+    const dark = Math.random() < 0.5;
+    const shade = (dark ? -1 : 1) * (10 + Math.random() * 16);
+    ctx.fillStyle = `rgba(${201 + shade},${180 + shade},${140 + shade},0.45)`;
+    const s = 1 + Math.random() * 2;
+    ctx.fillRect(x, y, s, s);
+    rctx.fillStyle = dark ? 'rgba(40,40,40,0.35)' : 'rgba(220,220,220,0.3)';
+    rctx.fillRect(x, y, s, s);
   }
   // Soft warm-brown veining — a few faint curved strokes, not a repeating pattern
   ctx.strokeStyle = 'rgba(150,125,90,0.25)';
-  ctx.lineWidth = 1.5;
-  for (let i = 0; i < 4; i++) {
+  ctx.lineWidth = 2.5;
+  for (let i = 0; i < 5; i++) {
     const x0 = Math.random() * size, y0 = Math.random() * size;
     const x1 = x0 + (Math.random() - 0.5) * size, y1 = y0 + (Math.random() - 0.5) * size;
     const cx = (x0 + x1) / 2 + (Math.random() - 0.5) * size * 0.4;
@@ -521,8 +538,31 @@ function getFloorTexture() {
     ctx.quadraticCurveTo(cx, cy, x1, y1);
     ctx.stroke();
   }
-  _floorTex = new THREE.CanvasTexture(canvas);
+
+  _floorTex = new THREE.CanvasTexture(colorCanvas);
+  _floorRoughTex = new THREE.CanvasTexture(roughCanvas);
+}
+function getFloorTexture() {
+  if (!_floorTex) buildFloorTextures();
   return _floorTex;
+}
+function getFloorRoughnessTexture() {
+  if (!_floorRoughTex) buildFloorTextures();
+  return _floorRoughTex;
+}
+let _floorMat = null;
+function getFloorMaterial() {
+  // PBR instead of Phong, same reasoning as the column/beam rework — Phong's
+  // fixed specular highlight reads as flat plastic. Floor isn't metal
+  // (metalness 0) but a sealed epoxy coating does pick up soft environment
+  // reflections, which is what roughness + scene.environment gives it.
+  if (!_floorMat) {
+    _floorMat = new THREE.MeshStandardMaterial({
+      map: getFloorTexture(), roughnessMap: getFloorRoughnessTexture(),
+      roughness: 0.6, metalness: 0,
+    });
+  }
+  return _floorMat;
 }
 
 // ── Station shell ──────────────────────────────────────────────────────────────
@@ -595,7 +635,7 @@ function buildStationShell(box, statusMap, zeMap, scene, structStyle) {
     const floorW = CELL_W - 0.05, floorD = DEPTH - 0.05;
     const floor  = new THREE.Mesh(
       new THREE.BoxGeometry(floorW, 0.12, floorD),
-      new THREE.MeshPhongMaterial({ map: getFloorTexture(), specular: 0x8fa0aa, shininess: 15 })
+      getFloorMaterial()
     );
     floor.position.set(cellCX, 0.06, cellCZ);
     floor.userData.stationId = stnId;
