@@ -402,8 +402,10 @@ let _steelStructMat = null;
 function getStructMaterial() {
   // Real metalness/roughness PBR instead of Phong — Phong's specular is a
   // fixed highlight color with no sense of reflectivity, which is why the
-  // beams read as flat plastic. Needs scene.environment (set up alongside
-  // the renderer) to actually show a metal-like reflection gradient.
+  // beams read as flat plastic. Needs an envMap (assigned alongside the
+  // renderer, directly on this material — not scene.environment, which
+  // would also dull every uploaded model's PBR material) to actually show
+  // a metal-like reflection gradient.
   if (!_steelStructMat) {
     _steelStructMat = new THREE.MeshStandardMaterial({ map: getSteelTexture(), metalness: 0.85, roughness: 0.4 });
   }
@@ -411,10 +413,10 @@ function getStructMaterial() {
 }
 
 // ── Lightweight procedural environment for PBR metal reflections ───────────────
-// A metalness/roughness material with no scene.environment has nothing to
-// reflect and renders almost black except for direct specular highlights —
-// this builds a tiny "room" (walls + a couple of bright panels) purely from
-// core THREE primitives, no external HDR asset, just enough variation for
+// A metalness/roughness material with no envMap has nothing to reflect and
+// renders almost black except for direct specular highlights — this builds
+// a tiny "room" (walls + a couple of bright panels) purely from core THREE
+// primitives, no external HDR asset, just enough variation for
 // PMREMGenerator to bake into a believable metal reflection.
 function buildEnvScene() {
   const envScene = new THREE.Scene();
@@ -563,7 +565,8 @@ function getFloorMaterial() {
   // PBR instead of Phong, same reasoning as the column/beam rework — Phong's
   // fixed specular highlight reads as flat plastic. Floor isn't metal
   // (metalness 0) but a sealed epoxy coating does pick up soft environment
-  // reflections, which is what roughness + scene.environment gives it.
+  // reflections, which is what roughness + an envMap (assigned directly on
+  // this material, see the renderer-setup effect) gives it.
   if (!_floorMat) {
     _floorMat = new THREE.MeshStandardMaterial({
       map: getFloorTexture(), roughnessMap: getFloorRoughnessTexture(),
@@ -1002,9 +1005,22 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     // baked it — same issue as the shadow-map dispose fix above. Regenerate
     // it against the current renderer every time (cheap, tiny scene) rather
     // than trusting a texture potentially baked by a since-disposed renderer.
-    if (scene.environment) scene.environment.dispose();
+    //
+    // Assigned directly to the structure/floor materials' .envMap instead of
+    // scene.environment — scene.environment applies to EVERY PBR material in
+    // the scene with no opt-out, which was silently dulling/greying out
+    // uploaded models (most GLB exports use MeshStandardMaterial too, so
+    // they picked up this same flat grey room reflection). Per-material
+    // envMap keeps the reflection scoped to only the meshes it was built for.
+    const structMatForEnv = getStructMaterial();
+    const floorMatForEnv  = getFloorMaterial();
+    if (structMatForEnv.envMap) structMatForEnv.envMap.dispose();
     const pmrem = new THREE.PMREMGenerator(renderer);
-    scene.environment = pmrem.fromScene(buildEnvScene(), 0.04).texture;
+    const envTex = pmrem.fromScene(buildEnvScene(), 0.04).texture;
+    structMatForEnv.envMap = envTex;
+    structMatForEnv.needsUpdate = true;
+    floorMatForEnv.envMap = envTex;
+    floorMatForEnv.needsUpdate = true;
     pmrem.dispose();
 
     const orbit = new OrbitControls(camera, renderer.domElement);
