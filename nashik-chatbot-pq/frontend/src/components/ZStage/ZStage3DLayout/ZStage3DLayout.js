@@ -197,6 +197,9 @@ function makeIBeam(length, mat, orientation) {
   else if (orientation === 'horizontal-x') geo = new THREE.BoxGeometry(length, COL_H, COL_W);
   else                                geo = new THREE.BoxGeometry(COL_W, COL_H, length);
   const mesh = new THREE.Mesh(geo, mat);
+  // Tagged so the column-style toggle can find and re-material every
+  // column/beam live without rebuilding the whole scene.
+  mesh.userData.isStructureMesh = true;
   return mesh;
 }
 
@@ -326,17 +329,16 @@ function makeCantileverSign(stnId, ze, zeStatus) {
   return group;
 }
 
-// ── Shared brushed-steel texture for the structural frame ──────────────────────
+// ── Shared streak texture generator for the structural frame ───────────────────
 // Horizontal streak variation baked into one small texture, tiled — reads as
 // brushed metal instead of a flat plastic color, no extra material cost.
-let _steelTex = null;
-function getSteelTexture() {
-  if (_steelTex) return _steelTex;
+// Reused for both the steel finish and the safety-yellow painted finish.
+function makeStreakTexture(baseColor) {
   const w = 32, h = 128;
   const canvas = document.createElement('canvas');
   canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#546e7a';
+  ctx.fillStyle = baseColor;
   ctx.fillRect(0, 0, w, h);
   for (let y = 0; y < h; y++) {
     const delta = (Math.random() - 0.5) * 40;
@@ -346,8 +348,31 @@ function getSteelTexture() {
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(1, 4);
-  _steelTex = tex;
   return tex;
+}
+let _steelTex = null;
+function getSteelTexture() {
+  if (!_steelTex) _steelTex = makeStreakTexture('#37474f'); // dark charcoal-graphite steel
+  return _steelTex;
+}
+let _safetyTex = null;
+function getSafetyTexture() {
+  if (!_safetyTex) _safetyTex = makeStreakTexture('#f5c400'); // safety yellow, matches hazard-base stripe
+  return _safetyTex;
+}
+let _steelStructMat = null;
+let _safetyStructMat = null;
+function getStructMaterial(style) {
+  if (style === 'safety') {
+    if (!_safetyStructMat) {
+      _safetyStructMat = new THREE.MeshPhongMaterial({ map: getSafetyTexture(), specular: 0x4a3c00, shininess: 35 });
+    }
+    return _safetyStructMat;
+  }
+  if (!_steelStructMat) {
+    _steelStructMat = new THREE.MeshPhongMaterial({ map: getSteelTexture(), specular: 0x90a4ae, shininess: 60 });
+  }
+  return _steelStructMat;
 }
 
 // ── Shared hazard-stripe texture + base sleeve for column feet ─────────────────
@@ -427,16 +452,13 @@ function getFloorTexture() {
 }
 
 // ── Station shell ──────────────────────────────────────────────────────────────
-function buildStationShell(box, statusMap, zeMap, scene) {
+function buildStationShell(box, statusMap, zeMap, scene, structStyle) {
   const group   = new THREE.Group();
   const count   = box.station_count || 1;
   const totalW  = count * CELL_W;
   const originX = box._x3d ?? (box.position_x || 0) * SCALE;
   const originZ = box._z3d ?? (box.position_y || 0) * SCALE;
-  // Steel-look: brushed-metal texture with specular highlight via Phong
-  const structMat = new THREE.MeshPhongMaterial({
-    map: getSteelTexture(), specular: 0x90a4ae, shininess: 60,
-  });
+  const structMat = getStructMaterial(structStyle);
 
   // ── 4 corner columns (+ hazard-stripe base) ──
   [[originX, originZ], [originX + totalW, originZ],
@@ -666,13 +688,26 @@ class WalkController {
 }
 
 // ── Three.js scene hook ────────────────────────────────────────────────────────
-function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, onObjectsChange, onConvertStart, onConvertEnd, onStationClick, isActive, onSceneReady, onModelProgress) {
+function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, onObjectsChange, onConvertStart, onConvertEnd, onStationClick, isActive, onSceneReady, onModelProgress, columnStyle) {
   // Keep latest statusMap/zeMap in refs so scene reads current values
   // without triggering a full scene rebuild on every API response
   const statusMapRef = useRef(statusMapProp);
   const zeMapRef     = useRef(zeMapProp);
   useEffect(() => { statusMapRef.current = statusMapProp; }, [statusMapProp]);
   useEffect(() => { zeMapRef.current     = zeMapProp;     }, [zeMapProp]);
+  // Column/beam style ('steel' | 'safety') — kept in a ref so a fresh scene
+  // build always picks up the latest choice, and also live-swaps materials
+  // on every already-built column/beam mesh so toggling doesn't need a
+  // full scene rebuild.
+  const columnStyleRef = useRef(columnStyle);
+  useEffect(() => {
+    columnStyleRef.current = columnStyle;
+    const scene = sceneRef.current;
+    if (!scene) return;
+    const mat = getStructMaterial(columnStyle);
+    scene.traverse(obj => { if (obj.isMesh && obj.userData.isStructureMesh) obj.material = mat; });
+    dirtyRef.current = true;
+  }, [columnStyle]); // eslint-disable-line
   const sceneRef       = useRef(null);
   const rendererRef    = useRef(null);
   const cameraRef      = useRef(null);
@@ -800,7 +835,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         _z3d: zMap[rowBand(b.position_y)] ?? 0,
       }));
 
-      layoutBoxes.forEach(box => buildStationShell(box, statusMapRef.current, zeMapRef.current, scene));
+      layoutBoxes.forEach(box => buildStationShell(box, statusMapRef.current, zeMapRef.current, scene, columnStyleRef.current));
 
       // Build station-position lookup for snap placement & animation waypoints
       const stationPosMap = {};
@@ -2028,6 +2063,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [statusMap, setStatusMap] = useState({});
   const [zeMap,     setZeMap]     = useState({});
   const [walkMode,  setWalkMode]  = useState(false);
+  const [columnStyle, setColumnStyle] = useState('steel'); // 'steel' | 'safety' — column/beam finish
   const [placedObjects, setPlacedObjects] = useState([]);
   const [selectedId,    setSelectedId]    = useState(null);
   const [transformMode, setTransformModeState] = useState('translate');
@@ -2209,7 +2245,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   }, []);
 
   const { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation } =
-    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady, handleModelProgress);
+    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady, handleModelProgress, columnStyle);
 
   const runPreset = useCallback((preset) => {
     // Resolve current object ID by name (objId changes after page refresh)
@@ -2392,6 +2428,16 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             {/* Walk mode */}
             <button type="button" className={`z3d-walk-btn${walkMode ? ' z3d-walk-btn--active' : ''}`} onClick={() => setWalkMode(v => !v)}>
               {walkMode ? '🧍 Exit Walk' : '🚶 Walk Mode'}
+            </button>
+
+            {/* Column/beam finish toggle — compare steel vs safety-yellow live */}
+            <button
+              type="button"
+              className="z3d-walk-btn"
+              title="Toggle column/beam finish"
+              onClick={() => setColumnStyle(s => (s === 'steel' ? 'safety' : 'steel'))}
+            >
+              {columnStyle === 'steel' ? '🔩 Steel Columns' : '🟨 Safety-Yellow Columns'}
             </button>
 
             {/* Play All / Stop All presets */}
