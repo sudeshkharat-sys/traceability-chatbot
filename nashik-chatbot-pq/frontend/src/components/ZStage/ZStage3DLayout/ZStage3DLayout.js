@@ -1626,6 +1626,12 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
 
       // Cache this template so other layouts can clone it without re-downloading
       setCachedTemplate(name, obj);
+      // Any OTHER layout's cached scene (layoutSceneCacheRef, below) may have
+      // already baked in the OLD version of this model — that fast-path
+      // reuse skips the whole download pipeline, so it would otherwise never
+      // notice this upload. Clear it so switching to another layout rebuilds
+      // and picks up the new file instead of showing stale meshes.
+      layoutSceneCacheRef.current.clear();
 
       // Strip any existing text/label children from the loaded model
       obj.traverse(child => {
@@ -1856,6 +1862,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     // next visit to this layout rebuilds fresh instead of showing a deleted
     // model back in the side list.
     layoutSceneCacheRef.current.delete(layoutIdRef.current);
+    dirtyRef.current = true;
   }, [onObjectsChange]);
 
   // Rename label by id
@@ -1872,6 +1879,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     scene.add(lbl);
     entry.label = lbl;
     onObjectsChange([...placedRef.current]);
+    dirtyRef.current = true;
   }, [onObjectsChange]);
 
   // Set uniform scale multiplier — if object is in a line group, applies to all group members.
@@ -1905,6 +1913,11 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       saveModelPreset(modelName, { scale: multiplier, rotX: 0, rotY: 0, rotZ: 0 });
       z3dModelApi.saveDefaults(modelName, { sx: multiplier, sy: multiplier, sz: multiplier, rx: 0, ry: 0, rz: 0 }).catch(() => {});
     }
+    // The render loop only redraws when this flag is set — without it, the
+    // mesh's scale changes internally but stays on screen until some
+    // unrelated interaction (e.g. clicking the canvas) happens to mark the
+    // scene dirty for another reason.
+    dirtyRef.current = true;
   }, []);
 
   // Set rotation (degrees) on a placed object — if in a line group, applies to all group members.
@@ -1942,6 +1955,9 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         rx, ry, rz,
       }).catch(() => {});
     }
+    // Same reasoning as setObjectScale — force a redraw instead of waiting
+    // for an unrelated interaction to mark the scene dirty.
+    dirtyRef.current = true;
   }, []);
 
   // Place one file at every station in the given stationIds array (line placement).
@@ -1970,6 +1986,9 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
 
       // Cache so other layouts (or reuse-from-library) skip the download
       setCachedTemplate(name, template);
+      // See the matching comment in placeObject — an already-cached OTHER
+      // layout's scene could still be showing the OLD version of this model.
+      layoutSceneCacheRef.current.clear();
 
       // Measure auto-scale from a clean template at origin
       template.position.set(0, 0, 0);

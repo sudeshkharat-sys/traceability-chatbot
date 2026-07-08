@@ -135,13 +135,16 @@ def download_library_model(name: str, connector: StateDBConnector = Depends(get_
     ext = rec.get("ext", "glb")
     mime = {"glb": "model/gltf-binary", "gltf": "model/gltf+json",
             "obj": "text/plain", "stl": "application/octet-stream"}.get(ext, "application/octet-stream")
-    # Library models rarely change after upload, so let the browser cache the
-    # file for a day instead of re-downloading it on every layout open.
-    # Starlette's FileResponse already sets ETag/Last-Modified from the file's
-    # mtime, so must-revalidate still catches a re-upload overwriting the same
-    # path once the day passes — this isn't a "cache forever and risk staleness"
-    # header, just a "don't hit the network every single time" one.
-    headers = {"Cache-Control": "public, max-age=86400, must-revalidate"}
+    # A model's download URL is keyed by NAME, not by file version — replacing
+    # the file (re-upload under the same name) does not change the URL. With
+    # max-age, the browser wouldn't even ask the server again for up to a day,
+    # so a replaced/compressed model could sit invisible for that whole window.
+    # no-cache forces a conditional GET (If-None-Match/If-Modified-Since) on
+    # every request instead: still cheap (a 304 with no body if unchanged,
+    # using the ETag/Last-Modified FileResponse already sets from the file's
+    # mtime) but always correct — a replacement is picked up on the very next
+    # request, not up to 24h later.
+    headers = {"Cache-Control": "no-cache, must-revalidate"}
     return FileResponse(path=fp, filename=f"{rec['name']}.{ext}", media_type=mime, headers=headers)
 
 
