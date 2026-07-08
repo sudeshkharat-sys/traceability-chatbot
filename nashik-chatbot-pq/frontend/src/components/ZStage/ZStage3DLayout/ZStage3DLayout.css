@@ -827,6 +827,9 @@
   font-size: 12px;
   color: #3fb950;
 }
+.z3d-library-notice--warning {
+  color: #d29922;
+}
 .z3d-library-or { color: #8b949e; }
 .z3d-library-divider {
   margin-top: 10px;
