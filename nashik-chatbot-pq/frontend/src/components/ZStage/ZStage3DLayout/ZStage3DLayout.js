@@ -185,18 +185,62 @@ function makeFloorLabel(text, width, fontSize = 36) {
 }
 
 // ── I-beam helper ──────────────────────────────────────────────────────────────
-// Solid rectangular column / beam — single filled box, no I-shape.
+// Real extruded I/H-beam profile (flanges + web) instead of a solid box — a
+// plain rectangular block reads as a placeholder, not structural steel.
 // "vertical"     — square post along Y
-// "horizontal-x" — rectangular bar along X
-// "horizontal-z" — rectangular bar along Z
+// "horizontal-x" — beam along X
+// "horizontal-z" — beam along Z
 const COL_W = 0.35;  // column / beam cross-section width
 const COL_H = 0.22;  // beam cross-section height (thinner for horizontal)
+
+// 12-point outline of a standard I/H profile, centered at origin, in the
+// shape's local XY plane. Extruded along local Z to make the beam's length.
+function buildIProfileShape(width, height) {
+  const flangeT = Math.min(height * 0.24, height / 2 - 0.01);
+  const webT    = Math.min(width * 0.34, width / 2 - 0.01);
+  const w2 = width / 2, h2 = height / 2, wt2 = webT / 2;
+  const shape = new THREE.Shape();
+  shape.moveTo(-w2, -h2);
+  shape.lineTo(w2, -h2);
+  shape.lineTo(w2, -h2 + flangeT);
+  shape.lineTo(wt2, -h2 + flangeT);
+  shape.lineTo(wt2, h2 - flangeT);
+  shape.lineTo(w2, h2 - flangeT);
+  shape.lineTo(w2, h2);
+  shape.lineTo(-w2, h2);
+  shape.lineTo(-w2, h2 - flangeT);
+  shape.lineTo(-wt2, h2 - flangeT);
+  shape.lineTo(-wt2, -h2 + flangeT);
+  shape.lineTo(-w2, -h2 + flangeT);
+  shape.closePath();
+  return shape;
+}
+function makeIBeamGeometry(width, height, length) {
+  const geo = new THREE.ExtrudeGeometry(buildIProfileShape(width, height), {
+    depth: length, bevelEnabled: false, curveSegments: 1,
+  });
+  // Extrude's default UV generator scales V by actual world-unit depth
+  // (not 0..1 like BoxGeometry) — normalize so the streak texture's repeat
+  // count stays consistent instead of getting finer on longer beams.
+  const uv = geo.getAttribute('uv');
+  for (let i = 0; i < uv.count; i++) uv.setY(i, uv.getY(i) / length);
+  uv.needsUpdate = true;
+  geo.translate(0, 0, -length / 2); // center along the extrusion (length) axis
+  return geo;
+}
 function makeIBeam(length, mat, orientation) {
-  let geo;
-  if (orientation === 'vertical')     geo = new THREE.BoxGeometry(COL_W, length, COL_W);
-  else if (orientation === 'horizontal-x') geo = new THREE.BoxGeometry(length, COL_H, COL_W);
-  else                                geo = new THREE.BoxGeometry(COL_W, COL_H, length);
+  let geo, rotX = 0, rotY = 0;
+  if (orientation === 'vertical') {
+    geo = makeIBeamGeometry(COL_W, COL_W, length);
+    rotX = -Math.PI / 2; // extrusion (local Z) axis -> world Y
+  } else if (orientation === 'horizontal-x') {
+    geo = makeIBeamGeometry(COL_W, COL_H, length);
+    rotY = -Math.PI / 2; // extrusion (local Z) axis -> world X
+  } else {
+    geo = makeIBeamGeometry(COL_W, COL_H, length); // extrusion axis already world Z
+  }
   const mesh = new THREE.Mesh(geo, mat);
+  mesh.rotation.set(rotX, rotY, 0);
   // Tagged so the column-style toggle can find and re-material every
   // column/beam live without rebuilding the whole scene.
   mesh.userData.isStructureMesh = true;
@@ -352,7 +396,10 @@ function makeStreakTexture(baseColor) {
 }
 let _steelTex = null;
 function getSteelTexture() {
-  if (!_steelTex) _steelTex = makeStreakTexture('#37474f'); // dark charcoal-graphite steel
+  // Neutral mill/galvanized-steel grey — dark charcoal read as flat black
+  // plastic once combined with the real I-beam profile; a mid grey lets the
+  // PBR metal shading actually show a highlight gradient.
+  if (!_steelTex) _steelTex = makeStreakTexture('#9aa1a6');
   return _steelTex;
 }
 let _safetyTex = null;
@@ -363,16 +410,43 @@ function getSafetyTexture() {
 let _steelStructMat = null;
 let _safetyStructMat = null;
 function getStructMaterial(style) {
+  // Real metalness/roughness PBR instead of Phong — Phong's specular is a
+  // fixed highlight color with no sense of reflectivity, which is why the
+  // beams read as flat plastic. Needs scene.environment (set up alongside
+  // the renderer) to actually show a metal-like reflection gradient.
   if (style === 'safety') {
+    // Painted steel — much less metallic than bare metal, semi-gloss.
     if (!_safetyStructMat) {
-      _safetyStructMat = new THREE.MeshPhongMaterial({ map: getSafetyTexture(), specular: 0x4a3c00, shininess: 35 });
+      _safetyStructMat = new THREE.MeshStandardMaterial({ map: getSafetyTexture(), metalness: 0.2, roughness: 0.55 });
     }
     return _safetyStructMat;
   }
   if (!_steelStructMat) {
-    _steelStructMat = new THREE.MeshPhongMaterial({ map: getSteelTexture(), specular: 0x90a4ae, shininess: 60 });
+    _steelStructMat = new THREE.MeshStandardMaterial({ map: getSteelTexture(), metalness: 0.85, roughness: 0.4 });
   }
   return _steelStructMat;
+}
+
+// ── Lightweight procedural environment for PBR metal reflections ───────────────
+// A metalness/roughness material with no scene.environment has nothing to
+// reflect and renders almost black except for direct specular highlights —
+// this builds a tiny "room" (walls + a couple of bright panels) purely from
+// core THREE primitives, no external HDR asset, just enough variation for
+// PMREMGenerator to bake into a believable metal reflection.
+function buildEnvScene() {
+  const envScene = new THREE.Scene();
+  const boxGeo = new THREE.BoxGeometry();
+  boxGeo.deleteAttribute('uv');
+  const room = new THREE.Mesh(boxGeo, new THREE.MeshStandardMaterial({ side: THREE.BackSide, color: 0x888888 }));
+  room.scale.set(20, 20, 20);
+  envScene.add(room);
+  const panel1 = new THREE.Mesh(boxGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }));
+  panel1.scale.set(4, 0.1, 1); panel1.position.set(-3, 6, -3);
+  envScene.add(panel1);
+  const panel2 = new THREE.Mesh(boxGeo, new THREE.MeshBasicMaterial({ color: 0xffe4b5 }));
+  panel2.scale.set(0.1, 4, 1); panel2.position.set(6, 2, -3);
+  envScene.add(panel2);
+  return envScene;
 }
 
 // ── Shared hazard-stripe texture + base sleeve for column feet ─────────────────
@@ -882,6 +956,15 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       dir.target.position.set(sunCX, 0, sunCZ);
       dir.target.updateMatrixWorld();
     }
+
+    // Environment map is tied to the WebGL context of the renderer that
+    // baked it — same issue as the shadow-map dispose fix above. Regenerate
+    // it against the current renderer every time (cheap, tiny scene) rather
+    // than trusting a texture potentially baked by a since-disposed renderer.
+    if (scene.environment) scene.environment.dispose();
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(buildEnvScene(), 0.04).texture;
+    pmrem.dispose();
 
     const orbit = new OrbitControls(camera, renderer.domElement);
     orbit.enableDamping = true; orbit.dampingFactor = 0.08;
