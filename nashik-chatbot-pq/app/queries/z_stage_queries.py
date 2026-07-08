@@ -556,14 +556,23 @@ class Z3DPlacementQueries:
         ORDER BY line_group_id
     """
 
-    # Latest placement records for a line group across ALL layouts.
-    # Returns one row per (model_name, station_id) from the most recently updated layout.
+    # Latest placement record for a line group across ALL layouts — one row
+    # per station_id, whichever model_name was most recently saved for it.
+    # BUG (fixed): previously grouped DISTINCT ON (model_name, station_id),
+    # which returns ONE ROW PER MODEL NAME per station instead of just the
+    # single latest one. If an old and a newly-replaced model both still had
+    # placement rows for the same station (e.g. old layouts never cleaned up
+    # after a rename-style replace), this returned BOTH, ordered
+    # alphabetically by model_name — NOT by recency — so callers taking the
+    # first result could silently pick the OLDER model instead of the newer
+    # one. Dropping model_name from DISTINCT ON/ORDER BY so recency
+    # (updated_at DESC) is what actually decides the winner.
     LIST_LATEST_BY_LINE_GROUP = f"""
-        SELECT DISTINCT ON (model_name, station_id)
+        SELECT DISTINCT ON (station_id)
             {PL_COLS}
         FROM z3d_layout_placements
         WHERE line_group_id = :line_group_id
-        ORDER BY model_name, station_id, updated_at DESC
+        ORDER BY station_id, updated_at DESC
     """
 
 # keep old name as alias so existing import doesn't break during transition
