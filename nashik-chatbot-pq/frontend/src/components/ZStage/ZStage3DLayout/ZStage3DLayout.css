@@ -274,6 +274,28 @@
 .z3d-view-btn:hover { background: #e8ecf0; color: #1a1a2e; }
 .z3d-view-btn:active { background: #dbeafe; color: #0969da; }
 
+.z3d-env-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #f6f8fa;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+.z3d-env-swatch {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(0,0,0,0.25);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.z3d-env-swatch:hover { transform: scale(1.15); }
+.z3d-env-swatch.active {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px #0969da;
+}
+
 .z3d-walk-btn {
   background: #f6f8fa;
   color: #1a1a2e;
@@ -560,6 +582,28 @@
 .z3d-view-btn:active {
   background: #1f4391;
   color: #58a6ff;
+}
+
+.z3d-env-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+.z3d-env-swatch {
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.25);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.z3d-env-swatch:hover { transform: scale(1.15); }
+.z3d-env-swatch.active {
+  box-shadow: 0 0 0 2px #161b22, 0 0 0 4px #58a6ff;
 }
 
 .z3d-walk-btn {

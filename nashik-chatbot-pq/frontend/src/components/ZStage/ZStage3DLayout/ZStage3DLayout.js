@@ -30,6 +30,62 @@ function getModelPreset(modelName) {
   return loadModelPresets()[modelName.toLowerCase().trim()] || null;
 }
 
+// ── Environment presets ────────────────────────────────────────────────────
+// Swatch-style background/lighting moods, like picking a render environment
+// in Revit/AutoCAD — no external HDR/asset downloads, just background color,
+// fog and light color/intensity, so switching is instant and offline-safe.
+const ENV_PRESETS = [
+  {
+    key: 'studio', label: 'Studio Grey', swatch: '#f0f2f5',
+    bg: 0xf0f2f5, fogNear: 80, fogFar: 250,
+    ambientColor: 0xffffff, ambientIntensity: 0.7,
+    sunColor: 0xffffff, sunIntensity: 0.85,
+    fillColor: 0xdce8ff, fillIntensity: 0.4,
+  },
+  {
+    key: 'warm', label: 'Warm Factory', swatch: '#e8dcc8',
+    bg: 0xe8dcc8, fogNear: 80, fogFar: 250,
+    ambientColor: 0xfff2df, ambientIntensity: 0.75,
+    sunColor: 0xfff1d6, sunIntensity: 0.9,
+    fillColor: 0xcfe0ff, fillIntensity: 0.35,
+  },
+  {
+    key: 'cool', label: 'Cool Warehouse', swatch: '#dfe6ec',
+    bg: 0xdfe6ec, fogNear: 80, fogFar: 250,
+    ambientColor: 0xdfe9ff, ambientIntensity: 0.65,
+    sunColor: 0xffffff, sunIntensity: 0.8,
+    fillColor: 0xb8c9e0, fillIntensity: 0.45,
+  },
+  {
+    key: 'outdoor', label: 'Outdoor Daylight', swatch: '#bfe0f5',
+    bg: 0xbfe0f5, fogNear: 100, fogFar: 300,
+    ambientColor: 0xffffff, ambientIntensity: 0.85,
+    sunColor: 0xfff6e0, sunIntensity: 1.1,
+    fillColor: 0xcfe8ff, fillIntensity: 0.5,
+  },
+  {
+    key: 'night', label: 'Night Mode', swatch: '#12151a',
+    bg: 0x12151a, fogNear: 60, fogFar: 200,
+    ambientColor: 0x8899aa, ambientIntensity: 0.35,
+    sunColor: 0x88aaff, sunIntensity: 0.5,
+    fillColor: 0x445566, fillIntensity: 0.25,
+  },
+];
+const DEFAULT_ENV_KEY = ENV_PRESETS[0].key;
+const ENV_PRESET_KEY_LS = 'z3d_env_preset_v1'; // layoutId → preset key
+function loadEnvPresetMap() {
+  try { return JSON.parse(localStorage.getItem(ENV_PRESET_KEY_LS) || '{}'); } catch { return {}; }
+}
+function getEnvPreset(layoutId) {
+  const key = loadEnvPresetMap()[layoutId];
+  return ENV_PRESETS.find(p => p.key === key) || ENV_PRESETS[0];
+}
+function saveEnvPreset(layoutId, key) {
+  const all = loadEnvPresetMap();
+  all[layoutId] = key;
+  localStorage.setItem(ENV_PRESET_KEY_LS, JSON.stringify(all));
+}
+
 // ── Line name fuzzy matcher ────────────────────────────────────────────────────
 // Handles variations like "Trim 1" / "Trim Line" / "trim", "U/B" / "Under Break Line"
 function _normLine(name) {
@@ -837,6 +893,10 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
   const orbitRef       = useRef(null);
   const walkRef        = useRef(null);
   const transformRef   = useRef(null);
+  const ambientLightRef = useRef(null);
+  const sunLightRef     = useRef(null);
+  const fillLightRef    = useRef(null);
+  const envPresetKeyRef = useRef(DEFAULT_ENV_KEY);
   const rafRef         = useRef(null);
   const placedRef      = useRef([]);   // [{ id, mesh, labelSprite, name, stationId }]
   const selectedRef    = useRef(null);
@@ -857,6 +917,43 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
   // change) — only the expensive scene *content* is what gets reused.
   const layoutSceneCacheRef = useRef(new Map()); // layoutId → { scene, signature, stationPosMap, center, span, placedEntries }
   useEffect(() => { walkModeRef.current = walkMode; }, [walkMode]);
+
+  // Applies a background/lighting preset to the live renderer + scene +
+  // lights. Pure state tweak — no geometry rebuild — so it's safe to call
+  // both once on scene mount and on-demand when the user picks a swatch.
+  const applyEnvPresetInternal = useCallback((key) => {
+    const preset  = ENV_PRESETS.find(p => p.key === key) || ENV_PRESETS[0];
+    const renderer = rendererRef.current;
+    const scene     = sceneRef.current;
+    if (!renderer || !scene) return;
+    renderer.setClearColor(preset.bg);
+    if (scene.fog) {
+      scene.fog.color.set(preset.bg);
+      scene.fog.near = preset.fogNear;
+      scene.fog.far  = preset.fogFar;
+    }
+    if (ambientLightRef.current) {
+      ambientLightRef.current.color.set(preset.ambientColor);
+      ambientLightRef.current.intensity = preset.ambientIntensity;
+    }
+    if (sunLightRef.current) {
+      sunLightRef.current.color.set(preset.sunColor);
+      sunLightRef.current.intensity = preset.sunIntensity;
+    }
+    if (fillLightRef.current) {
+      fillLightRef.current.color.set(preset.fillColor);
+      fillLightRef.current.intensity = preset.fillIntensity;
+    }
+    envPresetKeyRef.current = preset.key;
+    dirtyRef.current = true;
+  }, []);
+
+  // Public entry point — also persists the choice per-layout so it's
+  // remembered next time this layout is opened.
+  const setEnvironment = useCallback((key) => {
+    if (layoutIdRef.current != null) saveEnvPreset(layoutIdRef.current, key);
+    applyEnvPresetInternal(key);
+  }, [applyEnvPresetInternal]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -903,6 +1000,14 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       camera.position.set(c.x, span * 0.8, c.z + span * 0.9);
       camera.lookAt(c.x, 0, c.z);
 
+      // Lights live on the reused scene's userData (stashed when it was
+      // first built below) — grab them so environment-preset changes can
+      // still reach them without rebuilding the whole scene.
+      const cachedLights = scene.userData.lights || {};
+      ambientLightRef.current = cachedLights.ambient || null;
+      sunLightRef.current     = cachedLights.sun || null;
+      fillLightRef.current    = cachedLights.fill || null;
+
       onObjectsChange([...placedRef.current]);
     } else {
       scene = new THREE.Scene();
@@ -914,7 +1019,8 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 300);
       cameraRef.current = camera;
 
-      scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+      scene.add(ambientLight);
       // "Sun" — no shadow casting, just directional highlight/modeling light.
       const dir = new THREE.DirectionalLight(0xffffff, 0.85);
       dir.position.set(20, 40, 25); scene.add(dir);
@@ -923,6 +1029,13 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       const fill = new THREE.DirectionalLight(0xdce8ff, 0.4);
       fill.position.set(-20, 10, -20); scene.add(fill);
       scene.add(new THREE.GridHelper(200, 100, 0xb0bec5, 0xdde1e7));
+
+      ambientLightRef.current = ambientLight;
+      sunLightRef.current     = dir;
+      fillLightRef.current    = fill;
+      // Stashed on the scene itself so a later cache-reuse pass (the branch
+      // above) can find these same light instances instead of losing them.
+      scene.userData.lights = { ambient: ambientLight, sun: dir, fill };
 
       const boxes = layout.station_boxes || [];
 
@@ -1027,6 +1140,11 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     floorMatForEnv.envMap = envTex;
     floorMatForEnv.needsUpdate = true;
     pmrem.dispose();
+
+    // Apply whichever environment/background preset was last picked for this
+    // layout (defaults to Studio Grey) — same on a fresh build or a reused
+    // cached scene, since it only touches renderer/fog/light state, not geometry.
+    applyEnvPresetInternal(getEnvPreset(layout.id).key);
 
     const orbit = new OrbitControls(camera, renderer.domElement);
     orbit.enableDamping = true; orbit.dampingFactor = 0.08;
@@ -2194,7 +2312,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     return () => clearInterval(tid);
   }, []);
 
-  return { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation };
+  return { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, setEnvironment };
 }
 
 // ── Compute Z/E status per station from input records (mirrors ZStageDashboard logic) ──
@@ -2418,8 +2536,20 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setModelLoadCount({ loaded, total, completed });
   }, []);
 
-  const { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation } =
+  const { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, setEnvironment } =
     useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady, handleModelProgress);
+
+  // Environment/background swatch — remembered per layout (localStorage),
+  // re-read whenever the selected layout changes.
+  const [envKey, setEnvKey] = useState(DEFAULT_ENV_KEY);
+  useEffect(() => {
+    if (!selectedLayoutId) return;
+    setEnvKey(getEnvPreset(selectedLayoutId).key);
+  }, [selectedLayoutId]);
+  const handleEnvChange = useCallback((key) => {
+    setEnvKey(key);
+    setEnvironment(key);
+  }, [setEnvironment]);
 
   const runPreset = useCallback((preset) => {
     // Resolve current object ID by name (objId changes after page refresh)
@@ -2626,6 +2756,20 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             <div className="z3d-view-group">
               {['3D','Top','Front','Back','Left','Right'].map(v => (
                 <button key={v} type="button" className="z3d-view-btn" onClick={() => snapView(v.toLowerCase())}>{v}</button>
+              ))}
+            </div>
+
+            {/* Environment / background swatches */}
+            <div className="z3d-env-group" title="Environment">
+              {ENV_PRESETS.map(p => (
+                <button
+                  key={p.key}
+                  type="button"
+                  className={`z3d-env-swatch${envKey === p.key ? ' active' : ''}`}
+                  style={{ backgroundColor: p.swatch }}
+                  title={p.label}
+                  onClick={() => handleEnvChange(p.key)}
+                />
               ))}
             </div>
 
