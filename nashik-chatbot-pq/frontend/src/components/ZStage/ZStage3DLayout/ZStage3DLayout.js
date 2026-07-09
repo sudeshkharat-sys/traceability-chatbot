@@ -1416,36 +1416,35 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           lineGroupsAndLibrary.then(([lgRes, libRes]) => {
             const knownLineGroups = lgRes.data || [];
             const libraryModels = libRes.data || [];  // [{name, ext, ...}]
-            const matchedModel = libraryModels.find(m => lineNamesMatch(m.name, lineGroupId));
 
-            // Strategy 2: fuzzy match line name directly against library model
-            // names — handles station/free-mode uploads where line_group_id
-            // was never set, and also serves as the fallback below.
-            const trySeedFromLibrary = () => {
-              if (!matchedModel) return Promise.resolve([]);
-              return z3dModelApi.getPlacementsByModelName(matchedModel.name).then(r => {
-                const recs = r.data || [];
-                if (recs.length === 0) return [];
-                return seedFromTemplate(recs[0], lineGroupId);
-              }).catch(() => []);
-            };
+            // Gather EVERY plausible source instead of taking the first fuzzy
+            // match: every line_group_id in the DB that loosely resembles
+            // this line's name, plus every library model whose file name
+            // does. lineNamesMatch is a loose matcher (substrings,
+            // abbreviations) with no notion of "best" match, and
+            // knownLineGroups/libraryModels are NOT ordered by recency — so
+            // picking just the first match (old behavior) could silently
+            // grab a stale naming variant instead of the one that's actually
+            // current. Instead: fetch placements from every matching source,
+            // then pick the single most-recently-updated record across all
+            // of them — recency, not array order, decides the winner.
+            const matchingLineGroups = knownLineGroups.filter(kg => lineNamesMatch(kg, lineGroupId));
+            const matchingModels = libraryModels.filter(m => lineNamesMatch(m.name, lineGroupId));
 
-            // Strategy 1: fuzzy match against line_group_id values in DB. If
-            // this finds a line-group match but its placement turns out to be
-            // invalid/corrupt (seedFromTemplate returns nothing), fall through
-            // to Strategy 2 instead of giving up — the model may still exist
-            // cleanly in the library even if every placement referencing it
-            // for a similarly-named line is broken.
-            const matchedLineGroupId = knownLineGroups.find(kg => lineNamesMatch(kg, lineGroupId));
-            if (!matchedLineGroupId) return trySeedFromLibrary();
+            const lookups = [
+              ...matchingLineGroups.map(kg => z3dModelApi.getPlacementsByLineGroup(kg).then(r => r.data || []).catch(() => [])),
+              ...matchingModels.map(m => z3dModelApi.getPlacementsByModelName(m.name).then(r => r.data || []).catch(() => [])),
+            ];
+            if (lookups.length === 0) return Promise.resolve([]);
 
-            return z3dModelApi.getPlacementsByLineGroup(matchedLineGroupId).then(r => {
-              const recs = r.data || [];
-              if (recs.length === 0) return trySeedFromLibrary();
-              return seedFromTemplate(recs[0], lineGroupId).then(seeded =>
-                seeded.length > 0 ? seeded : trySeedFromLibrary()
-              );
-            }).catch(() => trySeedFromLibrary());
+            return Promise.all(lookups).then(resultsArr => {
+              const allRecs = resultsArr.flat();
+              if (allRecs.length === 0) return [];
+              const latest = allRecs.reduce((best, r) =>
+                (!best || new Date(r.updated_at) > new Date(best.updated_at)) ? r : best
+              , null);
+              return seedFromTemplate(latest, lineGroupId);
+            });
           }).then(newRecords => {
             batchesResolved += 1;
             if (newRecords.length > 0) loadAndPlace(newRecords);
