@@ -1128,9 +1128,16 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
 
       // For lines that have NO placements in this layout yet, auto-seed from
       // the most recently saved placement for that line in any other layout.
-      const placedLineGroups = new Set(placements.map(p => p.line_group_id).filter(Boolean));
+      // Only count placements with a real, loadable model_name here — an
+      // orphaned row (invalid model_name, e.g. left over from a bug in an
+      // earlier session) would otherwise mark the line as "already placed"
+      // forever, permanently blocking auto-seeding even though nothing
+      // actually renders for it (loadAndPlace below deletes those rows, but
+      // only AFTER this seeding decision has already been made this run).
+      const validPlacements = placements.filter(p => isValidModelName(p.model_name));
+      const placedLineGroups = new Set(validPlacements.map(p => p.line_group_id).filter(Boolean));
       // Also track which station IDs already have a placement (covers NULL line_group_id records)
-      const placedStationIds = new Set(placements.map(p => p.station_id).filter(Boolean));
+      const placedStationIds = new Set(validPlacements.map(p => p.station_id).filter(Boolean));
 
       const allLineGroups = (layout.station_boxes || []).map(b => b.name).filter(Boolean);
 
@@ -2250,6 +2257,10 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [libraryModels,     setLibraryModels]     = useState([]);   // global library list
   const [selectedLibraryModel, setSelectedLibraryModel] = useState(null); // reuse-from-library
   const [existingNameMatch, setExistingNameMatch] = useState(null); // library entry that the pending upload's name would overwrite
+  // Replace-confirmation popup — shown instead of uploading straight away when
+  // the picked name collides with an existing library model.
+  const [showReplaceModal,  setShowReplaceModal]  = useState(false);
+  const [replaceInfo,       setReplaceInfo]       = useState(null); // { file, name, existingMatch }
   // Per-object scale and rotation
   const [scaleVal,          setScaleVal]          = useState(1.0);
   const [rotX,              setRotX]              = useState(0);
@@ -2482,30 +2493,32 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     e.target.value = '';
   }, [shopList]);
 
-  const handleUploadConfirm = useCallback(() => {
-    // Helper to place after we have the file (real upload or blob fetched from library)
-    const doPlace = (file, name) => {
-      if (uploadMode === 'line' && uploadLine) {
-        const lineStations = stationList.filter(s => s.shop === uploadLine).map(s => s.id);
-        if (lineStations.length === 0) { alert(`No stations found for line "${uploadLine}".`); return; }
-        placeObjectForLine(file, name, selectedLayoutId, lineStations, uploadLine);
-      } else {
-        // Pass the shop/line as lineGroupId so cross-layout seeding can find this model
-        const opts = uploadMode === 'station' && uploadStation
-          ? { stationId: uploadStation, lineGroupId: uploadShop || null }
-          : {};
-        placeObject(file, name, selectedLayoutId, opts);
-      }
-      const _p = getModelPreset(name);
-      setShowObjPanel(true);
-      setScaleVal(_p ? (_p.scale || 1.0) : 1.0);
-      setRotX(_p ? (_p.rotX || 0) : 0);
-      setRotY(_p ? (_p.rotY || 0) : 0);
-      setRotZ(_p ? (_p.rotZ || 0) : 0);
-      setAnimFromStation(''); setAnimToStation(''); setAnimPlaying(false);
-      setShowUploadModal(false); setPendingFile(null); setSelectedLibraryModel(null); setExistingNameMatch(null);
-    };
+  // Places a file (real upload or blob fetched from the library) using
+  // whichever upload-mode tab (free / station / line) is currently selected.
+  // Shared by the normal upload path and both branches of the replace-confirm popup.
+  const doPlaceUpload = useCallback((file, name) => {
+    if (uploadMode === 'line' && uploadLine) {
+      const lineStations = stationList.filter(s => s.shop === uploadLine).map(s => s.id);
+      if (lineStations.length === 0) { alert(`No stations found for line "${uploadLine}".`); return; }
+      placeObjectForLine(file, name, selectedLayoutId, lineStations, uploadLine);
+    } else {
+      // Pass the shop/line as lineGroupId so cross-layout seeding can find this model
+      const opts = uploadMode === 'station' && uploadStation
+        ? { stationId: uploadStation, lineGroupId: uploadShop || null }
+        : {};
+      placeObject(file, name, selectedLayoutId, opts);
+    }
+    const _p = getModelPreset(name);
+    setShowObjPanel(true);
+    setScaleVal(_p ? (_p.scale || 1.0) : 1.0);
+    setRotX(_p ? (_p.rotX || 0) : 0);
+    setRotY(_p ? (_p.rotY || 0) : 0);
+    setRotZ(_p ? (_p.rotZ || 0) : 0);
+    setAnimFromStation(''); setAnimToStation(''); setAnimPlaying(false);
+    setShowUploadModal(false); setPendingFile(null); setSelectedLibraryModel(null); setExistingNameMatch(null);
+  }, [uploadMode, uploadStation, uploadLine, uploadShop, stationList, placeObject, placeObjectForLine, selectedLayoutId]);
 
+  const handleUploadConfirm = useCallback(() => {
     // Reuse an existing library model — if already cached this session, still need a
     // File blob for placeObject (it creates a blob URL internally), so fetch from server.
     // The template cache inside placeObject/placeObjectForLine will then skip re-parsing.
@@ -2517,7 +2530,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
         .then(r => { if (!r.ok) throw new Error('Download failed'); return r.blob(); })
         .then(blob => {
           const file = new File([blob], `${libName}.${ext}`, { type: blob.type || 'model/gltf-binary' });
-          doPlace(file, libName);
+          doPlaceUpload(file, libName);
         })
         .catch(err => alert('Failed to load library model: ' + err.message));
       return;
@@ -2525,19 +2538,41 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
 
     if (!pendingFile) return;
     const name = pendingFile.name.replace(/\.[^/.]+$/, '');
-    // Uploading under a name that already exists in the library silently
-    // replaces that model's file for every layout/line that references it —
-    // confirm before doing something that hard to notice.
-    if (existingNameMatch && existingNameMatch.name === name) {
-      const sizeNote = existingNameMatch.file_size ? ` (${formatFileSize(existingNameMatch.file_size)})` : '';
-      const ok = window.confirm(
-        `A model named "${name}"${sizeNote} already exists in the library.\n\n` +
-        `Uploading will replace it everywhere it's used. Continue?`
-      );
-      if (!ok) return;
+    // Uploading under a name that already exists in the library would silently
+    // replace that model's file for every layout/line that references it —
+    // ask which behaviour is wanted before doing something that hard to notice.
+    if (existingNameMatch && existingNameMatch.name.toLowerCase() === name.toLowerCase()) {
+      setReplaceInfo({ file: pendingFile, name, existingMatch: existingNameMatch });
+      setShowReplaceModal(true);
+      return;
     }
-    doPlace(pendingFile, name);
-  }, [pendingFile, selectedLibraryModel, existingNameMatch, uploadMode, uploadStation, uploadLine, stationList, placeObject, placeObjectForLine, selectedLayoutId]);
+    doPlaceUpload(pendingFile, name);
+  }, [pendingFile, selectedLibraryModel, existingNameMatch, doPlaceUpload]);
+
+  // "Yes" — overwrite the shared library file so every layout/line using this
+  // model name (old presets included, since presets are keyed by name) picks
+  // up the new file.
+  const confirmReplaceEverywhere = useCallback(() => {
+    if (!replaceInfo) return;
+    const { file, name } = replaceInfo;
+    setShowReplaceModal(false); setReplaceInfo(null);
+    doPlaceUpload(file, name);
+  }, [replaceInfo, doPlaceUpload]);
+
+  // "No" — keep the existing shared model untouched (every other layout keeps
+  // rendering the old file) and save the new upload under its own distinct
+  // library name so only the current placement uses it.
+  const confirmReplaceThisLayoutOnly = useCallback(() => {
+    if (!replaceInfo) return;
+    const { file, name } = replaceInfo;
+    setShowReplaceModal(false); setReplaceInfo(null);
+    const uniqueName = `${name}_${Date.now().toString(36)}`;
+    doPlaceUpload(file, uniqueName);
+  }, [replaceInfo, doPlaceUpload]);
+
+  const cancelReplaceModal = useCallback(() => {
+    setShowReplaceModal(false); setReplaceInfo(null);
+  }, []);
 
   const handleModeChange = useCallback((mode) => {
     setTransformModeState(mode);
@@ -3053,7 +3088,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
               <div className="z3d-modal-filename">{pendingFile?.name}</div>
             )}
             {!selectedLibraryModel && existingNameMatch &&
-              existingNameMatch.name === pendingFile?.name.replace(/\.[^/.]+$/, '') && (
+              existingNameMatch.name.toLowerCase() === pendingFile?.name.replace(/\.[^/.]+$/, '').toLowerCase() && (
               <div className="z3d-library-notice z3d-library-notice--warning">
                 ⚠ A model named "{existingNameMatch.name}"
                 {existingNameMatch.file_size ? ` (${formatFileSize(existingNameMatch.file_size)})` : ''} already
@@ -3146,6 +3181,30 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                 }
                 onClick={handleUploadConfirm}
               >{selectedLibraryModel ? 'Place' : 'Upload'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showReplaceModal && replaceInfo && (
+        <div className="z3d-modal-overlay" onClick={cancelReplaceModal}>
+          <div className="z3d-modal-box" onClick={e => e.stopPropagation()}>
+            <div className="z3d-modal-title">Replace "{replaceInfo.name}"?</div>
+            <div className="z3d-modal-hint">
+              A model named "{replaceInfo.name}"
+              {replaceInfo.existingMatch?.file_size ? ` (${formatFileSize(replaceInfo.existingMatch.file_size)})` : ''} already
+              exists in the library.
+            </div>
+            <div className="z3d-modal-hint" style={{ marginTop: 8 }}>
+              <strong>Replace all layouts</strong> — every layout/line currently using this model will
+              switch to the new file, keeping the same scale/rotation preset.<br />
+              <strong>Keep old layouts as-is</strong> — only this upload uses the new file; every other
+              layout keeps showing the old model untouched.
+            </div>
+            <div className="z3d-modal-actions">
+              <button type="button" className="z3d-modal-cancel" onClick={cancelReplaceModal}>Cancel</button>
+              <button type="button" className="z3d-modal-cancel" onClick={confirmReplaceThisLayoutOnly}>Keep old layouts as-is</button>
+              <button type="button" className="z3d-modal-confirm" onClick={confirmReplaceEverywhere}>Replace all layouts</button>
             </div>
           </div>
         </div>
