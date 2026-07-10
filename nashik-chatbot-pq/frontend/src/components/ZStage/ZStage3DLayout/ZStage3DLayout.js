@@ -1410,6 +1410,30 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       const totalBatches = 1 + unseededLines.length;
       const checkDone = () => {
         if (batchesResolved >= totalBatches && loadedModels >= totalModels) {
+          // Diagnostic: a placement can exist and be counted (shows up in the
+          // Objects panel) but render nowhere visible if its 3D position is
+          // wrong — e.g. two stations landing on the exact same coordinate
+          // (one hides behind/inside the other) or a station whose position
+          // fell back to a default like (0,0) because it wasn't found in
+          // this layout's station map at seed time. Logging every placed
+          // object's station + rounded position makes either case obvious
+          // at a glance instead of having to guess which one is "missing".
+          const posByStation = new Map();
+          const dupes = [];
+          placedRef.current.forEach(p => {
+            const x = Math.round(p.mesh.position.x * 10) / 10;
+            const z = Math.round(p.mesh.position.z * 10) / 10;
+            const key = `${x},${z}`;
+            if (posByStation.has(key)) dupes.push([posByStation.get(key), p.stationId, key]);
+            posByStation.set(key, p.stationId);
+          });
+          console.info(
+            `[Z3D] Scene ready: ${placedRef.current.length} object(s) placed.`,
+            placedRef.current.map(p => ({ station: p.stationId, name: p.name, x: Math.round(p.mesh.position.x * 10) / 10, z: Math.round(p.mesh.position.z * 10) / 10 }))
+          );
+          if (dupes.length > 0) {
+            console.warn(`[Z3D] Scene ready: ${dupes.length} pair(s) of objects share the exact same position (one is likely hidden behind/inside the other):`, dupes);
+          }
           // Cache this freshly-built scene so switching away and back to this
           // exact layout (same structure/Z-E signature) can skip straight to
           // reuse next time, instead of redoing this whole pipeline. Capped
