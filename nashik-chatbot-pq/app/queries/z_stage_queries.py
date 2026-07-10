@@ -548,12 +548,21 @@ class Z3DPlacementQueries:
     # casing of that name, not just the exact one currently on screen —
     # otherwise placements saved under a different-case variant silently
     # never get updated and keep showing stale values.
+    #
+    # DISTINCT ON must include layout_id, not just station_id: different
+    # layouts commonly reuse the same station_id (e.g. "Trim 1" line and
+    # "Trim Line" layout both place this model at station "ST01"). Deduping
+    # on station_id alone collapsed those into a single row — whichever
+    # layout was edited most recently "won" and got updated, while every
+    # other layout's placement at that same station_id was silently dropped
+    # from the result set and never received the new transform, so it kept
+    # showing the old (or default/untransformed) rotation and scale.
     LIST_LATEST_BY_MODEL_NAME = f"""
-        SELECT DISTINCT ON (station_id)
+        SELECT DISTINCT ON (layout_id, station_id)
             {PL_COLS}
         FROM z3d_layout_placements
         WHERE LOWER(model_name) = LOWER(:model_name)
-        ORDER BY station_id, updated_at DESC
+        ORDER BY layout_id, station_id, updated_at DESC
     """
 
     # All distinct line_group_ids that have at least one placement (any layout).
