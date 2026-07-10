@@ -1631,6 +1631,12 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       // notice this upload. Clear it so switching to another layout rebuilds
       // and picks up the new file instead of showing stale meshes.
       layoutSceneCacheRef.current.clear();
+      // _placementGeoCache is keyed by model_name+scale+rotation only, so a
+      // re-upload with the same name/scale/rotation but a different mesh
+      // (different bbox) would otherwise reuse the OLD file's autoScale /
+      // floorOffset / xOff / zOff — producing wrong scale/position (or the
+      // model landing outside its box, appearing empty) in any layout.
+      _placementGeoCache.clear();
 
       // Strip any existing text/label children from the loaded model
       obj.traverse(child => {
@@ -1988,6 +1994,9 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       // See the matching comment in placeObject — an already-cached OTHER
       // layout's scene could still be showing the OLD version of this model.
       layoutSceneCacheRef.current.clear();
+      // See the matching comment in placeObject — stale geometry offsets
+      // from the old file must not be reused for the new one.
+      _placementGeoCache.clear();
 
       // Measure auto-scale from a clean template at origin
       template.position.set(0, 0, 0);
