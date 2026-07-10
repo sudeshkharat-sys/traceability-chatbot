@@ -1590,18 +1590,33 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
             }
 
             return Promise.all(lookups).then(resultsArr => {
-              const allRecs = resultsArr.flat();
+              const allRecsRaw = resultsArr.flat();
+              // Drop candidates with a broken model_name (e.g. the literal
+              // string "undefined") BEFORE picking "latest" — otherwise one
+              // stray garbage row with a recent timestamp can permanently
+              // win the "most recently updated" contest over real, valid
+              // records, leaving the line seeded with nothing (or blocked
+              // entirely) even though good data exists among the candidates.
+              const brokenRecs = allRecsRaw.filter(r => !isValidModelName(r.model_name));
+              if (brokenRecs.length > 0) {
+                console.warn(
+                  `[Z3D] Auto-seed: ignoring ${brokenRecs.length} broken candidate record(s) for "${lineGroupId}" ` +
+                  `(model_name: ${[...new Set(brokenRecs.map(r => r.model_name))].join(', ')}) — deleting them.`
+                );
+                brokenRecs.forEach(r => { if (r.id) z3dModelApi.deletePlacement(r.id).catch(() => {}); });
+              }
+              const allRecs = allRecsRaw.filter(r => isValidModelName(r.model_name));
               if (allRecs.length === 0) {
                 console.warn(
                   `[Z3D] Auto-seed: matched ${matchingLineGroups.length} line group(s)/${matchingModels.length} ` +
-                  `library model(s) for "${lineGroupId}", but they returned 0 placement records.`
+                  `library model(s) for "${lineGroupId}", but they returned 0 usable placement records.`
                 );
                 return [];
               }
               const latest = allRecs.reduce((best, r) =>
                 (!best || new Date(r.updated_at) > new Date(best.updated_at)) ? r : best
               , null);
-              console.info(`[Z3D] Auto-seed: line "${lineGroupId}" seeded from model "${latest.model_name}" (${allRecs.length} candidate record(s)).`);
+              console.info(`[Z3D] Auto-seed: line "${lineGroupId}" seeded from model "${latest.model_name}" (${allRecs.length} usable candidate record(s), ${brokenRecs.length} broken skipped).`);
               return seedFromTemplate(latest, lineGroupId);
             });
           }).then(newRecords => {
