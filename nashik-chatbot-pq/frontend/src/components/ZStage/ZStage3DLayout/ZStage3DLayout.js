@@ -1279,11 +1279,17 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       //   1. Fetch what model + scale/rotation was used for that line in any other layout
       //   2. Place that model at EVERY station of that line in THIS layout
       //      using THIS layout's 3D positions (not the other layout's positions)
+      // Accumulate (push), don't overwrite — two boxes can legitimately share
+      // the exact same name (e.g. two boxes both named "Trim Line"). Keying
+      // by name with a plain assignment would let the second box's station
+      // IDs silently replace the first's, so only one of the two ever got
+      // auto-seeded. Merging into one array covers every box with that name.
       const localStationsByLine = {};
       (layout.station_boxes || []).forEach(box => {
         if (!box.name) return;
         const ids = (box.station_ids || '').split(',').map(s => s.trim()).filter(Boolean);
-        localStationsByLine[box.name] = ids;
+        if (!localStationsByLine[box.name]) localStationsByLine[box.name] = [];
+        localStationsByLine[box.name].push(...ids);
       });
 
       // Helper: given a template record + line name, place at all stations of
@@ -2321,7 +2327,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     return () => clearInterval(tid);
   }, []);
 
-  return { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, setEnvironment };
+  return { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, setEnvironment, previewEnvironment: applyEnvPresetInternal };
 }
 
 // ── Compute Z/E status per station from input records (mirrors ZStageDashboard logic) ──
@@ -2545,7 +2551,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setModelLoadCount({ loaded, total, completed });
   }, []);
 
-  const { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, setEnvironment } =
+  const { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, setEnvironment, previewEnvironment } =
     useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady, handleModelProgress);
 
   // Environment/background swatch — remembered per layout (localStorage),
@@ -2733,11 +2739,24 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     });
   }, [currentSelected, scaleVal, rotX, rotY, rotZ]);
 
+  // Clicking a swatch shows the change immediately (so you can see it before
+  // deciding anything) but doesn't save anywhere yet — only Cancel/Confirm
+  // in the popup decides whether it sticks, and where.
   const openEnvScopeConfirm = useCallback((key) => {
-    setScopeConfirm({ kind: 'environment', key });
-  }, []);
+    const prevKey = envKey;
+    previewEnvironment(key);
+    setEnvKey(key);
+    setScopeConfirm({ kind: 'environment', key, prevKey });
+  }, [envKey, previewEnvironment]);
 
-  const cancelScopeConfirm = useCallback(() => setScopeConfirm(null), []);
+  const cancelScopeConfirm = useCallback(() => {
+    if (scopeConfirm?.kind === 'environment') {
+      // Undo the preview — restore whatever was showing before the swatch was clicked.
+      previewEnvironment(scopeConfirm.prevKey);
+      setEnvKey(scopeConfirm.prevKey);
+    }
+    setScopeConfirm(null);
+  }, [scopeConfirm, previewEnvironment]);
 
   const confirmScopeThisLayout = useCallback(() => {
     if (!scopeConfirm) return;
@@ -2754,8 +2773,22 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     if (!scopeConfirm) return;
     if (scopeConfirm.kind === 'transform') {
       const { modelName, scale, rotX: rx, rotY: ry, rotZ: rz } = scopeConfirm;
+      // Sets the default for FUTURE placements/new layouts...
       saveModelPreset(modelName, { scale, rotX: rx, rotY: ry, rotZ: rz });
       z3dModelApi.saveDefaults(modelName, { sx: scale, sy: scale, sz: scale, rx, ry, rz }).catch(() => {});
+      // ...AND retroactively pushes the same scale/rotation onto every
+      // already-placed copy of this model in every other layout, so "All
+      // layouts" actually means all layouts — not just ones created later.
+      // Position (px/py/pz) is left as each placement's own value; only
+      // rotation/scale are shared across a model's copies.
+      z3dModelApi.getPlacementsByModelName(modelName).then(res => {
+        (res.data || []).forEach(p => {
+          z3dModelApi.updateTransform(p.id, {
+            px: p.px, py: p.py, pz: p.pz,
+            rx, ry, rz, sx: scale, sy: scale, sz: scale,
+          }).catch(() => {});
+        });
+      }).catch(() => {});
     } else if (scopeConfirm.kind === 'environment') {
       const { key } = scopeConfirm;
       setEnvKey(key);
