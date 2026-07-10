@@ -2216,9 +2216,14 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           ? entry.mesh.scale.x / entry.mesh.userData.baseScale
           : 1;
         saveModelPreset(modelName, { scale: currentScale, rotX: rx, rotY: ry, rotZ: rz });
+        // rx/ry/rz here are the slider's DEGREES (0-360) — the server/renderer
+        // expects radians (same convention as t.mesh.rotation, set above via
+        // `* Math.PI / 180`). Sending raw degrees as radians is what made
+        // "Save Preset -> All Layouts" show other layouts' copies wildly
+        // tilted, as if freshly uploaded with garbage rotation.
         z3dModelApi.saveDefaults(modelName, {
           sx: currentScale, sy: currentScale, sz: currentScale,
-          rx, ry, rz,
+          rx: (rx * Math.PI) / 180, ry: (ry * Math.PI) / 180, rz: (rz * Math.PI) / 180,
         }).catch(() => {});
       }
     }
@@ -2769,7 +2774,12 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
       const lib = res.data;
       if (lib) {
         const scale = lib.default_sx || 1;
-        saveModelPreset(modelName, { scale, rotX: lib.default_rx || 0, rotY: lib.default_ry || 0, rotZ: lib.default_rz || 0 });
+        // lib.default_rx/ry/rz are stored in RADIANS (same convention as
+        // every placement's rx/ry/rz); the local preset cache and the
+        // rotation sliders are in DEGREES — convert or the modal/slider
+        // shows a bogus angle and re-saves it back out just as wrong.
+        const toDeg = (r) => ((r || 0) * 180) / Math.PI;
+        saveModelPreset(modelName, { scale, rotX: toDeg(lib.default_rx), rotY: toDeg(lib.default_ry), rotZ: toDeg(lib.default_rz) });
         setExistingNameMatch(lib);
       }
     }).catch(() => {}); // not in library yet — that's fine
@@ -2923,9 +2933,17 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     if (!scopeConfirm) return;
     if (scopeConfirm.kind === 'transform') {
       const { modelName, scale, rotX: rx, rotY: ry, rotZ: rz } = scopeConfirm;
+      // rx/ry/rz are the slider's DEGREES (0-360) — every placement's stored
+      // rotation, and the renderer's obj.rotation.set(), are in RADIANS.
+      // The live per-layout drag handler (setGroupRotation) converts before
+      // saving; this "apply to all" push must do the same conversion or
+      // every OTHER layout's copy ends up with a huge bogus radian value
+      // (e.g. 90° sent as 90 rad), which renders as a wild, "tilted"
+      // rotation that looks like an untouched fresh upload.
+      const rxRad = (rx * Math.PI) / 180, ryRad = (ry * Math.PI) / 180, rzRad = (rz * Math.PI) / 180;
       // Sets the default for FUTURE placements/new layouts...
       saveModelPreset(modelName, { scale, rotX: rx, rotY: ry, rotZ: rz });
-      z3dModelApi.saveDefaults(modelName, { sx: scale, sy: scale, sz: scale, rx, ry, rz })
+      z3dModelApi.saveDefaults(modelName, { sx: scale, sy: scale, sz: scale, rx: rxRad, ry: ryRad, rz: rzRad })
         .catch(err => console.error('[Z3D] Save Preset: saveDefaults failed —', err?.response?.status, err?.response?.data || err?.message));
       // ...AND retroactively pushes the same scale/rotation onto every
       // already-placed copy of this model in every other layout, so "All
@@ -2938,7 +2956,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
         return Promise.all(rows.map(p =>
           z3dModelApi.updateTransform(p.id, {
             px: p.px, py: p.py, pz: p.pz,
-            rx, ry, rz, sx: scale, sy: scale, sz: scale,
+            rx: rxRad, ry: ryRad, rz: rzRad, sx: scale, sy: scale, sz: scale,
           }).then(
             () => ({ id: p.id, ok: true }),
             err => {
