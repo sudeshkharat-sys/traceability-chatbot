@@ -132,8 +132,8 @@ class FileScraper:
 
         if not directory.exists():
             logger.error(f"Directory does not exist: {directory}")
-            return 
-        
+            return stats
+
         files = []
         files.extend(directory.glob(f"*.Pdf"))
         files.extend(directory.glob(f"*.pdf"))

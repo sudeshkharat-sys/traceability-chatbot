@@ -56,6 +56,7 @@ COPY app/ ./app/
 COPY backend/ ./backend/
 COPY dataloader/ ./dataloader/
 COPY scripts/ ./scripts/
+COPY data_qlense/ ./data_qlense/
 
 # Copy frontend build from stage 1
 COPY --from=frontend-builder /app/frontend/build ./frontend/build
