@@ -540,11 +540,19 @@ class Z3DPlacementQueries:
 
     # Latest placements for a given model_name across all layouts (used as fallback
     # when line_group_id is NULL — match by model name instead of line group).
+    # Case-insensitive match — the library's name-uniqueness check turned
+    # out to be case-sensitive (ON CONFLICT (name), no LOWER()), so the same
+    # model could get uploaded under slightly different casing ("Trim Line"
+    # vs "trim line") and end up as two separate rows. A retroactive
+    # "apply to all layouts" push needs to catch every placement using any
+    # casing of that name, not just the exact one currently on screen —
+    # otherwise placements saved under a different-case variant silently
+    # never get updated and keep showing stale values.
     LIST_LATEST_BY_MODEL_NAME = f"""
         SELECT DISTINCT ON (station_id)
             {PL_COLS}
         FROM z3d_layout_placements
-        WHERE model_name = :model_name
+        WHERE LOWER(model_name) = LOWER(:model_name)
         ORDER BY station_id, updated_at DESC
     """
 

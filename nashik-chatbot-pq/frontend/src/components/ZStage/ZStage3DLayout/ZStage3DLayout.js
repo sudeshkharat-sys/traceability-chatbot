@@ -1472,7 +1472,14 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       // for each line as soon as ITS seed data resolves — no batch waits on
       // any other batch to start downloading.
       const loadAndPlace = (records) => {
-        const byName = new Map();
+        // Keyed by LOWERCASED model_name — the library's name-uniqueness
+        // check turned out to be case-sensitive, so "Trim Line" and
+        // "trim line" ended up as two separate rows/files in the database
+        // instead of one. Grouping by exact-case model_name here treated
+        // those as two different models: both got downloaded and placed,
+        // landing two objects on the exact same station (one hiding the
+        // other). Grouping case-insensitively merges them back into one.
+        const byName = new Map(); // lowercase name -> { modelName (first-seen casing), recs }
         records.forEach(p => {
           // A placement with no model_name has nothing to download — skip it
           // instead of crashing later trying to fetch/cache an undefined name.
@@ -1485,13 +1492,14 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
             if (p.id) z3dModelApi.deletePlacement(p.id).catch(() => {});
             return;
           }
-          if (!byName.has(p.model_name)) byName.set(p.model_name, []);
-          byName.get(p.model_name).push(p);
+          const key = p.model_name.toLowerCase();
+          if (!byName.has(key)) byName.set(key, { modelName: p.model_name, recs: [] });
+          byName.get(key).recs.push(p);
         });
         totalModels += byName.size;
         reportProgress();
 
-        byName.forEach((recs, modelName) => {
+        byName.forEach(({ modelName, recs }) => {
           const downloadUrl = z3dModelApi.getDownloadUrl(modelName);
           // Extension comes straight from the filename — avoids an extra
           // getLibraryModel round-trip per unique model before download starts.
@@ -2776,9 +2784,15 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   // up the new file.
   const confirmReplaceEverywhere = useCallback(() => {
     if (!replaceInfo) return;
-    const { file, name } = replaceInfo;
+    const { file, name, existingMatch } = replaceInfo;
     setShowReplaceModal(false); setReplaceInfo(null);
-    doPlaceUpload(file, name);
+    // Use the EXISTING library entry's exact casing, not whatever case the
+    // new file happened to be named — the library's name-uniqueness check
+    // is case-sensitive, so uploading "Trim Line" when the library already
+    // has "trim line" would otherwise create a brand-new second row/file
+    // instead of updating the one everything already points to, silently
+    // leaving old placements (and old layouts) referencing the old entry.
+    doPlaceUpload(file, existingMatch?.name || name);
   }, [replaceInfo, doPlaceUpload]);
 
   // "No" — keep the existing shared model untouched (every other layout keeps
