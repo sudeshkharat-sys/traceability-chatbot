@@ -152,6 +152,19 @@ function setCachedTemplate(name, template) {
 // (model, scale, rotation) combo instead of recomputing per station.
 const _placementGeoCache = new Map();
 
+// Bounding-box measurements are only valid for the geometry they were
+// measured from. A re-upload (same name, new file) changes the geometry
+// without changing scale/rotation, so the geoKey stays identical — evict
+// every cached entry for this model name whenever its template is
+// (re)loaded, or stale offsets get applied to the new mesh in other layouts.
+function invalidateGeoCache(name) {
+  if (!isValidModelName(name)) return;
+  const prefix = `${name}::`;
+  for (const key of _placementGeoCache.keys()) {
+    if (key.startsWith(prefix)) _placementGeoCache.delete(key);
+  }
+}
+
 // Single shared DRACOLoader — decoder is downloaded and initialised once,
 // then reused for every upload. Saves 1-3 s per upload vs creating a new one each time.
 const _sharedDraco = new DRACOLoader();
@@ -1355,8 +1368,15 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       // Places one loaded template at every record that shares its model_name.
       // Defined once outside the per-model-name loop since it doesn't close
       // over anything model-specific.
-      const applyRecord = (template, record, isFirst) => {
-        const obj = isFirst ? template : sharedClone(template);
+      const applyRecord = (template, record) => {
+        // Always clone — `template` is the same object held in the
+        // module-level _modelTemplateCache. Placing it directly would parent
+        // it into THIS scene; Object3D.add() silently detaches an object
+        // from its previous parent, so the next layout/session that reuses
+        // this cached template for its own placement would rip the mesh out
+        // of whichever scene currently shows it, leaving that station's box
+        // empty even though its entry survives.
+        const obj = sharedClone(template);
         obj.traverse(child => {
           if (child.isSprite || (child.material && child.material.map === null && child.isLine)) child.visible = false;
         });
@@ -1552,7 +1572,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
               renderedStations.add(r.station_id); // mark as handled
               return true;
             });
-            dedupedRecords.forEach((record, idx) => applyRecord(template, record, idx === 0));
+            dedupedRecords.forEach((record) => applyRecord(template, record));
             loadedModels += 1;
             reportProgress();
             checkDone();
@@ -1866,6 +1886,10 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       // notice this upload. Clear it so switching to another layout rebuilds
       // and picks up the new file instead of showing stale meshes.
       layoutSceneCacheRef.current.clear();
+      // A re-upload keeps the same scale/rotation, so the geo cache key is
+      // unchanged even though the geometry (and its bbox) is new — evict it
+      // too, or other layouts apply the OLD file's offsets to the NEW mesh.
+      invalidateGeoCache(name);
 
       // Strip any existing text/label children from the loaded model
       obj.traverse(child => {
@@ -2232,6 +2256,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       // See the matching comment in placeObject — an already-cached OTHER
       // layout's scene could still be showing the OLD version of this model.
       layoutSceneCacheRef.current.clear();
+      invalidateGeoCache(name);
 
       // Measure auto-scale from a clean template at origin
       template.position.set(0, 0, 0);
@@ -2275,8 +2300,13 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         if (!stnPos) return; // station not in this scene yet
 
         // Clone for every station — sharedClone shares geometry/material buffers
-        // so GPU memory stays ~1× instead of N× for a 70 MB model
-        const obj = idx === 0 ? template : sharedClone(template);
+        // so GPU memory stays ~1× instead of N× for a 70 MB model. Always
+        // clone (never place `template` itself): it's the same object held
+        // in _modelTemplateCache, and Object3D.add() silently detaches an
+        // object from its previous parent — placing the cached template
+        // directly would rip it out of whichever scene last displayed it
+        // the next time this line/model is loaded, leaving that station empty.
+        const obj = sharedClone(template);
 
         // Center model's bounding box visual center at station center (X/Z)
         obj.position.set(0, effectiveFloorY, 0);
