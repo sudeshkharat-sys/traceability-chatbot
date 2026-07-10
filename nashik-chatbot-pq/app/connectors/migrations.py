@@ -156,3 +156,53 @@ def run_index_migrations(session_factory) -> None:
     logger.info(
         f"Index migrations complete: {created} applied, {failed} skipped/failed"
     )
+
+
+# One-time data cleanup: a since-fixed bug in the Z-Stage 3D layout UI sent the
+# rotation sliders' raw DEGREES (0-360) straight into rx/ry/rz columns that are
+# supposed to hold RADIANS (same convention as THREE.Object3D.rotation and every
+# other rx/ry/rz in these tables). A legitimate radian value from that slider
+# can never exceed a full turn (2*pi ~= 6.2832), so any stored value bigger than
+# that in magnitude is unambiguously one of these leftover bad values — convert
+# it back by treating it as the degrees it always was. Idempotent: once fixed,
+# a value is a small radian and the WHERE clause no longer matches it, so this
+# is safe to run on every startup.
+DATA_MIGRATIONS = [
+    """
+    UPDATE z3d_layout_placements
+    SET rx = CASE WHEN ABS(rx) > 6.2832 THEN rx * 3.14159265358979 / 180 ELSE rx END,
+        ry = CASE WHEN ABS(ry) > 6.2832 THEN ry * 3.14159265358979 / 180 ELSE ry END,
+        rz = CASE WHEN ABS(rz) > 6.2832 THEN rz * 3.14159265358979 / 180 ELSE rz END
+    WHERE ABS(rx) > 6.2832 OR ABS(ry) > 6.2832 OR ABS(rz) > 6.2832
+    """,
+    """
+    UPDATE z3d_model_library
+    SET default_rx = CASE WHEN ABS(default_rx) > 6.2832 THEN default_rx * 3.14159265358979 / 180 ELSE default_rx END,
+        default_ry = CASE WHEN ABS(default_ry) > 6.2832 THEN default_ry * 3.14159265358979 / 180 ELSE default_ry END,
+        default_rz = CASE WHEN ABS(default_rz) > 6.2832 THEN default_rz * 3.14159265358979 / 180 ELSE default_rz END
+    WHERE ABS(default_rx) > 6.2832 OR ABS(default_ry) > 6.2832 OR ABS(default_rz) > 6.2832
+    """,
+]
+
+
+def run_data_migrations(session_factory) -> None:
+    """
+    Run one-time idempotent data-cleanup UPDATEs. Safe to run on every
+    startup — each statement's WHERE clause only matches rows still needing
+    the fix, so it's a no-op once the data is clean.
+    """
+    fixed_rows = 0
+    failed = 0
+    for sql in DATA_MIGRATIONS:
+        try:
+            with session_factory() as session:
+                result = session.execute(text(sql))
+                session.commit()
+                fixed_rows += result.rowcount or 0
+        except Exception as e:
+            logger.warning(f"Data migration skipped [{sql[:60].strip()}]: {e}")
+            failed += 1
+    if fixed_rows > 0:
+        logger.info(f"Data migrations complete: {fixed_rows} row(s) fixed, {failed} skipped/failed")
+    else:
+        logger.info(f"Data migrations complete: nothing to fix, {failed} skipped/failed")

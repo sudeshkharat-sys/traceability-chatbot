@@ -42,11 +42,12 @@ async def lifespan(app: FastAPI):
 
         # Run idempotent column + index migrations
         try:
-            from app.connectors.migrations import run_index_migrations, run_column_migrations
+            from app.connectors.migrations import run_index_migrations, run_column_migrations, run_data_migrations
             from app.connectors.state_db_connector import StateDBConnector
             _db = StateDBConnector()
             run_column_migrations(_db.get_session)
             run_index_migrations(_db.get_session)
+            run_data_migrations(_db.get_session)
         except Exception as _idx_err:
             logger.warning(f"Index migrations non-critical failure: {_idx_err}")
 

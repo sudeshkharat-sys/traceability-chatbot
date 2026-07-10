@@ -2232,12 +2232,19 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     dirtyRef.current = true;
   }, []);
 
-  // Place one file at every station in the given stationIds array (line placement).
+  // Place one file at every station in the given stationEntries array (line placement).
   // Loads the file once then deep-clones the resulting object per station — same
   // code path as placeObject so it's proven to work.
-  const placeObjectForLine = useCallback((file, name, layoutId, stationIds, lineName) => {
+  // stationEntries: [{ stationId, lineGroupId }] — lineGroupId is each STATION's
+  // own box name, which can differ from `lineName` (the line picked in the
+  // upload dropdown) when the upload was fanned out to fuzzy-matching sibling
+  // boxes ("Trim 1"/"Trim 2"/"Trim Line" etc. all count as one logical line
+  // for seeding, but each keeps its own box name as line_group_id in the DB —
+  // otherwise DELETE_BY_GROUP/getPlacementsByLineGroup for a sibling box's
+  // real name would no longer find rows created under the dropdown's name).
+  const placeObjectForLine = useCallback((file, name, layoutId, stationEntries, lineName) => {
     const scene = sceneRef.current;
-    if (!scene || !stationIds?.length) return;
+    if (!scene || !stationEntries?.length) return;
     const ext  = file.name.split('.').pop().toLowerCase();
     // Use line name as group ID so the same line across layouts shares the same key.
     // Fall back to a timestamp-based ID only if no line name is provided.
@@ -2300,7 +2307,9 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       const posMap = stationPosRef.current;
       const newEntries = [];
 
-      stationIds.forEach((stationId, idx) => {
+      stationEntries.forEach((se, idx) => {
+        const stationId = se.stationId;
+        const entryGroupId = se.lineGroupId || groupId;
         const stnPos = posMap[stationId];
         if (!stnPos) return; // station not in this scene yet
 
@@ -2325,19 +2334,19 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         obj.userData.objName          = name;
         obj.userData.objExt           = ext;
         obj.userData.assignedStation  = stationId;
-        obj.userData.lineGroupId      = groupId;
+        obj.userData.lineGroupId      = entryGroupId;
 
         scene.add(obj); dirtyRef.current = true;
         newEntries.push({
           id: obj.userData.objId, mesh: obj,
-          label: null, name, stationId, lineGroupId: groupId,
+          label: null, name, stationId, lineGroupId: entryGroupId,
         });
       });
 
       if (newEntries.length === 0) {
         alert(
           `Line Placement: no 3D positions found.\n` +
-          `Tried stations: ${stationIds.slice(0,5).join(', ')}${stationIds.length>5?'…':''}\n` +
+          `Tried stations: ${stationEntries.slice(0,5).map(se => se.stationId).join(', ')}${stationEntries.length>5?'…':''}\n` +
           `Scene has ${Object.keys(posMap).length} station(s) mapped.`
         );
         return;
@@ -2355,7 +2364,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           Promise.all(newEntries.map(entry =>
             z3dModelApi.createPlacement({
               layoutId, modelName: name,
-              lineGroupId: groupId, stationId: entry.stationId || null,
+              lineGroupId: entry.lineGroupId, stationId: entry.stationId || null,
               px: entry.mesh.position.x, py: entry.mesh.position.y, pz: entry.mesh.position.z,
               rx: entry.mesh.rotation.x, ry: entry.mesh.rotation.y, rz: entry.mesh.rotation.z,
               sx: entry.mesh.scale.x,    sy: entry.mesh.scale.y,    sz: entry.mesh.scale.z,
@@ -2797,7 +2806,16 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   // Shared by the normal upload path and both branches of the replace-confirm popup.
   const doPlaceUpload = useCallback((file, name) => {
     if (uploadMode === 'line' && uploadLine) {
-      const lineStations = stationList.filter(s => s.shop === uploadLine).map(s => s.id);
+      // Fan out to every box whose name fuzzy-matches the selected line
+      // ("Trim 1" / "Trim 2" / "Trim Line" all count as the same logical
+      // line per lineNamesMatch), not just boxes with a byte-identical
+      // name. Each station keeps its OWN box name as lineGroupId. Without
+      // this, only the exactly-matching box got filled immediately and the
+      // rest stayed empty until the next full layout reload happened to
+      // trigger the separate cross-layout auto-seed fallback.
+      const lineStations = stationList
+        .filter(s => s.shop === uploadLine || lineNamesMatch(s.shop, uploadLine))
+        .map(s => ({ stationId: s.id, lineGroupId: s.shop }));
       if (lineStations.length === 0) { alert(`No stations found for line "${uploadLine}".`); return; }
       placeObjectForLine(file, name, selectedLayoutId, lineStations, uploadLine);
     } else {
