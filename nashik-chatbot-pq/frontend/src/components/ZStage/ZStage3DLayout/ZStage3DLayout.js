@@ -1065,9 +1065,38 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         }
       });
 
+      // Within a row, boxes were placed left-to-right using their raw 2D
+      // position_x with no minimum-gap enforcement (unlike between rows,
+      // where MIN_GAP is already enforced above). Two boxes sitting at
+      // similar/identical position_x in the SAME row therefore could
+      // compute to the exact same 3D X — confirmed via a real report where
+      // two different boxes' stations landed on the identical (x, z)
+      // coordinate, hiding one model inside/behind the other. Fix: within
+      // each row, walk boxes left-to-right (by their original position_x,
+      // so relative order is preserved) and push any box whose raw X would
+      // overlap the previous box's footprint out past it + MIN_GAP.
+      const boxesByBand = {};
+      boxes.forEach(b => {
+        const band = rowBand(b.position_y);
+        if (!boxesByBand[band]) boxesByBand[band] = [];
+        boxesByBand[band].push(b);
+      });
+      const xById = new Map(); // box.id -> resolved _x3d
+      Object.values(boxesByBand).forEach(rowBoxes => {
+        const sorted = [...rowBoxes].sort((a, b) => (a.position_x || 0) - (b.position_x || 0));
+        let cursorX = null;
+        sorted.forEach(b => {
+          const rawX = (b.position_x || 0) * scaleX;
+          const width = (b.station_count || 1) * CELL_W;
+          const x = cursorX === null ? rawX : Math.max(rawX, cursorX);
+          xById.set(b.id, x);
+          cursorX = x + width + MIN_GAP;
+        });
+      });
+
       const layoutBoxes = boxes.map(b => ({
         ...b,
-        _x3d: (b.position_x || 0) * scaleX,
+        _x3d: xById.get(b.id) ?? (b.position_x || 0) * scaleX,
         _z3d: zMap[rowBand(b.position_y)] ?? 0,
       }));
 
