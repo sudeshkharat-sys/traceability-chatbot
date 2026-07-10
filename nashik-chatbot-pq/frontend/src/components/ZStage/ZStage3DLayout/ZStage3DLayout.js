@@ -2813,7 +2813,8 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
       const { modelName, scale, rotX: rx, rotY: ry, rotZ: rz } = scopeConfirm;
       // Sets the default for FUTURE placements/new layouts...
       saveModelPreset(modelName, { scale, rotX: rx, rotY: ry, rotZ: rz });
-      z3dModelApi.saveDefaults(modelName, { sx: scale, sy: scale, sz: scale, rx, ry, rz }).catch(() => {});
+      z3dModelApi.saveDefaults(modelName, { sx: scale, sy: scale, sz: scale, rx, ry, rz })
+        .catch(err => console.error('[Z3D] Save Preset: saveDefaults failed —', err?.response?.status, err?.response?.data || err?.message));
       // ...AND retroactively pushes the same scale/rotation onto every
       // already-placed copy of this model in every other layout, so "All
       // layouts" actually means all layouts — not just ones created later.
@@ -2821,20 +2822,33 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
       // rotation/scale are shared across a model's copies.
       z3dModelApi.getPlacementsByModelName(modelName).then(res => {
         const rows = res.data || [];
+        console.info(`[Z3D] Save Preset (All layouts): found ${rows.length} existing placement(s) of "${modelName}" to update.`);
         return Promise.all(rows.map(p =>
           z3dModelApi.updateTransform(p.id, {
             px: p.px, py: p.py, pz: p.pz,
             rx, ry, rz, sx: scale, sy: scale, sz: scale,
-          }).catch(() => {})
+          }).then(
+            () => ({ id: p.id, ok: true }),
+            err => {
+              console.error(`[Z3D] Save Preset: updateTransform failed for placement ${p.id} —`, err?.response?.status, err?.response?.data || err?.message);
+              return { id: p.id, ok: false };
+            }
+          )
         ));
-      }).then(() => {
+      }).then(results => {
+        const failed = results.filter(r => !r.ok);
+        if (failed.length > 0) {
+          console.error(`[Z3D] Save Preset (All layouts): ${failed.length} of ${results.length} placement(s) FAILED to update — see errors above. IDs:`, failed.map(f => f.id));
+        } else {
+          console.info(`[Z3D] Save Preset (All layouts): all ${results.length} placement(s) updated successfully.`);
+        }
         // Without this, switching back to a layout you edited moments ago
         // (or any other layout using this model) can show the OLD in-memory
         // scene from before this update — the retroactive fix landed in the
         // database, but the cached scene never got told to refresh, so it
         // looked like nothing happened (or reverted back to the old tilt).
         clearSceneCache();
-      }).catch(() => {});
+      }).catch(err => console.error('[Z3D] Save Preset (All layouts): getPlacementsByModelName failed —', err?.response?.status, err?.response?.data || err?.message));
     } else if (scopeConfirm.kind === 'environment') {
       const { key } = scopeConfirm;
       setEnvKey(key);
