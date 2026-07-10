@@ -1302,22 +1302,33 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         // model_name (e.g. the literal string "undefined") just creates more
         // of the same garbage on the new line instead of fixing anything.
         if (!isValidModelName(modelName)) return Promise.resolve([]);
-        const sx = tmpl.sx ?? 1, sy = tmpl.sy ?? 1, sz = tmpl.sz ?? 1;
-        const rx = tmpl.rx ?? 0, ry = tmpl.ry ?? 0, rz = tmpl.rz ?? 0;
-        const py = tmpl.py ?? 0;
         const lineStationIds = localStationsByLine[lineGroupId] || [];
         if (lineStationIds.length === 0) return Promise.resolve([]);
-        return Promise.all(lineStationIds.map(stationId => {
-          const pos = localPosMap[stationId] || { x: 0, z: 0 };
-          return z3dModelApi.createPlacement({
-            layoutId: layout.id, modelName, lineGroupId, stationId,
-            px: pos.x, py, pz: pos.z, rx, ry, rz, sx, sy, sz,
-          }).then(cr => ({
-            id: cr.data.id, layout_id: layout.id,
-            model_name: modelName, line_group_id: lineGroupId, station_id: stationId,
-            px: pos.x, py, pz: pos.z, rx, ry, rz, sx, sy, sz,
+        // Prefer the model's saved LIBRARY default scale/rotation (the one
+        // set via "Save Preset -> All layouts") over this specific
+        // placement row's own numbers. `tmpl` is just whichever single
+        // placement happened to have the most recent updated_at across every
+        // layout — a one-off drag/rotate on a lone station (never meant to
+        // be broadcast) would otherwise become "the latest" and get copied
+        // onto every brand-new empty line, tilt and all. The library default
+        // is the deliberate, confirmed value; fall back to tmpl's own
+        // numbers only if the model has no library entry yet.
+        return z3dModelApi.getLibraryModel(modelName).then(res => res.data).catch(() => null).then(lib => {
+          const sx = lib?.default_sx ?? tmpl.sx ?? 1, sy = lib?.default_sy ?? tmpl.sy ?? 1, sz = lib?.default_sz ?? tmpl.sz ?? 1;
+          const rx = lib?.default_rx ?? tmpl.rx ?? 0, ry = lib?.default_ry ?? tmpl.ry ?? 0, rz = lib?.default_rz ?? tmpl.rz ?? 0;
+          const py = tmpl.py ?? 0;
+          return Promise.all(lineStationIds.map(stationId => {
+            const pos = localPosMap[stationId] || { x: 0, z: 0 };
+            return z3dModelApi.createPlacement({
+              layoutId: layout.id, modelName, lineGroupId, stationId,
+              px: pos.x, py, pz: pos.z, rx, ry, rz, sx, sy, sz,
+            }).then(cr => ({
+              id: cr.data.id, layout_id: layout.id,
+              model_name: modelName, line_group_id: lineGroupId, station_id: stationId,
+              px: pos.x, py, pz: pos.z, rx, ry, rz, sx, sy, sz,
+            }));
           }));
-        }));
+        });
       };
 
       // Places one loaded template at every record that shares its model_name.
@@ -1574,14 +1585,31 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
               ...matchingLineGroups.map(kg => z3dModelApi.getPlacementsByLineGroup(kg).then(r => r.data || []).catch(() => [])),
               ...matchingModels.map(m => z3dModelApi.getPlacementsByModelName(m.name).then(r => r.data || []).catch(() => [])),
             ];
-            if (lookups.length === 0) return Promise.resolve([]);
+            if (lookups.length === 0) {
+              // Nothing to seed this line from — surface WHY in the console
+              // instead of silently leaving it blank, so a "why didn't this
+              // line get a model" report can be diagnosed from a screenshot
+              // of devtools instead of guessing blind.
+              console.warn(
+                `[Z3D] Auto-seed: no source found for line "${lineGroupId}". ` +
+                `Checked ${knownLineGroups.length} known line group(s) and ${libraryModels.length} library model(s), 0 matched.`
+              );
+              return Promise.resolve([]);
+            }
 
             return Promise.all(lookups).then(resultsArr => {
               const allRecs = resultsArr.flat();
-              if (allRecs.length === 0) return [];
+              if (allRecs.length === 0) {
+                console.warn(
+                  `[Z3D] Auto-seed: matched ${matchingLineGroups.length} line group(s)/${matchingModels.length} ` +
+                  `library model(s) for "${lineGroupId}", but they returned 0 placement records.`
+                );
+                return [];
+              }
               const latest = allRecs.reduce((best, r) =>
                 (!best || new Date(r.updated_at) > new Date(best.updated_at)) ? r : best
               , null);
+              console.info(`[Z3D] Auto-seed: line "${lineGroupId}" seeded from model "${latest.model_name}" (${allRecs.length} candidate record(s)).`);
               return seedFromTemplate(latest, lineGroupId);
             });
           }).then(newRecords => {
