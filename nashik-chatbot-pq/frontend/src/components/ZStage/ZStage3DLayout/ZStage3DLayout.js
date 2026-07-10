@@ -2813,8 +2813,22 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
       // this, only the exactly-matching box got filled immediately and the
       // rest stayed empty until the next full layout reload happened to
       // trigger the separate cross-layout auto-seed fallback.
+      //
+      // Guard: lineNamesMatch is deliberately loose (substring + abbreviation
+      // matching) so it can equate "Trim 1"/"Trim Line", but that looseness
+      // can also false-positive-match two genuinely unrelated lines that
+      // happen to share a word. Never blast this upload onto a station that
+      // already holds a DIFFERENT model — only fan out into stations that
+      // are empty or already show this same model. Otherwise an edit to one
+      // model could silently overwrite/rescale an unrelated model sitting in
+      // a fuzzy-matched-but-different box.
+      const modelAtStation = new Map(placedObjects.filter(o => o.stationId).map(o => [o.stationId, o.name]));
       const lineStations = stationList
         .filter(s => s.shop === uploadLine || lineNamesMatch(s.shop, uploadLine))
+        .filter(s => {
+          const existing = modelAtStation.get(s.id);
+          return !existing || existing === name;
+        })
         .map(s => ({ stationId: s.id, lineGroupId: s.shop }));
       if (lineStations.length === 0) { alert(`No stations found for line "${uploadLine}".`); return; }
       placeObjectForLine(file, name, selectedLayoutId, lineStations, uploadLine);
@@ -2833,7 +2847,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setRotZ(_p ? (_p.rotZ || 0) : 0);
     setAnimFromStation(''); setAnimToStation(''); setAnimPlaying(false);
     setShowUploadModal(false); setPendingFile(null); setSelectedLibraryModel(null); setExistingNameMatch(null);
-  }, [uploadMode, uploadStation, uploadLine, uploadShop, stationList, placeObject, placeObjectForLine, selectedLayoutId]);
+  }, [uploadMode, uploadStation, uploadLine, uploadShop, stationList, placeObject, placeObjectForLine, selectedLayoutId, placedObjects]);
 
   const handleUploadConfirm = useCallback(() => {
     // Reuse an existing library model — if already cached this session, still need a
