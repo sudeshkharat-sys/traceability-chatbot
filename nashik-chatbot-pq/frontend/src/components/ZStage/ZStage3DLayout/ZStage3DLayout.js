@@ -1244,65 +1244,57 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     z3dModelApi.listPlacements(layout.id).then(res => {
       const placements = res.data || [];
 
-      // For lines that have NO placements in this layout yet, auto-seed from
-      // the most recently saved placement for that line in any other layout.
-      // Only count placements with a real, loadable model_name here — an
-      // orphaned row (invalid model_name, e.g. left over from a bug in an
-      // earlier session) would otherwise mark the line as "already placed"
-      // forever, permanently blocking auto-seeding even though nothing
-      // actually renders for it (loadAndPlace below deletes those rows, but
-      // only AFTER this seeding decision has already been made this run).
+      // Auto-seed any station that has NO placement yet — per STATION, not
+      // per line. Only count placements with a real, loadable model_name
+      // here — an orphaned row (invalid model_name, e.g. left over from a
+      // bug in an earlier session) would otherwise mark the station as
+      // "already placed" forever, permanently blocking auto-seeding even
+      // though nothing actually renders for it (loadAndPlace below deletes
+      // those rows, but only AFTER this seeding decision has already been
+      // made this run).
       const validPlacements = placements.filter(p => isValidModelName(p.model_name));
-      const placedLineGroups = new Set(validPlacements.map(p => p.line_group_id).filter(Boolean));
-      // Also track which station IDs already have a placement (covers NULL line_group_id records)
       const placedStationIds = new Set(validPlacements.map(p => p.station_id).filter(Boolean));
-
-      const allLineGroups = (layout.station_boxes || []).map(b => b.name).filter(Boolean);
-
-      // A line is unseeded only if:
-      // 1. Its line_group_id is not in placedLineGroups, AND
-      // 2. None of its station IDs already have a placement in this layout
-      // This prevents duplicate seeding when old records have line_group_id = NULL
-      const unseededLines = allLineGroups.filter(lg => {
-        if (placedLineGroups.has(lg)) return false;
-        const lineStationIds = (layout.station_boxes || [])
-          .find(b => b.name === lg)
-          ?.station_ids?.split(',').map(s => s.trim()).filter(Boolean) || [];
-        return !lineStationIds.some(sid => placedStationIds.has(sid));
-      });
 
       // Build a local station-id → 3D-position map for THIS layout
       // (stationPosRef is already populated by the box-building loop above)
       const localPosMap = stationPosRef.current;
 
-      // For each line in the current layout that has no placements:
-      //   1. Fetch what model + scale/rotation was used for that line in any other layout
-      //   2. Place that model at EVERY station of that line in THIS layout
-      //      using THIS layout's 3D positions (not the other layout's positions)
+      // Per-line list of stations that still need a model. This used to be
+      // an all-or-nothing check per LINE — if even one station in a line
+      // already had ANY placement row (including a stale/broken leftover
+      // from earlier testing), the entire line was skipped, leaving its
+      // genuinely-empty siblings blank forever ("sometimes one station gets
+      // it, sometimes all, one stays empty" — that flakiness was exactly
+      // this: which stations happened to carry leftover rows varied between
+      // test runs). Now every station is judged independently.
       // Accumulate (push), don't overwrite — two boxes can legitimately share
       // the exact same name (e.g. two boxes both named "Trim Line"). Keying
       // by name with a plain assignment would let the second box's station
       // IDs silently replace the first's, so only one of the two ever got
       // auto-seeded. Merging into one array covers every box with that name.
-      const localStationsByLine = {};
+      const missingStationsByLine = {}; // lineGroupId -> [stationId, ...]
       (layout.station_boxes || []).forEach(box => {
         if (!box.name) return;
         const ids = (box.station_ids || '').split(',').map(s => s.trim()).filter(Boolean);
-        if (!localStationsByLine[box.name]) localStationsByLine[box.name] = [];
-        localStationsByLine[box.name].push(...ids);
+        const missing = ids.filter(sid => !placedStationIds.has(sid));
+        if (missing.length === 0) return;
+        if (!missingStationsByLine[box.name]) missingStationsByLine[box.name] = [];
+        missingStationsByLine[box.name].push(...missing);
       });
+      const unseededLines = Object.keys(missingStationsByLine);
 
-      // Helper: given a template record + line name, place at all stations of
-      // that line. Returns the new records instead of mutating a shared array,
-      // so each seeded line's models can start downloading the moment its own
-      // seed data resolves — not gated behind every other line finishing.
+      // Helper: given a template record + line name, place at every station
+      // of that line still missing one. Returns the new records instead of
+      // mutating a shared array, so each seeded line's models can start
+      // downloading the moment its own seed data resolves — not gated
+      // behind every other line finishing.
       const seedFromTemplate = (tmpl, lineGroupId) => {
         const modelName = tmpl.model_name;
         // Don't propagate a broken template — copying an already-invalid
         // model_name (e.g. the literal string "undefined") just creates more
         // of the same garbage on the new line instead of fixing anything.
         if (!isValidModelName(modelName)) return Promise.resolve([]);
-        const lineStationIds = localStationsByLine[lineGroupId] || [];
+        const lineStationIds = missingStationsByLine[lineGroupId] || [];
         if (lineStationIds.length === 0) return Promise.resolve([]);
         // Prefer the model's saved LIBRARY default scale/rotation (the one
         // set via "Save Preset -> All layouts") over this specific
