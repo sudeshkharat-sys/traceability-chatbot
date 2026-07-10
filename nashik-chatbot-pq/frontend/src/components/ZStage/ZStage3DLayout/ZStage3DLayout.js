@@ -2355,7 +2355,17 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     return () => clearInterval(tid);
   }, []);
 
-  return { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, setEnvironment, previewEnvironment: applyEnvPresetInternal };
+  // Drops every cached scene so the next visit to ANY layout re-fetches
+  // placements from the server instead of reusing stale in-memory meshes.
+  // Needed after any change that edits placement rows OUTSIDE this hook's
+  // own mutation functions (which already clear their own layout's cache
+  // entry) — e.g. a retroactive "apply to all layouts" bulk update that
+  // touches other layouts' rows directly via the API.
+  const clearSceneCache = useCallback(() => {
+    layoutSceneCacheRef.current.clear();
+  }, []);
+
+  return { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, setEnvironment, previewEnvironment: applyEnvPresetInternal, clearSceneCache };
 }
 
 // ── Compute Z/E status per station from input records (mirrors ZStageDashboard logic) ──
@@ -2579,7 +2589,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setModelLoadCount({ loaded, total, completed });
   }, []);
 
-  const { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, setEnvironment, previewEnvironment } =
+  const { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, setEnvironment, previewEnvironment, clearSceneCache } =
     useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady, handleModelProgress);
 
   // Environment/background swatch — remembered per layout (localStorage),
@@ -2810,12 +2820,20 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
       // Position (px/py/pz) is left as each placement's own value; only
       // rotation/scale are shared across a model's copies.
       z3dModelApi.getPlacementsByModelName(modelName).then(res => {
-        (res.data || []).forEach(p => {
+        const rows = res.data || [];
+        return Promise.all(rows.map(p =>
           z3dModelApi.updateTransform(p.id, {
             px: p.px, py: p.py, pz: p.pz,
             rx, ry, rz, sx: scale, sy: scale, sz: scale,
-          }).catch(() => {});
-        });
+          }).catch(() => {})
+        ));
+      }).then(() => {
+        // Without this, switching back to a layout you edited moments ago
+        // (or any other layout using this model) can show the OLD in-memory
+        // scene from before this update — the retroactive fix landed in the
+        // database, but the cached scene never got told to refresh, so it
+        // looked like nothing happened (or reverted back to the old tilt).
+        clearSceneCache();
       }).catch(() => {});
     } else if (scopeConfirm.kind === 'environment') {
       const { key } = scopeConfirm;
@@ -2824,7 +2842,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
       savedLayouts.forEach(l => { if (l.id !== selectedLayoutId) saveEnvPreset(l.id, key); });
     }
     setScopeConfirm(null);
-  }, [scopeConfirm, savedLayouts, selectedLayoutId, setEnvironment]);
+  }, [scopeConfirm, savedLayouts, selectedLayoutId, setEnvironment, clearSceneCache]);
 
   const handleModeChange = useCallback((mode) => {
     setTransformModeState(mode);
