@@ -824,10 +824,24 @@
 }
 .z3d-scale-reset:hover { background: #21262d; color: #e6edf3; }
 
+.z3d-save-preset-btn {
+  width: 100%;
+  margin-top: 8px;
+  padding: 6px 0;
+  border-radius: 5px;
+  border: 1px solid #30363d;
+  background: #21262d;
+  color: #e6edf3;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.z3d-save-preset-btn:hover { background: #30363d; }
+
 .z3d-autosave-notice {
-  margin-top: 4px;
+  margin-top: 6px;
   font-size: 11px;
-  color: #3fb950;
+  color: #8b949e;
   text-align: center;
   opacity: 0.8;
 }

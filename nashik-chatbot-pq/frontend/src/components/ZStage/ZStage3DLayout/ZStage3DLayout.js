@@ -2008,7 +2008,11 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
 
   // Set uniform scale multiplier — if object is in a line group, applies to all group members.
   // Auto-saves as default for the model name so other layouts inherit the same scale.
-  const setObjectScale = useCallback((id, multiplier) => {
+  // applyGlobally: false (default) — only this layout's placement(s) are
+  // updated, exactly like every other drag/edit. true is opt-in, only ever
+  // passed from the explicit "Save Preset" confirm popup — that's what
+  // pushes the value into the shared model default other layouts inherit.
+  const setObjectScale = useCallback((id, multiplier, applyGlobally = false) => {
     const entry = placedRef.current.find(p => p.id === id);
     if (!entry) return;
     const targets = entry.lineGroupId
@@ -2031,11 +2035,15 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         }).catch(() => {});
       }
     });
-    // Auto-save scale as default for this model so other layouts inherit it
-    const modelName = entry.mesh.userData.objName || entry.name;
-    if (modelName) {
-      saveModelPreset(modelName, { scale: multiplier, rotX: 0, rotY: 0, rotZ: 0 });
-      z3dModelApi.saveDefaults(modelName, { sx: multiplier, sy: multiplier, sz: multiplier, rx: 0, ry: 0, rz: 0 }).catch(() => {});
+    // Only pushed to the shared model default (which every OTHER layout's
+    // future placements/new-layout auto-seed inherit) when the user
+    // explicitly confirmed "All Layouts" in the save-scope popup.
+    if (applyGlobally) {
+      const modelName = entry.mesh.userData.objName || entry.name;
+      if (modelName) {
+        saveModelPreset(modelName, { scale: multiplier, rotX: 0, rotY: 0, rotZ: 0 });
+        z3dModelApi.saveDefaults(modelName, { sx: multiplier, sy: multiplier, sz: multiplier, rx: 0, ry: 0, rz: 0 }).catch(() => {});
+      }
     }
     // The render loop only redraws when this flag is set — without it, the
     // mesh's scale changes internally but stays on screen until some
@@ -2045,8 +2053,8 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
   }, []);
 
   // Set rotation (degrees) on a placed object — if in a line group, applies to all group members.
-  // Auto-saves as default for the model name so other layouts inherit the same rotation.
-  const setGroupRotation = useCallback((id, rx, ry, rz) => {
+  // applyGlobally: see setObjectScale above — same opt-in-only rule.
+  const setGroupRotation = useCallback((id, rx, ry, rz, applyGlobally = false) => {
     const entry = placedRef.current.find(p => p.id === id);
     if (!entry) return;
     const targets = entry.lineGroupId
@@ -2067,17 +2075,18 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         }).catch(() => {});
       }
     });
-    // Auto-save rotation as default for this model
-    const modelName = entry.mesh.userData.objName || entry.name;
-    if (modelName) {
-      const currentScale = entry.mesh.userData.baseScale
-        ? entry.mesh.scale.x / entry.mesh.userData.baseScale
-        : 1;
-      saveModelPreset(modelName, { scale: currentScale, rotX: rx, rotY: ry, rotZ: rz });
-      z3dModelApi.saveDefaults(modelName, {
-        sx: currentScale, sy: currentScale, sz: currentScale,
-        rx, ry, rz,
-      }).catch(() => {});
+    if (applyGlobally) {
+      const modelName = entry.mesh.userData.objName || entry.name;
+      if (modelName) {
+        const currentScale = entry.mesh.userData.baseScale
+          ? entry.mesh.scale.x / entry.mesh.userData.baseScale
+          : 1;
+        saveModelPreset(modelName, { scale: currentScale, rotX: rx, rotY: ry, rotZ: rz });
+        z3dModelApi.saveDefaults(modelName, {
+          sx: currentScale, sy: currentScale, sz: currentScale,
+          rx, ry, rz,
+        }).catch(() => {});
+      }
     }
     // Same reasoning as setObjectScale — force a redraw instead of waiting
     // for an unrelated interaction to mark the scene dirty.
@@ -2704,6 +2713,58 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setShowReplaceModal(false); setReplaceInfo(null);
   }, []);
 
+  const currentSelected = placedObjects.find(o => o.id === selectedId);
+
+  // ── Scope-confirm popup ─────────────────────────────────────────────────
+  // Same "this layout only, or every layout" question, reused for two things:
+  // saving a scale/rotation as the model's default, and picking an
+  // environment swatch. `pending` carries whatever the confirm/cancel
+  // handlers need: { kind: 'transform', modelName, scale, rotX, rotY, rotZ }
+  // or { kind: 'environment', key }.
+  const [scopeConfirm, setScopeConfirm] = useState(null);
+
+  const openSavePresetConfirm = useCallback(() => {
+    if (!currentSelected) return;
+    const modelName = currentSelected.mesh?.userData?.objName || currentSelected.name;
+    if (!modelName) return;
+    setScopeConfirm({
+      kind: 'transform', modelName,
+      scale: scaleVal, rotX, rotY, rotZ,
+    });
+  }, [currentSelected, scaleVal, rotX, rotY, rotZ]);
+
+  const openEnvScopeConfirm = useCallback((key) => {
+    setScopeConfirm({ kind: 'environment', key });
+  }, []);
+
+  const cancelScopeConfirm = useCallback(() => setScopeConfirm(null), []);
+
+  const confirmScopeThisLayout = useCallback(() => {
+    if (!scopeConfirm) return;
+    if (scopeConfirm.kind === 'transform') {
+      // Values are already live-saved to this layout's placement(s) as the
+      // user dragged the slider — nothing further to do.
+    } else if (scopeConfirm.kind === 'environment') {
+      handleEnvChange(scopeConfirm.key);
+    }
+    setScopeConfirm(null);
+  }, [scopeConfirm, handleEnvChange]);
+
+  const confirmScopeAllLayouts = useCallback(() => {
+    if (!scopeConfirm) return;
+    if (scopeConfirm.kind === 'transform') {
+      const { modelName, scale, rotX: rx, rotY: ry, rotZ: rz } = scopeConfirm;
+      saveModelPreset(modelName, { scale, rotX: rx, rotY: ry, rotZ: rz });
+      z3dModelApi.saveDefaults(modelName, { sx: scale, sy: scale, sz: scale, rx, ry, rz }).catch(() => {});
+    } else if (scopeConfirm.kind === 'environment') {
+      const { key } = scopeConfirm;
+      setEnvKey(key);
+      setEnvironment(key);
+      savedLayouts.forEach(l => { if (l.id !== selectedLayoutId) saveEnvPreset(l.id, key); });
+    }
+    setScopeConfirm(null);
+  }, [scopeConfirm, savedLayouts, selectedLayoutId, setEnvironment]);
+
   const handleModeChange = useCallback((mode) => {
     setTransformModeState(mode);
     setTransformMode(mode);
@@ -2734,8 +2795,6 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     if (!renameVal.trim() || !selectedId) return;
     renameById(selectedId, renameVal.trim());
   }, [renameVal, renameById, selectedId]);
-
-  const currentSelected = placedObjects.find(o => o.id === selectedId);
 
   return (
     <div className="z3d-root">
@@ -2768,7 +2827,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                   className={`z3d-env-swatch${envKey === p.key ? ' active' : ''}`}
                   style={{ backgroundColor: p.swatch }}
                   title={p.label}
-                  onClick={() => handleEnvChange(p.key)}
+                  onClick={() => openEnvScopeConfirm(p.key)}
                 />
               ))}
             </div>
@@ -3083,7 +3142,12 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                   title="Reset rotation"
                   onClick={() => { setRotX(0); setRotY(0); setRotZ(0); setGroupRotation(selectedId, 0, 0, 0); }}
                 >↺ Reset</button>
-                <div className="z3d-autosave-notice">✓ Scale &amp; rotation auto-saved as default</div>
+                <button
+                  type="button" className="z3d-save-preset-btn"
+                  title="Save this scale/rotation as the model's preset"
+                  onClick={openSavePresetConfirm}
+                >💾 Save Preset…</button>
+                <div className="z3d-autosave-notice">Changes apply to this layout only until you save a preset</div>
               </div>
             )}
 
@@ -3349,6 +3413,38 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
               <button type="button" className="z3d-modal-cancel" onClick={cancelReplaceModal}>Cancel</button>
               <button type="button" className="z3d-modal-cancel" onClick={confirmReplaceThisLayoutOnly}>Keep old layouts as-is</button>
               <button type="button" className="z3d-modal-confirm" onClick={confirmReplaceEverywhere}>Replace all layouts</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {scopeConfirm && (
+        <div className="z3d-modal-overlay" onClick={cancelScopeConfirm}>
+          <div className="z3d-modal-box" onClick={e => e.stopPropagation()}>
+            {scopeConfirm.kind === 'transform' ? (
+              <>
+                <div className="z3d-modal-title">Save preset for "{scopeConfirm.modelName}"?</div>
+                <div className="z3d-modal-hint">
+                  <strong>This layout only</strong> — keep this scale/rotation just for the copy you're
+                  editing now; every other layout keeps its own values.<br />
+                  <strong>All layouts</strong> — save this as the default for "{scopeConfirm.modelName}", so
+                  new placements and newly-created layouts use it too.
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="z3d-modal-title">Apply this environment everywhere?</div>
+                <div className="z3d-modal-hint">
+                  <strong>This layout only</strong> — just the layout you're viewing now switches to this
+                  background/lighting.<br />
+                  <strong>All layouts</strong> — every saved layout switches to it too.
+                </div>
+              </>
+            )}
+            <div className="z3d-modal-actions">
+              <button type="button" className="z3d-modal-cancel" onClick={cancelScopeConfirm}>Cancel</button>
+              <button type="button" className="z3d-modal-cancel" onClick={confirmScopeThisLayout}>This layout only</button>
+              <button type="button" className="z3d-modal-confirm" onClick={confirmScopeAllLayouts}>All layouts</button>
             </div>
           </div>
         </div>
