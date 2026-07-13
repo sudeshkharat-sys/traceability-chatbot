@@ -127,6 +127,22 @@ COLUMN_MIGRATIONS = [
     "ALTER TABLE z3d_model_library ADD COLUMN IF NOT EXISTS default_px FLOAT NOT NULL DEFAULT 0",
     "ALTER TABLE z3d_model_library ADD COLUMN IF NOT EXISTS default_py FLOAT NOT NULL DEFAULT 0",
     "ALTER TABLE z3d_model_library ADD COLUMN IF NOT EXISTS default_pz FLOAT NOT NULL DEFAULT 0",
+    # Fixup for an earlier, since-replaced version of this feature that created
+    # line_model_mappings as PER-LAYOUT (layout_id NOT NULL, preset_id NOT NULL
+    # FK to a now-removed z3d_model_presets table). CREATE TABLE IF NOT EXISTS
+    # below is a no-op against an existing table, so anyone who ran that
+    # earlier version would otherwise keep the old columns forever and every
+    # query against the new (global, model_name-based) schema would fail with
+    # a 500 — indexes must be dropped before the columns they cover, and all
+    # of this is a harmless no-op (relation/column doesn't exist) on a DB that
+    # never had the old version.
+    "DROP INDEX IF EXISTS idx_line_model_mappings_unique_car",
+    "DROP INDEX IF EXISTS idx_line_model_mappings_unique_nocar",
+    "DROP INDEX IF EXISTS idx_line_model_mappings_layout_id",
+    "ALTER TABLE line_model_mappings DROP COLUMN IF EXISTS layout_id",
+    "ALTER TABLE line_model_mappings DROP COLUMN IF EXISTS preset_id",
+    "ALTER TABLE line_model_mappings ADD COLUMN IF NOT EXISTS model_name VARCHAR(500)",
+    "DROP TABLE IF EXISTS z3d_model_presets",
     # line -> car model -> library model mapping. GLOBAL (not per-layout) — any
     # layout whose station box name matches line_group_id picks up this model.
     # car_model_id is NULL for lines that use one model regardless of car model
@@ -141,6 +157,24 @@ COLUMN_MIGRATIONS = [
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     )
+    """,
+    # model_name was only added as nullable by the fixup ADD COLUMN above (an
+    # existing table can't retroactively get NOT NULL for free) — enforce it
+    # now that any stale rows have had a chance to be cleaned up above.
+    "DELETE FROM line_model_mappings WHERE model_name IS NULL",
+    # Add the FK from the fixup path's plain ADD COLUMN (fresh tables already
+    # have it inline from CREATE TABLE) — guarded so re-running is a no-op.
+    """
+    DO $$
+    BEGIN
+        IF NOT EXISTS (
+            SELECT 1 FROM pg_constraint WHERE conname = 'fk_line_model_mappings_model_name'
+        ) THEN
+            ALTER TABLE line_model_mappings
+            ADD CONSTRAINT fk_line_model_mappings_model_name
+            FOREIGN KEY (model_name) REFERENCES z3d_model_library(name) ON DELETE CASCADE;
+        END IF;
+    END $$;
     """,
     # one active mapping per (line, car model); car_model_id NULL is a single
     # value for uniqueness purposes across all rows in Postgres, so a partial
