@@ -1209,13 +1209,24 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       const dx = leader.position.x - leaderDragStart.x;
       const dy = leader.position.y - leaderDragStart.y;
       const dz = leader.position.z - leaderDragStart.z;
+      // Only sync the property the active gizmo actually changes — a plain
+      // translate drag must never touch siblings' rotation/scale. Previously
+      // this unconditionally copied the leader's rotation+scale onto every
+      // other station on the line on EVERY drag (including pure moves), so
+      // moving one station's object silently reset every other station's
+      // rotation/scale to match the leader's, even though the user never
+      // touched rotate/scale.
       placedRef.current
         .filter(p => p.lineGroupId === sel.lineGroupId && p.id !== sel.id)
         .forEach(m => {
-          const start = memberDragStarts.get(m.id);
-          if (start) m.mesh.position.set(start.x + dx, start.y + dy, start.z + dz);
-          m.mesh.rotation.copy(leader.rotation);
-          m.mesh.scale.copy(leader.scale);
+          if (tc.mode === 'translate') {
+            const start = memberDragStarts.get(m.id);
+            if (start) m.mesh.position.set(start.x + dx, start.y + dy, start.z + dz);
+          } else if (tc.mode === 'rotate') {
+            m.mesh.rotation.copy(leader.rotation);
+          } else if (tc.mode === 'scale') {
+            m.mesh.scale.copy(leader.scale);
+          }
         });
       dirtyRef.current = true;
     });
