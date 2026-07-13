@@ -39,6 +39,7 @@ class TransformUpdate(BaseModel):
 
 
 class DefaultsUpdate(BaseModel):
+    px: float = 0; py: float = 0; pz: float = 0
     rx: float = 0; ry: float = 0; rz: float = 0
     sx: float = 1; sy: float = 1; sz: float = 1
 
@@ -112,9 +113,11 @@ def update_defaults(
     body: DefaultsUpdate,
     connector: StateDBConnector = Depends(get_connector),
 ):
-    """Save default scale/rotation for a model name."""
+    """Save default position/scale/rotation for a model name — this doubles as the
+    reusable "preset" transform applied whenever the model is mapped onto a line."""
     rows = connector.execute_query(Z3DLibraryQueries.UPDATE_DEFAULTS, {
         "name": name,
+        "px": body.px, "py": body.py, "pz": body.pz,
         "sx": body.sx, "sy": body.sy, "sz": body.sz,
         "rx": body.rx, "ry": body.ry, "rz": body.rz,
     })
@@ -146,6 +149,27 @@ def download_library_model(name: str, connector: StateDBConnector = Depends(get_
     # request, not up to 24h later.
     headers = {"Cache-Control": "no-cache, must-revalidate"}
     return FileResponse(path=fp, filename=f"{rec['name']}.{ext}", media_type=mime, headers=headers)
+
+
+@router.delete("/library/{name}", status_code=204)
+def delete_library_model(name: str, connector: StateDBConnector = Depends(get_connector)):
+    """Remove a model from the library entirely — deletes its file, any
+    line->car-model mappings using it (FK CASCADE), and any placements
+    across every layout that were showing it."""
+    rows = connector.execute_query(Z3DLibraryQueries.GET_BY_NAME, {"name": name})
+    if not rows:
+        raise HTTPException(status_code=404, detail="Model not in library")
+    rec = _row(rows[0])
+
+    connector.execute_update(Z3DPlacementQueries.DELETE_BY_MODEL_NAME, {"model_name": name})
+    connector.execute_update(Z3DLibraryQueries.DELETE_BY_NAME, {"name": name})
+
+    fp = rec.get("file_path")
+    if fp and Path(fp).exists():
+        try:
+            Path(fp).unlink()
+        except OSError:
+            logger.warning(f"Failed to delete file on disk for model '{name}': {fp}")
 
 
 # ── Placement endpoints ────────────────────────────────────────────────────────

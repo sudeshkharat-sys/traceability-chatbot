@@ -13,6 +13,7 @@ import { layeredAuditApi } from '../../../services/api/layoutApi';
 import { StationDetailModal, MONTHLY_KEYS } from '../ZStageDashboard/ZStageDashboard';
 import '../ZStageDashboard/ZStageDashboard.css';
 import { backend_url } from '../../../services/api/config';
+import ModelMappingModal from './ModelMappingModal';
 import './ZStage3DLayout.css';
 
 // ── Model Presets (localStorage) ─────────────────────────────────────────────
@@ -2538,6 +2539,8 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [sceneReady,        setSceneReady]        = useState(false);
   const [refreshing,        setRefreshing]        = useState(false);
   const [modelLoadCount,    setModelLoadCount]    = useState({ loaded: 0, total: 0 });
+  // Model mapping modal (line -> car model -> library model, global across layouts)
+  const [showMappingModal,  setShowMappingModal]  = useState(false);
   // Upload modal
   const [showUploadModal,   setShowUploadModal]   = useState(false);
   const [pendingFile,       setPendingFile]       = useState(null);
@@ -3086,6 +3089,11 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                 />
               ))}
             </div>
+
+            {/* Line -> car model -> object mapping */}
+            <button type="button" className="z3d-walk-btn" onClick={() => setShowMappingModal(true)} title="Map lines to car models and 3D objects">
+              🔗 Model Mapping
+            </button>
 
             {/* Upload object */}
             <button type="button" className="z3d-upload-btn" onClick={() => fileInputRef.current?.click()} title="Upload GLB, OBJ or STL file">
@@ -3647,6 +3655,14 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             </div>
           </div>
         </div>
+      )}
+
+      {showMappingModal && (
+        <ModelMappingModal
+          shopList={shopList}
+          onClose={() => setShowMappingModal(false)}
+          onApplied={() => { clearSceneCache(); handleRefresh(); }}
+        />
       )}
 
       {showReplaceModal && replaceInfo && (

@@ -169,8 +169,10 @@ export const z3dModelApi = {
     return axios.post(`${BASE_URL}/3d-models/library/upload`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
 
-  saveDefaults: (name, { sx, sy, sz, rx, ry, rz }) =>
-    api.put(`/3d-models/library/${encodeURIComponent(name)}/defaults`, { sx, sy, sz, rx, ry, rz }),
+  saveDefaults: (name, { px = 0, py = 0, pz = 0, sx = 1, sy = 1, sz = 1, rx = 0, ry = 0, rz = 0 }) =>
+    api.put(`/3d-models/library/${encodeURIComponent(name)}/defaults`, { px, py, pz, sx, sy, sz, rx, ry, rz }),
+
+  deleteLibraryModel: (name) => api.delete(`/3d-models/library/${encodeURIComponent(name)}`),
 
   getDownloadUrl: (name) => `${BASE_URL}/3d-models/library/${encodeURIComponent(name)}/download`,
 
@@ -214,33 +216,13 @@ export const carModelApi = {
   delete: (carModelId) => api.delete(`/car-models/${carModelId}`),
 };
 
-export const z3dPresetApi = {
-  list: () => api.get('/3d-models/presets'),
-  create: ({ name, modelName, px, py, pz, rx, ry, rz, sx, sy, sz }) =>
-    api.post('/3d-models/presets', {
-      name, model_name: modelName,
-      px: px ?? 0, py: py ?? 0, pz: pz ?? 0,
-      rx: rx ?? 0, ry: ry ?? 0, rz: rz ?? 0,
-      sx: sx ?? 1, sy: sy ?? 1, sz: sz ?? 1,
-    }),
-  update: (presetId, { name, modelName, px, py, pz, rx, ry, rz, sx, sy, sz }) =>
-    api.put(`/3d-models/presets/${presetId}`, {
-      name, model_name: modelName,
-      px: px ?? 0, py: py ?? 0, pz: pz ?? 0,
-      rx: rx ?? 0, ry: ry ?? 0, rz: rz ?? 0,
-      sx: sx ?? 1, sy: sy ?? 1, sz: sz ?? 1,
-    }),
-  delete: (presetId) => api.delete(`/3d-models/presets/${presetId}`),
-};
-
+// Global mappings: line name (+ optional car model) -> library model. Not
+// scoped to a layout — any layout with a matching line name picks this up.
 export const lineModelMappingApi = {
-  listByLayout: (layoutId) => api.get(`/line-model-mappings/layout/${layoutId}`),
-  create: ({ layoutId, lineGroupId, carModelId, presetId }) =>
+  list: () => api.get('/line-model-mappings'),
+  create: ({ lineGroupId, carModelId, modelName }) =>
     api.post('/line-model-mappings', {
-      layout_id: layoutId, line_group_id: lineGroupId,
-      car_model_id: carModelId ?? null, preset_id: presetId,
+      line_group_id: lineGroupId, car_model_id: carModelId ?? null, model_name: modelName,
     }),
   delete: (mappingId) => api.delete(`/line-model-mappings/${mappingId}`),
-  getLatestByLineGroup: (lineGroupId) =>
-    api.get(`/line-model-mappings/by-line-group/${encodeURIComponent(lineGroupId)}`),
 };

@@ -122,49 +122,34 @@ COLUMN_MIGRATIONS = [
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     )
     """,
-    # reusable 3D model presets — a library model plus a saved transform
-    # (relative offset from a reference station), so the same "object" can be
-    # applied to any line/station without re-doing rotation/scale/position each time
-    """
-    CREATE TABLE IF NOT EXISTS z3d_model_presets (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL UNIQUE,
-        model_name VARCHAR(500) NOT NULL,
-        px FLOAT NOT NULL DEFAULT 0,
-        py FLOAT NOT NULL DEFAULT 0,
-        pz FLOAT NOT NULL DEFAULT 0,
-        rx FLOAT NOT NULL DEFAULT 0,
-        ry FLOAT NOT NULL DEFAULT 0,
-        rz FLOAT NOT NULL DEFAULT 0,
-        sx FLOAT NOT NULL DEFAULT 1,
-        sy FLOAT NOT NULL DEFAULT 1,
-        sz FLOAT NOT NULL DEFAULT 1,
-        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-    )
-    """,
-    # line -> car model -> preset mapping. car_model_id is NULL for lines that
-    # use a single model regardless of car model (e.g. Chassis, Engine).
+    # a model's saved position offset, alongside its existing default scale/rotation —
+    # together these make the library model itself the reusable "preset" for a line
+    "ALTER TABLE z3d_model_library ADD COLUMN IF NOT EXISTS default_px FLOAT NOT NULL DEFAULT 0",
+    "ALTER TABLE z3d_model_library ADD COLUMN IF NOT EXISTS default_py FLOAT NOT NULL DEFAULT 0",
+    "ALTER TABLE z3d_model_library ADD COLUMN IF NOT EXISTS default_pz FLOAT NOT NULL DEFAULT 0",
+    # line -> car model -> library model mapping. GLOBAL (not per-layout) — any
+    # layout whose station box name matches line_group_id picks up this model.
+    # car_model_id is NULL for lines that use one model regardless of car model
+    # (e.g. Chassis, Engine). model_name references the library directly, so
+    # deleting a model from the library automatically drops mappings using it.
     """
     CREATE TABLE IF NOT EXISTS line_model_mappings (
         id SERIAL PRIMARY KEY,
-        layout_id INTEGER NOT NULL REFERENCES layouts(id) ON DELETE CASCADE,
         line_group_id VARCHAR(100) NOT NULL,
         car_model_id INTEGER REFERENCES car_models(id) ON DELETE CASCADE,
-        preset_id INTEGER NOT NULL REFERENCES z3d_model_presets(id) ON DELETE CASCADE,
+        model_name VARCHAR(500) NOT NULL REFERENCES z3d_model_library(name) ON DELETE CASCADE,
         created_at TIMESTAMP NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     )
     """,
-    "CREATE INDEX IF NOT EXISTS idx_line_model_mappings_layout_id ON line_model_mappings (layout_id)",
-    # one active mapping per (layout, line, car model); car_model_id NULL is a
-    # single value for uniqueness purposes across all rows in Postgres, so a
-    # partial unique index is used to still enforce "one NULL-car-model mapping
-    # per line" while allowing many non-NULL car_model_id rows per line
+    # one active mapping per (line, car model); car_model_id NULL is a single
+    # value for uniqueness purposes across all rows in Postgres, so a partial
+    # unique index enforces "one NULL-car-model mapping per line" while
+    # allowing many non-NULL car_model_id rows per line
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_line_model_mappings_unique_car "
-    "ON line_model_mappings (layout_id, line_group_id, car_model_id) WHERE car_model_id IS NOT NULL",
+    "ON line_model_mappings (line_group_id, car_model_id) WHERE car_model_id IS NOT NULL",
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_line_model_mappings_unique_nocar "
-    "ON line_model_mappings (layout_id, line_group_id) WHERE car_model_id IS NULL",
+    "ON line_model_mappings (line_group_id) WHERE car_model_id IS NULL",
 ]
 
 
