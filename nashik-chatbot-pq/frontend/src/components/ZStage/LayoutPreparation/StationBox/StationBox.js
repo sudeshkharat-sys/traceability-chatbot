@@ -37,6 +37,7 @@ function StationBox({
   onStationNamesChange,
   onStationIdChange,
   onSelect,
+  onAssignObject,
   isSelected = false,
   canvasScale,
 }) {
@@ -249,6 +250,15 @@ function StationBox({
           )}
 
           <div className="station-box-controls">
+            {onAssignObject && (
+              <button
+                className="station-box-ctrl-btn station-box-ctrl-btn--assign"
+                title="Assign 3D object (car model + object)"
+                onClick={(e) => { e.stopPropagation(); onAssignObject(id, name); }}
+              >
+                🎯
+              </button>
+            )}
             {onDelete && (
               <button
                 className="station-box-ctrl-btn station-box-ctrl-btn--delete"

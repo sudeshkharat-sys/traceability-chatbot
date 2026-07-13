@@ -117,6 +117,14 @@
   background-color: #fff5f5;
 }
 
+.station-box-ctrl-btn--assign {
+  border-color: #93c5fd;
+}
+
+.station-box-ctrl-btn--assign:hover {
+  background-color: #eff6ff;
+}
+
 /* Grid */
 .station-box-body {
   overflow-x: auto;

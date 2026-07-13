@@ -7,6 +7,7 @@ import BuyoffIcon from './BypassIcon/BypassIcon';
 import CanvasTextLabel from './CanvasTextLabel/CanvasTextLabel';
 import CanvasArrow from './CanvasArrow/CanvasArrow';
 import AddBoxModal from './AddBoxModal/AddBoxModal';
+import AssignObjectPopup from './AssignObjectPopup';
 import { layoutApi } from '../../../services/api/layoutApi';
 import { getPortCanvasPos, buildObstacles, routePath } from '../shared/routeArrow';
 import HelpGuide from '../shared/HelpGuide/HelpGuide';
@@ -326,6 +327,7 @@ function LayoutPreparation({
   const [layoutName, setLayoutName] = useState('New Layout');
   const [editingName, setEditingName] = useState(false);
   const [currentLayoutId, setCurrentLayoutId] = useState(null);
+  const [assignTarget, setAssignTarget] = useState(null); // { lineName } for the box being assigned an object
   const [canvasScale, setCanvasScale] = useState(1);
   const [transformState, setTransformState] = useState({ scale: 1, positionX: 0, positionY: 0 });
   const [newTextId,  setNewTextId ] = useState(null); // id of freshly-placed text label
@@ -643,6 +645,16 @@ function LayoutPreparation({
     setConnections((prev) => prev.filter((c) => c.fromId !== id && c.toId !== id));
     setSelectedIds((prev) => prev.filter((sid) => sid !== id));
   }, []);
+
+  // Object assignment needs a real, saved layout row to attach the mapping to
+  // — a box drawn on a brand-new, never-saved layout has no layout_id yet.
+  const handleAssignObject = useCallback((_boxId, lineName) => {
+    if (!currentLayoutId) {
+      alert('Save this layout first, then assign objects to its lines.');
+      return;
+    }
+    setAssignTarget({ lineName });
+  }, [currentLayoutId]);
 
   // ── Selection ────────────────────────────────────────────────────────────────
   const handleBoxSelect = useCallback((id, multi) => {
@@ -1466,6 +1478,7 @@ function LayoutPreparation({
                         position={box.position}
                         onPositionChange={handleBoxPositionChange}
                         onDelete={handleDeleteBox}
+                        onAssignObject={handleAssignObject}
                         onPortMouseDown={handlePortMouseDown}
                         onNameChange={handleBoxNameChange}
                         onDescriptionChange={handleBoxDescriptionChange}
@@ -1519,6 +1532,14 @@ function LayoutPreparation({
 
         {showAddBoxModal && (
           <AddBoxModal onAdd={handleAddBox} onClose={onCloseAddBoxModal} />
+        )}
+
+        {assignTarget && (
+          <AssignObjectPopup
+            layoutId={currentLayoutId}
+            lineGroupId={assignTarget.lineName}
+            onClose={() => setAssignTarget(null)}
+          />
         )}
 
         {/* ── Layout Name Modal (first-time save) ─────────────────────────── */}
