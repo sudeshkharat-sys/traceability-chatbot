@@ -22,12 +22,13 @@ const TABS = [
   { key: 'carModels', label: 'Car Models' },
 ];
 
-// This modal saves GLOBAL mappings (line -> [car model] -> library model).
-// A mapping applies to every layout whose station box name matches the
-// chosen line, not just the layout currently open — matching the old
-// "one model for the line, used everywhere" behaviour, just now explicit
-// and (optionally) split per car model.
-export default function ModelMappingModal({ shopList, onClose, onApplied }) {
+// The line -> [car model] -> library model MAPPING is per-layout — each
+// layout keeps its own choice of which object represents a line, so
+// different layouts can be styled differently. The object's own
+// position/rotation/scale (its "preset", stored on the library model) IS
+// global: whichever layout maps a model onto a line, it renders with the
+// same saved transform.
+export default function ModelMappingModal({ layoutId, shopList, onClose, onApplied }) {
   const [tab, setTab] = useState('mapping');
 
   const [carModels, setCarModels] = useState([]);
@@ -41,10 +42,10 @@ export default function ModelMappingModal({ shopList, onClose, onApplied }) {
     Promise.all([
       carModelApi.list().then(r => setCarModels(r.data || [])),
       z3dModelApi.listLibrary().then(r => setLibraryModels(r.data || [])),
-      lineModelMappingApi.list().then(r => setMappings(r.data || [])),
+      layoutId ? lineModelMappingApi.listByLayout(layoutId).then(r => setMappings(r.data || [])) : Promise.resolve(),
     ]).catch(err => setError(err?.response?.data?.detail || err.message))
       .finally(() => setLoading(false));
-  }, []);
+  }, [layoutId]);
 
   useEffect(() => { reloadAll(); }, [reloadAll]);
 
@@ -129,6 +130,7 @@ export default function ModelMappingModal({ shopList, onClose, onApplied }) {
       rx: deg2rad(xform.rx), ry: deg2rad(xform.ry), rz: deg2rad(xform.rz),
       sx: Number(xform.sx), sy: Number(xform.sy), sz: Number(xform.sz),
     }).then(() => lineModelMappingApi.create({
+      layoutId,
       lineGroupId: mapLine,
       carModelId: needsCarModel ? Number(mapCarModel) : null,
       modelName: selectedModelName,
@@ -137,7 +139,7 @@ export default function ModelMappingModal({ shopList, onClose, onApplied }) {
       onApplied && onApplied();
     }).catch(err => setError(err?.response?.data?.detail || err.message))
       .finally(() => setLoading(false));
-  }, [mapLine, mapCarModel, selectedModelName, needsCarModel, xform, reloadAll, onApplied]);
+  }, [layoutId, mapLine, mapCarModel, selectedModelName, needsCarModel, xform, reloadAll, onApplied]);
 
   const deleteMapping = useCallback((id) => {
     setLoading(true);
@@ -198,7 +200,9 @@ export default function ModelMappingModal({ shopList, onClose, onApplied }) {
         {tab === 'mapping' && (
           <div>
             <div className="z3d-modal-hint" style={{ marginBottom: 10 }}>
-              This applies to every layout that has a matching line — not just the one you're viewing.
+              This mapping is saved only for the layout you're currently viewing. The object's
+              own position/rotation/scale (below) is remembered globally, so it looks the same
+              wherever it's used.
             </div>
 
             <label className="z3d-modal-label">Line</label>
@@ -248,8 +252,8 @@ export default function ModelMappingModal({ shopList, onClose, onApplied }) {
                 <div className="z3d-modal-label">Preset — Movement / Scale / Rotation for "{selectedModelName}"</div>
                 <div className="z3d-modal-hint" style={{ marginBottom: 8 }}>
                   Adjust how this object sits on the station, then Save Preset below. These
-                  numbers get remembered as this model's preset — every station on this
-                  line, in every layout, will use them from now on.
+                  numbers get remembered as this model's preset globally — wherever "{selectedModelName}"
+                  is used, on any line, in any layout, it'll use these same values.
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 8 }}>
                   {['px', 'py', 'pz'].map(f => (
@@ -280,12 +284,12 @@ export default function ModelMappingModal({ shopList, onClose, onApplied }) {
               </button>
             </div>
             <div className="z3d-modal-hint">
-              Saved automatically for next time — reopening any layout with this line will
-              show this object with these exact values, no re-setup needed.
+              Saved automatically — reopening this layout will show this object on this line
+              with these exact values, no re-setup needed.
             </div>
 
             <div style={{ marginTop: 16, borderTop: '1px solid #30363d', paddingTop: 10 }}>
-              <div className="z3d-modal-label">Current mappings (all layouts)</div>
+              <div className="z3d-modal-label">Current mappings (this layout)</div>
               {mappings.length === 0 && <div className="z3d-modal-hint">No mappings yet.</div>}
               {mappings.map(m => (
                 <div key={m.id} className="z3d-mapping-row-static">

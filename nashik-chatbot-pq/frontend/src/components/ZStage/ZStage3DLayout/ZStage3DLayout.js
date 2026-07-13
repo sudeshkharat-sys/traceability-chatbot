@@ -2539,7 +2539,8 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [sceneReady,        setSceneReady]        = useState(false);
   const [refreshing,        setRefreshing]        = useState(false);
   const [modelLoadCount,    setModelLoadCount]    = useState({ loaded: 0, total: 0 });
-  // Model mapping modal (line -> car model -> library model, global across layouts)
+  // Model mapping modal (line -> car model -> library model, per-layout; the
+  // object's own transform is saved globally on the library model itself)
   const [showMappingModal,  setShowMappingModal]  = useState(false);
   // Upload modal
   const [showUploadModal,   setShowUploadModal]   = useState(false);
@@ -3659,6 +3660,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
 
       {showMappingModal && (
         <ModelMappingModal
+          layoutId={selectedLayoutId}
           shopList={shopList}
           onClose={() => setShowMappingModal(false)}
           onApplied={() => { clearSceneCache(); handleRefresh(); }}

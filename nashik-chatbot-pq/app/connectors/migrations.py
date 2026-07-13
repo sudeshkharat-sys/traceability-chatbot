@@ -127,30 +127,35 @@ COLUMN_MIGRATIONS = [
     "ALTER TABLE z3d_model_library ADD COLUMN IF NOT EXISTS default_px FLOAT NOT NULL DEFAULT 0",
     "ALTER TABLE z3d_model_library ADD COLUMN IF NOT EXISTS default_py FLOAT NOT NULL DEFAULT 0",
     "ALTER TABLE z3d_model_library ADD COLUMN IF NOT EXISTS default_pz FLOAT NOT NULL DEFAULT 0",
-    # Fixup for an earlier, since-replaced version of this feature that created
-    # line_model_mappings as PER-LAYOUT (layout_id NOT NULL, preset_id NOT NULL
-    # FK to a now-removed z3d_model_presets table). CREATE TABLE IF NOT EXISTS
-    # below is a no-op against an existing table, so anyone who ran that
-    # earlier version would otherwise keep the old columns forever and every
-    # query against the new (global, model_name-based) schema would fail with
-    # a 500 — indexes must be dropped before the columns they cover, and all
-    # of this is a harmless no-op (relation/column doesn't exist) on a DB that
-    # never had the old version.
+    # Fixup covering TWO earlier, since-replaced shapes of this feature:
+    #   v1: per-layout, with a preset_id FK to a now-removed z3d_model_presets table
+    #   v2: global (no layout_id at all)
+    # Final shape is per-layout again (each layout picks its own line->car
+    # model->object mapping) while the object's position/rotation/scale stays
+    # global on the library model itself (z3d_model_library.default_*, i.e.
+    # the "preset"). CREATE TABLE IF NOT EXISTS is a no-op against an existing
+    # table, so without this fixup anyone on v1 or v2 would keep the wrong
+    # columns forever and every query would 500. Every statement here is a
+    # harmless no-op on a DB that never had the column/table in question.
     "DROP INDEX IF EXISTS idx_line_model_mappings_unique_car",
     "DROP INDEX IF EXISTS idx_line_model_mappings_unique_nocar",
     "DROP INDEX IF EXISTS idx_line_model_mappings_layout_id",
-    "ALTER TABLE line_model_mappings DROP COLUMN IF EXISTS layout_id",
     "ALTER TABLE line_model_mappings DROP COLUMN IF EXISTS preset_id",
     "ALTER TABLE line_model_mappings ADD COLUMN IF NOT EXISTS model_name VARCHAR(500)",
+    "ALTER TABLE line_model_mappings ADD COLUMN IF NOT EXISTS layout_id INTEGER REFERENCES layouts(id) ON DELETE CASCADE",
+    # Rows left over from v2 (global, no layout) can't be attributed to any
+    # one layout — drop them rather than guess; same for any v1 row that
+    # predates model_name existing. Users just re-do the mapping per layout.
+    "DELETE FROM line_model_mappings WHERE layout_id IS NULL OR model_name IS NULL",
     "DROP TABLE IF EXISTS z3d_model_presets",
-    # line -> car model -> library model mapping. GLOBAL (not per-layout) — any
-    # layout whose station box name matches line_group_id picks up this model.
-    # car_model_id is NULL for lines that use one model regardless of car model
-    # (e.g. Chassis, Engine). model_name references the library directly, so
+    # line -> car model -> library model mapping, PER LAYOUT. car_model_id is
+    # NULL for lines that use one model regardless of car model (e.g.
+    # Chassis, Engine). model_name references the library directly, so
     # deleting a model from the library automatically drops mappings using it.
     """
     CREATE TABLE IF NOT EXISTS line_model_mappings (
         id SERIAL PRIMARY KEY,
+        layout_id INTEGER NOT NULL REFERENCES layouts(id) ON DELETE CASCADE,
         line_group_id VARCHAR(100) NOT NULL,
         car_model_id INTEGER REFERENCES car_models(id) ON DELETE CASCADE,
         model_name VARCHAR(500) NOT NULL REFERENCES z3d_model_library(name) ON DELETE CASCADE,
@@ -158,12 +163,15 @@ COLUMN_MIGRATIONS = [
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
     )
     """,
-    # model_name was only added as nullable by the fixup ADD COLUMN above (an
-    # existing table can't retroactively get NOT NULL for free) — enforce it
-    # now that any stale rows have had a chance to be cleaned up above.
-    "DELETE FROM line_model_mappings WHERE model_name IS NULL",
-    # Add the FK from the fixup path's plain ADD COLUMN (fresh tables already
-    # have it inline from CREATE TABLE) — guarded so re-running is a no-op.
+    # layout_id/model_name were only added as nullable by the fixup ADD
+    # COLUMN above (an existing table can't retroactively get NOT NULL for
+    # free) — enforce it now that stale/orphaned rows have been deleted above.
+    # A no-op (succeeds trivially) on a table that already has the constraint.
+    "ALTER TABLE line_model_mappings ALTER COLUMN layout_id SET NOT NULL",
+    "ALTER TABLE line_model_mappings ALTER COLUMN model_name SET NOT NULL",
+    # Add the model_name FK for tables that only got the fixup ADD COLUMN
+    # above (fresh tables already have it inline from CREATE TABLE) — guarded
+    # so re-running is a no-op.
     """
     DO $$
     BEGIN
@@ -176,14 +184,15 @@ COLUMN_MIGRATIONS = [
         END IF;
     END $$;
     """,
-    # one active mapping per (line, car model); car_model_id NULL is a single
-    # value for uniqueness purposes across all rows in Postgres, so a partial
-    # unique index enforces "one NULL-car-model mapping per line" while
-    # allowing many non-NULL car_model_id rows per line
+    "CREATE INDEX IF NOT EXISTS idx_line_model_mappings_layout_id ON line_model_mappings (layout_id)",
+    # one active mapping per (layout, line, car model); car_model_id NULL is a
+    # single value for uniqueness purposes across all rows in Postgres, so a
+    # partial unique index enforces "one NULL-car-model mapping per line"
+    # while allowing many non-NULL car_model_id rows per line
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_line_model_mappings_unique_car "
-    "ON line_model_mappings (line_group_id, car_model_id) WHERE car_model_id IS NOT NULL",
+    "ON line_model_mappings (layout_id, line_group_id, car_model_id) WHERE car_model_id IS NOT NULL",
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_line_model_mappings_unique_nocar "
-    "ON line_model_mappings (line_group_id) WHERE car_model_id IS NULL",
+    "ON line_model_mappings (layout_id, line_group_id) WHERE car_model_id IS NULL",
 ]
 
 

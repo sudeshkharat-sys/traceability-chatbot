@@ -123,15 +123,6 @@ class StationBoxQueries:
 
     CHECK_EXISTS = "SELECT id FROM station_boxes WHERE id = :box_id"
 
-    # Every station box across ALL layouts sharing this exact name — used to
-    # fan a global line->model mapping out to every layout that has this line.
-    LIST_BY_NAME_ALL_LAYOUTS = """
-        SELECT id, layout_id, name, prefix, station_count, station_ids, z_labels,
-               station_data, position_x, position_y, order_index, created_at, updated_at
-        FROM station_boxes
-        WHERE name = :name
-    """
-
 
 # ── Buyoff icon queries ───────────────────────────────────────────────────────
 
@@ -660,26 +651,27 @@ class CarModelQueries:
 # ── Line -> car model -> library model mappings (GLOBAL, not per-layout) ──────
 
 class LineModelMappingQueries:
-    MAP_COLS = "id, line_group_id, car_model_id, model_name, created_at, updated_at"
+    MAP_COLS = "id, layout_id, line_group_id, car_model_id, model_name, created_at, updated_at"
 
-    LIST_ALL = f"""
+    LIST_BY_LAYOUT = f"""
         SELECT {MAP_COLS} FROM line_model_mappings
+        WHERE layout_id = :layout_id
         ORDER BY line_group_id, car_model_id NULLS FIRST
     """
 
     # Upsert respecting the two partial unique indexes (car_model_id NULL vs not-NULL)
     UPSERT_WITH_CAR_MODEL = f"""
-        INSERT INTO line_model_mappings (line_group_id, car_model_id, model_name, created_at, updated_at)
-        VALUES (:line_group_id, :car_model_id, :model_name, NOW(), NOW())
-        ON CONFLICT (line_group_id, car_model_id) WHERE car_model_id IS NOT NULL
+        INSERT INTO line_model_mappings (layout_id, line_group_id, car_model_id, model_name, created_at, updated_at)
+        VALUES (:layout_id, :line_group_id, :car_model_id, :model_name, NOW(), NOW())
+        ON CONFLICT (layout_id, line_group_id, car_model_id) WHERE car_model_id IS NOT NULL
         DO UPDATE SET model_name = EXCLUDED.model_name, updated_at = NOW()
         RETURNING {MAP_COLS}
     """
 
     UPSERT_NO_CAR_MODEL = f"""
-        INSERT INTO line_model_mappings (line_group_id, car_model_id, model_name, created_at, updated_at)
-        VALUES (:line_group_id, NULL, :model_name, NOW(), NOW())
-        ON CONFLICT (line_group_id) WHERE car_model_id IS NULL
+        INSERT INTO line_model_mappings (layout_id, line_group_id, car_model_id, model_name, created_at, updated_at)
+        VALUES (:layout_id, :line_group_id, NULL, :model_name, NOW(), NOW())
+        ON CONFLICT (layout_id, line_group_id) WHERE car_model_id IS NULL
         DO UPDATE SET model_name = EXCLUDED.model_name, updated_at = NOW()
         RETURNING {MAP_COLS}
     """

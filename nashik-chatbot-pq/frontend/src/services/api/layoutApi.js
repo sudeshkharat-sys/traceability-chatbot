@@ -216,13 +216,15 @@ export const carModelApi = {
   delete: (carModelId) => api.delete(`/car-models/${carModelId}`),
 };
 
-// Global mappings: line name (+ optional car model) -> library model. Not
-// scoped to a layout — any layout with a matching line name picks this up.
+// Per-layout mappings: line name (+ optional car model) -> library model.
+// Each layout has its own set — the object's transform (position/rotation/
+// scale) is what's shared globally, via the library model's own defaults.
 export const lineModelMappingApi = {
-  list: () => api.get('/line-model-mappings'),
-  create: ({ lineGroupId, carModelId, modelName }) =>
+  listByLayout: (layoutId) => api.get(`/line-model-mappings/layout/${layoutId}`),
+  create: ({ layoutId, lineGroupId, carModelId, modelName }) =>
     api.post('/line-model-mappings', {
-      line_group_id: lineGroupId, car_model_id: carModelId ?? null, model_name: modelName,
+      layout_id: layoutId, line_group_id: lineGroupId,
+      car_model_id: carModelId ?? null, model_name: modelName,
     }),
   delete: (mappingId) => api.delete(`/line-model-mappings/${mappingId}`),
 };
