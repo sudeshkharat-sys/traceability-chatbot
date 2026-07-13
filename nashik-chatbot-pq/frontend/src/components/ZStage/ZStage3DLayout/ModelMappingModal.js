@@ -55,7 +55,17 @@ export default function ModelMappingModal({ shopList, onClose, onApplied }) {
   const [xform, setXform] = useState(EMPTY_XFORM);
   const needsCarModel = mapLine ? lineNeedsCarModel(mapLine) : false;
 
-  const selectedModel = libraryModels.find(m => m.name === selectedModelName) || null;
+  // Once a car model is chosen, models whose name mentions it (e.g. picking
+  // "Thar" surfaces "Thar_Skid", "XUV_Thar_Roxx", ...) float to the top —
+  // saves hunting through the full library for the right variant.
+  const sortedLibraryModels = React.useMemo(() => {
+    const carModel = carModels.find(c => String(c.id) === String(mapCarModel));
+    if (!carModel) return libraryModels;
+    const needle = carModel.name.toLowerCase();
+    const matches = libraryModels.filter(m => m.name.toLowerCase().includes(needle));
+    const rest = libraryModels.filter(m => !m.name.toLowerCase().includes(needle));
+    return [...matches, ...rest];
+  }, [libraryModels, carModels, mapCarModel]);
 
   // Loading a model into the picker pre-fills the transform fields from its
   // saved defaults (which double as the reusable "preset" for that model).
@@ -207,17 +217,15 @@ export default function ModelMappingModal({ shopList, onClose, onApplied }) {
               </>
             )}
 
-            <label className="z3d-modal-label">Object</label>
-            <div style={{ maxHeight: 140, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 6, marginBottom: 8 }}>
+            <label className="z3d-modal-label">
+              Object{mapCarModel ? ' (matching models shown first)' : ''}
+            </label>
+            <div style={{ maxHeight: 140, overflowY: 'auto', border: '1px solid #30363d', borderRadius: 6, marginBottom: 8 }}>
               {libraryModels.length === 0 && <div className="z3d-modal-hint" style={{ padding: 8 }}>No models uploaded yet.</div>}
-              {libraryModels.map(m => (
+              {sortedLibraryModels.map(m => (
                 <div
                   key={m.name}
-                  style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '6px 8px', fontSize: 13, cursor: 'pointer',
-                    background: selectedModelName === m.name ? '#eff6ff' : 'transparent',
-                  }}
+                  className={`z3d-mapping-row${selectedModelName === m.name ? ' z3d-mapping-row--active' : ''}`}
                   onClick={() => pickModel(m.name)}
                 >
                   <span>{m.name}</span>
@@ -265,11 +273,11 @@ export default function ModelMappingModal({ shopList, onClose, onApplied }) {
               <button type="button" className="z3d-modal-confirm" disabled={loading} onClick={saveMapping}>Save Mapping</button>
             </div>
 
-            <div style={{ marginTop: 16, borderTop: '1px solid #e5e7eb', paddingTop: 10 }}>
+            <div style={{ marginTop: 16, borderTop: '1px solid #30363d', paddingTop: 10 }}>
               <div className="z3d-modal-label">Current mappings (all layouts)</div>
               {mappings.length === 0 && <div className="z3d-modal-hint">No mappings yet.</div>}
               {mappings.map(m => (
-                <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 13 }}>
+                <div key={m.id} className="z3d-mapping-row-static">
                   <span><b>{m.line_group_id}</b> · {carModelLabel(m.car_model_id)} → {m.model_name}</span>
                   <button type="button" className="z3d-modal-cancel" onClick={() => deleteMapping(m.id)}>Remove</button>
                 </div>
@@ -290,11 +298,11 @@ export default function ModelMappingModal({ shopList, onClose, onApplied }) {
               <button type="button" className="z3d-modal-confirm" disabled={loading} onClick={saveCarModel}>Add Car Model</button>
             </div>
 
-            <div style={{ marginTop: 16, borderTop: '1px solid #e5e7eb', paddingTop: 10 }}>
+            <div style={{ marginTop: 16, borderTop: '1px solid #30363d', paddingTop: 10 }}>
               <div className="z3d-modal-label">Car models</div>
               {carModels.length === 0 && <div className="z3d-modal-hint">No car models yet.</div>}
               {carModels.map(c => (
-                <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 0', fontSize: 13 }}>
+                <div key={c.id} className="z3d-mapping-row-static">
                   <span>{c.name}{c.code ? ` (${c.code})` : ''}</span>
                   <button type="button" className="z3d-modal-cancel" onClick={() => deleteCarModel(c.id)}>Delete</button>
                 </div>

@@ -809,6 +809,19 @@
 .z3d-modal-confirm:disabled { background: #0d2818; color: #3d7a4f; cursor: not-allowed; }
 .z3d-modal-confirm:hover:not(:disabled) { background: #2ea043; }
 
+/* ── Model Mapping modal (list rows) ──────────────────────────── */
+.z3d-mapping-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 8px; font-size: 13px; color: #e6edf3; cursor: pointer;
+  background: transparent;
+}
+.z3d-mapping-row:hover { background: #21262d; }
+.z3d-mapping-row--active { background: #1c2f4d; color: #58a6ff; }
+.z3d-mapping-row-static {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 4px 0; font-size: 13px; color: #e6edf3;
+}
+
 /* ── Scale control ──────────────────────────────────────────── */
 .z3d-scale-row {
   display: flex; align-items: center; gap: 6px;
