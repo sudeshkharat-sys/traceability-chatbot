@@ -177,6 +177,37 @@ function makeGLTFLoader() {
   return loader;
 }
 
+// Build the transform payload to persist for a placed entry. Station-bound
+// entries (baseX/baseZ set) save px/pz as an OFFSET from their station anchor
+// with pos_is_offset=true — the loader adds it back on top of the station's
+// current position, so a sideways drag survives refresh AND still follows the
+// station if its 2D box is moved. Free objects save absolute coords; px gets
+// the same xOff compensation the loader applies in reverse (geoXOff), so a
+// save/reload round-trip lands exactly where the object was left.
+function buildTransformPayload(entry) {
+  const mesh = entry.mesh;
+  const stationBound = entry.baseX != null && entry.baseZ != null;
+  const common = {
+    py: mesh.position.y,
+    rx: mesh.rotation.x, ry: mesh.rotation.y, rz: mesh.rotation.z,
+    sx: mesh.scale.x, sy: mesh.scale.y, sz: mesh.scale.z,
+  };
+  if (stationBound) {
+    return {
+      ...common,
+      px: mesh.position.x - entry.baseX,
+      pz: mesh.position.z - entry.baseZ,
+      pos_is_offset: true,
+    };
+  }
+  return {
+    ...common,
+    px: mesh.position.x + (mesh.userData.geoXOff || 0),
+    pz: mesh.position.z,
+    pos_is_offset: false,
+  };
+}
+
 // Clone a Three.js object sharing geometry + material buffers (no deep copy).
 // Avoids the N×fileSize GPU cost of clone(true) for line-placement groups.
 function sharedClone(src) {
@@ -1249,14 +1280,11 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           const targets = sel.lineGroupId
             ? placedRef.current.filter(p => p.lineGroupId === sel.lineGroupId)
             : [sel];
-          targets.forEach(({ mesh }) => {
-            const sid = mesh.userData.serverModelId;
+          targets.forEach(t => {
+            const sid = t.mesh.userData.serverModelId;
             if (!sid) return;
-            z3dModelApi.updateTransform(sid, {
-              px: mesh.position.x, py: mesh.position.y, pz: mesh.position.z,
-              rx: mesh.rotation.x, ry: mesh.rotation.y, rz: mesh.rotation.z,
-              sx: mesh.scale.x,    sy: mesh.scale.y,    sz: mesh.scale.z,
-            }).catch(err => console.error('[Z3D] Transform update failed:', err));
+            z3dModelApi.updateTransform(sid, buildTransformPayload(t))
+              .catch(err => console.error('[Z3D] Transform update failed:', err));
           });
         }
       }
@@ -1361,16 +1389,18 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         return z3dModelApi.getLibraryModel(modelName).then(res => res.data).catch(() => null).then(lib => {
           const sx = lib?.default_sx ?? tmpl.sx ?? 1, sy = lib?.default_sy ?? tmpl.sy ?? 1, sz = lib?.default_sz ?? tmpl.sz ?? 1;
           const rx = lib?.default_rx ?? tmpl.rx ?? 0, ry = lib?.default_ry ?? tmpl.ry ?? 0, rz = lib?.default_rz ?? tmpl.rz ?? 0;
-          const py = tmpl.py ?? 0;
+          // Position: library default_px/pz are station-relative offsets (the
+          // model's saved "movement" preset); py is an absolute height.
+          const px = lib?.default_px ?? 0, pz = lib?.default_pz ?? 0;
+          const py = lib?.default_py ?? tmpl.py ?? 0;
           return Promise.all(lineStationIds.map(stationId => {
-            const pos = localPosMap[stationId] || { x: 0, z: 0 };
             return z3dModelApi.createPlacement({
               layoutId: layout.id, modelName, lineGroupId, stationId,
-              px: pos.x, py, pz: pos.z, rx, ry, rz, sx, sy, sz,
+              px, py, pz, rx, ry, rz, sx, sy, sz, posIsOffset: true,
             }).then(cr => ({
               id: cr.data.id, layout_id: layout.id,
               model_name: modelName, line_group_id: lineGroupId, station_id: stationId,
-              px: pos.x, py, pz: pos.z, rx, ry, rz, sx, sy, sz,
+              px, py, pz, rx, ry, rz, sx, sy, sz, pos_is_offset: true,
             }));
           }));
         });
@@ -1435,17 +1465,33 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         }
         obj.userData.baseScale = geo.autoScale;
         obj.userData.floorOffsetAtBase = geo.floorOffsetAtBase;
+        obj.userData.geoXOff = geo.xOff;
 
         // Use saved py if user manually lifted the model above floor, else use floor-snap
         const floorY = geo.floorOffsetAtBase * sx;
         const savedPy = record.py ?? 0;
         const finalY = savedPy > floorY ? savedPy : floorY;
 
-        // Z is exactly at station center; X compensates for mesh origin offset.
+        // Station-bound placements anchor to their station's center (so they
+        // follow the station if the 2D box is moved). Rows saved with
+        // pos_is_offset carry the user's drag as an offset from that anchor —
+        // legacy rows (flag false) stored absolute world coords the renderer
+        // never used, so they keep the old snap-to-center behaviour. Free
+        // placements use absolute px/pz as always.
         const stnPos = record.station_id ? localPosMap[record.station_id] : null;
-        const targetX = stnPos ? stnPos.x : (record.px ?? sceneCenterRef.current.x);
-        const targetZ = stnPos ? stnPos.z : (record.pz ?? sceneCenterRef.current.z);
-        obj.position.set(targetX - geo.xOff, finalY, targetZ);
+        const baseX = stnPos ? stnPos.x - geo.xOff : null;
+        const baseZ = stnPos ? stnPos.z : null;
+        let finalX, finalZ;
+        if (stnPos) {
+          const offX = record.pos_is_offset ? (record.px ?? 0) : 0;
+          const offZ = record.pos_is_offset ? (record.pz ?? 0) : 0;
+          finalX = baseX + offX;
+          finalZ = baseZ + offZ;
+        } else {
+          finalX = (record.px ?? sceneCenterRef.current.x) - geo.xOff;
+          finalZ = record.pz ?? sceneCenterRef.current.z;
+        }
+        obj.position.set(finalX, finalY, finalZ);
 
         obj.userData.isPlaced          = true;
         obj.userData.objId             = String(record.id);
@@ -1458,6 +1504,9 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           id: String(record.id), mesh: obj, label: null, name: record.model_name,
           stationId: record.station_id || null,
           lineGroupId: record.line_group_id || null,
+          // Station anchor (already xOff-compensated) — persist code uses it
+          // to convert the mesh's world position back into a saveable offset.
+          baseX, baseZ,
         };
         placedRef.current = [...placedRef.current, entry];
         onObjectsChange([...placedRef.current]);
@@ -1964,10 +2013,18 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       obj.userData.objName        = name;
       obj.userData.objExt         = ext;
       obj.userData.assignedStation = options.stationId || null;
+      obj.userData.geoXOff        = xOff;
 
       scene.add(obj); dirtyRef.current = true;
 
-      const entry = { id: objId, mesh: obj, label: null, name, stationId: options.stationId || null, lineGroupId: options.lineGroupId || null };
+      const entry = {
+        id: objId, mesh: obj, label: null, name,
+        stationId: options.stationId || null, lineGroupId: options.lineGroupId || null,
+        // Station anchor for offset-based persistence — the object currently
+        // sits exactly on it (offset 0) since it was just snapped there.
+        baseX: stnPos ? obj.position.x : null,
+        baseZ: stnPos ? obj.position.z : null,
+      };
       placedRef.current = [...placedRef.current, entry];
       // A newly-placed model makes any cached scene snapshot for this layout
       // stale (its placedEntries wouldn't include this new one) — drop it.
@@ -1980,7 +2037,10 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           z3dModelApi.createPlacement({
             layoutId, modelName: name,
             lineGroupId: options.lineGroupId || null, stationId: options.stationId || null,
-            px: obj.position.x, py: obj.position.y, pz: obj.position.z,
+            ...(() => {
+              const p = buildTransformPayload(entry);
+              return { px: p.px, py: p.py, pz: p.pz, posIsOffset: p.pos_is_offset };
+            })(),
             rx: obj.rotation.x, ry: obj.rotation.y, rz: obj.rotation.z,
             sx: obj.scale.x,    sy: obj.scale.y,    sz: obj.scale.z,
           })
@@ -2173,11 +2233,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       }
       const sid = t.mesh.userData.serverModelId;
       if (sid) {
-        z3dModelApi.updateTransform(sid, {
-          px: t.mesh.position.x, py: t.mesh.position.y, pz: t.mesh.position.z,
-          rx: t.mesh.rotation.x, ry: t.mesh.rotation.y, rz: t.mesh.rotation.z,
-          sx: t.mesh.scale.x,    sy: t.mesh.scale.y,    sz: t.mesh.scale.z,
-        }).catch(() => {});
+        z3dModelApi.updateTransform(sid, buildTransformPayload(t)).catch(() => {});
       }
     });
     // Only pushed to the shared model default (which every OTHER layout's
@@ -2188,13 +2244,15 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       if (modelName) {
         // Preserve current position/rotation — this only changes scale, so
         // hardcoding rotation to 0 or omitting position would silently wipe
-        // out whatever was previously saved for this model.
+        // out whatever was previously saved for this model. Position is the
+        // station-relative offset (what default_px/pz mean), not world coords.
         const rotXDeg = (entry.mesh.rotation.x * 180) / Math.PI;
         const rotYDeg = (entry.mesh.rotation.y * 180) / Math.PI;
         const rotZDeg = (entry.mesh.rotation.z * 180) / Math.PI;
+        const p = buildTransformPayload(entry);
         saveModelPreset(modelName, { scale: multiplier, rotX: rotXDeg, rotY: rotYDeg, rotZ: rotZDeg });
         z3dModelApi.saveDefaults(modelName, {
-          px: entry.mesh.position.x, py: entry.mesh.position.y, pz: entry.mesh.position.z,
+          px: p.pos_is_offset ? p.px : 0, py: p.py, pz: p.pos_is_offset ? p.pz : 0,
           sx: multiplier, sy: multiplier, sz: multiplier,
           rx: entry.mesh.rotation.x, ry: entry.mesh.rotation.y, rz: entry.mesh.rotation.z,
         }).catch(() => {});
@@ -2223,11 +2281,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       );
       const sid = t.mesh.userData.serverModelId;
       if (sid) {
-        z3dModelApi.updateTransform(sid, {
-          px: t.mesh.position.x, py: t.mesh.position.y, pz: t.mesh.position.z,
-          rx: t.mesh.rotation.x, ry: t.mesh.rotation.y, rz: t.mesh.rotation.z,
-          sx: t.mesh.scale.x,    sy: t.mesh.scale.y,    sz: t.mesh.scale.z,
-        }).catch(() => {});
+        z3dModelApi.updateTransform(sid, buildTransformPayload(t)).catch(() => {});
       }
     });
     if (applyGlobally) {
@@ -2242,8 +2296,9 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         // `* Math.PI / 180`). Sending raw degrees as radians is what made
         // "Save Preset -> All Layouts" show other layouts' copies wildly
         // tilted, as if freshly uploaded with garbage rotation.
+        const p = buildTransformPayload(entry);
         z3dModelApi.saveDefaults(modelName, {
-          px: entry.mesh.position.x, py: entry.mesh.position.y, pz: entry.mesh.position.z,
+          px: p.pos_is_offset ? p.px : 0, py: p.py, pz: p.pos_is_offset ? p.pz : 0,
           sx: currentScale, sy: currentScale, sz: currentScale,
           rx: (rx * Math.PI) / 180, ry: (ry * Math.PI) / 180, rz: (rz * Math.PI) / 180,
         }).catch(() => {});
@@ -2351,6 +2406,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         obj.position.set(stnPos.x - _xOff, effectiveFloorY, stnPos.z); // Z: station center directly
         obj.userData.baseScale           = effectiveScale;
         obj.userData.floorOffsetAtBase   = effectiveFloorY / effectiveScale;
+        obj.userData.geoXOff          = _xOff;
         obj.userData.isPlaced         = true;
         obj.userData.objId            = `${groupId}_${idx}`;
         obj.userData.objName          = name;
@@ -2362,6 +2418,8 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         newEntries.push({
           id: obj.userData.objId, mesh: obj,
           label: null, name, stationId, lineGroupId: entryGroupId,
+          // Station anchor for offset persistence — object starts at offset 0.
+          baseX: obj.position.x, baseZ: obj.position.z,
         });
       });
 
@@ -2387,7 +2445,10 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
             z3dModelApi.createPlacement({
               layoutId, modelName: name,
               lineGroupId: entry.lineGroupId, stationId: entry.stationId || null,
-              px: entry.mesh.position.x, py: entry.mesh.position.y, pz: entry.mesh.position.z,
+              ...(() => {
+                const p = buildTransformPayload(entry);
+                return { px: p.px, py: p.py, pz: p.pz, posIsOffset: p.pos_is_offset };
+              })(),
               rx: entry.mesh.rotation.x, ry: entry.mesh.rotation.y, rz: entry.mesh.rotation.z,
               sx: entry.mesh.scale.x,    sy: entry.mesh.scale.y,    sz: entry.mesh.scale.z,
             }).then(res => {
@@ -2947,11 +3008,14 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     if (!currentSelected) return;
     const modelName = currentSelected.mesh?.userData?.objName || currentSelected.name;
     if (!modelName) return;
-    const pos = currentSelected.mesh?.position;
+    // Capture position as the station-relative offset (what the library's
+    // default_px/pz mean) so the preset makes sense on any station/line.
+    // Free objects have no station anchor — save a zero offset for them.
+    const p = buildTransformPayload(currentSelected);
     setScopeConfirm({
       kind: 'transform', modelName,
       scale: scaleVal, rotX, rotY, rotZ,
-      px: pos?.x ?? 0, py: pos?.y ?? 0, pz: pos?.z ?? 0,
+      px: p.pos_is_offset ? p.px : 0, py: p.py, pz: p.pos_is_offset ? p.pz : 0,
     });
   }, [currentSelected, scaleVal, rotX, rotY, rotZ]);
 
@@ -3015,7 +3079,9 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
         console.info(`[Z3D] Save Preset (All layouts): found ${rows.length} existing placement(s) of "${modelName}" to update.`);
         return Promise.all(rows.map(p =>
           z3dModelApi.updateTransform(p.id, {
-            px: p.px, py: p.py, pz: p.pz,
+            // Keep each row's own position AND its offset-vs-absolute
+            // semantics — this push only shares rotation/scale.
+            px: p.px, py: p.py, pz: p.pz, pos_is_offset: p.pos_is_offset,
             rx: rxRad, ry: ryRad, rz: rzRad, sx: scale, sy: scale, sz: scale,
           }).then(
             () => ({ id: p.id, ok: true }),

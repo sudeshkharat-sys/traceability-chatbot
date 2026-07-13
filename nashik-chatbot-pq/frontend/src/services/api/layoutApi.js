@@ -182,7 +182,7 @@ export const z3dModelApi = {
   getPlacementsByModelName: (modelName) => api.get(`/3d-models/placements/by-model-name/${encodeURIComponent(modelName)}`),
   getPlacementsByLineGroup: (lineGroupId) => api.get(`/3d-models/placements/by-line-group/${encodeURIComponent(lineGroupId)}`),
 
-  createPlacement: ({ layoutId, modelName, lineGroupId, stationId, px, py, pz, rx, ry, rz, sx, sy, sz }) => {
+  createPlacement: ({ layoutId, modelName, lineGroupId, stationId, px, py, pz, rx, ry, rz, sx, sy, sz, posIsOffset }) => {
     // FormData.append() silently stringifies a missing value into the literal
     // text "undefined"/"null", which then gets saved to the DB as if it were
     // a real model name — fail loudly here instead of writing garbage data.
@@ -197,6 +197,7 @@ export const z3dModelApi = {
     fd.append('px', px ?? 0); fd.append('py', py ?? 0); fd.append('pz', pz ?? 0);
     fd.append('rx', rx ?? 0); fd.append('ry', ry ?? 0); fd.append('rz', rz ?? 0);
     fd.append('sx', sx ?? 1); fd.append('sy', sy ?? 1); fd.append('sz', sz ?? 1);
+    fd.append('pos_is_offset', posIsOffset ? 'true' : 'false');
     return axios.post(`${BASE_URL}/3d-models/placements`, fd, { headers: { 'Content-Type': 'multipart/form-data' } });
   },
 

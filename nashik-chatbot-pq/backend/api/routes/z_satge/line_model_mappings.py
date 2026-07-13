@@ -44,11 +44,16 @@ def _apply_mapping_to_layout(connector: StateDBConnector, layout_id: int, line_g
             Z3DPlacementQueries.GET_BY_LAYOUT_STATION,
             {"layout_id": layout_id, "station_id": station_id},
         )
+        # default_px/pz are an OFFSET from each station's center (py is an
+        # absolute height) — the same values work for every station on the
+        # line, unlike an absolute world position which would stack every
+        # station's object at one spot.
         transform = {
             "model_name": library_model["name"], "line_group_id": line_group_id,
             "px": library_model["default_px"], "py": library_model["default_py"], "pz": library_model["default_pz"],
             "rx": library_model["default_rx"], "ry": library_model["default_ry"], "rz": library_model["default_rz"],
             "sx": library_model["default_sx"], "sy": library_model["default_sy"], "sz": library_model["default_sz"],
+            "pos_is_offset": True,
         }
         if existing:
             transform["placement_id"] = _row(existing[0])["id"]

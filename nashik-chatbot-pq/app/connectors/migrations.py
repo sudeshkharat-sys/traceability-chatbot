@@ -127,6 +127,14 @@ COLUMN_MIGRATIONS = [
     "ALTER TABLE z3d_model_library ADD COLUMN IF NOT EXISTS default_px FLOAT NOT NULL DEFAULT 0",
     "ALTER TABLE z3d_model_library ADD COLUMN IF NOT EXISTS default_py FLOAT NOT NULL DEFAULT 0",
     "ALTER TABLE z3d_model_library ADD COLUMN IF NOT EXISTS default_pz FLOAT NOT NULL DEFAULT 0",
+    # Position semantics marker for station-bound placements. Historically the
+    # 3D renderer IGNORED a station placement's stored px/pz and snapped the
+    # object to its station's center on every load — so dragging a line object
+    # sideways saved fine but silently reverted on refresh. New writes store
+    # px/pz as an OFFSET from the station center and set this flag; legacy rows
+    # keep FALSE and keep the old snap-to-center behaviour, so nothing moves
+    # unexpectedly on upgrade.
+    "ALTER TABLE z3d_layout_placements ADD COLUMN IF NOT EXISTS pos_is_offset BOOLEAN NOT NULL DEFAULT FALSE",
     # Fixup covering TWO earlier, since-replaced shapes of this feature:
     #   v1: per-layout, with a preset_id FK to a now-removed z3d_model_presets table
     #   v2: global (no layout_id at all)

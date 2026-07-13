@@ -503,7 +503,7 @@ class Z3DLibraryQueries:
 class Z3DPlacementQueries:
     PL_COLS = """
         id, layout_id, model_name, line_group_id, station_id,
-        px, py, pz, rx, ry, rz, sx, sy, sz,
+        px, py, pz, rx, ry, rz, sx, sy, sz, pos_is_offset,
         created_at, updated_at
     """
 
@@ -516,11 +516,11 @@ class Z3DPlacementQueries:
     CREATE = f"""
         INSERT INTO z3d_layout_placements
             (layout_id, model_name, line_group_id, station_id,
-             px, py, pz, rx, ry, rz, sx, sy, sz,
+             px, py, pz, rx, ry, rz, sx, sy, sz, pos_is_offset,
              created_at, updated_at)
         VALUES
             (:layout_id, :model_name, :line_group_id, :station_id,
-             :px, :py, :pz, :rx, :ry, :rz, :sx, :sy, :sz,
+             :px, :py, :pz, :rx, :ry, :rz, :sx, :sy, :sz, :pos_is_offset,
              NOW(), NOW())
         RETURNING {PL_COLS}
     """
@@ -530,6 +530,7 @@ class Z3DPlacementQueries:
         SET px = :px, py = :py, pz = :pz,
             rx = :rx, ry = :ry, rz = :rz,
             sx = :sx, sy = :sy, sz = :sz,
+            pos_is_offset = :pos_is_offset,
             updated_at = NOW()
         WHERE id = :placement_id
         RETURNING id
@@ -547,6 +548,7 @@ class Z3DPlacementQueries:
             px = :px, py = :py, pz = :pz,
             rx = :rx, ry = :ry, rz = :rz,
             sx = :sx, sy = :sy, sz = :sz,
+            pos_is_offset = :pos_is_offset,
             updated_at = NOW()
         WHERE id = :placement_id
         RETURNING {PL_COLS}

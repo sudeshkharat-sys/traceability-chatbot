@@ -36,6 +36,10 @@ class TransformUpdate(BaseModel):
     px: float = 0; py: float = 0; pz: float = 0
     rx: float = 0; ry: float = 0; rz: float = 0
     sx: float = 1; sy: float = 1; sz: float = 1
+    # True when px/pz are an offset from the placement's station center
+    # (survives refresh and follows the station); False = legacy absolute
+    # coords, which the renderer ignores for station-bound rows.
+    pos_is_offset: bool = False
 
 
 class DefaultsUpdate(BaseModel):
@@ -190,6 +194,7 @@ def create_placement(
     px: float = Form(0), py: float = Form(0), pz: float = Form(0),
     rx: float = Form(0), ry: float = Form(0), rz: float = Form(0),
     sx: float = Form(1), sy: float = Form(1), sz: float = Form(1),
+    pos_is_offset: bool = Form(False),
     connector: StateDBConnector = Depends(get_connector),
 ):
     rows = connector.execute_query(Z3DPlacementQueries.CREATE, {
@@ -198,6 +203,7 @@ def create_placement(
         "px": px, "py": py, "pz": pz,
         "rx": rx, "ry": ry, "rz": rz,
         "sx": sx, "sy": sy, "sz": sz,
+        "pos_is_offset": pos_is_offset,
     })
     if not rows:
         raise HTTPException(status_code=500, detail="Failed to create placement")
@@ -215,6 +221,7 @@ def update_placement_transform(
         "px": body.px, "py": body.py, "pz": body.pz,
         "rx": body.rx, "ry": body.ry, "rz": body.rz,
         "sx": body.sx, "sy": body.sy, "sz": body.sz,
+        "pos_is_offset": body.pos_is_offset,
     })
     return {"ok": True}
 
