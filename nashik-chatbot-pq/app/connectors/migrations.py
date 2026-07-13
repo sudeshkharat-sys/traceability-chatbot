@@ -112,6 +112,59 @@ COLUMN_MIGRATIONS = [
     "ALTER TABLE layouts ADD COLUMN IF NOT EXISTS text_labels TEXT DEFAULT '[]'",
     # canvas arrow elements stored as JSON array in the layout row
     "ALTER TABLE layouts ADD COLUMN IF NOT EXISTS canvas_arrows TEXT DEFAULT '[]'",
+    # car models master list — used by the line -> car model -> 3D object mapping
+    """
+    CREATE TABLE IF NOT EXISTS car_models (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL UNIQUE,
+        code VARCHAR(100),
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+    """,
+    # reusable 3D model presets — a library model plus a saved transform
+    # (relative offset from a reference station), so the same "object" can be
+    # applied to any line/station without re-doing rotation/scale/position each time
+    """
+    CREATE TABLE IF NOT EXISTS z3d_model_presets (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL UNIQUE,
+        model_name VARCHAR(500) NOT NULL,
+        px FLOAT NOT NULL DEFAULT 0,
+        py FLOAT NOT NULL DEFAULT 0,
+        pz FLOAT NOT NULL DEFAULT 0,
+        rx FLOAT NOT NULL DEFAULT 0,
+        ry FLOAT NOT NULL DEFAULT 0,
+        rz FLOAT NOT NULL DEFAULT 0,
+        sx FLOAT NOT NULL DEFAULT 1,
+        sy FLOAT NOT NULL DEFAULT 1,
+        sz FLOAT NOT NULL DEFAULT 1,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+    """,
+    # line -> car model -> preset mapping. car_model_id is NULL for lines that
+    # use a single model regardless of car model (e.g. Chassis, Engine).
+    """
+    CREATE TABLE IF NOT EXISTS line_model_mappings (
+        id SERIAL PRIMARY KEY,
+        layout_id INTEGER NOT NULL REFERENCES layouts(id) ON DELETE CASCADE,
+        line_group_id VARCHAR(100) NOT NULL,
+        car_model_id INTEGER REFERENCES car_models(id) ON DELETE CASCADE,
+        preset_id INTEGER NOT NULL REFERENCES z3d_model_presets(id) ON DELETE CASCADE,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    )
+    """,
+    "CREATE INDEX IF NOT EXISTS idx_line_model_mappings_layout_id ON line_model_mappings (layout_id)",
+    # one active mapping per (layout, line, car model); car_model_id NULL is a
+    # single value for uniqueness purposes across all rows in Postgres, so a
+    # partial unique index is used to still enforce "one NULL-car-model mapping
+    # per line" while allowing many non-NULL car_model_id rows per line
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_line_model_mappings_unique_car "
+    "ON line_model_mappings (layout_id, line_group_id, car_model_id) WHERE car_model_id IS NOT NULL",
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_line_model_mappings_unique_nocar "
+    "ON line_model_mappings (layout_id, line_group_id) WHERE car_model_id IS NULL",
 ]
 
 

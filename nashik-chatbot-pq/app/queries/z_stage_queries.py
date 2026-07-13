@@ -531,6 +531,23 @@ class Z3DPlacementQueries:
         RETURNING id
     """
 
+    GET_BY_LAYOUT_STATION = f"""
+        SELECT {PL_COLS} FROM z3d_layout_placements
+        WHERE layout_id = :layout_id AND station_id = :station_id
+        LIMIT 1
+    """
+
+    UPDATE_MODEL_AND_TRANSFORM = f"""
+        UPDATE z3d_layout_placements
+        SET model_name = :model_name, line_group_id = :line_group_id,
+            px = :px, py = :py, pz = :pz,
+            rx = :rx, ry = :ry, rz = :rz,
+            sx = :sx, sy = :sy, sz = :sz,
+            updated_at = NOW()
+        WHERE id = :placement_id
+        RETURNING {PL_COLS}
+    """
+
     DELETE = "DELETE FROM z3d_layout_placements WHERE id = :placement_id"
 
     DELETE_BY_GROUP = """
@@ -594,3 +611,122 @@ class Z3DPlacementQueries:
 
 # keep old name as alias so existing import doesn't break during transition
 Z3DModelQueries = Z3DPlacementQueries
+
+
+# ── Car models master list ────────────────────────────────────────────────────
+
+class CarModelQueries:
+    CM_COLS = "id, name, code, created_at, updated_at"
+
+    LIST_ALL = f"SELECT {CM_COLS} FROM car_models ORDER BY name"
+
+    GET_BY_ID = f"SELECT {CM_COLS} FROM car_models WHERE id = :car_model_id"
+
+    CREATE = f"""
+        INSERT INTO car_models (name, code, created_at, updated_at)
+        VALUES (:name, :code, NOW(), NOW())
+        RETURNING {CM_COLS}
+    """
+
+    UPDATE = f"""
+        UPDATE car_models
+        SET name = COALESCE(:name, name),
+            code = COALESCE(:code, code),
+            updated_at = NOW()
+        WHERE id = :car_model_id
+        RETURNING {CM_COLS}
+    """
+
+    DELETE = "DELETE FROM car_models WHERE id = :car_model_id"
+
+    CHECK_EXISTS = "SELECT id FROM car_models WHERE id = :car_model_id"
+
+
+# ── Z3D reusable model presets ────────────────────────────────────────────────
+
+class Z3DPresetQueries:
+    PR_COLS = """
+        id, name, model_name,
+        px, py, pz, rx, ry, rz, sx, sy, sz,
+        created_at, updated_at
+    """
+
+    LIST_ALL = f"SELECT {PR_COLS} FROM z3d_model_presets ORDER BY name"
+
+    GET_BY_ID = f"SELECT {PR_COLS} FROM z3d_model_presets WHERE id = :preset_id"
+
+    CREATE = f"""
+        INSERT INTO z3d_model_presets
+            (name, model_name, px, py, pz, rx, ry, rz, sx, sy, sz, created_at, updated_at)
+        VALUES
+            (:name, :model_name, :px, :py, :pz, :rx, :ry, :rz, :sx, :sy, :sz, NOW(), NOW())
+        RETURNING {PR_COLS}
+    """
+
+    UPDATE = f"""
+        UPDATE z3d_model_presets
+        SET name = COALESCE(:name, name),
+            model_name = COALESCE(:model_name, model_name),
+            px = :px, py = :py, pz = :pz,
+            rx = :rx, ry = :ry, rz = :rz,
+            sx = :sx, sy = :sy, sz = :sz,
+            updated_at = NOW()
+        WHERE id = :preset_id
+        RETURNING {PR_COLS}
+    """
+
+    DELETE = "DELETE FROM z3d_model_presets WHERE id = :preset_id"
+
+    CHECK_EXISTS = "SELECT id FROM z3d_model_presets WHERE id = :preset_id"
+
+
+# ── Line -> car model -> preset mappings ──────────────────────────────────────
+
+class LineModelMappingQueries:
+    MAP_COLS = """
+        id, layout_id, line_group_id, car_model_id, preset_id,
+        created_at, updated_at
+    """
+
+    LIST_BY_LAYOUT = f"""
+        SELECT {MAP_COLS} FROM line_model_mappings
+        WHERE layout_id = :layout_id
+        ORDER BY line_group_id, car_model_id NULLS FIRST
+    """
+
+    # Upsert respecting the two partial unique indexes (car_model_id NULL vs not-NULL)
+    UPSERT_WITH_CAR_MODEL = f"""
+        INSERT INTO line_model_mappings (layout_id, line_group_id, car_model_id, preset_id, created_at, updated_at)
+        VALUES (:layout_id, :line_group_id, :car_model_id, :preset_id, NOW(), NOW())
+        ON CONFLICT (layout_id, line_group_id, car_model_id) WHERE car_model_id IS NOT NULL
+        DO UPDATE SET preset_id = EXCLUDED.preset_id, updated_at = NOW()
+        RETURNING {MAP_COLS}
+    """
+
+    UPSERT_NO_CAR_MODEL = f"""
+        INSERT INTO line_model_mappings (layout_id, line_group_id, car_model_id, preset_id, created_at, updated_at)
+        VALUES (:layout_id, :line_group_id, NULL, :preset_id, NOW(), NOW())
+        ON CONFLICT (layout_id, line_group_id) WHERE car_model_id IS NULL
+        DO UPDATE SET preset_id = EXCLUDED.preset_id, updated_at = NOW()
+        RETURNING {MAP_COLS}
+    """
+
+    DELETE = "DELETE FROM line_model_mappings WHERE id = :mapping_id"
+
+    DELETE_BY_LINE = """
+        DELETE FROM line_model_mappings
+        WHERE layout_id = :layout_id AND line_group_id = :line_group_id
+    """
+
+    CHECK_EXISTS = "SELECT id FROM line_model_mappings WHERE id = :mapping_id"
+
+    # Latest mapping per (line_group_id, car_model_id) across ALL layouts —
+    # used by auto-seed so a new layout's line inherits the same car-model/preset
+    # assignment as other layouts with a matching line name.
+    LIST_LATEST_BY_LINE_GROUP = """
+        SELECT DISTINCT ON (car_model_id)
+            id, layout_id, line_group_id, car_model_id, preset_id, created_at, updated_at
+        FROM line_model_mappings
+        WHERE line_group_id = :line_group_id
+        ORDER BY car_model_id NULLS FIRST, updated_at DESC
+    """

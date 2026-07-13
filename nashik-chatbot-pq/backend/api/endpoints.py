@@ -17,6 +17,9 @@ from backend.api.routes.z_satge.input_records import router as input_record_rout
 from backend.api.routes.z_satge.layered_audit import router as layered_audit_router
 from backend.api.routes.z_satge.docs import router as docs_router
 from backend.api.routes.z_satge.z3d_models import router as z3d_models_router
+from backend.api.routes.z_satge.z3d_presets import router as z3d_presets_router
+from backend.api.routes.z_satge.car_models import router as car_models_router
+from backend.api.routes.z_satge.line_model_mappings import router as line_model_mappings_router
 
 # Create main router
 router = APIRouter()
@@ -46,3 +49,6 @@ router.include_router(input_record_router, prefix="/z-stage", tags=["z_stage_inp
 router.include_router(layered_audit_router, prefix="/z-stage", tags=["z_stage_layered_audit"])
 router.include_router(docs_router, prefix="/z-stage", tags=["z_stage_docs"])
 router.include_router(z3d_models_router, prefix="/z-stage", tags=["z3d_models"])
+router.include_router(z3d_presets_router, prefix="/z-stage", tags=["z3d_presets"])
+router.include_router(car_models_router, prefix="/z-stage", tags=["car_models"])
+router.include_router(line_model_mappings_router, prefix="/z-stage", tags=["line_model_mappings"])

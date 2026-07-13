@@ -206,3 +206,41 @@ export const z3dModelApi = {
   deleteGroup: (layoutId, lineGroupId) =>
     api.delete(`/3d-models/placements/group/${layoutId}/${encodeURIComponent(lineGroupId)}`),
 };
+
+export const carModelApi = {
+  list: () => api.get('/car-models'),
+  create: ({ name, code }) => api.post('/car-models', { name, code }),
+  update: (carModelId, { name, code }) => api.put(`/car-models/${carModelId}`, { name, code }),
+  delete: (carModelId) => api.delete(`/car-models/${carModelId}`),
+};
+
+export const z3dPresetApi = {
+  list: () => api.get('/3d-models/presets'),
+  create: ({ name, modelName, px, py, pz, rx, ry, rz, sx, sy, sz }) =>
+    api.post('/3d-models/presets', {
+      name, model_name: modelName,
+      px: px ?? 0, py: py ?? 0, pz: pz ?? 0,
+      rx: rx ?? 0, ry: ry ?? 0, rz: rz ?? 0,
+      sx: sx ?? 1, sy: sy ?? 1, sz: sz ?? 1,
+    }),
+  update: (presetId, { name, modelName, px, py, pz, rx, ry, rz, sx, sy, sz }) =>
+    api.put(`/3d-models/presets/${presetId}`, {
+      name, model_name: modelName,
+      px: px ?? 0, py: py ?? 0, pz: pz ?? 0,
+      rx: rx ?? 0, ry: ry ?? 0, rz: rz ?? 0,
+      sx: sx ?? 1, sy: sy ?? 1, sz: sz ?? 1,
+    }),
+  delete: (presetId) => api.delete(`/3d-models/presets/${presetId}`),
+};
+
+export const lineModelMappingApi = {
+  listByLayout: (layoutId) => api.get(`/line-model-mappings/layout/${layoutId}`),
+  create: ({ layoutId, lineGroupId, carModelId, presetId }) =>
+    api.post('/line-model-mappings', {
+      layout_id: layoutId, line_group_id: lineGroupId,
+      car_model_id: carModelId ?? null, preset_id: presetId,
+    }),
+  delete: (mappingId) => api.delete(`/line-model-mappings/${mappingId}`),
+  getLatestByLineGroup: (lineGroupId) =>
+    api.get(`/line-model-mappings/by-line-group/${encodeURIComponent(lineGroupId)}`),
+};
