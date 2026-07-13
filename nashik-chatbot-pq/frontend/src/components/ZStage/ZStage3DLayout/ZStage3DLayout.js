@@ -2186,8 +2186,18 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     if (applyGlobally) {
       const modelName = entry.mesh.userData.objName || entry.name;
       if (modelName) {
-        saveModelPreset(modelName, { scale: multiplier, rotX: 0, rotY: 0, rotZ: 0 });
-        z3dModelApi.saveDefaults(modelName, { sx: multiplier, sy: multiplier, sz: multiplier, rx: 0, ry: 0, rz: 0 }).catch(() => {});
+        // Preserve current position/rotation — this only changes scale, so
+        // hardcoding rotation to 0 or omitting position would silently wipe
+        // out whatever was previously saved for this model.
+        const rotXDeg = (entry.mesh.rotation.x * 180) / Math.PI;
+        const rotYDeg = (entry.mesh.rotation.y * 180) / Math.PI;
+        const rotZDeg = (entry.mesh.rotation.z * 180) / Math.PI;
+        saveModelPreset(modelName, { scale: multiplier, rotX: rotXDeg, rotY: rotYDeg, rotZ: rotZDeg });
+        z3dModelApi.saveDefaults(modelName, {
+          px: entry.mesh.position.x, py: entry.mesh.position.y, pz: entry.mesh.position.z,
+          sx: multiplier, sy: multiplier, sz: multiplier,
+          rx: entry.mesh.rotation.x, ry: entry.mesh.rotation.y, rz: entry.mesh.rotation.z,
+        }).catch(() => {});
       }
     }
     // The render loop only redraws when this flag is set — without it, the
@@ -2233,6 +2243,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         // "Save Preset -> All Layouts" show other layouts' copies wildly
         // tilted, as if freshly uploaded with garbage rotation.
         z3dModelApi.saveDefaults(modelName, {
+          px: entry.mesh.position.x, py: entry.mesh.position.y, pz: entry.mesh.position.z,
           sx: currentScale, sy: currentScale, sz: currentScale,
           rx: (rx * Math.PI) / 180, ry: (ry * Math.PI) / 180, rz: (rz * Math.PI) / 180,
         }).catch(() => {});
@@ -2936,9 +2947,11 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     if (!currentSelected) return;
     const modelName = currentSelected.mesh?.userData?.objName || currentSelected.name;
     if (!modelName) return;
+    const pos = currentSelected.mesh?.position;
     setScopeConfirm({
       kind: 'transform', modelName,
       scale: scaleVal, rotX, rotY, rotZ,
+      px: pos?.x ?? 0, py: pos?.y ?? 0, pz: pos?.z ?? 0,
     });
   }, [currentSelected, scaleVal, rotX, rotY, rotZ]);
 
@@ -2975,7 +2988,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const confirmScopeAllLayouts = useCallback(() => {
     if (!scopeConfirm) return;
     if (scopeConfirm.kind === 'transform') {
-      const { modelName, scale, rotX: rx, rotY: ry, rotZ: rz } = scopeConfirm;
+      const { modelName, scale, rotX: rx, rotY: ry, rotZ: rz, px, py, pz } = scopeConfirm;
       // rx/ry/rz are the slider's DEGREES (0-360) — every placement's stored
       // rotation, and the renderer's obj.rotation.set(), are in RADIANS.
       // The live per-layout drag handler (setGroupRotation) converts before
@@ -2984,9 +2997,13 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
       // (e.g. 90° sent as 90 rad), which renders as a wild, "tilted"
       // rotation that looks like an untouched fresh upload.
       const rxRad = (rx * Math.PI) / 180, ryRad = (ry * Math.PI) / 180, rzRad = (rz * Math.PI) / 180;
-      // Sets the default for FUTURE placements/new layouts...
+      // Sets the default for FUTURE placements/new layouts... position must
+      // be included too — the defaults endpoint accepts px/py/pz and
+      // defaults any missing one to 0, so omitting them here would silently
+      // reset this model's saved position to the origin every time someone
+      // saves a rotation/scale preset.
       saveModelPreset(modelName, { scale, rotX: rx, rotY: ry, rotZ: rz });
-      z3dModelApi.saveDefaults(modelName, { sx: scale, sy: scale, sz: scale, rx: rxRad, ry: ryRad, rz: rzRad })
+      z3dModelApi.saveDefaults(modelName, { px, py, pz, sx: scale, sy: scale, sz: scale, rx: rxRad, ry: ryRad, rz: rzRad })
         .catch(err => console.error('[Z3D] Save Preset: saveDefaults failed —', err?.response?.status, err?.response?.data || err?.message));
       // ...AND retroactively pushes the same scale/rotation onto every
       // already-placed copy of this model in every other layout, so "All
