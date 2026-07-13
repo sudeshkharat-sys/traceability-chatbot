@@ -245,17 +245,22 @@ export default function ModelMappingModal({ shopList, onClose, onApplied }) {
 
             {selectedModelName && (
               <>
-                <div className="z3d-modal-label">Transform for "{selectedModelName}"</div>
+                <div className="z3d-modal-label">Preset — Movement / Scale / Rotation for "{selectedModelName}"</div>
+                <div className="z3d-modal-hint" style={{ marginBottom: 8 }}>
+                  Adjust how this object sits on the station, then Save Preset below. These
+                  numbers get remembered as this model's preset — every station on this
+                  line, in every layout, will use them from now on.
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 8 }}>
                   {['px', 'py', 'pz'].map(f => (
                     <div key={f}>
-                      <label className="z3d-modal-label">{f.toUpperCase()} (pos)</label>
+                      <label className="z3d-modal-label">{f.toUpperCase()} (move)</label>
                       <input type="number" step="0.1" className="z3d-modal-select" value={xform[f]} onChange={e => setXformField(f, e.target.value)} />
                     </div>
                   ))}
                   {['rx', 'ry', 'rz'].map(f => (
                     <div key={f}>
-                      <label className="z3d-modal-label">{f.toUpperCase()} (deg)</label>
+                      <label className="z3d-modal-label">{f.toUpperCase()} (rotate °)</label>
                       <input type="number" step="1" className="z3d-modal-select" value={xform[f]} onChange={e => setXformField(f, e.target.value)} />
                     </div>
                   ))}
@@ -270,7 +275,13 @@ export default function ModelMappingModal({ shopList, onClose, onApplied }) {
             )}
 
             <div className="z3d-modal-actions">
-              <button type="button" className="z3d-modal-confirm" disabled={loading} onClick={saveMapping}>Save Mapping</button>
+              <button type="button" className="z3d-modal-confirm" disabled={loading} onClick={saveMapping}>
+                Save Preset — Apply to This Line
+              </button>
+            </div>
+            <div className="z3d-modal-hint">
+              Saved automatically for next time — reopening any layout with this line will
+              show this object with these exact values, no re-setup needed.
             </div>
 
             <div style={{ marginTop: 16, borderTop: '1px solid #30363d', paddingTop: 10 }}>
