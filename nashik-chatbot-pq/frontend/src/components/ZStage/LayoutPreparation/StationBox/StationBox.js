@@ -1,7 +1,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import Draggable from 'react-draggable';
 import { useXarrow } from 'react-xarrows';
-import { X } from 'lucide-react';
+import { X, Box } from 'lucide-react';
 import './StationBox.css';
 
 // Shows start + '..' + end for names longer than 8 chars
@@ -256,7 +256,7 @@ function StationBox({
                 title="Assign 3D object (car model + object)"
                 onClick={(e) => { e.stopPropagation(); onAssignObject(id, name); }}
               >
-                🎯
+                <Box size={12} />
               </button>
             )}
             {onDelete && (
