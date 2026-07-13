@@ -177,6 +177,30 @@ function makeGLTFLoader() {
   return loader;
 }
 
+// Bumped whenever the placement persistence logic changes — logged on every
+// scene build so "is the browser actually running the new bundle" can be
+// answered from a console screenshot instead of guessing.
+const Z3D_BUILD_TAG = 'offset-persistence-v2';
+
+// A transform save that fails leaves the object looking correct on screen but
+// silently reverts it on the next refresh — the single most confusing failure
+// mode this component has. Alert the first time it happens (console-only for
+// repeats) so it's diagnosed at drag-time, not discovered a day later.
+let _transformSaveErrorAlerted = false;
+function reportTransformSaveError(err) {
+  const status = err?.response?.status;
+  const detail = err?.response?.data?.detail || err?.message || 'unknown error';
+  console.error('[Z3D] Transform save FAILED — changes will revert on refresh:', status, detail);
+  if (!_transformSaveErrorAlerted) {
+    _transformSaveErrorAlerted = true;
+    alert(
+      `Saving the object's position/rotation to the server FAILED (${status ?? ''} ${detail}).\n` +
+      `The change you just made will revert when the page is refreshed.\n` +
+      `Check that the backend is running the latest code and was restarted.`
+    );
+  }
+}
+
 // Build the transform payload to persist for a placed entry. Station-bound
 // entries (baseX/baseZ set) save px/pz as an OFFSET from their station anchor
 // with pos_is_offset=true — the loader adds it back on top of the station's
@@ -1284,7 +1308,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
             const sid = t.mesh.userData.serverModelId;
             if (!sid) return;
             z3dModelApi.updateTransform(sid, buildTransformPayload(t))
-              .catch(err => console.error('[Z3D] Transform update failed:', err));
+              .catch(reportTransformSaveError);
           });
         }
       }
@@ -1322,6 +1346,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     if (canReuseScene) {
       onSceneReady && onSceneReady();
     } else {
+    console.info(`[Z3D] bundle: ${Z3D_BUILD_TAG} — loading placements for layout ${layout.id}`);
     z3dModelApi.listPlacements(layout.id).then(res => {
       const placements = res.data || [];
 
@@ -1507,6 +1532,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           // Station anchor (already xOff-compensated) — persist code uses it
           // to convert the mesh's world position back into a saveable offset.
           baseX, baseZ,
+          posIsOffset: !!record.pos_is_offset,
         };
         placedRef.current = [...placedRef.current, entry];
         onObjectsChange([...placedRef.current]);
@@ -1537,8 +1563,13 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
             posByStation.set(key, p.stationId);
           });
           console.info(
-            `[Z3D] Scene ready: ${placedRef.current.length} object(s) placed.`,
-            placedRef.current.map(p => ({ station: p.stationId, name: p.name, x: Math.round(p.mesh.position.x * 10) / 10, z: Math.round(p.mesh.position.z * 10) / 10 }))
+            `[Z3D] Scene ready (${Z3D_BUILD_TAG}): ${placedRef.current.length} object(s) placed.`,
+            placedRef.current.map(p => ({
+              station: p.stationId, name: p.name,
+              x: Math.round(p.mesh.position.x * 10) / 10, z: Math.round(p.mesh.position.z * 10) / 10,
+              ryDeg: Math.round((p.mesh.rotation.y * 180) / Math.PI),
+              offsetMode: !!p.posIsOffset,
+            }))
           );
           if (dupes.length > 0) {
             console.warn(`[Z3D] Scene ready: ${dupes.length} pair(s) of objects share the exact same position (one is likely hidden behind/inside the other):`, dupes);
@@ -2233,7 +2264,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       }
       const sid = t.mesh.userData.serverModelId;
       if (sid) {
-        z3dModelApi.updateTransform(sid, buildTransformPayload(t)).catch(() => {});
+        z3dModelApi.updateTransform(sid, buildTransformPayload(t)).catch(reportTransformSaveError);
       }
     });
     // Only pushed to the shared model default (which every OTHER layout's
@@ -2281,7 +2312,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       );
       const sid = t.mesh.userData.serverModelId;
       if (sid) {
-        z3dModelApi.updateTransform(sid, buildTransformPayload(t)).catch(() => {});
+        z3dModelApi.updateTransform(sid, buildTransformPayload(t)).catch(reportTransformSaveError);
       }
     });
     if (applyGlobally) {
