@@ -226,6 +226,28 @@ def update_placement_transform(
     return {"ok": True}
 
 
+class RotationScaleUpdate(BaseModel):
+    rx: float = 0; ry: float = 0; rz: float = 0
+    sx: float = 1; sy: float = 1; sz: float = 1
+
+
+@router.put("/placements/{placement_id}/rotation-scale")
+def update_placement_rotation_scale(
+    placement_id: int,
+    body: RotationScaleUpdate,
+    connector: StateDBConnector = Depends(get_connector),
+):
+    """Partial update — rotation/scale only, position untouched. Safe to call
+    without first fetching the row, unlike a full transform update that would
+    need to read-then-rewrite position and risk racing a concurrent drag."""
+    connector.execute_update(Z3DPlacementQueries.UPDATE_ROTATION_SCALE, {
+        "placement_id": placement_id,
+        "rx": body.rx, "ry": body.ry, "rz": body.rz,
+        "sx": body.sx, "sy": body.sy, "sz": body.sz,
+    })
+    return {"ok": True}
+
+
 @router.delete("/placements/{placement_id}", status_code=204)
 def delete_placement(placement_id: int, connector: StateDBConnector = Depends(get_connector)):
     connector.execute_update(Z3DPlacementQueries.DELETE, {"placement_id": placement_id})

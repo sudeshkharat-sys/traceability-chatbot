@@ -3194,16 +3194,17 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
       // ...AND retroactively pushes the same scale/rotation onto every
       // already-placed copy of this model in every other layout, so "All
       // layouts" actually means all layouts — not just ones created later.
-      // Position (px/py/pz) is left as each placement's own value; only
-      // rotation/scale are shared across a model's copies.
+      // Uses the rotation/scale-ONLY endpoint — it never reads or rewrites
+      // position, so it can't race a concurrent drag/move on the same
+      // placement (the old approach fetched each row's "current" px/py/pz
+      // and wrote it straight back "unchanged", but if that fetch ran before
+      // an in-flight drag's own save had committed, it silently wrote back
+      // the stale pre-drag position, undoing the move).
       z3dModelApi.getPlacementsByModelName(modelName).then(res => {
         const rows = res.data || [];
         console.info(`[Z3D] Save Preset (All layouts): found ${rows.length} existing placement(s) of "${modelName}" to update.`);
         return Promise.all(rows.map(p =>
-          z3dModelApi.updateTransform(p.id, {
-            // Keep each row's own position AND its offset-vs-absolute
-            // semantics — this push only shares rotation/scale.
-            px: p.px, py: p.py, pz: p.pz, pos_is_offset: p.pos_is_offset,
+          z3dModelApi.updateRotationScale(p.id, {
             rx: rxRad, ry: ryRad, rz: rzRad, sx: absScale, sy: absScale, sz: absScale,
           }).then(
             () => ({ id: p.id, ok: true }),

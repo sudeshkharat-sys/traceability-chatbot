@@ -536,6 +536,22 @@ class Z3DPlacementQueries:
         RETURNING id
     """
 
+    # True partial update — touches ONLY rotation/scale, never reads or
+    # rewrites position. Used by "Save Preset -> All Layouts" so it can never
+    # race with (and silently discard) a concurrent drag/move on the same
+    # placement: the old approach fetched each row's "current" px/py/pz and
+    # wrote it straight back to "leave position unchanged", but if that fetch
+    # ran before an in-flight drag's own save had committed, it wrote back
+    # the STALE pre-drag position, undoing the move.
+    UPDATE_ROTATION_SCALE = """
+        UPDATE z3d_layout_placements
+        SET rx = :rx, ry = :ry, rz = :rz,
+            sx = :sx, sy = :sy, sz = :sz,
+            updated_at = NOW()
+        WHERE id = :placement_id
+        RETURNING id
+    """
+
     GET_BY_LAYOUT_STATION = f"""
         SELECT {PL_COLS} FROM z3d_layout_placements
         WHERE layout_id = :layout_id AND station_id = :station_id

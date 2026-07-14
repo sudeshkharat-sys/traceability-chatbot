@@ -204,6 +204,11 @@ export const z3dModelApi = {
   updateTransform: (placementId, transform) =>
     api.put(`/3d-models/placements/${placementId}/transform`, transform),
 
+  // Rotation/scale ONLY — never touches position, so it can't race a
+  // concurrent drag/move on the same placement.
+  updateRotationScale: (placementId, { rx, ry, rz, sx, sy, sz }) =>
+    api.put(`/3d-models/placements/${placementId}/rotation-scale`, { rx, ry, rz, sx, sy, sz }),
+
   deletePlacement: (placementId) => api.delete(`/3d-models/placements/${placementId}`),
 
   deleteGroup: (layoutId, lineGroupId) =>
