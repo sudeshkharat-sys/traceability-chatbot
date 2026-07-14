@@ -1524,10 +1524,18 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         obj.userData.floorOffsetAtBase = geo.floorOffsetAtBase;
         obj.userData.geoXOff = geo.xOff;
 
-        // Use saved py if user manually lifted the model above floor, else use floor-snap
+        // Use the saved height if one was ever explicitly set — ABOVE or
+        // BELOW the auto floor-snap — and only fall back to the computed
+        // floor-snap for a never-touched row (py still at its 0 default).
+        // Previously this only ever let a saved height win if it was HIGHER
+        // than the auto-snap, treating the auto-snap as a hard floor no
+        // saved value could go below — so dragging an object down and
+        // saving it (e.g. to fix a model whose bounding box makes it look
+        // like it's floating) always got silently overridden back up on
+        // the next load, no matter how many times it was re-saved.
         const floorY = geo.floorOffsetAtBase * sx;
         const savedPy = record.py ?? 0;
-        const finalY = savedPy > floorY ? savedPy : floorY;
+        const finalY = savedPy !== 0 ? savedPy : floorY;
 
         // Station-bound placements anchor to their station's center (so they
         // follow the station if the 2D box is moved). Rows saved with
