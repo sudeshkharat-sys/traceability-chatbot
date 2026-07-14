@@ -1606,7 +1606,9 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
             `[Z3D] Scene ready (${Z3D_BUILD_TAG}): ${placedRef.current.length} object(s) placed.`,
             placedRef.current.map(p => ({
               station: p.stationId, name: p.name,
-              x: Math.round(p.mesh.position.x * 10) / 10, z: Math.round(p.mesh.position.z * 10) / 10,
+              x: Math.round(p.mesh.position.x * 10) / 10,
+              y: Math.round(p.mesh.position.y * 100) / 100,
+              z: Math.round(p.mesh.position.z * 10) / 10,
               ryDeg: Math.round((p.mesh.rotation.y * 180) / Math.PI),
               offsetMode: !!p.posIsOffset,
             }))
