@@ -3120,7 +3120,14 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     const p = buildTransformPayload(currentSelected);
     setScopeConfirm({
       kind: 'transform', modelName,
-      scale: scaleVal, rotX, rotY, rotZ,
+      // scale here is the SLIDER MULTIPLIER (e.g. 1.0 = "100%", shown as
+      // "1.0×") — baseScale is the model's own auto-fit scale. Both saved
+      // placements and library defaults store an ABSOLUTE scale
+      // (baseScale * multiplier), same convention as every drag/rotate save
+      // elsewhere — baseScale must travel with scale so the confirm handler
+      // can convert back to absolute instead of saving the bare multiplier.
+      scale: scaleVal, baseScale: currentSelected.mesh?.userData?.baseScale || 1,
+      rotX, rotY, rotZ,
       px: p.pos_is_offset ? p.px : 0, py: p.py, pz: p.pos_is_offset ? p.pz : 0,
     });
   }, [currentSelected, scaleVal, rotX, rotY, rotZ]);
@@ -3158,7 +3165,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const confirmScopeAllLayouts = useCallback(() => {
     if (!scopeConfirm) return;
     if (scopeConfirm.kind === 'transform') {
-      const { modelName, scale, rotX: rx, rotY: ry, rotZ: rz, px, py, pz } = scopeConfirm;
+      const { modelName, scale, baseScale, rotX: rx, rotY: ry, rotZ: rz, px, py, pz } = scopeConfirm;
       // rx/ry/rz are the slider's DEGREES (0-360) — every placement's stored
       // rotation, and the renderer's obj.rotation.set(), are in RADIANS.
       // The live per-layout drag handler (setGroupRotation) converts before
@@ -3167,13 +3174,22 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
       // (e.g. 90° sent as 90 rad), which renders as a wild, "tilted"
       // rotation that looks like an untouched fresh upload.
       const rxRad = (rx * Math.PI) / 180, ryRad = (ry * Math.PI) / 180, rzRad = (rz * Math.PI) / 180;
+      // `scale` is the slider's MULTIPLIER (1.0 = "100%") — every stored sx/
+      // sy/sz (placements AND library defaults) is an ABSOLUTE scale
+      // (baseScale * multiplier), same convention the loader/renderer use
+      // everywhere else. Sending the bare multiplier as sx directly shrank
+      // or grew the object on the very next reload (autoScale is typically
+      // well under 1, e.g. 0.1-0.5, so a "1.0×" save could 2-10x the visible
+      // size) — and since floor-snap height is scale-dependent, the object
+      // visibly jumped upward at the same time as it changed size.
+      const absScale = (baseScale || 1) * scale;
       // Sets the default for FUTURE placements/new layouts... position must
       // be included too — the defaults endpoint accepts px/py/pz and
       // defaults any missing one to 0, so omitting them here would silently
       // reset this model's saved position to the origin every time someone
       // saves a rotation/scale preset.
       saveModelPreset(modelName, { scale, rotX: rx, rotY: ry, rotZ: rz });
-      z3dModelApi.saveDefaults(modelName, { px, py, pz, sx: scale, sy: scale, sz: scale, rx: rxRad, ry: ryRad, rz: rzRad })
+      z3dModelApi.saveDefaults(modelName, { px, py, pz, sx: absScale, sy: absScale, sz: absScale, rx: rxRad, ry: ryRad, rz: rzRad })
         .catch(err => console.error('[Z3D] Save Preset: saveDefaults failed —', err?.response?.status, err?.response?.data || err?.message));
       // ...AND retroactively pushes the same scale/rotation onto every
       // already-placed copy of this model in every other layout, so "All
@@ -3188,7 +3204,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             // Keep each row's own position AND its offset-vs-absolute
             // semantics — this push only shares rotation/scale.
             px: p.px, py: p.py, pz: p.pz, pos_is_offset: p.pos_is_offset,
-            rx: rxRad, ry: ryRad, rz: rzRad, sx: scale, sy: scale, sz: scale,
+            rx: rxRad, ry: ryRad, rz: rzRad, sx: absScale, sy: absScale, sz: absScale,
           }).then(
             () => ({ id: p.id, ok: true }),
             err => {
