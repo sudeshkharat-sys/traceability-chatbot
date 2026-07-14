@@ -8,7 +8,7 @@ import { VRMLLoader } from 'three/examples/jsm/loaders/VRMLLoader';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
 import { RefreshCw } from 'lucide-react';
-import { layoutApi, inputApi, z3dModelApi } from '../../../services/api/layoutApi';
+import { layoutApi, inputApi, z3dModelApi, lineModelMappingApi } from '../../../services/api/layoutApi';
 import { layeredAuditApi } from '../../../services/api/layoutApi';
 import { StationDetailModal, MONTHLY_KEYS } from '../ZStageDashboard/ZStageDashboard';
 import '../ZStageDashboard/ZStageDashboard.css';
@@ -1347,8 +1347,40 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       onSceneReady && onSceneReady();
     } else {
     console.info(`[Z3D] bundle: ${Z3D_BUILD_TAG} — loading placements for layout ${layout.id}`);
-    z3dModelApi.listPlacements(layout.id).then(res => {
-      const placements = res.data || [];
+    Promise.all([
+      z3dModelApi.listPlacements(layout.id),
+      // This layout's own explicit line->car model->object assignments (set
+      // via the Layout Preparation 🎯 popup). A line with an explicit
+      // mapping here must NEVER fall through to the fuzzy cross-line
+      // auto-seed matcher below — lineNamesMatch() deliberately treats
+      // "Trim"/"Trim 1"/"Trim Line" as the SAME logical line (it strips
+      // trailing numbers), which is right for the old "one shared model,
+      // copied across layouts" use case but wrong the moment two DIFFERENT
+      // physical lines in the SAME layout ("Trim" and "Trim 1") are each
+      // explicitly assigned a DIFFERENT model — the fuzzy matcher would
+      // otherwise seed a missing station on one from whichever line's
+      // placement happens to be "most recently updated", silently swapping
+      // one line's object for the other's on the very next reload.
+      lineModelMappingApi.listByLayout(layout.id).catch(() => ({ data: [] })),
+    ]).then(([placementsRes, mappingsRes]) => {
+      const placements = placementsRes.data || [];
+      const explicitMappings = mappingsRes.data || [];
+      // Prefer a mapping with no car model (single-model line) since it's
+      // unambiguous; otherwise fall back to whichever car-model mapping was
+      // saved most recently. No "active car model" selector exists yet to
+      // pick deliberately — this only matters for FILLING IN a station that
+      // has no placement at all, not for lines that are already fully seeded.
+      const mappingByLine = new Map();
+      explicitMappings.forEach(m => {
+        const existing = mappingByLine.get(m.line_group_id);
+        if (!existing) { mappingByLine.set(m.line_group_id, m); return; }
+        const existingIsGeneric = existing.car_model_id == null;
+        const thisIsGeneric = m.car_model_id == null;
+        if (existingIsGeneric) return; // generic mapping already wins
+        if (thisIsGeneric || new Date(m.updated_at) > new Date(existing.updated_at)) {
+          mappingByLine.set(m.line_group_id, m);
+        }
+      });
 
       // Auto-seed any station that has NO placement yet — per STATION, not
       // per line. Only count placements with a real, loadable model_name
@@ -1727,6 +1759,31 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         ]);
 
         unseededLines.forEach(lineGroupId => {
+          // This exact line has an explicit assignment in THIS layout —
+          // trust it completely and skip fuzzy cross-line matching, so a
+          // missing station on "Trim" can never get seeded from "Trim 1"'s
+          // (or any other layout's) model just because the names are similar.
+          const explicitMapping = mappingByLine.get(lineGroupId);
+          if (explicitMapping) {
+            z3dModelApi.getLibraryModel(explicitMapping.model_name).then(res => res.data).then(lib => {
+              console.info(`[Z3D] Auto-seed: line "${lineGroupId}" seeded from its own explicit mapping (model "${explicitMapping.model_name}"), no fuzzy matching used.`);
+              return seedFromTemplate({
+                model_name: explicitMapping.model_name,
+                sx: lib?.default_sx, sy: lib?.default_sy, sz: lib?.default_sz,
+                rx: lib?.default_rx, ry: lib?.default_ry, rz: lib?.default_rz,
+                py: lib?.default_py,
+              }, lineGroupId);
+            }).catch(err => {
+              console.error(`[Z3D] Auto-seed: explicit mapping for "${lineGroupId}" references missing model "${explicitMapping.model_name}" —`, err?.message);
+              return [];
+            }).then(newRecords => {
+              batchesResolved += 1;
+              if (newRecords.length > 0) loadAndPlace(newRecords);
+              checkDone();
+            });
+            return;
+          }
+
           lineGroupsAndLibrary.then(([lgRes, libRes]) => {
             const knownLineGroups = lgRes.data || [];
             const libraryModels = libRes.data || [];  // [{name, ext, ...}]
