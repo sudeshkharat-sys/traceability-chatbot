@@ -1,6 +1,7 @@
 """
 SQL Query definitions for Z-Stage
 """
+# includes CarModelQueries and LineModelMappingQueries (line/car-model/object mapping feature)
 
 import re
 
