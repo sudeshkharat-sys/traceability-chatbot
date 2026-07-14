@@ -3084,6 +3084,24 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
 
   const currentSelected = placedObjects.find(o => o.id === selectedId);
 
+  // Keep the scale/rotation sliders in sync with whatever is ACTUALLY
+  // selected. Without this, the sliders only ever get set when a NEW object
+  // is first placed (or explicitly dragged) — selecting a different,
+  // already-placed object (click in the canvas, or the Objects list) left
+  // them showing whatever was left over from the PREVIOUS selection. Clicking
+  // "Save Preset" then broadcast that stale, wrong value onto every
+  // placement of the newly-selected model, silently reverting its real saved
+  // rotation/scale back to whatever the sliders happened to still show.
+  useEffect(() => {
+    if (!currentSelected?.mesh) return;
+    const mesh = currentSelected.mesh;
+    const base = mesh.userData.baseScale || 1;
+    setScaleVal(base ? mesh.scale.x / base : 1);
+    setRotX(Math.round((mesh.rotation.x * 180) / Math.PI));
+    setRotY(Math.round((mesh.rotation.y * 180) / Math.PI));
+    setRotZ(Math.round((mesh.rotation.z * 180) / Math.PI));
+  }, [selectedId, currentSelected]);
+
   // ── Scope-confirm popup ─────────────────────────────────────────────────
   // Same "this layout only, or every layout" question, reused for two things:
   // saving a scale/rotation as the model's default, and picking an
