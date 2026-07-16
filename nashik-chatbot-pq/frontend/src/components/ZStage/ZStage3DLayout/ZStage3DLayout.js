@@ -395,39 +395,44 @@ function getHangerBarMaterial() {
   return _hangerBarMat;
 }
 // Circular-pipe hanger rail running along the LINE LENGTH (X) across the
-// station cell — one continuous bent tube, like a clothes rail: horizontal
-// round bar, smooth 90° bends at both ends, then round rods rising up to
-// the roof beams. Same safety yellow as the floor-boundary striping.
-const HANGER_PIPE_R = 0.06; // pipe radius
-const HANGER_BEND_R = 0.20; // radius of the 90° bend at each end
+// station cell, in a TRAPEZOID shape: full-width horizontal round bar, with
+// the two support rods slanting INWARD as they rise to the roof. The slant
+// pulls the uprights away from the box-name boards hanging at the line ends
+// (straight vertical rods at the cell edges cut right through them). Same
+// safety yellow as the floor-boundary striping.
+const HANGER_PIPE_R  = 0.06; // pipe radius
+const HANGER_TOP_INSET = 1.2; // how far each rod's TOP end is pulled inward
 function makeHangerBar(pos) {
   const group = new THREE.Group();
   const mat = getHangerBarMaterial();
   const barY = HEIGHT - HANGER_BAR_DROP;
   const halfW = CELL_W / 2;
 
-  // Horizontal round bar (shortened by the bend radius on each side)
-  const barLen = CELL_W - 2 * HANGER_BEND_R;
-  const bar = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, barLen, 16), mat);
+  // Horizontal round bar — full cell width
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, CELL_W, 16), mat);
   bar.rotation.z = Math.PI / 2; // cylinder axis Y → X
   bar.position.set(pos.x, barY, pos.z);
   group.add(bar);
 
-  // 90° bends + vertical rods up to the roof, one at each end
-  const rodLen = HANGER_BAR_DROP - HANGER_BEND_R;
+  // Slanted support rods: bottom at the bar ends, top pulled inward toward
+  // the cell centre → trapezoid profile (wide at the rail, narrow at the roof)
+  const rodLen = Math.hypot(HANGER_TOP_INSET, HANGER_BAR_DROP);
+  const tilt   = Math.atan2(HANGER_TOP_INSET, HANGER_BAR_DROP);
   [-1, 1].forEach(side => {
-    const bend = new THREE.Mesh(
-      new THREE.TorusGeometry(HANGER_BEND_R, HANGER_PIPE_R, 12, 16, Math.PI / 2), mat
-    );
-    // Arc center sits bendR inward and bendR above the bar end, tangent to
-    // both the horizontal bar and the vertical rod.
-    bend.position.set(pos.x + side * (halfW - HANGER_BEND_R), barY + HANGER_BEND_R, pos.z);
-    bend.rotation.z = side === 1 ? -Math.PI / 2 : Math.PI;
-    group.add(bend);
-
     const rod = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, rodLen, 16), mat);
-    rod.position.set(pos.x + side * halfW, barY + HANGER_BEND_R + rodLen / 2, pos.z);
+    // Rotating a Y-axis cylinder about Z by +angle leans its top toward -X,
+    // so the right-side (+X) rod gets +tilt and the left one -tilt.
+    rod.rotation.z = side * tilt;
+    rod.position.set(
+      pos.x + side * (halfW - HANGER_TOP_INSET / 2),
+      barY + HANGER_BAR_DROP / 2,
+      pos.z
+    );
     group.add(rod);
+    // Rounded joint where the slanted rod meets the bar
+    const joint = new THREE.Mesh(new THREE.SphereGeometry(HANGER_PIPE_R * 1.15, 12, 12), mat);
+    joint.position.set(pos.x + side * halfW, barY, pos.z);
+    group.add(joint);
   });
   return group;
 }
