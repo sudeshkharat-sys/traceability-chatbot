@@ -375,13 +375,41 @@ function makeIBeam(length, mat, orientation) {
 }
 
 // ── Hanger support bar ─────────────────────────────────────────────────────────
-// Stations whose placed model is a "hanger" get an extra horizontal beam
-// 1 m below the top of the structure — like the rail inside a cupboard —
-// so the hanger has a bar to hang from / be height-adjusted against. Bars
-// are kept on scene.userData so they survive the cached-scene reuse path
-// and are added/removed automatically as hanger models are placed or deleted.
+// Stations whose placed model is a "hanger" get an extra horizontal rail
+// 2 m below the top of the structure — like the rail inside a cupboard —
+// so the hanger has a bar to hang from / be height-adjusted against. The
+// rail runs along the station depth so both ends land directly under the
+// front/back top beams, and two vertical drop rods tie it to them (no
+// floating steel). Bars are kept on scene.userData so they survive the
+// cached-scene reuse path and are added/removed automatically as hanger
+// models are placed or deleted.
 const HANGER_NAME_RE = /hanger/i;
-const HANGER_BAR_DROP = 1.0; // metres below the top beam
+const HANGER_BAR_DROP = 2.0; // metres below the top beam
+let _hangerBarMat = null;
+function getHangerBarMaterial() {
+  // Safety yellow so the rail reads as purpose-built hanger equipment,
+  // clearly distinct from the grey structural steel around it.
+  if (!_hangerBarMat) {
+    _hangerBarMat = new THREE.MeshStandardMaterial({ color: 0xf5c400, metalness: 0.4, roughness: 0.5 });
+  }
+  return _hangerBarMat;
+}
+function makeHangerBar(pos) {
+  const group = new THREE.Group();
+  const mat = getHangerBarMaterial();
+  const barY = HEIGHT - HANGER_BAR_DROP;
+  // Rail along Z — ends sit exactly under the front/back top beams
+  const bar = makeIBeam(DEPTH, mat, 'horizontal-z');
+  bar.position.set(pos.x, barY, pos.z);
+  group.add(bar);
+  // Vertical drop rods connecting each rail end up to the top beams
+  [pos.z - DEPTH / 2, pos.z + DEPTH / 2].forEach(cz => {
+    const drop = makeIBeam(HANGER_BAR_DROP, mat, 'vertical');
+    drop.position.set(pos.x, barY + HANGER_BAR_DROP / 2, cz);
+    group.add(drop);
+  });
+  return group;
+}
 function syncHangerBars(scene, placedEntries, posMap) {
   if (!scene) return;
   if (!scene.userData.hangerBars) scene.userData.hangerBars = new Map(); // stationId → mesh
@@ -397,8 +425,7 @@ function syncHangerBars(scene, placedEntries, posMap) {
     if (bars.has(sid)) return;
     const pos = posMap[sid];
     if (!pos) return;
-    const bar = makeIBeam(CELL_W, getStructMaterial(), 'horizontal-x');
-    bar.position.set(pos.x, HEIGHT - HANGER_BAR_DROP, pos.z);
+    const bar = makeHangerBar(pos);
     scene.add(bar);
     bars.set(sid, bar);
   });
