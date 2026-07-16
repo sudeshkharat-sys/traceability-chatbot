@@ -1029,6 +1029,32 @@
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   background: #fff;
+  /* Cap the table's height to the visible area so the HORIZONTAL scrollbar
+     sits at the bottom of the screen instead of below hundreds of rows —
+     without this, wide tables (Master Data has many columns) looked like
+     they simply had no way to reach the right-hand-side columns. */
+  max-width: 100%;
+  max-height: calc(100vh - 240px);
+  scrollbar-width: thin;
+  scrollbar-color: #718096 #edf2f7;
+}
+
+/* Always-visible, chunky scrollbars so the horizontal slider is obvious */
+.table-wrapper::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+.table-wrapper::-webkit-scrollbar-track {
+  background: #edf2f7;
+  border-radius: 6px;
+}
+.table-wrapper::-webkit-scrollbar-thumb {
+  background: #718096;
+  border-radius: 6px;
+  border: 2px solid #edf2f7;
+}
+.table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #4a5568;
 }
 
 .master-table {

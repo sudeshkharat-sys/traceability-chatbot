@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { carModelApi, lineModelMappingApi, z3dModelApi } from '../../../services/api/layoutApi';
+import authService from '../../../services/api/authService';
 import { lineNeedsCarModel } from '../lineUtils';
 import '../ZStage3DLayout/ZStage3DLayout.css';
 
@@ -16,6 +17,10 @@ export default function AssignObjectPopup({ layoutId, lineGroupId, onClose, onAp
   const [error, setError] = useState('');
 
   const needsCarModel = lineNeedsCarModel(lineGroupId);
+  // Uploading a new library file or deleting one affects EVERY layout using
+  // that model — admin-only. Assigning/removing a mapping for this line stays
+  // available to everyone.
+  const isAdmin = authService.isAdmin();
 
   const [carModel, setCarModel] = useState('');
   const [modelName, setModelName] = useState('');
@@ -86,6 +91,36 @@ export default function AssignObjectPopup({ layoutId, lineGroupId, onClose, onAp
   const save = useCallback(() => {
     if (!modelName) { setError('Choose an object.'); return; }
     if (needsCarModel && !carModel) { setError('Choose a car model for this line.'); return; }
+    // Guard against silently overwriting an existing assignment: if this line
+    // (for the same car model slot) already has a model mapped, make the user
+    // explicitly choose between replacing it or keeping it — an accidental
+    // save must not swap the line's model without anyone noticing.
+    const existing = mappings.find(m => needsCarModel
+      ? String(m.car_model_id) === String(carModel)
+      : m.car_model_id == null);
+    if (existing && existing.model_name !== modelName) {
+      const replace = window.confirm(
+        `"${existing.model_name}" is already assigned to line "${lineGroupId}".\n\n` +
+        `Press OK to REPLACE it with "${modelName}", or Cancel to keep the current ` +
+        `model (remove the existing assignment first if you want to change it).`
+      );
+      if (!replace) {
+        setError(`"${existing.model_name}" is already assigned — remove it first or choose Replace.`);
+        return;
+      }
+      setError('');
+      setLoading(true);
+      lineModelMappingApi.delete(existing.id)
+        .then(() => lineModelMappingApi.create({
+          layoutId, lineGroupId,
+          carModelId: needsCarModel ? Number(carModel) : null,
+          modelName,
+        }))
+        .then(() => { reloadAll(); onApplied && onApplied(); })
+        .catch(err => setError(err?.response?.data?.detail || err.message))
+        .finally(() => setLoading(false));
+      return;
+    }
     setError('');
     setLoading(true);
     lineModelMappingApi.create({
@@ -97,7 +132,7 @@ export default function AssignObjectPopup({ layoutId, lineGroupId, onClose, onAp
       onApplied && onApplied();
     }).catch(err => setError(err?.response?.data?.detail || err.message))
       .finally(() => setLoading(false));
-  }, [layoutId, lineGroupId, carModel, modelName, needsCarModel, reloadAll, onApplied]);
+  }, [layoutId, lineGroupId, carModel, modelName, needsCarModel, mappings, reloadAll, onApplied]);
 
   const removeMapping = useCallback((id) => {
     setLoading(true);
@@ -154,19 +189,23 @@ export default function AssignObjectPopup({ layoutId, lineGroupId, onClose, onAp
               onClick={() => setModelName(m.name)}
             >
               <span>{m.name}</span>
-              <button type="button" className="z3d-modal-cancel" onClick={(e) => { e.stopPropagation(); deleteModel(m.name); }}>Delete</button>
+              {isAdmin && (
+                <button type="button" className="z3d-modal-cancel" onClick={(e) => { e.stopPropagation(); deleteModel(m.name); }}>Delete</button>
+              )}
             </div>
           ))}
         </div>
 
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
-          <input type="file" accept=".glb,.gltf,.obj,.stl" onChange={e => setUploadFile(e.target.files?.[0] || null)} />
-          <input
-            className="z3d-modal-select" style={{ flex: 1 }} placeholder="Name (optional)"
-            value={uploadName} onChange={e => setUploadName(e.target.value)}
-          />
-          <button type="button" className="z3d-modal-confirm" disabled={loading || !uploadFile} onClick={uploadNewModel}>Upload New</button>
-        </div>
+        {isAdmin && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+            <input type="file" accept=".glb,.gltf,.obj,.stl" onChange={e => setUploadFile(e.target.files?.[0] || null)} />
+            <input
+              className="z3d-modal-select" style={{ flex: 1 }} placeholder="Name (optional)"
+              value={uploadName} onChange={e => setUploadName(e.target.value)}
+            />
+            <button type="button" className="z3d-modal-confirm" disabled={loading || !uploadFile} onClick={uploadNewModel}>Upload New</button>
+          </div>
+        )}
 
         <div className="z3d-modal-hint" style={{ marginBottom: 10 }}>
           Fine-tune position/rotation/scale in the 3D Layout view — that's the object's

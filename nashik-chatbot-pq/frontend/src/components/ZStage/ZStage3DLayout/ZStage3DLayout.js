@@ -13,6 +13,7 @@ import { layeredAuditApi } from '../../../services/api/layoutApi';
 import { StationDetailModal, MONTHLY_KEYS } from '../ZStageDashboard/ZStageDashboard';
 import '../ZStageDashboard/ZStageDashboard.css';
 import { backend_url } from '../../../services/api/config';
+import authService from '../../../services/api/authService';
 import './ZStage3DLayout.css';
 
 // ── Model Presets (localStorage) ─────────────────────────────────────────────
@@ -371,6 +372,36 @@ function makeIBeam(length, mat, orientation) {
   const mesh = new THREE.Mesh(geo, mat);
   mesh.rotation.set(rotX, rotY, 0);
   return mesh;
+}
+
+// ── Hanger support bar ─────────────────────────────────────────────────────────
+// Stations whose placed model is a "hanger" get an extra horizontal beam at
+// 1/4 of the line height (e.g. structure height 4 m → bar at 1 m), so the
+// hanger has a rail to hang from / be height-adjusted against. Bars are kept
+// on scene.userData so they survive the cached-scene reuse path and are
+// added/removed automatically as hanger models are placed or deleted.
+const HANGER_NAME_RE = /hanger/i;
+const HANGER_BAR_FRACTION = 0.25; // 1/4 of the structure height
+function syncHangerBars(scene, placedEntries, posMap) {
+  if (!scene) return;
+  if (!scene.userData.hangerBars) scene.userData.hangerBars = new Map(); // stationId → mesh
+  const bars = scene.userData.hangerBars;
+  const wanted = new Set();
+  placedEntries.forEach(p => {
+    if (p.stationId && HANGER_NAME_RE.test(p.name || '')) wanted.add(p.stationId);
+  });
+  for (const [sid, mesh] of [...bars]) {
+    if (!wanted.has(sid)) { scene.remove(mesh); bars.delete(sid); }
+  }
+  wanted.forEach(sid => {
+    if (bars.has(sid)) return;
+    const pos = posMap[sid];
+    if (!pos) return;
+    const bar = makeIBeam(CELL_W, getStructMaterial(), 'horizontal-x');
+    bar.position.set(pos.x, HEIGHT * HANGER_BAR_FRACTION, pos.z);
+    scene.add(bar);
+    bars.set(sid, bar);
+  });
 }
 
 // ── Green center strip inside each station cell ────────────────────────────────
@@ -948,7 +979,12 @@ class WalkController {
 }
 
 // ── Three.js scene hook ────────────────────────────────────────────────────────
-function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, onObjectsChange, onConvertStart, onConvertEnd, onStationClick, isActive, onSceneReady, onModelProgress) {
+function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, onObjectsChange, onConvertStart, onConvertEnd, onStationClick, isActive, onSceneReady, onModelProgress, canEdit = true) {
+  // Model editing (move/rotate/scale gizmo) is admin-only — kept in a ref so
+  // the click handlers below read the current value without re-running the
+  // whole scene effect.
+  const canEditRef = useRef(canEdit);
+  useEffect(() => { canEditRef.current = canEdit; }, [canEdit]);
   // Keep latest statusMap/zeMap in refs so scene reads current values
   // without triggering a full scene rebuild on every API response
   const statusMapRef = useRef(statusMapProp);
@@ -1575,6 +1611,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           posIsOffset: !!record.pos_is_offset,
         };
         placedRef.current = [...placedRef.current, entry];
+        syncHangerBars(scene, placedRef.current, localPosMap);
         onObjectsChange([...placedRef.current]);
       };
 
@@ -2124,6 +2161,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         baseZ: stnPos ? obj.position.z : null,
       };
       placedRef.current = [...placedRef.current, entry];
+      syncHangerBars(scene, placedRef.current, stationPosRef.current);
       // A newly-placed model makes any cached scene snapshot for this layout
       // stale (its placedEntries wouldn't include this new one) — drop it.
       layoutSceneCacheRef.current.delete(layoutIdRef.current);
@@ -2160,7 +2198,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       }
 
       // Select immediately and set mode to translate
-      if (transformRef.current) {
+      if (transformRef.current && canEditRef.current) {
         transformRef.current.setMode('translate');
         transformRef.current.attach(obj);
         selectedRef.current = entry;
@@ -2223,7 +2261,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       const entry = placedRef.current.find(p => p.mesh === obj);
       if (entry) {
         selectedRef.current = entry;
-        if (transformRef.current) transformRef.current.attach(obj);
+        if (transformRef.current && canEditRef.current) transformRef.current.attach(obj);
         onObjectsChange([...placedRef.current]);
         return;
       }
@@ -2257,7 +2295,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     const entry = placedRef.current.find(p => p.id === id);
     if (!entry) return;
     selectedRef.current = entry;
-    if (transformRef.current) {
+    if (transformRef.current && canEditRef.current) {
       transformRef.current.attach(entry.mesh);
     }
     onObjectsChange([...placedRef.current]);
@@ -2279,6 +2317,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     });
     const deleteIds = new Set(targets.map(t => t.id));
     placedRef.current = placedRef.current.filter(p => !deleteIds.has(p.id));
+    syncHangerBars(scene, placedRef.current, stationPosRef.current);
     // Delete from server using server-assigned IDs
     targets.forEach(t => {
       const sid = t.mesh.userData.serverModelId;
@@ -2531,6 +2570,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       }
 
       placedRef.current = [...placedRef.current, ...newEntries];
+      syncHangerBars(scene, placedRef.current, posMap);
       onObjectsChange([...placedRef.current]);
       // Same reasoning as the single-object placement path — new entries mean
       // any cached scene snapshot for this layout is now out of date.
@@ -2698,6 +2738,10 @@ function computeZeMap(records) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive }) {
+  // Model editing (upload, move/rotate/scale, rename, delete, presets) is
+  // admin-only. Everyone else keeps the viewing features: layout/view
+  // selection, environment swatches, walk mode, animations and station popups.
+  const isAdmin = authService.isAdmin();
   const canvasRef          = useRef(null);
   const fileInputRef       = useRef(null);
   const [selectedLayoutId, setSelectedLayoutId] = useState(null);
@@ -2891,7 +2935,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   }, []);
 
   const { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, setEnvironment, previewEnvironment, clearSceneCache } =
-    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady, handleModelProgress);
+    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady, handleModelProgress, isAdmin);
 
   // Environment/background swatch — remembered per layout (localStorage),
   // re-read whenever the selected layout changes.
@@ -3269,6 +3313,13 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     const groupIds = obj?.lineGroupId
       ? placedObjects.filter(o => o.lineGroupId === obj.lineGroupId).map(o => o.id)
       : [id];
+    const scopeMsg = obj?.lineGroupId
+      ? `Remove "${obj?.name}" from all ${groupIds.length} station(s) of line "${obj.lineGroupId}"?`
+      : `Remove "${obj?.name}" from this layout?`;
+    if (!window.confirm(
+      `${scopeMsg}\n\nThe uploaded file stays in the model library — it can be ` +
+      `assigned again from Layout Preparation without re-uploading.`
+    )) return;
     deleteById(id);
     if (groupIds.includes(selectedId)) setSelectedId(null);
   }, [deleteById, selectedId, placedObjects]);
@@ -3314,11 +3365,15 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
               ))}
             </div>
 
-            {/* Upload object */}
-            <button type="button" className="z3d-upload-btn" onClick={() => fileInputRef.current?.click()} title="Upload GLB, OBJ or STL file">
-              ⬆ Upload Object
-            </button>
-            <input ref={fileInputRef} type="file" accept=".glb,.gltf,.obj,.stl,.wrl,.stp,.step" style={{ display: 'none' }} onChange={handleFileUpload} />
+            {/* Upload object — admin only */}
+            {isAdmin && (
+              <>
+                <button type="button" className="z3d-upload-btn" onClick={() => fileInputRef.current?.click()} title="Upload GLB, OBJ or STL file">
+                  ⬆ Upload Object
+                </button>
+                <input ref={fileInputRef} type="file" accept=".glb,.gltf,.obj,.stl,.wrl,.stp,.step" style={{ display: 'none' }} onChange={handleFileUpload} />
+              </>
+            )}
 
             {/* Object list toggle */}
             <button type="button" className={`z3d-walk-btn${showObjPanel ? ' z3d-walk-btn--active' : ''}`} onClick={() => setShowObjPanel(v => !v)}>
@@ -3537,8 +3592,8 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
           <div className="z3d-obj-panel">
             <div className="z3d-obj-panel-title">Placed Objects</div>
 
-            {/* Transform mode */}
-            {currentSelected && (
+            {/* Transform mode — admin only */}
+            {isAdmin && currentSelected && (
               <div className="z3d-transform-group">
                 {[['translate','Move'],['rotate','Rotate'],['scale','Scale']].map(([m, lbl]) => (
                   <button type="button"
@@ -3550,8 +3605,8 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
               </div>
             )}
 
-            {/* Rename */}
-            {currentSelected && (
+            {/* Rename — admin only */}
+            {isAdmin && currentSelected && (
               <div className="z3d-rename-row">
                 <input
                   className="z3d-rename-input"
@@ -3564,8 +3619,8 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
               </div>
             )}
 
-            {/* Scale */}
-            {currentSelected && (
+            {/* Scale — admin only */}
+            {isAdmin && currentSelected && (
               <div className="z3d-scale-row">
                 <span className="z3d-scale-label">Scale{currentSelected.lineGroupId ? ' (all)' : ''}</span>
                 <input
@@ -3583,8 +3638,8 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
               </div>
             )}
 
-            {/* Rotation (applies to all in group) */}
-            {currentSelected && (
+            {/* Rotation (applies to all in group) — admin only */}
+            {isAdmin && currentSelected && (
               <div className="z3d-rotation-panel">
                 <div className="z3d-rotation-title">Rotation{currentSelected.lineGroupId ? ' (all)' : ''} °</div>
                 {[['X', rotX, setRotX], ['Y', rotY, setRotY], ['Z', rotZ, setRotZ]].map(([axis, val, setter]) => (
@@ -3660,11 +3715,13 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                           : obj.stationId && <span className="z3d-obj-station-tag">{obj.stationId}</span>
                         }
                       </span>
-                      <button type="button"
-                        className="z3d-obj-del"
-                        title={obj.lineGroupId ? 'Delete all in line' : 'Delete'}
-                        onClick={e => { e.stopPropagation(); handleDelete(obj.id); }}
-                      >✕</button>
+                      {isAdmin && (
+                        <button type="button"
+                          className="z3d-obj-del"
+                          title={obj.lineGroupId ? 'Delete all in line' : 'Delete'}
+                          onClick={e => { e.stopPropagation(); handleDelete(obj.id); }}
+                        >✕</button>
+                      )}
                     </div>
                   );
                 });
