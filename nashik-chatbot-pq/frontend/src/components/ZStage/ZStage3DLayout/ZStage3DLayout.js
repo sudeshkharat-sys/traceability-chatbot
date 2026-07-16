@@ -395,39 +395,51 @@ function getHangerBarMaterial() {
   return _hangerBarMat;
 }
 // Circular-pipe hanger rail running along the LINE LENGTH (X) across the
-// station cell, built as a floor-standing GOALPOST frame — two round posts
-// standing on the floor at the cell ends with the round rail across their
-// tops. Everything is connected floor → posts → rail (nothing hangs in
-// mid-air), the frame stays well below the box-name boards at the line
-// ends, and it reads like the real hanger stands used on plant floors.
+// station cell, suspended from the roof by two upside-down-L (⌐) supports:
+// each support is a vertical round rod bolted to the BACK top beam of the
+// structure, dropping down to rail height, then a horizontal arm reaching
+// out to the middle of the station where it carries the rail. Both
+// attachment points sit exactly ON the roof beam, so the whole assembly is
+// visibly connected — roof beam → drop rod → arm → rail.
 // Same safety yellow as the floor-boundary striping.
 const HANGER_PIPE_R    = 0.07; // pipe radius
-const HANGER_POST_INSET = 0.35; // posts pulled slightly inside the columns
+const HANGER_POST_INSET = 0.35; // supports pulled slightly inside the columns
 function makeHangerBar(pos) {
   const group = new THREE.Group();
   const mat = getHangerBarMaterial();
-  const barY = HEIGHT - HANGER_BAR_DROP; // rail height (3 m on a 5 m structure)
-  const postX = CELL_W / 2 - HANGER_POST_INSET;
+  const barY  = HEIGHT - HANGER_BAR_DROP; // rail height (3 m on a 5 m structure)
+  const armX  = CELL_W / 2 - HANGER_POST_INSET;
+  const backZ = pos.z - DEPTH / 2;        // back top beam of the station
+  const armLen = DEPTH / 2;               // back edge → station centre
 
-  // Horizontal round rail sitting on top of the two posts
-  const bar = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, postX * 2, 16), mat);
+  // Horizontal round rail at the station centre, along the line length
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, armX * 2, 16), mat);
   bar.rotation.z = Math.PI / 2; // cylinder axis Y → X
   bar.position.set(pos.x, barY, pos.z);
   group.add(bar);
 
   [-1, 1].forEach(side => {
-    // Vertical post from the floor up to the rail
-    const post = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, barY, 16), mat);
-    post.position.set(pos.x + side * postX, barY / 2, pos.z);
-    group.add(post);
-    // Rounded corner where post meets rail
-    const joint = new THREE.Mesh(new THREE.SphereGeometry(HANGER_PIPE_R * 1.2, 12, 12), mat);
-    joint.position.set(pos.x + side * postX, barY, pos.z);
-    group.add(joint);
-    // Small base plate so the post visibly stands on the floor
-    const base = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R * 2.4, HANGER_PIPE_R * 2.4, 0.06, 16), mat);
-    base.position.set(pos.x + side * postX, 0.15, pos.z);
-    group.add(base);
+    const sx = pos.x + side * armX;
+    // Vertical drop rod from the back top beam down to rail height
+    const dropLen = HEIGHT - barY;
+    const drop = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, dropLen, 16), mat);
+    drop.position.set(sx, barY + dropLen / 2, backZ);
+    group.add(drop);
+    // Mounting collar where the rod meets the roof beam
+    const mount = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R * 2.0, HANGER_PIPE_R * 2.0, 0.08, 16), mat);
+    mount.position.set(sx, HEIGHT - 0.04, backZ);
+    group.add(mount);
+    // Horizontal arm from the drop rod out to the station centre (along Z)
+    const arm = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, armLen, 16), mat);
+    arm.rotation.x = Math.PI / 2; // cylinder axis Y → Z
+    arm.position.set(sx, barY, backZ + armLen / 2);
+    group.add(arm);
+    // Rounded elbows at both corners of the ⌐
+    [[sx, barY, backZ], [sx, barY, pos.z]].forEach(([jx, jy, jz]) => {
+      const joint = new THREE.Mesh(new THREE.SphereGeometry(HANGER_PIPE_R * 1.2, 12, 12), mat);
+      joint.position.set(jx, jy, jz);
+      group.add(joint);
+    });
   });
   return group;
 }
