@@ -2811,13 +2811,12 @@ function computeZeMap(records) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive }) {
-  // Model editing (upload, move/rotate/scale, rename, delete, presets) will
-  // become admin-only; everyone else keeps the viewing features (layout/view
-  // selection, environment swatches, walk mode, animations, station popups).
-  // Enforcement is OFF for now so the whole flow can be tested as a normal
-  // user — flip ENFORCE_ADMIN_EDIT to true once the exact set of options to
-  // restrict is confirmed.
-  const ENFORCE_ADMIN_EDIT = false;
+  // Model editing (upload, replace, move/rotate/scale, rename, delete,
+  // presets) is admin-only. Z-Stage users keep every viewing feature:
+  // layout/view selection, environment swatches, walk mode, animations,
+  // station popups, objects list, and assigning library models to lines.
+  // Master Data is deliberately NOT gated — it's unrelated to 3D models.
+  const ENFORCE_ADMIN_EDIT = true;
   const isAdmin = !ENFORCE_ADMIN_EDIT || authService.isAdmin();
   const canvasRef          = useRef(null);
   const fileInputRef       = useRef(null);

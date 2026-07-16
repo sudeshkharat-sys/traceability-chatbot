@@ -18,10 +18,10 @@ export default function AssignObjectPopup({ layoutId, lineGroupId, onClose, onAp
   const [error, setError] = useState('');
 
   const needsCarModel = lineNeedsCarModel(lineGroupId);
-  // Uploading a new library file or deleting one affects EVERY layout using
-  // that model — will become admin-only. Enforcement is OFF for now (testing
-  // as a normal user); flip ENFORCE_ADMIN_EDIT to true to restrict.
-  const ENFORCE_ADMIN_EDIT = false;
+  // Uploading, replacing or deleting a library file affects EVERY layout
+  // using that model — admin-only. Assigning/removing an already-uploaded
+  // model for this line stays available to every Z-Stage user.
+  const ENFORCE_ADMIN_EDIT = true;
   const isAdmin = !ENFORCE_ADMIN_EDIT || authService.isAdmin();
 
   const [carModel, setCarModel] = useState('');
