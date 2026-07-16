@@ -394,50 +394,49 @@ function getHangerBarMaterial() {
   }
   return _hangerBarMat;
 }
-// Circular-pipe hanger rail running along the LINE LENGTH (X) across the
-// station cell, suspended from the roof by two upside-down-L (⌐) supports:
-// each support is a vertical round rod bolted to the BACK top beam of the
-// structure, dropping down to rail height, then a horizontal arm reaching
-// out to the middle of the station where it carries the rail. Both
-// attachment points sit exactly ON the roof beam, so the whole assembly is
-// visibly connected — roof beam → drop rod → arm → rail.
-// Same safety yellow as the floor-boundary striping.
+// Circular-pipe hanger rail, shaped  -¡__________¡-  in the station's
+// X-Y plane: a short mounting stub at each roof corner, a vertical rod
+// dropping from each stub to rail height, and the long round rail running
+// between the rods along the LINE LENGTH (X). The stubs' outer ends land
+// on the roof-corner/column line so the assembly reads as hung from the
+// structure. Same safety yellow as the floor-boundary striping.
 const HANGER_PIPE_R    = 0.07; // pipe radius
 const HANGER_POST_INSET = 0.35; // supports pulled slightly inside the columns
 function makeHangerBar(pos) {
   const group = new THREE.Group();
   const mat = getHangerBarMaterial();
-  const barY  = HEIGHT - HANGER_BAR_DROP; // rail height (3 m on a 5 m structure)
-  const armX  = CELL_W / 2 - HANGER_POST_INSET;
-  const backZ = pos.z - DEPTH / 2;        // back top beam of the station
-  const armLen = DEPTH / 2;               // back edge → station centre
+  const barY   = HEIGHT - HANGER_BAR_DROP; // rail height (3 m on a 5 m structure)
+  const halfW  = CELL_W / 2;
+  const stubLen = HANGER_POST_INSET;       // short roof stub at each end: -¡
+  const dropX  = halfW - stubLen;          // where the vertical rods hang
 
-  // Horizontal round rail at the station centre, along the line length
-  const bar = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, armX * 2, 16), mat);
+  // Long horizontal rail between the two vertical rods: ¡__________¡
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, dropX * 2, 16), mat);
   bar.rotation.z = Math.PI / 2; // cylinder axis Y → X
   bar.position.set(pos.x, barY, pos.z);
   group.add(bar);
 
   [-1, 1].forEach(side => {
-    const sx = pos.x + side * armX;
-    // Vertical drop rod from the back top beam down to rail height
+    const outerX = pos.x + side * halfW;  // roof corner (column line)
+    const dropXx = pos.x + side * dropX;  // vertical rod position
+    // Short horizontal stub at roof height, from the corner inward: -
+    const stub = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, stubLen, 16), mat);
+    stub.rotation.z = Math.PI / 2;
+    stub.position.set((outerX + dropXx) / 2, HEIGHT, pos.z);
+    group.add(stub);
+    // Mounting collar at the stub's outer end, on the roof corner
+    const mount = new THREE.Mesh(new THREE.SphereGeometry(HANGER_PIPE_R * 1.6, 12, 12), mat);
+    mount.position.set(outerX, HEIGHT, pos.z);
+    group.add(mount);
+    // Vertical rod from the stub down to the rail: ¡
     const dropLen = HEIGHT - barY;
     const drop = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, dropLen, 16), mat);
-    drop.position.set(sx, barY + dropLen / 2, backZ);
+    drop.position.set(dropXx, barY + dropLen / 2, pos.z);
     group.add(drop);
-    // Mounting collar where the rod meets the roof beam
-    const mount = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R * 2.0, HANGER_PIPE_R * 2.0, 0.08, 16), mat);
-    mount.position.set(sx, HEIGHT - 0.04, backZ);
-    group.add(mount);
-    // Horizontal arm from the drop rod out to the station centre (along Z)
-    const arm = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, armLen, 16), mat);
-    arm.rotation.x = Math.PI / 2; // cylinder axis Y → Z
-    arm.position.set(sx, barY, backZ + armLen / 2);
-    group.add(arm);
-    // Rounded elbows at both corners of the ⌐
-    [[sx, barY, backZ], [sx, barY, pos.z]].forEach(([jx, jy, jz]) => {
+    // Rounded elbows at the top and bottom corners
+    [[dropXx, HEIGHT], [dropXx, barY]].forEach(([jx, jy]) => {
       const joint = new THREE.Mesh(new THREE.SphereGeometry(HANGER_PIPE_R * 1.2, 12, 12), mat);
-      joint.position.set(jx, jy, jz);
+      joint.position.set(jx, jy, pos.z);
       group.add(joint);
     });
   });
