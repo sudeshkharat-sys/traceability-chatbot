@@ -375,13 +375,13 @@ function makeIBeam(length, mat, orientation) {
 }
 
 // ── Hanger support bar ─────────────────────────────────────────────────────────
-// Stations whose placed model is a "hanger" get an extra horizontal beam at
-// 1/4 of the line height (e.g. structure height 4 m → bar at 1 m), so the
-// hanger has a rail to hang from / be height-adjusted against. Bars are kept
-// on scene.userData so they survive the cached-scene reuse path and are
-// added/removed automatically as hanger models are placed or deleted.
+// Stations whose placed model is a "hanger" get an extra horizontal beam
+// 1 m below the top of the structure — like the rail inside a cupboard —
+// so the hanger has a bar to hang from / be height-adjusted against. Bars
+// are kept on scene.userData so they survive the cached-scene reuse path
+// and are added/removed automatically as hanger models are placed or deleted.
 const HANGER_NAME_RE = /hanger/i;
-const HANGER_BAR_FRACTION = 0.25; // 1/4 of the structure height
+const HANGER_BAR_DROP = 1.0; // metres below the top beam
 function syncHangerBars(scene, placedEntries, posMap) {
   if (!scene) return;
   if (!scene.userData.hangerBars) scene.userData.hangerBars = new Map(); // stationId → mesh
@@ -398,7 +398,7 @@ function syncHangerBars(scene, placedEntries, posMap) {
     const pos = posMap[sid];
     if (!pos) return;
     const bar = makeIBeam(CELL_W, getStructMaterial(), 'horizontal-x');
-    bar.position.set(pos.x, HEIGHT * HANGER_BAR_FRACTION, pos.z);
+    bar.position.set(pos.x, HEIGHT - HANGER_BAR_DROP, pos.z);
     scene.add(bar);
     bars.set(sid, bar);
   });
@@ -2738,10 +2738,14 @@ function computeZeMap(records) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive }) {
-  // Model editing (upload, move/rotate/scale, rename, delete, presets) is
-  // admin-only. Everyone else keeps the viewing features: layout/view
-  // selection, environment swatches, walk mode, animations and station popups.
-  const isAdmin = authService.isAdmin();
+  // Model editing (upload, move/rotate/scale, rename, delete, presets) will
+  // become admin-only; everyone else keeps the viewing features (layout/view
+  // selection, environment swatches, walk mode, animations, station popups).
+  // Enforcement is OFF for now so the whole flow can be tested as a normal
+  // user — flip ENFORCE_ADMIN_EDIT to true once the exact set of options to
+  // restrict is confirmed.
+  const ENFORCE_ADMIN_EDIT = false;
+  const isAdmin = !ENFORCE_ADMIN_EDIT || authService.isAdmin();
   const canvasRef          = useRef(null);
   const fileInputRef       = useRef(null);
   const [selectedLayoutId, setSelectedLayoutId] = useState(null);

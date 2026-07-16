@@ -18,9 +18,10 @@ export default function AssignObjectPopup({ layoutId, lineGroupId, onClose, onAp
 
   const needsCarModel = lineNeedsCarModel(lineGroupId);
   // Uploading a new library file or deleting one affects EVERY layout using
-  // that model — admin-only. Assigning/removing a mapping for this line stays
-  // available to everyone.
-  const isAdmin = authService.isAdmin();
+  // that model — will become admin-only. Enforcement is OFF for now (testing
+  // as a normal user); flip ENFORCE_ADMIN_EDIT to true to restrict.
+  const ENFORCE_ADMIN_EDIT = false;
+  const isAdmin = !ENFORCE_ADMIN_EDIT || authService.isAdmin();
 
   const [carModel, setCarModel] = useState('');
   const [modelName, setModelName] = useState('');
