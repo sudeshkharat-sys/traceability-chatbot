@@ -166,6 +166,19 @@ function invalidateGeoCache(name) {
   }
 }
 
+// Called from OUTSIDE this component (e.g. the Layout Preparation "Replace"
+// button) after a library model's file has been swapped on the server: drops
+// the in-memory template + measurement caches for that name and bumps the
+// library epoch, which is baked into every scene signature — so every cached
+// scene rebuilds and re-downloads the new file instead of showing stale meshes.
+let _libraryEpoch = 0;
+export function invalidateModelTemplate(name) {
+  _libraryEpoch += 1;
+  if (!isValidModelName(name)) return;
+  _modelTemplateCache.delete(name.toLowerCase());
+  invalidateGeoCache(name);
+}
+
 // Single shared DRACOLoader — decoder is downloaded and initialised once,
 // then reused for every upload. Saves 1-3 s per upload vs creating a new one each time.
 const _sharedDraco = new DRACOLoader();
@@ -1142,6 +1155,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       })),
       conns: (layout.connections || []).map(c => [c.from_box_id, c.to_box_id]),
       ze: zeMapRef.current,
+      epoch: _libraryEpoch, // bumped when a library model's file is replaced
     });
     const cachedScene   = layoutSceneCacheRef.current.get(layout.id);
     const canReuseScene = !!cachedScene && cachedScene.signature === sceneSignature;

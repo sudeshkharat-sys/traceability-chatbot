@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { carModelApi, lineModelMappingApi, z3dModelApi } from '../../../services/api/layoutApi';
 import authService from '../../../services/api/authService';
+import { invalidateModelTemplate } from '../ZStage3DLayout/ZStage3DLayout';
 import { lineNeedsCarModel } from '../lineUtils';
 import '../ZStage3DLayout/ZStage3DLayout.css';
 
@@ -79,6 +80,39 @@ export default function AssignObjectPopup({ layoutId, lineGroupId, onClose, onAp
       .catch(err => setError(err?.response?.data?.detail || err.message))
       .finally(() => setLoading(false));
   }, [uploadFile, uploadName, reloadAll]);
+
+  // ── Replace model file ────────────────────────────────────────────────
+  // Swaps ONLY the 3D file behind an existing library model. The name, every
+  // line/layout assignment and all saved position/rotation/scale values stay
+  // untouched — so updating a model doesn't mean delete + re-upload + re-tune.
+  const replaceInputRef = useRef(null);
+  const [replaceTarget, setReplaceTarget] = useState(null);
+  const startReplace = useCallback((name) => {
+    setReplaceTarget(name);
+    replaceInputRef.current?.click();
+  }, []);
+  const handleReplaceFile = useCallback((e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || !replaceTarget) return;
+    if (!window.confirm(
+      `Replace the 3D file of "${replaceTarget}" with "${file.name}"?\n\n` +
+      `Every line/layout using "${replaceTarget}" switches to the new file and ` +
+      `KEEPS its saved position/rotation/scale. You can still fine-tune the ` +
+      `values in the 3D Layout view afterwards if the new file needs it.`
+    )) { setReplaceTarget(null); return; }
+    setError('');
+    setLoading(true);
+    z3dModelApi.uploadToLibrary(file, { name: replaceTarget })
+      .then(() => {
+        // Drop the in-memory caches so 3D views re-download the new file
+        invalidateModelTemplate(replaceTarget);
+        reloadAll();
+        onApplied && onApplied();
+      })
+      .catch(err => setError(err?.response?.data?.detail || err.message))
+      .finally(() => { setLoading(false); setReplaceTarget(null); });
+  }, [replaceTarget, reloadAll, onApplied]);
 
   const deleteModel = useCallback((name) => {
     if (!window.confirm(`Delete "${name}" from the library? This removes it from every line/layout using it.`)) return;
@@ -191,7 +225,11 @@ export default function AssignObjectPopup({ layoutId, lineGroupId, onClose, onAp
             >
               <span>{m.name}</span>
               {isAdmin && (
-                <button type="button" className="z3d-modal-cancel" onClick={(e) => { e.stopPropagation(); deleteModel(m.name); }}>Delete</button>
+                <span style={{ display: 'flex', gap: 6 }}>
+                  <button type="button" className="z3d-modal-cancel" title="Swap the 3D file, keep name + all saved scale/rotation/placements"
+                    onClick={(e) => { e.stopPropagation(); startReplace(m.name); }}>Replace</button>
+                  <button type="button" className="z3d-modal-cancel" onClick={(e) => { e.stopPropagation(); deleteModel(m.name); }}>Delete</button>
+                </span>
               )}
             </div>
           ))}
@@ -207,6 +245,9 @@ export default function AssignObjectPopup({ layoutId, lineGroupId, onClose, onAp
             <button type="button" className="z3d-modal-confirm" disabled={loading || !uploadFile} onClick={uploadNewModel}>Upload New</button>
           </div>
         )}
+
+        {/* Hidden picker for the per-model Replace buttons above */}
+        <input ref={replaceInputRef} type="file" accept=".glb,.gltf,.obj,.stl" style={{ display: 'none' }} onChange={handleReplaceFile} />
 
         <div className="z3d-modal-hint" style={{ marginBottom: 10 }}>
           Fine-tune position/rotation/scale in the 3D Layout view — that's the object's
