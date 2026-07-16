@@ -394,19 +394,40 @@ function getHangerBarMaterial() {
   }
   return _hangerBarMat;
 }
+// Circular-pipe hanger rail running along the LINE LENGTH (X) across the
+// station cell — one continuous bent tube, like a clothes rail: horizontal
+// round bar, smooth 90° bends at both ends, then round rods rising up to
+// the roof beams. Same safety yellow as the floor-boundary striping.
+const HANGER_PIPE_R = 0.06; // pipe radius
+const HANGER_BEND_R = 0.20; // radius of the 90° bend at each end
 function makeHangerBar(pos) {
   const group = new THREE.Group();
   const mat = getHangerBarMaterial();
   const barY = HEIGHT - HANGER_BAR_DROP;
-  // Rail along Z — ends sit exactly under the front/back top beams
-  const bar = makeIBeam(DEPTH, mat, 'horizontal-z');
+  const halfW = CELL_W / 2;
+
+  // Horizontal round bar (shortened by the bend radius on each side)
+  const barLen = CELL_W - 2 * HANGER_BEND_R;
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, barLen, 16), mat);
+  bar.rotation.z = Math.PI / 2; // cylinder axis Y → X
   bar.position.set(pos.x, barY, pos.z);
   group.add(bar);
-  // Vertical drop rods connecting each rail end up to the top beams
-  [pos.z - DEPTH / 2, pos.z + DEPTH / 2].forEach(cz => {
-    const drop = makeIBeam(HANGER_BAR_DROP, mat, 'vertical');
-    drop.position.set(pos.x, barY + HANGER_BAR_DROP / 2, cz);
-    group.add(drop);
+
+  // 90° bends + vertical rods up to the roof, one at each end
+  const rodLen = HANGER_BAR_DROP - HANGER_BEND_R;
+  [-1, 1].forEach(side => {
+    const bend = new THREE.Mesh(
+      new THREE.TorusGeometry(HANGER_BEND_R, HANGER_PIPE_R, 12, 16, Math.PI / 2), mat
+    );
+    // Arc center sits bendR inward and bendR above the bar end, tangent to
+    // both the horizontal bar and the vertical rod.
+    bend.position.set(pos.x + side * (halfW - HANGER_BEND_R), barY + HANGER_BEND_R, pos.z);
+    bend.rotation.z = side === 1 ? -Math.PI / 2 : Math.PI;
+    group.add(bend);
+
+    const rod = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, rodLen, 16), mat);
+    rod.position.set(pos.x + side * halfW, barY + HANGER_BEND_R + rodLen / 2, pos.z);
+    group.add(rod);
   });
   return group;
 }
