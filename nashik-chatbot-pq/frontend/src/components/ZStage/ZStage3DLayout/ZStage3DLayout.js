@@ -395,44 +395,39 @@ function getHangerBarMaterial() {
   return _hangerBarMat;
 }
 // Circular-pipe hanger rail running along the LINE LENGTH (X) across the
-// station cell, in a TRAPEZOID shape: full-width horizontal round bar, with
-// the two support rods slanting INWARD as they rise to the roof. The slant
-// pulls the uprights away from the box-name boards hanging at the line ends
-// (straight vertical rods at the cell edges cut right through them). Same
-// safety yellow as the floor-boundary striping.
-const HANGER_PIPE_R  = 0.06; // pipe radius
-const HANGER_TOP_INSET = 1.2; // how far each rod's TOP end is pulled inward
+// station cell, built as a floor-standing GOALPOST frame — two round posts
+// standing on the floor at the cell ends with the round rail across their
+// tops. Everything is connected floor → posts → rail (nothing hangs in
+// mid-air), the frame stays well below the box-name boards at the line
+// ends, and it reads like the real hanger stands used on plant floors.
+// Same safety yellow as the floor-boundary striping.
+const HANGER_PIPE_R    = 0.07; // pipe radius
+const HANGER_POST_INSET = 0.35; // posts pulled slightly inside the columns
 function makeHangerBar(pos) {
   const group = new THREE.Group();
   const mat = getHangerBarMaterial();
-  const barY = HEIGHT - HANGER_BAR_DROP;
-  const halfW = CELL_W / 2;
+  const barY = HEIGHT - HANGER_BAR_DROP; // rail height (3 m on a 5 m structure)
+  const postX = CELL_W / 2 - HANGER_POST_INSET;
 
-  // Horizontal round bar — full cell width
-  const bar = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, CELL_W, 16), mat);
+  // Horizontal round rail sitting on top of the two posts
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, postX * 2, 16), mat);
   bar.rotation.z = Math.PI / 2; // cylinder axis Y → X
   bar.position.set(pos.x, barY, pos.z);
   group.add(bar);
 
-  // Slanted support rods: bottom at the bar ends, top pulled inward toward
-  // the cell centre → trapezoid profile (wide at the rail, narrow at the roof)
-  const rodLen = Math.hypot(HANGER_TOP_INSET, HANGER_BAR_DROP);
-  const tilt   = Math.atan2(HANGER_TOP_INSET, HANGER_BAR_DROP);
   [-1, 1].forEach(side => {
-    const rod = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, rodLen, 16), mat);
-    // Rotating a Y-axis cylinder about Z by +angle leans its top toward -X,
-    // so the right-side (+X) rod gets +tilt and the left one -tilt.
-    rod.rotation.z = side * tilt;
-    rod.position.set(
-      pos.x + side * (halfW - HANGER_TOP_INSET / 2),
-      barY + HANGER_BAR_DROP / 2,
-      pos.z
-    );
-    group.add(rod);
-    // Rounded joint where the slanted rod meets the bar
-    const joint = new THREE.Mesh(new THREE.SphereGeometry(HANGER_PIPE_R * 1.15, 12, 12), mat);
-    joint.position.set(pos.x + side * halfW, barY, pos.z);
+    // Vertical post from the floor up to the rail
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, barY, 16), mat);
+    post.position.set(pos.x + side * postX, barY / 2, pos.z);
+    group.add(post);
+    // Rounded corner where post meets rail
+    const joint = new THREE.Mesh(new THREE.SphereGeometry(HANGER_PIPE_R * 1.2, 12, 12), mat);
+    joint.position.set(pos.x + side * postX, barY, pos.z);
     group.add(joint);
+    // Small base plate so the post visibly stands on the floor
+    const base = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R * 2.4, HANGER_PIPE_R * 2.4, 0.06, 16), mat);
+    base.position.set(pos.x + side * postX, 0.15, pos.z);
+    group.add(base);
   });
   return group;
 }
