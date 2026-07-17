@@ -1884,22 +1884,33 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       loadAndPlace(placements);
       checkDone();
 
-      // Remaining batches: one per unseeded line. All unseeded lines share a
-      // single listAllLineGroups/listLibrary fetch (only made at all if there's
-      // something to seed), but each line's own seed lookup + download proceeds
-      // independently as soon as it resolves.
+      // Remaining batches: one per unseeded line — seeded ONLY from an
+      // explicit line->model assignment (the Layout Preparation 🎯 popup).
+      // The old fallback that guessed a model from history (any placement or
+      // library file whose NAME loosely matched the line) is gone: it kept
+      // RESURRECTING deleted models — e.g. a box named "Chassis" always
+      // re-matched the old "chassis" model, so deleting it and assigning a
+      // car model left a mix of old/new/empty after refresh. Now a deleted
+      // line stays empty until someone deliberately assigns a model.
       if (unseededLines.length > 0) {
-        const lineGroupsAndLibrary = Promise.all([
-          z3dModelApi.listAllLineGroups().catch(() => ({ data: [] })),
-          z3dModelApi.listLibrary().catch(() => ({ data: [] })),
-        ]);
-
         unseededLines.forEach(lineGroupId => {
           // This exact line has an explicit assignment in THIS layout —
           // trust it completely and skip fuzzy cross-line matching, so a
           // missing station on "Trim" can never get seeded from "Trim 1"'s
           // (or any other layout's) model just because the names are similar.
-          const explicitMapping = mappingByLine.get(lineGroupId);
+          // Exact box-name match first; fall back to a mapping saved under a
+          // NAME VARIANT of the same logical line ("Trim 1" mapping must also
+          // cover the "Trim Line" box). Without this, only the exactly-named
+          // box was protected from the fuzzy history-based seeder below —
+          // sibling boxes fell through to it and got resurrected with
+          // whatever OLD model was most recently placed somewhere, even
+          // though the user had just deleted it and assigned a new one.
+          let explicitMapping = mappingByLine.get(lineGroupId);
+          if (!explicitMapping) {
+            for (const [mappedLine, m] of mappingByLine) {
+              if (lineNamesMatch(mappedLine, lineGroupId)) { explicitMapping = m; break; }
+            }
+          }
           if (explicitMapping) {
             z3dModelApi.getLibraryModel(explicitMapping.model_name).then(res => res.data).then(lib => {
               console.info(`[Z3D] Auto-seed: line "${lineGroupId}" seeded from its own explicit mapping (model "${explicitMapping.model_name}"), no fuzzy matching used.`);
@@ -1920,75 +1931,15 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
             return;
           }
 
-          lineGroupsAndLibrary.then(([lgRes, libRes]) => {
-            const knownLineGroups = lgRes.data || [];
-            const libraryModels = libRes.data || [];  // [{name, ext, ...}]
-
-            // Gather EVERY plausible source instead of taking the first fuzzy
-            // match: every line_group_id in the DB that loosely resembles
-            // this line's name, plus every library model whose file name
-            // does. lineNamesMatch is a loose matcher (substrings,
-            // abbreviations) with no notion of "best" match, and
-            // knownLineGroups/libraryModels are NOT ordered by recency — so
-            // picking just the first match (old behavior) could silently
-            // grab a stale naming variant instead of the one that's actually
-            // current. Instead: fetch placements from every matching source,
-            // then pick the single most-recently-updated record across all
-            // of them — recency, not array order, decides the winner.
-            const matchingLineGroups = knownLineGroups.filter(kg => lineNamesMatch(kg, lineGroupId));
-            const matchingModels = libraryModels.filter(m => lineNamesMatch(m.name, lineGroupId));
-
-            const lookups = [
-              ...matchingLineGroups.map(kg => z3dModelApi.getPlacementsByLineGroup(kg).then(r => r.data || []).catch(() => [])),
-              ...matchingModels.map(m => z3dModelApi.getPlacementsByModelName(m.name).then(r => r.data || []).catch(() => [])),
-            ];
-            if (lookups.length === 0) {
-              // Nothing to seed this line from — surface WHY in the console
-              // instead of silently leaving it blank, so a "why didn't this
-              // line get a model" report can be diagnosed from a screenshot
-              // of devtools instead of guessing blind.
-              console.warn(
-                `[Z3D] Auto-seed: no source found for line "${lineGroupId}". ` +
-                `Checked ${knownLineGroups.length} known line group(s) and ${libraryModels.length} library model(s), 0 matched.`
-              );
-              return Promise.resolve([]);
-            }
-
-            return Promise.all(lookups).then(resultsArr => {
-              const allRecsRaw = resultsArr.flat();
-              // Drop candidates with a broken model_name (e.g. the literal
-              // string "undefined") BEFORE picking "latest" — otherwise one
-              // stray garbage row with a recent timestamp can permanently
-              // win the "most recently updated" contest over real, valid
-              // records, leaving the line seeded with nothing (or blocked
-              // entirely) even though good data exists among the candidates.
-              const brokenRecs = allRecsRaw.filter(r => !isValidModelName(r.model_name));
-              if (brokenRecs.length > 0) {
-                console.warn(
-                  `[Z3D] Auto-seed: ignoring ${brokenRecs.length} broken candidate record(s) for "${lineGroupId}" ` +
-                  `(model_name: ${[...new Set(brokenRecs.map(r => r.model_name))].join(', ')}) — deleting them.`
-                );
-                brokenRecs.forEach(r => { if (r.id) z3dModelApi.deletePlacement(r.id).catch(() => {}); });
-              }
-              const allRecs = allRecsRaw.filter(r => isValidModelName(r.model_name));
-              if (allRecs.length === 0) {
-                console.warn(
-                  `[Z3D] Auto-seed: matched ${matchingLineGroups.length} line group(s)/${matchingModels.length} ` +
-                  `library model(s) for "${lineGroupId}", but they returned 0 usable placement records.`
-                );
-                return [];
-              }
-              const latest = allRecs.reduce((best, r) =>
-                (!best || new Date(r.updated_at) > new Date(best.updated_at)) ? r : best
-              , null);
-              console.info(`[Z3D] Auto-seed: line "${lineGroupId}" seeded from model "${latest.model_name}" (${allRecs.length} usable candidate record(s), ${brokenRecs.length} broken skipped).`);
-              return seedFromTemplate(latest, lineGroupId);
-            });
-          }).then(newRecords => {
-            batchesResolved += 1;
-            if (newRecords.length > 0) loadAndPlace(newRecords);
-            checkDone();
-          });
+          // No explicit assignment for this line (or any of its name
+          // variants) — deliberately leave its stations EMPTY instead of
+          // guessing a model from history. Assigning via the 🎯 popup is
+          // the one and only way an empty line gets a model.
+          console.info(
+            `[Z3D] Auto-seed: line "${lineGroupId}" has no explicit model assignment — leaving its empty station(s) empty.`
+          );
+          batchesResolved += 1;
+          checkDone();
         });
       }
     }).catch(err => {
@@ -2395,8 +2346,18 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     const scene = sceneRef.current;
     const entry = placedRef.current.find(p => p.id === id);
     if (!entry || !scene) return;
+    // Delete across the whole LOGICAL line, not just entries whose box name
+    // matches byte-for-byte. Sibling boxes of one line often carry name
+    // variants ("Trim 1"/"Trim 2"/"Trim Line") — the upload/seed paths
+    // treat those as one line (lineNamesMatch), so delete must too, or the
+    // variants keep showing the old model after "the line" was deleted.
+    // Restricted to entries showing the SAME model, so a genuinely different
+    // model on a fuzzy-similar-but-unrelated box is never collateral damage.
     const targets = entry.lineGroupId
-      ? placedRef.current.filter(p => p.lineGroupId === entry.lineGroupId)
+      ? placedRef.current.filter(p => p.lineGroupId && (
+          p.lineGroupId === entry.lineGroupId ||
+          (lineNamesMatch(p.lineGroupId, entry.lineGroupId) && p.name === entry.name)
+        ))
       : [entry];
     targets.forEach(t => {
       if (transformRef.current && selectedRef.current?.id === t.id) transformRef.current.detach();
@@ -2412,6 +2373,20 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       const sid = t.mesh.userData.serverModelId;
       if (sid) z3dModelApi.deletePlacement(sid).catch(() => {});
     });
+    // Also remove this layout's line->model assignment(s) pointing this line
+    // (or a name variant of it) at THIS model — the assignment is what the
+    // auto-seeder trusts, so leaving it behind would legitimately re-place
+    // the just-deleted model on the next refresh.
+    if (entry.lineGroupId) {
+      lineModelMappingApi.listByLayout(layoutIdRef.current).then(r => {
+        (r.data || [])
+          .filter(m =>
+            (m.line_group_id === entry.lineGroupId || lineNamesMatch(m.line_group_id, entry.lineGroupId)) &&
+            (m.model_name || '').toLowerCase() === (entry.name || '').toLowerCase()
+          )
+          .forEach(m => lineModelMappingApi.delete(m.id).catch(() => {}));
+      }).catch(() => {});
+    }
     onObjectsChange([...placedRef.current]);
     // The cached scene's placedEntries snapshot is now stale — drop it so the
     // next visit to this layout rebuilds fresh instead of showing a deleted
@@ -3402,8 +3377,13 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const handleDelete = useCallback((id) => {
     // deleteById removes entire group — clear selection if any group member was selected
     const obj = placedObjects.find(o => o.id === id);
+    // Mirror deleteById's expanded group: same box name OR a fuzzy name
+    // variant of the same line showing the same model.
     const groupIds = obj?.lineGroupId
-      ? placedObjects.filter(o => o.lineGroupId === obj.lineGroupId).map(o => o.id)
+      ? placedObjects.filter(o => o.lineGroupId && (
+          o.lineGroupId === obj.lineGroupId ||
+          (lineNamesMatch(o.lineGroupId, obj.lineGroupId) && o.name === obj.name)
+        )).map(o => o.id)
       : [id];
     const scopeMsg = obj?.lineGroupId
       ? `Remove "${obj?.name}" from all ${groupIds.length} station(s) of line "${obj.lineGroupId}"?`
