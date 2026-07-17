@@ -400,10 +400,12 @@ const HANGER_NAME_RE = /hanger/i;
 const HANGER_BAR_DROP = 2.0; // metres below the top beam
 let _hangerBarMat = null;
 function getHangerBarMaterial() {
-  // Safety yellow so the rail reads as purpose-built hanger equipment,
-  // clearly distinct from the grey structural steel around it.
+  // Safety yellow, same shade AND same unlit material type as the
+  // floor-boundary hazard striping — a lit/metallic material renders the
+  // identical hex noticeably darker (mustard) under the scene lights, so
+  // the two yellows only truly match when both are MeshBasicMaterial.
   if (!_hangerBarMat) {
-    _hangerBarMat = new THREE.MeshStandardMaterial({ color: 0xf5c400, metalness: 0.4, roughness: 0.5 });
+    _hangerBarMat = new THREE.MeshBasicMaterial({ color: 0xf5c400 });
   }
   return _hangerBarMat;
 }
