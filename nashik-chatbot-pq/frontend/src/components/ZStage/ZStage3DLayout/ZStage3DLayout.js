@@ -3461,8 +3461,8 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
               {walkMode ? '🧍 Exit Walk' : '🚶 Walk Mode'}
             </button>
 
-            {/* Play All / Stop All presets */}
-            {!playingAll ? (
+            {/* Play All / Stop All presets — admin only */}
+            {isAdmin && (!playingAll ? (
               <button type="button"
                 className="z3d-walk-btn z3d-play-all-btn"
                 disabled={animPresets.length === 0}
@@ -3481,9 +3481,10 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                   setPlayingAll(false);
                 }}
               >■ Stop All</button>
-            )}
+            ))}
 
-            {/* Animate dropdown trigger */}
+            {/* Animate dropdown trigger — admin only */}
+            {isAdmin && (
             <div className="z3d-anim-dropdown-wrapper">
               <button type="button"
                 className={`z3d-walk-btn${showAnimPanel ? ' z3d-walk-btn--active' : ''}${animPlaying ? ' z3d-walk-btn--playing' : ''}`}
@@ -3637,6 +3638,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                 </div>
               )}
             </div>
+            )}
           </>
         )}
 
