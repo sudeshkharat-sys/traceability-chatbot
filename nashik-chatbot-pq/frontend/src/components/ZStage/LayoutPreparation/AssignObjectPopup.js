@@ -134,6 +134,16 @@ export default function AssignObjectPopup({ layoutId, lineGroupId, onClose, onAp
       ? String(m.car_model_id) === String(carModel)
       : m.car_model_id == null);
     if (existing && existing.model_name !== modelName) {
+      // Non-admin users must explicitly remove the current assignment first
+      // (one deliberate step at a time) — only admins get the faster
+      // confirm-to-replace shortcut below.
+      if (!isAdmin) {
+        setError(
+          `"${existing.model_name}" is already assigned to this line. ` +
+          `Remove it first (button under "Currently assigned" below), then assign the new model.`
+        );
+        return;
+      }
       const replace = window.confirm(
         `"${existing.model_name}" is already assigned to line "${lineGroupId}".\n\n` +
         `Press OK to REPLACE it with "${modelName}", or Cancel to keep the current ` +
@@ -167,7 +177,7 @@ export default function AssignObjectPopup({ layoutId, lineGroupId, onClose, onAp
       onApplied && onApplied();
     }).catch(err => setError(err?.response?.data?.detail || err.message))
       .finally(() => setLoading(false));
-  }, [layoutId, lineGroupId, carModel, modelName, needsCarModel, mappings, reloadAll, onApplied]);
+  }, [layoutId, lineGroupId, carModel, modelName, needsCarModel, mappings, isAdmin, reloadAll, onApplied]);
 
   const removeMapping = useCallback((id) => {
     setLoading(true);
