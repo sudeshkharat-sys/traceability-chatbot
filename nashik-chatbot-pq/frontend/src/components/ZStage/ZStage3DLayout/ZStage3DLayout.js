@@ -292,6 +292,20 @@ function makeLabel(text, { fontSize = 48, color = '#ffffff', bgColor = null, pad
   return spr;
 }
 
+// Shrink a canvas font size until `text` fits within maxWidth — long names
+// were drawn at a fixed size and spilled past the board edges (only the
+// middle of the name visible). Returns the fitted px size and leaves
+// ctx.font set to it.
+function fitFontSize(ctx, text, maxWidth, startSize, minSize = 12, weight = 'bold', family = 'Arial') {
+  let size = startSize;
+  ctx.font = `${weight} ${size}px ${family}`;
+  while (ctx.measureText(text).width > maxWidth && size > minSize) {
+    size -= 2;
+    ctx.font = `${weight} ${size}px ${family}`;
+  }
+  return size;
+}
+
 function makeShopBoard(shopName) {
   const W = 256, H = 80;
   const canvas = document.createElement('canvas');
@@ -301,8 +315,9 @@ function makeShopBoard(shopName) {
   ctx.beginPath(); ctx.roundRect(0, 0, W, H, 10); ctx.fill();
   ctx.strokeStyle = '#BBDEFB'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.roundRect(4, 4, W - 8, H - 8, 7); ctx.stroke();
-  ctx.fillStyle = '#ffffff'; ctx.font = 'bold 36px Arial';
+  ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  fitFontSize(ctx, shopName, W - 24, 36);
   ctx.fillText(shopName, W / 2, H / 2);
   const tex = new THREE.CanvasTexture(canvas);
   const geo = new THREE.PlaneGeometry(2.0, 0.625);
@@ -316,8 +331,9 @@ function makeFloorLabel(text, width, fontSize = 36) {
   const ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, 512, 128);
   ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(0, 0, 512, 128);
-  ctx.fillStyle = '#ffffff'; ctx.font = `bold ${fontSize}px Arial`;
+  ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  fitFontSize(ctx, text, 512 - 32, fontSize);
   ctx.fillText(text, 256, 64);
   const tex = new THREE.CanvasTexture(canvas);
   const geo = new THREE.PlaneGeometry(width, width * (128 / 512));
@@ -580,8 +596,8 @@ function makeCantileverSign(stnId, ze, zeStatus) {
   ic.strokeStyle = 'rgba(255,255,255,0.45)'; ic.lineWidth = 5;
   ic.beginPath(); ic.roundRect(7, 7, idCW - 14, idCH - 14, 13); ic.stroke();
   ic.fillStyle = '#ffffff';
-  ic.font = 'bold 130px Arial';
   ic.textAlign = 'center'; ic.textBaseline = 'middle';
+  fitFontSize(ic, stnId, idCW - 40, 130);
   ic.fillText(stnId, idCW / 2, idCH / 2);
 
   const idBoardW = 1.4, idBoardH = idBoardW * (idCH / idCW);
