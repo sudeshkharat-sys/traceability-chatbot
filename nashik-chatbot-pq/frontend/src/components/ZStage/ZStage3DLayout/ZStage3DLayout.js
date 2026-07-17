@@ -398,16 +398,13 @@ function makeIBeam(length, mat, orientation) {
 // models are placed or deleted.
 const HANGER_NAME_RE = /hanger/i;
 const HANGER_BAR_DROP = 2.0; // metres below the top beam
-let _hangerBarMat = null;
 function getHangerBarMaterial() {
-  // Safety yellow, same shade AND same unlit material type as the
-  // floor-boundary hazard striping — a lit/metallic material renders the
-  // identical hex noticeably darker (mustard) under the scene lights, so
-  // the two yellows only truly match when both are MeshBasicMaterial.
-  if (!_hangerBarMat) {
-    _hangerBarMat = new THREE.MeshBasicMaterial({ color: 0xf5c400 });
-  }
-  return _hangerBarMat;
+  // Exactly the same brushed-steel PBR material as the structure's beams
+  // and columns (shared instance — envMap and all), so the hanger rail
+  // reads as part of the same steelwork instead of a differently-shaded
+  // add-on. Tried safety yellow first, but nothing matched the baked
+  // hazard-stripe tone under the scene lights.
+  return getStructMaterial();
 }
 // Circular-pipe hanger rail, shaped  -¡__________¡-  in the station's
 // X-Y plane: a short mounting stub at each roof corner, a vertical rod
