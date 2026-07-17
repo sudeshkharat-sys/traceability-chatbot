@@ -415,41 +415,41 @@ function getHangerBarMaterial() {
 // structure. Same safety yellow as the floor-boundary striping.
 const HANGER_PIPE_R    = 0.07; // pipe radius
 const HANGER_POST_INSET = 0.35; // supports pulled slightly inside the columns
-function makeHangerBar(pos) {
+function makeHangerBar(centerX, z, width) {
   const group = new THREE.Group();
   const mat = getHangerBarMaterial();
   const barY   = HEIGHT - HANGER_BAR_DROP; // rail height (3 m on a 5 m structure)
-  const halfW  = CELL_W / 2;
+  const halfW  = width / 2;
   const stubLen = HANGER_POST_INSET;       // short roof stub at each end: -¡
   const dropX  = halfW - stubLen;          // where the vertical rods hang
 
   // Long horizontal rail between the two vertical rods: ¡__________¡
   const bar = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, dropX * 2, 16), mat);
   bar.rotation.z = Math.PI / 2; // cylinder axis Y → X
-  bar.position.set(pos.x, barY, pos.z);
+  bar.position.set(centerX, barY, z);
   group.add(bar);
 
   [-1, 1].forEach(side => {
-    const outerX = pos.x + side * halfW;  // roof corner (column line)
-    const dropXx = pos.x + side * dropX;  // vertical rod position
+    const outerX = centerX + side * halfW;  // roof corner at the line END
+    const dropXx = centerX + side * dropX;  // vertical rod position
     // Short horizontal stub at roof height, from the corner inward: -
     const stub = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, stubLen, 16), mat);
     stub.rotation.z = Math.PI / 2;
-    stub.position.set((outerX + dropXx) / 2, HEIGHT, pos.z);
+    stub.position.set((outerX + dropXx) / 2, HEIGHT, z);
     group.add(stub);
     // Mounting collar at the stub's outer end, on the roof corner
     const mount = new THREE.Mesh(new THREE.SphereGeometry(HANGER_PIPE_R * 1.6, 12, 12), mat);
-    mount.position.set(outerX, HEIGHT, pos.z);
+    mount.position.set(outerX, HEIGHT, z);
     group.add(mount);
     // Vertical rod from the stub down to the rail: ¡
     const dropLen = HEIGHT - barY;
     const drop = new THREE.Mesh(new THREE.CylinderGeometry(HANGER_PIPE_R, HANGER_PIPE_R, dropLen, 16), mat);
-    drop.position.set(dropXx, barY + dropLen / 2, pos.z);
+    drop.position.set(dropXx, barY + dropLen / 2, z);
     group.add(drop);
     // Rounded elbows at the top and bottom corners
     [[dropXx, HEIGHT], [dropXx, barY]].forEach(([jx, jy]) => {
       const joint = new THREE.Mesh(new THREE.SphereGeometry(HANGER_PIPE_R * 1.2, 12, 12), mat);
-      joint.position.set(jx, jy, pos.z);
+      joint.position.set(jx, jy, z);
       group.add(joint);
     });
   });
@@ -457,22 +457,39 @@ function makeHangerBar(pos) {
 }
 function syncHangerBars(scene, placedEntries, posMap) {
   if (!scene) return;
-  if (!scene.userData.hangerBars) scene.userData.hangerBars = new Map(); // stationId → mesh
+  if (!scene.userData.hangerBars) scene.userData.hangerBars = new Map(); // spanKey → mesh
   const bars = scene.userData.hangerBars;
-  const wanted = new Set();
+  // ONE continuous rail per line, not one per station: group the hanger
+  // stations by line + Z row, take the min/max station X of each group, and
+  // build a single frame spanning the whole run — so the bends/support rods
+  // appear only at the two ENDS of the line instead of repeating per cell.
+  const groups = new Map(); // lineKey → { z, minX, maxX }
   placedEntries.forEach(p => {
-    if (p.stationId && HANGER_NAME_RE.test(p.name || '')) wanted.add(p.stationId);
-  });
-  for (const [sid, mesh] of [...bars]) {
-    if (!wanted.has(sid)) { scene.remove(mesh); bars.delete(sid); }
-  }
-  wanted.forEach(sid => {
-    if (bars.has(sid)) return;
-    const pos = posMap[sid];
+    if (!p.stationId || !HANGER_NAME_RE.test(p.name || '')) return;
+    const pos = posMap[p.stationId];
     if (!pos) return;
-    const bar = makeHangerBar(pos);
+    const lineKey = `${p.lineGroupId || p.stationId}::${Math.round(pos.z * 10)}`;
+    const g = groups.get(lineKey);
+    if (!g) groups.set(lineKey, { z: pos.z, minX: pos.x, maxX: pos.x });
+    else { g.minX = Math.min(g.minX, pos.x); g.maxX = Math.max(g.maxX, pos.x); }
+  });
+  // Span keys encode position+width, so adding/removing a station on the
+  // line changes the key and the old frame gets swapped for a re-spanned one.
+  const wanted = new Map(); // spanKey → { centerX, z, width }
+  groups.forEach(g => {
+    const width = (g.maxX - g.minX) + CELL_W; // half a cell beyond each end station
+    const centerX = (g.minX + g.maxX) / 2;
+    const spanKey = `${Math.round(centerX * 10)}::${Math.round(g.z * 10)}::${Math.round(width * 10)}`;
+    wanted.set(spanKey, { centerX, z: g.z, width });
+  });
+  for (const [key, mesh] of [...bars]) {
+    if (!wanted.has(key)) { scene.remove(mesh); bars.delete(key); }
+  }
+  wanted.forEach((g, key) => {
+    if (bars.has(key)) return;
+    const bar = makeHangerBar(g.centerX, g.z, g.width);
     scene.add(bar);
-    bars.set(sid, bar);
+    bars.set(key, bar);
   });
 }
 
