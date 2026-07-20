@@ -105,7 +105,22 @@ def create_mapping(
 
 @router.delete("/{mapping_id}", status_code=204)
 def delete_mapping(mapping_id: int, connector: StateDBConnector = Depends(get_connector)):
-    exists = connector.execute_query(LineModelMappingQueries.CHECK_EXISTS, {"mapping_id": mapping_id})
-    if not exists:
+    rows = connector.execute_query(LineModelMappingQueries.GET_BY_ID, {"mapping_id": mapping_id})
+    if not rows:
         raise HTTPException(status_code=404, detail="Mapping not found")
+    mapping = _row(rows[0])
+
     connector.execute_update(LineModelMappingQueries.DELETE, {"mapping_id": mapping_id})
+
+    # A mapping's placements (the actual visible 3D objects) are separate
+    # rows that don't cascade with it — without this, "Remove" only hid the
+    # assignment in Layout Preparation while the old model kept showing in
+    # the 3D view. Only purge them once no OTHER car-model variant on this
+    # same line/layout still needs the placement.
+    remaining = connector.execute_query(LineModelMappingQueries.LIST_BY_LAYOUT_LINE, {
+        "layout_id": mapping["layout_id"], "line_group_id": mapping["line_group_id"],
+    })
+    if not remaining:
+        connector.execute_update(Z3DPlacementQueries.DELETE_BY_GROUP, {
+            "layout_id": mapping["layout_id"], "line_group_id": mapping["line_group_id"],
+        })

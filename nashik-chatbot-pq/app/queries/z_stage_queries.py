@@ -578,6 +578,11 @@ class Z3DPlacementQueries:
         WHERE line_group_id = :line_group_id AND layout_id = :layout_id
     """
 
+    DELETE_BY_LAYOUT_STATION = """
+        DELETE FROM z3d_layout_placements
+        WHERE layout_id = :layout_id AND station_id = :station_id
+    """
+
     DELETE_BY_MODEL_NAME = "DELETE FROM z3d_layout_placements WHERE LOWER(model_name) = LOWER(:model_name)"
 
     # Latest placements for a given model_name across all layouts (used as fallback
@@ -676,6 +681,13 @@ class LineModelMappingQueries:
         SELECT {MAP_COLS} FROM line_model_mappings
         WHERE layout_id = :layout_id
         ORDER BY line_group_id, car_model_id NULLS FIRST
+    """
+
+    GET_BY_ID = f"SELECT {MAP_COLS} FROM line_model_mappings WHERE id = :mapping_id"
+
+    LIST_BY_LAYOUT_LINE = f"""
+        SELECT {MAP_COLS} FROM line_model_mappings
+        WHERE layout_id = :layout_id AND line_group_id = :line_group_id
     """
 
     # Upsert respecting the two partial unique indexes (car_model_id NULL vs not-NULL)

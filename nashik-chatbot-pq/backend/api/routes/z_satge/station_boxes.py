@@ -3,7 +3,7 @@ from typing import List
 
 from app.connectors.state_db_connector import StateDBConnector
 from app.connectors.database import get_connector
-from app.queries import LayoutQueries, StationBoxQueries
+from app.queries import LayoutQueries, StationBoxQueries, Z3DPlacementQueries
 import backend.models.schemas.z_stage_schemas as schemas
 
 router = APIRouter(tags=["station_boxes"])
@@ -100,10 +100,19 @@ def delete_box(
     box_id: int,
     connector: StateDBConnector = Depends(get_connector),
 ):
-    exists = connector.execute_query(
-        StationBoxQueries.CHECK_EXISTS, {"box_id": box_id}
-    )
-    if not exists:
+    rows = connector.execute_query(StationBoxQueries.GET_BOX, {"box_id": box_id})
+    if not rows:
         raise HTTPException(status_code=404, detail="Station box not found")
+    box = _row_to_dict(rows[0])
 
     connector.execute_update(StationBoxQueries.DELETE_BOX, {"box_id": box_id})
+
+    # station_ids aren't FK'd to placements, so deleting the box alone leaves
+    # its models' placement rows (position/rotation/scale) behind — orphaned
+    # but still rendered by the 3D view. Purge them along with the box.
+    for station_id in (box.get("station_ids") or "").split(","):
+        station_id = station_id.strip()
+        if station_id:
+            connector.execute_update(Z3DPlacementQueries.DELETE_BY_LAYOUT_STATION, {
+                "layout_id": box["layout_id"], "station_id": station_id,
+            })

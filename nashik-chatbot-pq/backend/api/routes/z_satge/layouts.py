@@ -7,7 +7,7 @@ from app.connectors.state_db_connector import StateDBConnector
 from app.connectors.database import get_connector
 from app.queries import (
     LayoutQueries, StationBoxQueries, BuyoffIconQueries,
-    ConnectionQueries, SnapshotQueries,
+    ConnectionQueries, SnapshotQueries, Z3DPlacementQueries,
 )
 import backend.models.schemas.z_stage_schemas as schemas
 
@@ -145,6 +145,31 @@ def _execute_snapshot(layout_id: int, payload: schemas.LayoutSnapshotCreate, con
             row = result.fetchone()
             if row:
                 box_map[box.local_id] = row[0]  # db id (first RETURNING column)
+
+        # 3b. Purge orphaned 3D placements. station_id/line_group_id on
+        # z3d_layout_placements aren't FK'd to station_boxes, so they survive
+        # the box wipe above untouched even when the box (and its line) is
+        # gone from this save — the 3D view would otherwise keep showing
+        # those stale models. Compare surviving placements against the box
+        # set just (re)written and drop anything no longer represented.
+        valid_station_ids = set()
+        valid_box_names = set()
+        for box in payload.boxes:
+            valid_box_names.add(box.name)
+            valid_station_ids.update(
+                s.strip() for s in (box.station_ids or "").split(",") if s.strip()
+            )
+        existing_placements = session.execute(
+            text(Z3DPlacementQueries.LIST_BY_LAYOUT), {"layout_id": layout_id}
+        ).fetchall()
+        for placement in existing_placements:
+            placement = dict(placement._mapping)
+            is_stale = (
+                placement["station_id"] not in valid_station_ids
+                or (placement["line_group_id"] and placement["line_group_id"] not in valid_box_names)
+            )
+            if is_stale:
+                session.execute(text(Z3DPlacementQueries.DELETE), {"placement_id": placement["id"]})
 
         # 4. Insert buyoff icons
         for icon in payload.buyoff_icons:
