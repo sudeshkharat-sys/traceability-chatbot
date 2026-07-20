@@ -179,6 +179,20 @@ export function invalidateModelTemplate(name) {
   invalidateGeoCache(name);
 }
 
+// Called from OUTSIDE this component (Layout Preparation's assign/remove
+// model actions) whenever a line's model mapping changes. Assigning or
+// unassigning a model doesn't touch station_boxes/connections, so the scene
+// signature above would otherwise stay identical and the per-layout cached
+// scene would be reused as-is — showing a stale model on a now-unassigned
+// line, or nothing at all for a newly-assigned one. Bumping a per-layout
+// epoch here and baking it into the signature forces a rebuild for that
+// layout the next time its 3D view is opened.
+const _mappingEpochByLayout = {};
+export function invalidateLayoutMapping(layoutId) {
+  if (layoutId == null) return;
+  _mappingEpochByLayout[layoutId] = (_mappingEpochByLayout[layoutId] || 0) + 1;
+}
+
 // Single shared DRACOLoader — decoder is downloaded and initialised once,
 // then reused for every upload. Saves 1-3 s per upload vs creating a new one each time.
 const _sharedDraco = new DRACOLoader();
@@ -1188,6 +1202,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       conns: (layout.connections || []).map(c => [c.from_box_id, c.to_box_id]),
       ze: zeMapRef.current,
       epoch: _libraryEpoch, // bumped when a library model's file is replaced
+      mappingEpoch: _mappingEpochByLayout[layout.id] || 0, // bumped when a line's model assignment changes
     });
     const cachedScene   = layoutSceneCacheRef.current.get(layout.id);
     const canReuseScene = !!cachedScene && cachedScene.signature === sceneSignature;

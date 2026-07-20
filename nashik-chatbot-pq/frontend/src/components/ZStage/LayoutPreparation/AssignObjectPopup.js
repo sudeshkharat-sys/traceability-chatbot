@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { carModelApi, lineModelMappingApi, z3dModelApi } from '../../../services/api/layoutApi';
 import authService from '../../../services/api/authService';
-import { invalidateModelTemplate } from '../ZStage3DLayout/ZStage3DLayout';
+import { invalidateModelTemplate, invalidateLayoutMapping } from '../ZStage3DLayout/ZStage3DLayout';
 import { lineNeedsCarModel } from '../lineUtils';
 import '../ZStage3DLayout/ZStage3DLayout.css';
 
@@ -161,7 +161,7 @@ export default function AssignObjectPopup({ layoutId, lineGroupId, onClose, onAp
           carModelId: needsCarModel ? Number(carModel) : null,
           modelName,
         }))
-        .then(() => { reloadAll(); onApplied && onApplied(); })
+        .then(() => { invalidateLayoutMapping(layoutId); reloadAll(); onApplied && onApplied(); })
         .catch(err => setError(err?.response?.data?.detail || err.message))
         .finally(() => setLoading(false));
       return;
@@ -173,6 +173,7 @@ export default function AssignObjectPopup({ layoutId, lineGroupId, onClose, onAp
       carModelId: needsCarModel ? Number(carModel) : null,
       modelName,
     }).then(() => {
+      invalidateLayoutMapping(layoutId);
       reloadAll();
       onApplied && onApplied();
     }).catch(err => setError(err?.response?.data?.detail || err.message))
@@ -182,10 +183,10 @@ export default function AssignObjectPopup({ layoutId, lineGroupId, onClose, onAp
   const removeMapping = useCallback((id) => {
     setLoading(true);
     lineModelMappingApi.delete(id)
-      .then(() => { reloadAll(); onApplied && onApplied(); })
+      .then(() => { invalidateLayoutMapping(layoutId); reloadAll(); onApplied && onApplied(); })
       .catch(err => setError(err?.response?.data?.detail || err.message))
       .finally(() => setLoading(false));
-  }, [reloadAll, onApplied]);
+  }, [layoutId, reloadAll, onApplied]);
 
   const carModelLabel = (id) => {
     if (id == null) return 'All / single model';
