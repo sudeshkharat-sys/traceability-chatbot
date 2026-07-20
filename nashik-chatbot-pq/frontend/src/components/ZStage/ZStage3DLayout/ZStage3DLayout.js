@@ -194,7 +194,7 @@ function makeGLTFLoader() {
 // Bumped whenever the placement persistence logic changes — logged on every
 // scene build so "is the browser actually running the new bundle" can be
 // answered from a console screenshot instead of guessing.
-const Z3D_BUILD_TAG = 'explicit-assign-v3';
+const Z3D_BUILD_TAG = 'offset-persistence-v2';
 
 // A transform save that fails leaves the object looking correct on screen but
 // silently reverts it on the next refresh — the single most confusing failure
@@ -2369,22 +2369,12 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     // variants keep showing the old model after "the line" was deleted.
     // Restricted to entries showing the SAME model, so a genuinely different
     // model on a fuzzy-similar-but-unrelated box is never collateral damage.
-    const baseTargets = entry.lineGroupId
+    const targets = entry.lineGroupId
       ? placedRef.current.filter(p => p.lineGroupId && (
           p.lineGroupId === entry.lineGroupId ||
           (lineNamesMatch(p.lineGroupId, entry.lineGroupId) && p.name === entry.name)
         ))
       : [entry];
-    // A station physically holds ONE model — if buggy old data left several
-    // different models stacked on the same station(s), deleting "the model
-    // at this station" must take the stowaways with it, or the delete looks
-    // like it did nothing (another mesh is sitting in the same spot).
-    const targetIds = new Set(baseTargets.map(t => t.id));
-    const stationSet = new Set(baseTargets.map(t => t.stationId).filter(Boolean));
-    const stowaways = placedRef.current.filter(p =>
-      !targetIds.has(p.id) && p.stationId && stationSet.has(p.stationId)
-    );
-    const targets = [...baseTargets, ...stowaways];
     targets.forEach(t => {
       if (transformRef.current && selectedRef.current?.id === t.id) transformRef.current.detach();
       scene.remove(t.mesh);
@@ -2796,26 +2786,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     layoutSceneCacheRef.current.clear();
   }, []);
 
-  // Remove EVERY placed model mesh from the live scene (plus hanger bars) —
-  // used by the admin "Clear Models" cleanup after the server-side rows have
-  // been deleted, so the screen reflects the wipe immediately.
-  const clearPlacedObjects = useCallback(() => {
-    const scene = sceneRef.current;
-    if (!scene) return;
-    if (transformRef.current) transformRef.current.detach();
-    selectedRef.current = null;
-    placedRef.current.forEach(p => {
-      scene.remove(p.mesh);
-      if (p.label) scene.remove(p.label);
-    });
-    placedRef.current = [];
-    syncHangerBars(scene, [], stationPosRef.current);
-    layoutSceneCacheRef.current.clear();
-    onObjectsChange([]);
-    dirtyRef.current = true;
-  }, [onObjectsChange]);
-
-  return { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, setEnvironment, previewEnvironment: applyEnvPresetInternal, clearSceneCache, clearPlacedObjects };
+  return { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, setEnvironment, previewEnvironment: applyEnvPresetInternal, clearSceneCache };
 }
 
 // ── Compute Z/E status per station from input records (mirrors ZStageDashboard logic) ──
@@ -3046,7 +3017,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setModelLoadCount({ loaded, total, completed });
   }, []);
 
-  const { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, setEnvironment, previewEnvironment, clearSceneCache, clearPlacedObjects } =
+  const { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, setEnvironment, previewEnvironment, clearSceneCache } =
     useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady, handleModelProgress, isAdmin);
 
   // Environment/background swatch — remembered per layout (localStorage),
@@ -3446,31 +3417,6 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     renameById(selectedId, renameVal.trim());
   }, [renameVal, renameById, selectedId]);
 
-  // Admin nuclear cleanup: wipe EVERY placement row and line->model
-  // assignment of this layout on the server, then clear the live scene.
-  // The reliable way out of polluted data (duplicate/stale models left by
-  // the old history-based auto-seeder) without hunting objects one by one.
-  const handleClearAllModels = useCallback(() => {
-    if (!selectedLayoutId) return;
-    if (!window.confirm(
-      'Remove ALL placed models from this layout?\n\n' +
-      'Every station goes empty and all line assignments of this layout are ' +
-      'cleared. Library files are NOT touched — models can be re-assigned ' +
-      'afterwards. This cannot be undone.'
-    )) return;
-    z3dModelApi.listPlacements(selectedLayoutId)
-      .then(res => Promise.allSettled((res.data || []).map(r => z3dModelApi.deletePlacement(r.id))))
-      .then(() => lineModelMappingApi.listByLayout(selectedLayoutId)
-        .then(r => Promise.allSettled((r.data || []).map(m => lineModelMappingApi.delete(m.id))))
-        .catch(() => {}))
-      .then(() => {
-        clearPlacedObjects();
-        setSelectedId(null);
-        alert('All models cleared from this layout. Assign fresh models via Layout Preparation (🎯).');
-      })
-      .catch(err => alert('Clear failed: ' + (err?.message || err)));
-  }, [selectedLayoutId, clearPlacedObjects]);
-
   return (
     <div className="z3d-root">
       {/* ── Toolbar ── */}
@@ -3514,10 +3460,6 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                   ⬆ Upload Object
                 </button>
                 <input ref={fileInputRef} type="file" accept=".glb,.gltf,.obj,.stl,.wrl,.stp,.step" style={{ display: 'none' }} onChange={handleFileUpload} />
-                <button type="button" className="z3d-walk-btn" onClick={handleClearAllModels}
-                  title="Delete every placed model and line assignment in this layout (library files are kept)">
-                  🧹 Clear Models
-                </button>
               </>
             )}
 
