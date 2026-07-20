@@ -2959,7 +2959,9 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [recShop,        setRecShop]        = useState('');
   const [recFromStation, setRecFromStation] = useState('');
   const [recToStation,   setRecToStation]   = useState('');
-  const [recHeight,      setRecHeight]      = useState(12);
+  // 1.8m matches the existing walk-mode eye height (WalkController) — reads
+  // as a person walking the line rather than a drone flyover.
+  const [recHeight,      setRecHeight]      = useState(1.8);
   const [recDuration,    setRecDuration]    = useState(5);
   const [recSegments,    setRecSegments]    = useState([]); // [{ id, fromStation, toStation, height, duration }]
   const [recording,      setRecording]      = useState(false);
@@ -3866,15 +3868,21 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                   </select>
 
                   <div className="z3d-anim-dur-row">
-                    <span className="z3d-anim-field-label">Camera Height</span>
+                    <span className="z3d-anim-field-label">Walking Height</span>
                     <input
-                      type="range" min="2" max="60" step="1"
+                      type="range" min="1" max="8" step="0.1"
                       value={recHeight}
                       className="z3d-scale-slider"
-                      onChange={e => setRecHeight(parseInt(e.target.value, 10))}
+                      onChange={e => setRecHeight(parseFloat(e.target.value))}
                       disabled={recording}
                     />
-                    <span className="z3d-scale-value">{recHeight}m</span>
+                    <span className="z3d-scale-value">{recHeight.toFixed(1)}m</span>
+                  </div>
+                  <div className="z3d-anim-hint" style={{ fontSize: 11, opacity: 0.7, margin: '2px 0 6px' }}>
+                    1.8m ≈ person&apos;s eye level. Raise it a bit for an over-the-shoulder view down the line.
+                  </div>
+                  <div className="z3d-anim-hint" style={{ fontSize: 11, opacity: 0.7, margin: '2px 0 6px' }}>
+                    Tip: add several From→To legs through the stations in between (not just start/end) — the camera turns at each station, so the shot follows the line's real bends instead of cutting straight through.
                   </div>
 
                   <div className="z3d-anim-dur-row">
@@ -3904,7 +3912,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                       {recSegments.map((seg, idx) => (
                         <div key={seg.id} className="z3d-preset-item">
                           <span className="z3d-preset-label">
-                            {idx + 1}. {seg.fromStation} → {seg.toStation} · h={seg.height}m · {seg.duration}s
+                            {idx + 1}. {seg.fromStation} → {seg.toStation} · h={seg.height.toFixed(1)}m · {seg.duration}s
                           </span>
                           <button
                             type="button"
