@@ -3068,6 +3068,47 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     return Array.from(set);
   }, [stationList]);
 
+  const handleRecordSaved = useCallback((recordId, updatedRecord) => {
+    setRecords((prev) => prev.map((r) => (r.id === recordId ? updatedRecord : r)));
+  }, []);
+
+  const handleRecordAdded = useCallback((tabType, newRec) => {
+    if (tabType === 'master') setRecords((prev) => [...prev, newRec]);
+    else if (tabType === 'layered-audit') setAuditRecords((prev) => [...prev, newRec]);
+    else if (tabType === 'audit-adherence') setAdherenceRecords((prev) => [...prev, newRec]);
+  }, []);
+
+  const handleRefresh = useCallback(() => {
+    if (!selectedLayoutId) return;
+    setRefreshing(true);
+    setSceneReady(false);
+    Promise.allSettled([
+      layoutApi.getLayout(selectedLayoutId).then(res => setLayout(res.data)),
+      inputApi.getRecords(userId, selectedLayoutId).then(r => {
+        const recs = Array.isArray(r.data) ? r.data : [];
+        setRecords(recs);
+        setZeMap(computeZeMap(recs));
+      }),
+      layeredAuditApi.getAuditRecords(userId, selectedLayoutId).then(r => setAuditRecords(Array.isArray(r.data) ? r.data : [])),
+      layeredAuditApi.getAdherenceRecords(userId, selectedLayoutId).then(r => setAdherenceRecords(Array.isArray(r.data) ? r.data : [])),
+    ]).finally(() => setRefreshing(false));
+  }, [selectedLayoutId, userId]);
+
+  const handleStationClick = useCallback((stationId) => {
+    setPopupStation(stationId);
+  }, []);
+
+  const handleSceneReady = useCallback(() => {
+    setSceneReady(true);
+  }, []);
+
+  const handleModelProgress = useCallback((loaded, total, completed) => {
+    setModelLoadCount({ loaded, total, completed });
+  }, []);
+
+  const { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, animateCameraPath, stopCameraPath, setEnvironment, previewEnvironment, clearSceneCache } =
+    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady, handleModelProgress, isAdmin);
+
   // ── Camera-path video recording ──────────────────────────────────────────
   const addRecSegment = useCallback(() => {
     if (!recFromStation || !recToStation || recFromStation === recToStation) return;
@@ -3140,47 +3181,6 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     if (recorderRef.current && recorderRef.current.state === 'recording') recorderRef.current.stop();
     else setRecording(false);
   }, [stopCameraPath]);
-
-  const handleRecordSaved = useCallback((recordId, updatedRecord) => {
-    setRecords((prev) => prev.map((r) => (r.id === recordId ? updatedRecord : r)));
-  }, []);
-
-  const handleRecordAdded = useCallback((tabType, newRec) => {
-    if (tabType === 'master') setRecords((prev) => [...prev, newRec]);
-    else if (tabType === 'layered-audit') setAuditRecords((prev) => [...prev, newRec]);
-    else if (tabType === 'audit-adherence') setAdherenceRecords((prev) => [...prev, newRec]);
-  }, []);
-
-  const handleRefresh = useCallback(() => {
-    if (!selectedLayoutId) return;
-    setRefreshing(true);
-    setSceneReady(false);
-    Promise.allSettled([
-      layoutApi.getLayout(selectedLayoutId).then(res => setLayout(res.data)),
-      inputApi.getRecords(userId, selectedLayoutId).then(r => {
-        const recs = Array.isArray(r.data) ? r.data : [];
-        setRecords(recs);
-        setZeMap(computeZeMap(recs));
-      }),
-      layeredAuditApi.getAuditRecords(userId, selectedLayoutId).then(r => setAuditRecords(Array.isArray(r.data) ? r.data : [])),
-      layeredAuditApi.getAdherenceRecords(userId, selectedLayoutId).then(r => setAdherenceRecords(Array.isArray(r.data) ? r.data : [])),
-    ]).finally(() => setRefreshing(false));
-  }, [selectedLayoutId, userId]);
-
-  const handleStationClick = useCallback((stationId) => {
-    setPopupStation(stationId);
-  }, []);
-
-  const handleSceneReady = useCallback(() => {
-    setSceneReady(true);
-  }, []);
-
-  const handleModelProgress = useCallback((loaded, total, completed) => {
-    setModelLoadCount({ loaded, total, completed });
-  }, []);
-
-  const { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, animateCameraPath, stopCameraPath, setEnvironment, previewEnvironment, clearSceneCache } =
-    useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady, handleModelProgress, isAdmin);
 
   // Environment/background swatch — remembered per layout (localStorage),
   // re-read whenever the selected layout changes.
