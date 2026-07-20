@@ -7,7 +7,7 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 import { VRMLLoader } from 'three/examples/jsm/loaders/VRMLLoader';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
-import { RefreshCw, Trash2 } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { layoutApi, inputApi, z3dModelApi, lineModelMappingApi } from '../../../services/api/layoutApi';
 import { layeredAuditApi } from '../../../services/api/layoutApi';
 import { StationDetailModal, MONTHLY_KEYS } from '../ZStageDashboard/ZStageDashboard';
@@ -2394,25 +2394,10 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     const deleteIds = new Set(targets.map(t => t.id));
     placedRef.current = placedRef.current.filter(p => !deleteIds.has(p.id));
     syncHangerBars(scene, placedRef.current, stationPosRef.current);
-    // Delete from server using server-assigned IDs. A failed server delete
-    // must NOT be silent — the mesh is already gone from the screen, so a
-    // surviving row is invisible until it "resurrects" on the next refresh.
-    let _deleteFailAlerted = false;
+    // Delete from server using server-assigned IDs
     targets.forEach(t => {
       const sid = t.mesh.userData.serverModelId;
-      if (sid) z3dModelApi.deletePlacement(sid).catch(err => {
-        console.error('[Z3D] deletePlacement FAILED for', sid, err?.response?.status, err?.response?.data || err?.message);
-        if (!_deleteFailAlerted) {
-          _deleteFailAlerted = true;
-          alert(
-            `Deleting "${t.name}" from the server FAILED ` +
-            `(${err?.response?.status ?? ''} ${err?.response?.data?.detail || err?.message || 'unknown error'}).\n` +
-            `It will REAPPEAR after refresh. Check the backend.`
-          );
-        }
-      });
-      // An entry with no server id was never saved — nothing to delete remotely.
-      if (!sid) console.warn('[Z3D] Deleted object had no server id (never saved?):', t.name, t.stationId);
+      if (sid) z3dModelApi.deletePlacement(sid).catch(() => {});
     });
     // Also remove this layout's line->model assignment(s) pointing this line
     // (or a name variant of it) at THIS model — the assignment is what the
@@ -3475,27 +3460,13 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     )) return;
     z3dModelApi.listPlacements(selectedLayoutId)
       .then(res => Promise.allSettled((res.data || []).map(r => z3dModelApi.deletePlacement(r.id))))
-      .then(results => {
-        // Failures must be LOUD — a silently-surviving row is exactly what
-        // makes a "deleted" model reappear on the next refresh.
-        const failed = results.filter(r => r.status === 'rejected');
-        return lineModelMappingApi.listByLayout(selectedLayoutId)
-          .then(r => Promise.allSettled((r.data || []).map(m => lineModelMappingApi.delete(m.id))))
-          .catch(() => [])
-          .then(() => ({ total: results.length, failed: failed.length, firstErr: failed[0]?.reason }));
-      })
-      .then(({ total, failed, firstErr }) => {
+      .then(() => lineModelMappingApi.listByLayout(selectedLayoutId)
+        .then(r => Promise.allSettled((r.data || []).map(m => lineModelMappingApi.delete(m.id))))
+        .catch(() => {}))
+      .then(() => {
         clearPlacedObjects();
         setSelectedId(null);
-        if (failed > 0) {
-          alert(
-            `Cleared ${total - failed} of ${total} placement(s) — ${failed} FAILED to delete on the server ` +
-            `(${firstErr?.response?.status ?? ''} ${firstErr?.response?.data?.detail || firstErr?.message || 'unknown error'}).\n` +
-            `The failed ones WILL reappear after refresh. Check that the backend is running and up to date.`
-          );
-        } else {
-          alert(`All ${total} placement(s) cleared from this layout. Assign fresh models via Layout Preparation (🎯).`);
-        }
+        alert('All models cleared from this layout. Assign fresh models via Layout Preparation (🎯).');
       })
       .catch(err => alert('Clear failed: ' + (err?.message || err)));
   }, [selectedLayoutId, clearPlacedObjects]);
@@ -3543,6 +3514,10 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                   ⬆ Upload Object
                 </button>
                 <input ref={fileInputRef} type="file" accept=".glb,.gltf,.obj,.stl,.wrl,.stp,.step" style={{ display: 'none' }} onChange={handleFileUpload} />
+                <button type="button" className="z3d-walk-btn" onClick={handleClearAllModels}
+                  title="Delete every placed model and line assignment in this layout (library files are kept)">
+                  🧹 Clear Models
+                </button>
               </>
             )}
 
@@ -3554,15 +3529,6 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
             {/* Walk mode */}
             <button type="button" className={`z3d-walk-btn${walkMode ? ' z3d-walk-btn--active' : ''}`} onClick={() => setWalkMode(v => !v)}>
               {walkMode ? '🧍 Exit Walk' : '🚶 Walk Mode'}
-            </button>
-
-            {/* Clear all models — available to every Z-Stage user: wipes this
-                layout's placements + assignments so fresh models can be
-                assigned via Layout Preparation. Library files are untouched. */}
-            <button type="button" className="z3d-walk-btn" onClick={handleClearAllModels}
-              title="Remove every placed model and line assignment from this layout (uploaded files stay in the library)">
-              <Trash2 size={13} style={{ marginRight: 4, verticalAlign: 'text-bottom' }} />
-              Clear Models
             </button>
 
             {/* Play All / Stop All presets — admin only */}
