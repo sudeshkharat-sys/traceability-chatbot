@@ -1128,6 +1128,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
   const layoutIdRef    = useRef(null);   // kept in sync by the scene effect
   const stationPosRef  = useRef({});     // stationId → { x, z, shopName }
   const animationsRef  = useRef([]);     // active tweens
+  const cameraTweenRef = useRef([]);     // active camera-path tweens (video recording)
   const blobCacheRef   = useRef({});     // objId → Blob — keeps file data alive across IDB updates
   const dirtyRef       = useRef(true);   // render dirty flag — set true whenever scene changes
   // Last-2 built scenes, keyed by layout id — lets switching back to a
@@ -1981,6 +1982,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       rafRef.current = requestAnimationFrame(animate);
       try {
         if (walkModeRef.current) { walk.update(); dirtyRef.current = true; orbit.enabled = false; }
+        else if (cameraTweenRef.current.length > 0) { orbit.enabled = false; }
         else { if (!tc.dragging) orbit.enabled = true; orbit.update(); }
 
         // Process active tweens
@@ -1998,6 +2000,23 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           });
         }
         done.forEach(anim => anim.onComplete && anim.onComplete());
+
+        // Process active camera-path tweens (video recording fly-through)
+        if (cameraTweenRef.current.length > 0) {
+          dirtyRef.current = true;
+          const camDone = [];
+          cameraTweenRef.current = cameraTweenRef.current.filter(anim => {
+            const raw  = Math.min((now - anim.startTime) / anim.durationMs, 1);
+            const ease = raw < 0.5 ? 2 * raw * raw : -1 + (4 - 2 * raw) * raw;
+            const x = anim.fromX + (anim.toX - anim.fromX) * ease;
+            const z = anim.fromZ + (anim.toZ - anim.fromZ) * ease;
+            camera.position.set(x, anim.height, z);
+            camera.lookAt(anim.lookAt.x, anim.lookAt.y, anim.lookAt.z);
+            if (raw >= 1) { camDone.push(anim); return false; }
+            return true;
+          });
+          camDone.forEach(anim => anim.onComplete && anim.onComplete());
+        }
 
         if (dirtyRef.current) {
           renderer.render(scene, camera);
@@ -2753,6 +2772,56 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     runSegment();
   }, []);
 
+  // Flies the camera through a sequence of admin-defined legs, each
+  // { fromStationId, toStationId, height, durationSec }, looking at the
+  // scene center throughout — used to record a "video clip of the object"
+  // (see recordCameraPath in the component). Runs legs back-to-back so a
+  // multi-leg path (A→B, then B→C, ...) plays as one continuous shot.
+  const animateCameraPath = useCallback((legs, onComplete) => {
+    const camera = cameraRef.current;
+    if (!camera || !legs || legs.length === 0) { onComplete && onComplete(); return; }
+
+    const posMap = stationPosRef.current;
+    const center = sceneCenterRef.current;
+    const lookY  = Math.max(1, sceneSpanRef.current * 0.08);
+
+    const segments = legs
+      .map(leg => {
+        const from = posMap[leg.fromStationId];
+        const to   = posMap[leg.toStationId];
+        if (!from || !to) return null;
+        return {
+          fromX: from.x, fromZ: from.z,
+          toX:   to.x,   toZ:   to.z,
+          height: leg.height,
+          durationMs: Math.max(0.5, leg.durationSec) * 1000,
+        };
+      })
+      .filter(Boolean);
+    if (segments.length === 0) { onComplete && onComplete(); return; }
+
+    cameraTweenRef.current = [];
+    let segIdx = 0;
+    const runSegment = () => {
+      if (segIdx >= segments.length) { onComplete && onComplete(); return; }
+      const seg = segments[segIdx];
+      cameraTweenRef.current = [{
+        fromX: seg.fromX, fromZ: seg.fromZ,
+        toX:   seg.toX,   toZ:   seg.toZ,
+        height: seg.height,
+        lookAt: { x: center.x, y: lookY, z: center.z },
+        startTime:  performance.now(),
+        durationMs: seg.durationMs,
+        onComplete: () => { segIdx++; runSegment(); },
+      }];
+    };
+    runSegment();
+  }, []);
+
+  const stopCameraPath = useCallback(() => {
+    cameraTweenRef.current = [];
+  }, []);
+
   const stopAnimation = useCallback((id, resetToStart) => {
     animationsRef.current = animationsRef.current.filter(a => a.id !== id);
     if (resetToStart) {
@@ -2794,7 +2863,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     layoutSceneCacheRef.current.clear();
   }, []);
 
-  return { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, setEnvironment, previewEnvironment: applyEnvPresetInternal, clearSceneCache };
+  return { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, animateCameraPath, stopCameraPath, setEnvironment, previewEnvironment: applyEnvPresetInternal, clearSceneCache };
 }
 
 // ── Compute Z/E status per station from input records (mirrors ZStageDashboard logic) ──
@@ -2883,6 +2952,18 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
   const [animPlaying,       setAnimPlaying]       = useState(false);
   const [animPresets,       setAnimPresets]       = useState([]);
   const [playingAll,        setPlayingAll]        = useState(false);
+
+  // Camera-path video recording — admin defines a multi-leg fly-through
+  // (From → To station, height, duration per leg) then records + downloads it.
+  const [showRecPanel,   setShowRecPanel]   = useState(false);
+  const [recShop,        setRecShop]        = useState('');
+  const [recFromStation, setRecFromStation] = useState('');
+  const [recToStation,   setRecToStation]   = useState('');
+  const [recHeight,      setRecHeight]      = useState(12);
+  const [recDuration,    setRecDuration]    = useState(5);
+  const [recSegments,    setRecSegments]    = useState([]); // [{ id, fromStation, toStation, height, duration }]
+  const [recording,      setRecording]      = useState(false);
+  const recorderRef = useRef(null);
 
   useEffect(() => {
     if (activeLayoutId && !selectedLayoutId) setSelectedLayoutId(activeLayoutId);
@@ -2987,6 +3068,79 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     return Array.from(set);
   }, [stationList]);
 
+  // ── Camera-path video recording ──────────────────────────────────────────
+  const addRecSegment = useCallback(() => {
+    if (!recFromStation || !recToStation || recFromStation === recToStation) return;
+    setRecSegments(prev => [...prev, {
+      id: `${Date.now()}`,
+      fromStation: recFromStation,
+      toStation:   recToStation,
+      height:      recHeight,
+      duration:    recDuration,
+    }]);
+  }, [recFromStation, recToStation, recHeight, recDuration]);
+
+  const removeRecSegment = useCallback((id) => {
+    setRecSegments(prev => prev.filter(s => s.id !== id));
+  }, []);
+
+  const handleRecordAndDownload = useCallback(() => {
+    if (recSegments.length === 0 || recording) return;
+    const canvas = canvasRef.current;
+    if (!canvas || typeof canvas.captureStream !== 'function' || typeof window.MediaRecorder === 'undefined') {
+      alert('Video recording is not supported in this browser. Try a recent Chrome or Edge.');
+      return;
+    }
+
+    const stream = canvas.captureStream(30);
+    const mimeCandidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+    const mimeType = mimeCandidates.find(t => window.MediaRecorder.isTypeSupported && window.MediaRecorder.isTypeSupported(t)) || '';
+    let recorder;
+    try {
+      recorder = new window.MediaRecorder(stream, mimeType
+        ? { mimeType, videoBitsPerSecond: 8_000_000 }
+        : { videoBitsPerSecond: 8_000_000 });
+    } catch (err) {
+      alert('Could not start the recorder: ' + (err?.message || err));
+      return;
+    }
+
+    const chunks = [];
+    recorder.ondataavailable = (e) => { if (e.data && e.data.size > 0) chunks.push(e.data); };
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: mimeType || 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `zstage-camera-path-${Date.now()}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      setRecording(false);
+    };
+
+    recorderRef.current = recorder;
+    recorder.start();
+    setRecording(true);
+
+    const legs = recSegments.map(s => ({
+      fromStationId: s.fromStation,
+      toStationId:   s.toStation,
+      height:        s.height,
+      durationSec:   s.duration,
+    }));
+    animateCameraPath(legs, () => {
+      if (recorderRef.current && recorderRef.current.state === 'recording') recorderRef.current.stop();
+    });
+  }, [recSegments, recording, animateCameraPath]);
+
+  const handleStopRecording = useCallback(() => {
+    stopCameraPath();
+    if (recorderRef.current && recorderRef.current.state === 'recording') recorderRef.current.stop();
+    else setRecording(false);
+  }, [stopCameraPath]);
+
   const handleRecordSaved = useCallback((recordId, updatedRecord) => {
     setRecords((prev) => prev.map((r) => (r.id === recordId ? updatedRecord : r)));
   }, []);
@@ -3025,7 +3179,7 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
     setModelLoadCount({ loaded, total, completed });
   }, []);
 
-  const { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, setEnvironment, previewEnvironment, clearSceneCache } =
+  const { snapView, setTransformMode, placeObject, placeObjectForLine, handleCanvasClick, handleCanvasDblClick, selectById, deleteById, renameById, setObjectScale, setGroupRotation, animateAlongPath, stopAnimation, animateCameraPath, stopCameraPath, setEnvironment, previewEnvironment, clearSceneCache } =
     useThreeScene(canvasRef, layout, statusMap, zeMap, walkMode, onObjectsChange, onConvertStart, onConvertEnd, handleStationClick, isActive, handleSceneReady, handleModelProgress, isAdmin);
 
   // Environment/background swatch — remembered per layout (localStorage),
@@ -3655,6 +3809,129 @@ function ZStage3DLayout({ userId, savedLayouts = [], activeLayoutId, isActive })
                       ))}
                     </div>
                   )}
+                </div>
+              )}
+            </div>
+            )}
+
+            {/* Record Video dropdown trigger — admin only */}
+            {isAdmin && (
+            <div className="z3d-anim-dropdown-wrapper">
+              <button type="button"
+                className={`z3d-walk-btn${showRecPanel ? ' z3d-walk-btn--active' : ''}${recording ? ' z3d-walk-btn--playing' : ''}`}
+                onClick={() => setShowRecPanel(v => !v)}
+              >
+                🎥 Record Video{recording ? ' ●' : ''}
+              </button>
+
+              {showRecPanel && (
+                <div className="z3d-anim-dropdown">
+                  <div className="z3d-anim-dropdown-title">Record Camera Path Video</div>
+
+                  <label className="z3d-anim-field-label">Site / Shop</label>
+                  <select
+                    className="z3d-anim-select"
+                    value={recShop}
+                    onChange={e => { setRecShop(e.target.value); setRecFromStation(''); setRecToStation(''); }}
+                    disabled={recording}
+                  >
+                    <option value="">— All shops —</option>
+                    {shopList.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+
+                  <label className="z3d-anim-field-label">From Station</label>
+                  <select
+                    className="z3d-anim-select"
+                    value={recFromStation}
+                    onChange={e => setRecFromStation(e.target.value)}
+                    disabled={recording}
+                  >
+                    <option value="">— Start —</option>
+                    {stationList
+                      .filter(s => !recShop || s.shop === recShop)
+                      .map(s => <option key={s.id} value={s.id}>{s.id}{s.shop ? ` · ${s.shop}` : ''}</option>)}
+                  </select>
+
+                  <label className="z3d-anim-field-label">To Station</label>
+                  <select
+                    className="z3d-anim-select"
+                    value={recToStation}
+                    onChange={e => setRecToStation(e.target.value)}
+                    disabled={recording}
+                  >
+                    <option value="">— End —</option>
+                    {stationList
+                      .filter(s => !recShop || s.shop === recShop)
+                      .map(s => <option key={s.id} value={s.id}>{s.id}{s.shop ? ` · ${s.shop}` : ''}</option>)}
+                  </select>
+
+                  <div className="z3d-anim-dur-row">
+                    <span className="z3d-anim-field-label">Camera Height</span>
+                    <input
+                      type="range" min="2" max="60" step="1"
+                      value={recHeight}
+                      className="z3d-scale-slider"
+                      onChange={e => setRecHeight(parseInt(e.target.value, 10))}
+                      disabled={recording}
+                    />
+                    <span className="z3d-scale-value">{recHeight}m</span>
+                  </div>
+
+                  <div className="z3d-anim-dur-row">
+                    <span className="z3d-anim-field-label">Duration</span>
+                    <input
+                      type="range" min="2" max="20" step="1"
+                      value={recDuration}
+                      className="z3d-scale-slider"
+                      onChange={e => setRecDuration(parseInt(e.target.value, 10))}
+                      disabled={recording}
+                    />
+                    <span className="z3d-scale-value">{recDuration}s</span>
+                  </div>
+
+                  <div className="z3d-anim-btns">
+                    <button
+                      type="button"
+                      className="z3d-anim-play-btn"
+                      disabled={recording || !recFromStation || !recToStation || recFromStation === recToStation}
+                      onClick={addRecSegment}
+                    >+ Add Segment</button>
+                  </div>
+
+                  {/* Ordered list of path segments that make up the shot */}
+                  {recSegments.length > 0 && (
+                    <div className="z3d-preset-list">
+                      {recSegments.map((seg, idx) => (
+                        <div key={seg.id} className="z3d-preset-item">
+                          <span className="z3d-preset-label">
+                            {idx + 1}. {seg.fromStation} → {seg.toStation} · h={seg.height}m · {seg.duration}s
+                          </span>
+                          <button
+                            type="button"
+                            className="z3d-preset-del-btn"
+                            disabled={recording}
+                            onClick={() => removeRecSegment(seg.id)}
+                          >×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="z3d-anim-btns" style={{ marginTop: 6 }}>
+                    {!recording ? (
+                      <button type="button"
+                        className="z3d-anim-play-btn"
+                        disabled={recSegments.length === 0}
+                        onClick={handleRecordAndDownload}
+                      >⏺ Record &amp; Download</button>
+                    ) : (
+                      <button type="button"
+                        className="z3d-anim-stop-btn"
+                        onClick={handleStopRecording}
+                      >■ Stop</button>
+                    )}
+                    {recording && <span className="z3d-anim-playing">Recording…</span>}
+                  </div>
                 </div>
               )}
             </div>
