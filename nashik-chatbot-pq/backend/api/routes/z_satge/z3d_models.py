@@ -197,14 +197,40 @@ def create_placement(
     pos_is_offset: bool = Form(False),
     connector: StateDBConnector = Depends(get_connector),
 ):
-    rows = connector.execute_query(Z3DPlacementQueries.CREATE, {
-        "layout_id": layout_id, "model_name": model_name,
-        "line_group_id": line_group_id, "station_id": station_id,
-        "px": px, "py": py, "pz": pz,
-        "rx": rx, "ry": ry, "rz": rz,
-        "sx": sx, "sy": sy, "sz": sz,
-        "pos_is_offset": pos_is_offset,
-    })
+    # A station can only ever show ONE placed model at a time — but this
+    # endpoint used to always INSERT, so manually placing an object onto a
+    # station that already had one (e.g. auto-seeded from a mapping, or a
+    # leftover from an earlier placement) created a SECOND row at the same
+    # station instead of replacing it. Both then rendered, which is what
+    # showed up as "multiple models on one line"; deleting one in the 3D
+    # view removed only that mesh, leaving the other to reappear on the next
+    # scene rebuild. Upsert by (layout_id, station_id) instead, mirroring
+    # the mapping-driven placement path (_apply_mapping_to_layout).
+    existing = (
+        connector.execute_query(
+            Z3DPlacementQueries.GET_BY_LAYOUT_STATION,
+            {"layout_id": layout_id, "station_id": station_id},
+        )
+        if station_id else []
+    )
+    if existing:
+        rows = connector.execute_query(Z3DPlacementQueries.UPDATE_MODEL_AND_TRANSFORM, {
+            "placement_id": _row(existing[0])["id"],
+            "model_name": model_name, "line_group_id": line_group_id,
+            "px": px, "py": py, "pz": pz,
+            "rx": rx, "ry": ry, "rz": rz,
+            "sx": sx, "sy": sy, "sz": sz,
+            "pos_is_offset": pos_is_offset,
+        })
+    else:
+        rows = connector.execute_query(Z3DPlacementQueries.CREATE, {
+            "layout_id": layout_id, "model_name": model_name,
+            "line_group_id": line_group_id, "station_id": station_id,
+            "px": px, "py": py, "pz": pz,
+            "rx": rx, "ry": ry, "rz": rz,
+            "sx": sx, "sy": sy, "sz": sz,
+            "pos_is_offset": pos_is_offset,
+        })
     if not rows:
         raise HTTPException(status_code=500, detail="Failed to create placement")
     return _row(rows[0])
