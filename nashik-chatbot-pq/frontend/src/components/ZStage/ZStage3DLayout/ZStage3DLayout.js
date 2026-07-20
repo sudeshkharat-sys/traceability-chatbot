@@ -1925,23 +1925,16 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       // line stays empty until someone deliberately assigns a model.
       if (unseededLines.length > 0) {
         unseededLines.forEach(lineGroupId => {
-          // This exact line has an explicit assignment in THIS layout —
-          // trust it completely and skip fuzzy cross-line matching, so a
-          // missing station on "Trim" can never get seeded from "Trim 1"'s
-          // (or any other layout's) model just because the names are similar.
-          // Exact box-name match first; fall back to a mapping saved under a
-          // NAME VARIANT of the same logical line ("Trim 1" mapping must also
-          // cover the "Trim Line" box). Without this, only the exactly-named
-          // box was protected from the fuzzy history-based seeder below —
-          // sibling boxes fell through to it and got resurrected with
-          // whatever OLD model was most recently placed somewhere, even
-          // though the user had just deleted it and assigned a new one.
-          let explicitMapping = mappingByLine.get(lineGroupId);
-          if (!explicitMapping) {
-            for (const [mappedLine, m] of mappingByLine) {
-              if (lineNamesMatch(mappedLine, lineGroupId)) { explicitMapping = m; break; }
-            }
-          }
+          // Only THIS exact box's own mapping may seed it — no fuzzy
+          // name-variant fallback. That fallback used to let an unmapped
+          // box ("Trim") silently borrow a SIBLING box's mapping ("Trim 1")
+          // just because lineNamesMatch() treats them as the same logical
+          // line: the box would keep coming back with someone else's model
+          // on every reload even though it was never assigned anything
+          // itself, and deleting the resulting placement (manually or via
+          // the cleanup script) never stuck since auto-seed just recreated
+          // it from that sibling mapping again next load.
+          const explicitMapping = mappingByLine.get(lineGroupId);
           if (explicitMapping) {
             z3dModelApi.getLibraryModel(explicitMapping.model_name).then(res => res.data).then(lib => {
               console.info(`[Z3D] Auto-seed: line "${lineGroupId}" seeded from its own explicit mapping (model "${explicitMapping.model_name}"), no fuzzy matching used.`);
@@ -1962,10 +1955,10 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
             return;
           }
 
-          // No explicit assignment for this line (or any of its name
-          // variants) — deliberately leave its stations EMPTY instead of
-          // guessing a model from history. Assigning via the 🎯 popup is
-          // the one and only way an empty line gets a model.
+          // No explicit assignment for this exact line — deliberately leave
+          // its stations EMPTY instead of guessing a model from a sibling
+          // line or history. Assigning via the 🎯 popup is the one and only
+          // way an empty line gets a model.
           console.info(
             `[Z3D] Auto-seed: line "${lineGroupId}" has no explicit model assignment — leaving its empty station(s) empty.`
           );
