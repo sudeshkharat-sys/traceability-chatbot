@@ -7,6 +7,7 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 import { VRMLLoader } from 'three/examples/jsm/loaders/VRMLLoader';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
+import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils';
 import { RefreshCw } from 'lucide-react';
 import { layoutApi, inputApi, z3dModelApi, lineModelMappingApi } from '../../../services/api/layoutApi';
 import { layeredAuditApi } from '../../../services/api/layoutApi';
@@ -258,6 +259,72 @@ function buildTransformPayload(entry) {
     pz: mesh.position.z,
     pos_is_offset: false,
   };
+}
+
+// A single imported model (machinery, fixtures, etc.) often arrives as
+// dozens of small sub-meshes — one per part — each of which is its own GPU
+// draw call. That cost is paid once per PLACEMENT (every station on every
+// line), so a layout with many stations can rack up thousands of draw calls
+// even though geometry buffers are shared (sharedClone below). Folding same-
+// material sub-meshes into one merged mesh here — once, right when the
+// template is first parsed, before it's cached/cloned anywhere — collapses
+// that down to roughly one draw call per material, for every future clone,
+// with zero changes needed to selection/drag/animation (they all still act
+// on the same outer placed Object3D as before).
+function optimizeTemplateDrawCalls(root) {
+  const mergeFn = BufferGeometryUtils.mergeGeometries;
+  if (!mergeFn) return; // unsupported three version — skip, correctness > optimization
+  try {
+    root.updateWorldMatrix(true, true);
+    const meshes = [];
+    root.traverse(child => {
+      if (
+        child.isMesh && child.geometry && !child.isSkinnedMesh &&
+        !Array.isArray(child.material) &&
+        !(child.geometry.morphAttributes && Object.keys(child.geometry.morphAttributes).length)
+      ) {
+        meshes.push(child);
+      }
+    });
+    if (meshes.length < 2) return; // nothing to gain
+
+    const groups = new Map(); // material.uuid → { material, meshes: [] }
+    meshes.forEach(mesh => {
+      const key = mesh.material.uuid;
+      if (!groups.has(key)) groups.set(key, { material: mesh.material, meshes: [] });
+      groups.get(key).meshes.push(mesh);
+    });
+
+    const rootInverse = new THREE.Matrix4().copy(root.matrixWorld).invert();
+    groups.forEach(({ material, meshes: group }) => {
+      if (group.length < 2) return; // only worth merging actual repeats
+
+      // Every geometry in a merge batch must share the same vertex attribute
+      // layout (position/normal/uv/…) — bail out for that group otherwise.
+      const attrKey = Object.keys(group[0].geometry.attributes).sort().join(',');
+      const compatible = group.every(m => Object.keys(m.geometry.attributes).sort().join(',') === attrKey);
+      if (!compatible) return;
+
+      let merged;
+      try {
+        const baked = group.map(mesh => {
+          const g = mesh.geometry.clone();
+          g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(rootInverse, mesh.matrixWorld));
+          return g;
+        });
+        merged = mergeFn(baked, false);
+      } catch (e) {
+        return; // leave this group's originals in place
+      }
+      if (!merged) return;
+
+      const mergedMesh = new THREE.Mesh(merged, material);
+      root.add(mergedMesh);
+      group.forEach(mesh => mesh.parent && mesh.parent.remove(mesh));
+    });
+  } catch (err) {
+    console.error('[Z3D] Template draw-call merge skipped:', err);
+  }
 }
 
 // Clone a Three.js object sharing geometry + material buffers (no deep copy).
@@ -1852,6 +1919,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           };
 
           const onTemplate = (template) => {
+            optimizeTemplateDrawCalls(template);
             setCachedTemplate(modelName, template);
             downloadFractions.delete(modelName);
             // Deduplicate: skip any record whose station_id is already placed in the scene
@@ -2138,6 +2206,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       URL.revokeObjectURL(url);
 
       // Cache this template so other layouts can clone it without re-downloading
+      optimizeTemplateDrawCalls(obj);
       setCachedTemplate(name, obj);
       // Any OTHER layout's cached scene (layoutSceneCacheRef, below) may have
       // already baked in the OLD version of this model — that fast-path
@@ -2566,6 +2635,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       URL.revokeObjectURL(url);
 
       // Cache so other layouts (or reuse-from-library) skip the download
+      optimizeTemplateDrawCalls(template);
       setCachedTemplate(name, template);
       // See the matching comment in placeObject — an already-cached OTHER
       // layout's scene could still be showing the OLD version of this model.
