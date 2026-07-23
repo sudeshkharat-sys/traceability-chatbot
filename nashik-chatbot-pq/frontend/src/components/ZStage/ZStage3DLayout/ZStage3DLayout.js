@@ -369,7 +369,7 @@ function optimizeTemplateDrawCalls(root) {
 // scenes. Materials are simpler: every shared singleton material is known
 // and explicitly protected below, so everything else is safe to dispose.
 function disposeEvictedSceneTextures(scene) {
-  const protectedMats = new Set([_hazardMat, _steelStructMat, _floorMat]);
+  const protectedMats = new Set([_hazardMat, _steelStructMat, _floorMat, _poleMat]);
   if (_zebraAssets) {
     protectedMats.add(_zebraAssets.fillMat);
     protectedMats.add(_zebraAssets.borderMat);
@@ -722,21 +722,26 @@ function makeDoubleSidedBoard(canvas, boardW, boardH) {
   return group;
 }
 
+// Shared across every sign in every box — was a brand-new material PER
+// STATION for a color that's identical everywhere; the rod/drop geometry it
+// colors is now built once per box as an InstancedMesh (see
+// buildStationShell), not per station either.
+let _poleMat = null;
+function getPoleMaterial() {
+  if (!_poleMat) _poleMat = new THREE.MeshLambertMaterial({ color: 0x546e7a });
+  return _poleMat;
+}
+const SIGN_ROD_LEN  = 2.5;   // how far the cantilever rod sticks out in +Z
+const SIGN_DROP_H   = 0.08;  // vertical drop at rod tip that boards mount to
+
+// Station-ID + Z/E badge boards only — the rod/drop support structure this
+// used to include is now a per-box InstancedMesh (buildStationShell), since
+// it's visually and dimensionally identical at every single station; only
+// the boards' canvas-baked text is genuinely unique per station.
 function makeCantileverSign(stnId, ze, zeStatus) {
-  const group    = new THREE.Group();
-  const rodLen   = 2.5;   // how far it sticks out in +Z
-  const poleMat  = new THREE.MeshLambertMaterial({ color: 0x546e7a });
-
-  // Horizontal cantilever rod pointing in +Z
-  const rod = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.07, rodLen), poleMat);
-  rod.position.set(0, 0, rodLen / 2);   // starts at column, extends outward
-  group.add(rod);
-
-  // Small vertical drop at rod tip to mount boards
-  const dropH = 0.08;
-  const drop  = new THREE.Mesh(new THREE.BoxGeometry(0.07, dropH, 0.07), poleMat);
-  drop.position.set(0, -dropH / 2, rodLen);
-  group.add(drop);
+  const group  = new THREE.Group();
+  const rodLen = SIGN_ROD_LEN;
+  const dropH  = SIGN_DROP_H;
 
   // ── Station ID board ────────────────────────────────────────────────────────
   const idCW = 512, idCH = 256;
@@ -1067,6 +1072,12 @@ function buildStationShell(box, statusMap, zeMap, scene) {
   const zebra = getZebraAssets();
   const zebraFillMesh = new THREE.InstancedMesh(zebra.fillGeo, zebra.fillMat, count);
   const zebraBorderMeshes = zebra.borderGeos.map(geo => new THREE.InstancedMesh(geo, zebra.borderMat, count));
+  // Cantilever sign rod + drop — identical dimensions/material at every
+  // station, so batched the same way; only the ID/Z-E boards (unique text
+  // per station) stay as individual meshes, built per station below.
+  const signRodInstances  = new THREE.InstancedMesh(new THREE.BoxGeometry(0.07, 0.07, SIGN_ROD_LEN), getPoleMaterial(), count);
+  const signDropInstances = new THREE.InstancedMesh(new THREE.BoxGeometry(0.07, SIGN_DROP_H, 0.07), getPoleMaterial(), count);
+  const signStationIdByInstance = new Array(count);
   const _mat = new THREE.Matrix4();
   const _rotX90 = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
 
@@ -1103,7 +1114,17 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     // Z/E data from input records (via zeMap)
     const { ze = null, zeStatus = null } = zeMap[stnId] || {};
 
-    // Cantilever rod + boards at front beam centre, sticking out toward viewer
+    // Cantilever rod + drop — one instance each of the shared per-box meshes
+    // (see above); world position = the sign anchor (cellCX, HEIGHT,
+    // originZ + DEPTH) plus each part's fixed local offset from it.
+    _mat.makeTranslation(cellCX, HEIGHT, originZ + DEPTH + SIGN_ROD_LEN / 2);
+    signRodInstances.setMatrixAt(i, _mat);
+    _mat.makeTranslation(cellCX, HEIGHT - SIGN_DROP_H / 2, originZ + DEPTH + SIGN_ROD_LEN);
+    signDropInstances.setMatrixAt(i, _mat);
+    signStationIdByInstance[i] = stnId;
+
+    // ID/Z-E boards at front beam centre, sticking out toward viewer — the
+    // only part of the sign that's genuinely unique per station (baked text)
     const sign = makeCantileverSign(stnId, ze, zeStatus);
     sign.traverse(child => { child.userData.stationId = stnId; });
     sign.position.set(cellCX, HEIGHT, originZ + DEPTH);
@@ -1119,6 +1140,13 @@ function buildStationShell(box, statusMap, zeMap, scene) {
   zebraFillMesh.instanceMatrix.needsUpdate = true;
   group.add(zebraFillMesh);
   zebraBorderMeshes.forEach(mesh => { mesh.instanceMatrix.needsUpdate = true; group.add(mesh); });
+
+  signRodInstances.instanceMatrix.needsUpdate = true;
+  signRodInstances.userData.stationIdByInstance = signStationIdByInstance;
+  group.add(signRodInstances);
+  signDropInstances.instanceMatrix.needsUpdate = true;
+  signDropInstances.userData.stationIdByInstance = signStationIdByInstance;
+  group.add(signDropInstances);
 
   // ── Yellow/black hazard-stripe border around the entire line ──────────────────
   // Same stripe treatment as the column-base safety markers, run around the
