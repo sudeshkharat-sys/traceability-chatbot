@@ -2261,17 +2261,6 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       tc.dispose();
       orbit.dispose();
       renderer.dispose();
-      // renderer.dispose() alone only clears three.js's OWN internal
-      // caches/state — it does NOT tell the browser to actually release the
-      // underlying GPU graphics context, which stays alive on this canvas
-      // until the browser/driver decides to reclaim it (not guaranteed to
-      // happen promptly). Every layout switch/refresh creates a brand new
-      // WebGLRenderer bound to the SAME canvas, so without this, repeated
-      // refreshes/switches were layering new GPU contexts on top of ones
-      // never actually released — exhausting the GPU after a handful of
-      // refreshes (the white-screen/black-floor crash even after the
-      // texture-leak fixes). forceContextLoss explicitly releases it.
-      renderer.forceContextLoss();
       placedRef.current = [];
       selectedRef.current = null;
     };
