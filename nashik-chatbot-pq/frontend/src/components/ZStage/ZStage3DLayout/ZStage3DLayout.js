@@ -146,6 +146,31 @@ function setCachedTemplate(name, template) {
   _modelTemplateCache.set(name.toLowerCase(), template);
 }
 
+// _modelTemplateCache had NO eviction at all — every distinct model file
+// ever downloaded this session (real geometry + textures, far heavier than
+// the per-layout floor/sign decoration that's already pruned on scene
+// eviction) stayed in GPU memory forever, growing without bound as more
+// layouts using different models were visited. That's the dominant driver
+// of the GPU-memory-exhaustion crash (WebGL context loss) seen touring
+// several layouts. Call this after a scene finishes (re)building, passing
+// every model name still referenced by the CURRENT scene plus whatever's
+// still in the (at most 2) LRU-cached scenes — anything else is provably
+// unused by anything currently shown or held onto, so it's safe to free.
+function pruneUnreferencedModelTemplates(referencedNamesLowercase) {
+  for (const [key, template] of [..._modelTemplateCache]) {
+    if (referencedNamesLowercase.has(key)) continue;
+    template.traverse(obj => {
+      if (obj.geometry) obj.geometry.dispose();
+      const mats = Array.isArray(obj.material) ? obj.material : (obj.material ? [obj.material] : []);
+      mats.forEach(mat => {
+        Object.keys(mat).forEach(k => { const v = mat[k]; if (v && v.isTexture) v.dispose(); });
+        mat.dispose();
+      });
+    });
+    _modelTemplateCache.delete(key);
+  }
+}
+
 // Bounding-box measurements (autoScale, floor offset, centering offset,
 // footprint) only depend on a model's geometry + its rotation/scale — not on
 // where it's placed. Box3().setFromObject() traverses every vertex, so doing
@@ -1969,6 +1994,16 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
             cache.delete(oldestKey);
             if (evicted?.scene) disposeEvictedSceneTextures(evicted.scene);
           }
+
+          // Free any downloaded model no longer used by the current scene or
+          // by whatever's still in the (at most 2) LRU-cached scenes above —
+          // see pruneUnreferencedModelTemplates for why this matters.
+          const referencedModelNames = new Set();
+          placedRef.current.forEach(p => { if (p.name) referencedModelNames.add(p.name.toLowerCase()); });
+          cache.forEach(entry => {
+            (entry.placedEntries || []).forEach(p => { if (p.name) referencedModelNames.add(p.name.toLowerCase()); });
+          });
+          pruneUnreferencedModelTemplates(referencedModelNames);
 
           onSceneReady && onSceneReady();
         }
