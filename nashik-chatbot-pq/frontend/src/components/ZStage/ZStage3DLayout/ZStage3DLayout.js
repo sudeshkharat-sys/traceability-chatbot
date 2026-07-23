@@ -1960,14 +1960,19 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           const onError = (err) => {
             console.error('[Z3D] Model load failed:', modelName, err);
             downloadFractions.delete(modelName);
-            // Same reasoning as the invalid-model_name cleanup above: a
-            // placement whose file 404s (deleted from disk, library entry
-            // removed, etc.) renders nothing, but the row still exists — so
-            // the auto-seed check keeps treating that station/line as
-            // "already has a model" forever, even though it visually looks
-            // completely empty. Deleting it lets the line self-heal and
-            // become eligible for auto-fill again on the next load.
-            recs.forEach(r => { if (r.id) z3dModelApi.deletePlacement(r.id).catch(() => {}); });
+            // Only auto-delete the placement for a CONFIRMED 404 (the file is
+            // genuinely gone from the server — deleted/replaced library entry).
+            // Any other failure (network hiccup, aborted fetch, decode error,
+            // browser under memory/GPU pressure from loading many models at
+            // once) used to be treated the same way and silently deleted a
+            // perfectly valid placement — the model would then look "gone"
+            // permanently, even on a clean reload, because the record itself
+            // had been wiped. Those transient failures should just be
+            // retried next load, not treated as proof the file is missing.
+            const isConfirmed404 = err?.response?.status === 404;
+            if (isConfirmed404) {
+              recs.forEach(r => { if (r.id) z3dModelApi.deletePlacement(r.id).catch(() => {}); });
+            }
             loadedModels += 1;
             reportProgress();
             checkDone();
