@@ -1,3 +1,15 @@
+/* Brand colors used across many components (Sidebar, ZStage, PartLabeler, …).
+   Defined here — always loaded first, before any route's code — because
+   several of those pages are now lazy-loaded (see App.js) and can render
+   without ever pulling in PartLabeler.css, which used to be the only place
+   these were defined. Without them defined here, any page that reads
+   var(--mahindra-red) with no fallback (e.g. the Z-Stage sidebar) renders
+   with a missing/default color rather than red. */
+:root {
+  --mahindra-red: #dc143c;
+  --mahindra-red-dark: #b01030;
+}
+
 body {
   margin: 0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
