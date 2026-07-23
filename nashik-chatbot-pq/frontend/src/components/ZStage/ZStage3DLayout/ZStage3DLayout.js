@@ -327,6 +327,46 @@ function optimizeTemplateDrawCalls(root) {
   }
 }
 
+// A layout switch keeps only the 2 most-recently-viewed built scenes cached
+// (see the LRU cap around cache.set below) — whatever gets evicted is never
+// shown again, but three.js does NOT free its GPU-side textures just
+// because the JS object becomes unreachable. Every station's floor label,
+// cantilever sign and line-name board bakes its own canvas texture, so
+// browsing through many different layouts in one session was accumulating
+// all of those forever — eventually exhausting GPU memory (the
+// blackout/crash seen when touring several layouts in a row).
+//
+// Only materials + their textures are disposed here, deliberately NOT
+// geometry: several geometries in this scene are shared module-level
+// singletons (hazard base, zebra markings), and THREE.Sprite instances (used
+// for some labels) share an internal geometry across every sprite in the
+// whole app — disposing any of those would corrupt other still-visible
+// scenes. Materials are simpler: every shared singleton material is known
+// and explicitly protected below, so everything else is safe to dispose.
+function disposeEvictedSceneTextures(scene) {
+  const protectedMats = new Set([_hazardMat, _steelStructMat, _floorMat]);
+  if (_zebraAssets) {
+    protectedMats.add(_zebraAssets.fillMat);
+    protectedMats.add(_zebraAssets.borderMat);
+  }
+  scene.traverse(obj => {
+    // Placed model clones share materials/textures with the module-level
+    // model template cache (sharedClone below) — those must stay alive for
+    // future clones and other layouts placing the same model.
+    let p = obj;
+    while (p) {
+      if (p.userData && p.userData.isPlaced) return;
+      p = p.parent;
+    }
+    const mats = Array.isArray(obj.material) ? obj.material : (obj.material ? [obj.material] : []);
+    mats.forEach(mat => {
+      if (!mat || protectedMats.has(mat)) return;
+      if (mat.map) mat.map.dispose();
+      mat.dispose();
+    });
+  });
+}
+
 // Clone a Three.js object sharing geometry + material buffers (no deep copy).
 // Avoids the N×fileSize GPU cost of clone(true) for line-placement groups.
 function sharedClone(src) {
@@ -1879,10 +1919,13 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           // Cache this freshly-built scene so switching away and back to this
           // exact layout (same structure/Z-E signature) can skip straight to
           // reuse next time, instead of redoing this whole pipeline. Capped
-          // at 2 entries (LRU) to bound GPU memory — evicted entries are just
-          // dropped, not explicitly disposed, since their placed-model
-          // geometry is shared with the module-level template cache and must
-          // not be destroyed out from under it.
+          // at 2 entries (LRU) to bound GPU memory — an evicted entry is the
+          // oldest one, which by construction is never the scene currently
+          // being displayed (the current layout was just re-inserted at the
+          // "most recently used" end above), so it's safe to free its
+          // textures (see disposeEvictedSceneTextures) rather than just
+          // dropping the reference and leaking them for the rest of the tab's
+          // lifetime.
           const cache = layoutSceneCacheRef.current;
           cache.delete(layout.id); // re-insert at the end → most-recently-used
           cache.set(layout.id, {
@@ -1892,7 +1935,12 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
             center: sceneCenterRef.current.clone(),
             span: sceneSpanRef.current,
           });
-          while (cache.size > 2) cache.delete(cache.keys().next().value);
+          while (cache.size > 2) {
+            const oldestKey = cache.keys().next().value;
+            const evicted = cache.get(oldestKey);
+            cache.delete(oldestKey);
+            if (evicted?.scene) disposeEvictedSceneTextures(evicted.scene);
+          }
 
           onSceneReady && onSceneReady();
         }
@@ -2153,8 +2201,18 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       placedRef.current = [];
       selectedRef.current = null;
     };
-  // statusMap/zeMap intentionally excluded — they update via refs to avoid scene rebuilds
-  }, [canvasRef, layout]); // eslint-disable-line
+  // statusMap intentionally excluded — it updates via a ref to avoid scene
+  // rebuilds. zeMapProp is NOT excluded: the Z/E-status fetch (input records
+  // for this layout) is a separate async call that resolves after this
+  // effect's first run, so on a cold load (e.g. right after a refresh) the
+  // scene used to always get built from the still-empty initial zeMap —
+  // permanently showing no Z/E status/input on every cantilever sign,
+  // because nothing ever triggered a second build once the real data
+  // arrived. zeMapProp only ever changes once per layout load/refresh (never
+  // polled — see the effect that calls setZeMap), so including it here costs
+  // exactly one extra, correct rebuild right when the data shows up, not
+  // repeated rebuilds.
+  }, [canvasRef, layout, zeMapProp]); // eslint-disable-line
 
   // Walk mode toggle
   useEffect(() => {
