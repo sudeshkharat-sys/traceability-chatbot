@@ -1905,7 +1905,20 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         totalModels += byName.size;
         reportProgress();
 
-        byName.forEach(({ modelName, recs }) => {
+        // Loading every unique model at once (old behaviour) fires dozens of
+        // simultaneous large-file downloads + GLTF/DRACO decodes on a cold
+        // load (e.g. right after a refresh, when nothing is cached yet) —
+        // on a big layout that spikes memory/GPU usage hard enough to lose
+        // the WebGL context (blackout) or crash the tab on weaker hardware.
+        // Queue them instead and only run a handful at a time.
+        const modelQueue = Array.from(byName.values());
+        const MAX_CONCURRENT_MODEL_LOADS = 4;
+        let queueIndex = 0;
+
+        const loadNextQueuedModel = () => {
+          if (queueIndex >= modelQueue.length) return;
+          const { modelName, recs } = modelQueue[queueIndex++];
+
           const downloadUrl = z3dModelApi.getDownloadUrl(modelName);
           // Extension comes straight from the filename — avoids an extra
           // getLibraryModel round-trip per unique model before download starts.
@@ -1934,6 +1947,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
             loadedModels += 1;
             reportProgress();
             checkDone();
+            loadNextQueuedModel(); // this slot is free — start the next queued model, if any
           };
 
           // If already loaded this session → skip download entirely
@@ -1957,6 +1971,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
             loadedModels += 1;
             reportProgress();
             checkDone();
+            loadNextQueuedModel();
           };
 
           try {
@@ -1974,7 +1989,11 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           } catch (err) {
             onError(err);
           }
-        });
+        };
+
+        for (let i = 0; i < Math.min(MAX_CONCURRENT_MODEL_LOADS, modelQueue.length); i++) {
+          loadNextQueuedModel();
+        }
       };
 
       // Batch 1: whatever is already placed in this layout — starts downloading
