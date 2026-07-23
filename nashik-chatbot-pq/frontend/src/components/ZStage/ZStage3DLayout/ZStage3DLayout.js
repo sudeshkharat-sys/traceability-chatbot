@@ -2019,11 +2019,117 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         onModelProgress && onModelProgress(loadedModels + inFlight, totalModels, loadedModels);
       };
 
+      // Loading every unique model at once (old behaviour) fires dozens of
+      // simultaneous large-file downloads + GLTF/DRACO decodes on a cold
+      // load (e.g. right after a refresh, when nothing is cached yet) — on a
+      // big layout that spikes memory/GPU usage hard enough to lose the
+      // WebGL context (blackout) or crash the tab on weaker hardware. This
+      // queue + activeLoads counter is shared across every batch below
+      // (the initial placements batch AND every auto-seeded line's batch),
+      // not per-batch — a layout with several auto-seeded lines used to get
+      // its own fresh 4-at-a-time queue PER LINE, so the real simultaneous
+      // total could still run into the dozens. One shared queue is what
+      // actually caps it at 4 in flight, layout-wide, no matter how many
+      // batches are contributing work to it.
+      const modelQueue = [];
+      const MAX_CONCURRENT_MODEL_LOADS = 4;
+      let queueIndex = 0;
+      let activeLoads = 0;
+
+      const startModelLoad = ({ modelName, recs }) => {
+        const downloadUrl = z3dModelApi.getDownloadUrl(modelName);
+        // Extension comes straight from the filename — avoids an extra
+        // getLibraryModel round-trip per unique model before download starts.
+        const ext = (recs[0].model_name || 'glb').split('.').pop().toLowerCase();
+
+        const onDownloadProgress = (evt) => {
+          if (evt.total > 0) {
+            downloadFractions.set(modelName, evt.loaded / evt.total);
+            reportProgress();
+          }
+        };
+
+        const onTemplate = (template) => {
+          optimizeTemplateDrawCalls(template);
+          setCachedTemplate(modelName, template);
+          downloadFractions.delete(modelName);
+          // Deduplicate: skip any record whose station_id is already placed in the scene
+          const renderedStations = new Set(placedRef.current.map(p => p.stationId).filter(Boolean));
+          const dedupedRecords = recs.filter(r => {
+            if (!r.station_id) return true; // free-placed, no station, always show
+            if (renderedStations.has(r.station_id)) return false; // already in scene
+            renderedStations.add(r.station_id); // mark as handled
+            return true;
+          });
+          dedupedRecords.forEach((record) => applyRecord(template, record));
+          loadedModels += 1;
+          reportProgress();
+          checkDone();
+          activeLoads -= 1;
+          dispatchQueuedModels(); // this slot is free — start the next queued model, if any
+        };
+
+        // If already loaded this session → skip download entirely
+        const cached = getCachedTemplate(modelName);
+        if (cached) { onTemplate(cached); return; }
+
+        // A failed/hanging model must not freeze the loading overlay forever —
+        // count it toward loadedModels so the rest of the scene still becomes
+        // ready even if this one file is broken, missing, or blocked.
+        const onError = (err) => {
+          console.error('[Z3D] Model load failed:', modelName, err);
+          downloadFractions.delete(modelName);
+          // Only auto-delete the placement for a CONFIRMED 404 (the file is
+          // genuinely gone from the server — deleted/replaced library entry).
+          // Any other failure (network hiccup, aborted fetch, decode error,
+          // browser under memory/GPU pressure from loading many models at
+          // once) used to be treated the same way and silently deleted a
+          // perfectly valid placement — the model would then look "gone"
+          // permanently, even on a clean reload, because the record itself
+          // had been wiped. Those transient failures should just be
+          // retried next load, not treated as proof the file is missing.
+          const isConfirmed404 = err?.response?.status === 404;
+          if (isConfirmed404) {
+            recs.forEach(r => { if (r.id) z3dModelApi.deletePlacement(r.id).catch(() => {}); });
+          }
+          loadedModels += 1;
+          reportProgress();
+          checkDone();
+          activeLoads -= 1;
+          dispatchQueuedModels();
+        };
+
+        try {
+          if (ext === 'obj') {
+            new OBJLoader().load(downloadUrl, onTemplate, onDownloadProgress, onError);
+          } else if (ext === 'stl') {
+            new STLLoader().load(downloadUrl, geo => {
+              geo.computeVertexNormals();
+              onTemplate(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x90a4ae })));
+            }, onDownloadProgress, onError);
+          } else {
+            // glb/gltf, or unrecognized extension — GLTFLoader is the common case
+            makeGLTFLoader().load(downloadUrl, g => onTemplate(g.scene), onDownloadProgress, onError);
+          }
+        } catch (err) {
+          onError(err);
+        }
+      };
+
+      const dispatchQueuedModels = () => {
+        while (activeLoads < MAX_CONCURRENT_MODEL_LOADS && queueIndex < modelQueue.length) {
+          activeLoads += 1;
+          startModelLoad(modelQueue[queueIndex++]);
+        }
+      };
+
       // Downloads+places one batch of records, grouped by model_name so each
       // unique GLB is only fetched once regardless of station count. Called
       // once immediately for the placements we already know about, and again
       // for each line as soon as ITS seed data resolves — no batch waits on
-      // any other batch to start downloading.
+      // any other batch to start downloading (they all feed the same shared
+      // queue above, so the true total in flight still never exceeds
+      // MAX_CONCURRENT_MODEL_LOADS regardless of how many batches there are).
       const loadAndPlace = (records) => {
         // Keyed by LOWERCASED model_name — the library's name-uniqueness
         // check turned out to be case-sensitive, so "Trim Line" and
@@ -2052,100 +2158,12 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         totalModels += byName.size;
         reportProgress();
 
-        // Loading every unique model at once (old behaviour) fires dozens of
-        // simultaneous large-file downloads + GLTF/DRACO decodes on a cold
-        // load (e.g. right after a refresh, when nothing is cached yet) —
-        // on a big layout that spikes memory/GPU usage hard enough to lose
-        // the WebGL context (blackout) or crash the tab on weaker hardware.
-        // Queue them instead and only run a handful at a time.
-        const modelQueue = Array.from(byName.values());
-        const MAX_CONCURRENT_MODEL_LOADS = 4;
-        let queueIndex = 0;
-
-        const loadNextQueuedModel = () => {
-          if (queueIndex >= modelQueue.length) return;
-          const { modelName, recs } = modelQueue[queueIndex++];
-
-          const downloadUrl = z3dModelApi.getDownloadUrl(modelName);
-          // Extension comes straight from the filename — avoids an extra
-          // getLibraryModel round-trip per unique model before download starts.
-          const ext = (recs[0].model_name || 'glb').split('.').pop().toLowerCase();
-
-          const onDownloadProgress = (evt) => {
-            if (evt.total > 0) {
-              downloadFractions.set(modelName, evt.loaded / evt.total);
-              reportProgress();
-            }
-          };
-
-          const onTemplate = (template) => {
-            optimizeTemplateDrawCalls(template);
-            setCachedTemplate(modelName, template);
-            downloadFractions.delete(modelName);
-            // Deduplicate: skip any record whose station_id is already placed in the scene
-            const renderedStations = new Set(placedRef.current.map(p => p.stationId).filter(Boolean));
-            const dedupedRecords = recs.filter(r => {
-              if (!r.station_id) return true; // free-placed, no station, always show
-              if (renderedStations.has(r.station_id)) return false; // already in scene
-              renderedStations.add(r.station_id); // mark as handled
-              return true;
-            });
-            dedupedRecords.forEach((record) => applyRecord(template, record));
-            loadedModels += 1;
-            reportProgress();
-            checkDone();
-            loadNextQueuedModel(); // this slot is free — start the next queued model, if any
-          };
-
-          // If already loaded this session → skip download entirely
-          const cached = getCachedTemplate(modelName);
-          if (cached) { onTemplate(cached); return; }
-
-          // A failed/hanging model must not freeze the loading overlay forever —
-          // count it toward loadedModels so the rest of the scene still becomes
-          // ready even if this one file is broken, missing, or blocked.
-          const onError = (err) => {
-            console.error('[Z3D] Model load failed:', modelName, err);
-            downloadFractions.delete(modelName);
-            // Only auto-delete the placement for a CONFIRMED 404 (the file is
-            // genuinely gone from the server — deleted/replaced library entry).
-            // Any other failure (network hiccup, aborted fetch, decode error,
-            // browser under memory/GPU pressure from loading many models at
-            // once) used to be treated the same way and silently deleted a
-            // perfectly valid placement — the model would then look "gone"
-            // permanently, even on a clean reload, because the record itself
-            // had been wiped. Those transient failures should just be
-            // retried next load, not treated as proof the file is missing.
-            const isConfirmed404 = err?.response?.status === 404;
-            if (isConfirmed404) {
-              recs.forEach(r => { if (r.id) z3dModelApi.deletePlacement(r.id).catch(() => {}); });
-            }
-            loadedModels += 1;
-            reportProgress();
-            checkDone();
-            loadNextQueuedModel();
-          };
-
-          try {
-            if (ext === 'obj') {
-              new OBJLoader().load(downloadUrl, onTemplate, onDownloadProgress, onError);
-            } else if (ext === 'stl') {
-              new STLLoader().load(downloadUrl, geo => {
-                geo.computeVertexNormals();
-                onTemplate(new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ color: 0x90a4ae })));
-              }, onDownloadProgress, onError);
-            } else {
-              // glb/gltf, or unrecognized extension — GLTFLoader is the common case
-              makeGLTFLoader().load(downloadUrl, g => onTemplate(g.scene), onDownloadProgress, onError);
-            }
-          } catch (err) {
-            onError(err);
-          }
-        };
-
-        for (let i = 0; i < Math.min(MAX_CONCURRENT_MODEL_LOADS, modelQueue.length); i++) {
-          loadNextQueuedModel();
-        }
+        // Feed this batch's unique models into the shared, layout-wide queue
+        // (declared above loadAndPlace) instead of running its own separate
+        // dispatcher — keeps the true simultaneous-download total capped at
+        // MAX_CONCURRENT_MODEL_LOADS across every batch, not per batch.
+        modelQueue.push(...byName.values());
+        dispatchQueuedModels();
       };
 
       // Batch 1: whatever is already placed in this layout — starts downloading
