@@ -675,6 +675,27 @@
 .sdm-table-wrap {
   flex: 1;
   overflow: auto;
+  /* App.css hides scrollbars globally (*::-webkit-scrollbar { display: none }),
+     which works fine for short scroll areas but leaves this table — many
+     rows, many monthly columns — looking cut off with no visible way to
+     tell there's more to scroll to. Override it back to visible here only. */
+  scrollbar-width: thin;
+  -ms-overflow-style: auto;
+}
+.sdm-table-wrap::-webkit-scrollbar {
+  width: 10px !important;
+  height: 10px !important;
+  display: block !important;
+}
+.sdm-table-wrap::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+.sdm-table-wrap::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 6px;
+}
+.sdm-table-wrap::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .sdm-table {
