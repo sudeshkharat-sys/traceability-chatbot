@@ -590,27 +590,34 @@ function syncHangerBars(scene, placedEntries, posMap) {
 }
 
 // ── Green center strip inside each station cell ────────────────────────────────
-function buildZebraCrossing(cellCX, originZ, group) {
-  const cellCZ = originZ + DEPTH / 2;
-  const fillGeo = new THREE.PlaneGeometry(CELL_W - 0.1, ZEBRA_W - 0.08);
-  const fillMat = new THREE.MeshBasicMaterial({ color: 0xa5d6a7, transparent: true, opacity: 0.7, side: THREE.DoubleSide });
-  const fill = new THREE.Mesh(fillGeo, fillMat);
-  fill.rotation.x = -Math.PI / 2;
-  fill.position.set(cellCX, 0.19, cellCZ);
-  group.add(fill);
-  const borderMat = new THREE.MeshBasicMaterial({ color: 0x2e7d32, side: THREE.DoubleSide });
-  const T = 0.08;
-  [
-    { geo: new THREE.PlaneGeometry(CELL_W, T), pos: [cellCX, 0.20, cellCZ - ZEBRA_W / 2 + T / 2] },
-    { geo: new THREE.PlaneGeometry(CELL_W, T), pos: [cellCX, 0.20, cellCZ + ZEBRA_W / 2 - T / 2] },
-    { geo: new THREE.PlaneGeometry(T, ZEBRA_W), pos: [cellCX - CELL_W / 2 + T / 2, 0.20, cellCZ] },
-    { geo: new THREE.PlaneGeometry(T, ZEBRA_W), pos: [cellCX + CELL_W / 2 - T / 2, 0.20, cellCZ] },
-  ].forEach(({ geo, pos }) => {
-    const mesh = new THREE.Mesh(geo, borderMat);
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(...pos);
-    group.add(mesh);
-  });
+// Shared geometry/material for the zebra-crossing marking — created once and
+// reused for every station cell in every box, instead of the 5 brand-new
+// geometries + 2 brand-new materials this used to allocate PER STATION.
+const ZEBRA_T = 0.08;
+let _zebraAssets = null;
+function getZebraAssets() {
+  if (!_zebraAssets) {
+    _zebraAssets = {
+      fillGeo: new THREE.PlaneGeometry(CELL_W - 0.1, ZEBRA_W - 0.08),
+      fillMat: new THREE.MeshBasicMaterial({ color: 0xa5d6a7, transparent: true, opacity: 0.7, side: THREE.DoubleSide }),
+      borderMat: new THREE.MeshBasicMaterial({ color: 0x2e7d32, side: THREE.DoubleSide }),
+      // [top, bottom, left, right] border strips, each with its own geometry
+      // (shared across every station) and its offset from the cell center.
+      borderGeos: [
+        new THREE.PlaneGeometry(CELL_W, ZEBRA_T),
+        new THREE.PlaneGeometry(CELL_W, ZEBRA_T),
+        new THREE.PlaneGeometry(ZEBRA_T, ZEBRA_W),
+        new THREE.PlaneGeometry(ZEBRA_T, ZEBRA_W),
+      ],
+      borderOffsets: [
+        [0, -ZEBRA_W / 2 + ZEBRA_T / 2],
+        [0,  ZEBRA_W / 2 - ZEBRA_T / 2],
+        [-CELL_W / 2 + ZEBRA_T / 2, 0],
+        [ CELL_W / 2 - ZEBRA_T / 2, 0],
+      ],
+    };
+  }
+  return _zebraAssets;
 }
 
 // ── Cantilever sign — one per station cell ─────────────────────────────────────
@@ -980,6 +987,24 @@ function buildStationShell(box, statusMap, zeMap, scene) {
 
   const stationIds = (box.station_ids || '').split(',').map(s => s.trim()).filter(Boolean);
 
+  // Floor tiles + zebra-crossing markings, batched across every station in
+  // this box: previously each station got its own floor Mesh plus up to 5
+  // zebra-crossing meshes — with 15-20 stations per line that's 100+ extra
+  // draw calls of pure static decoration on top of everything else. Every
+  // station's tile/marking is now one instance of a shared per-box
+  // InstancedMesh, so the whole box's floor+markings cost a handful of draw
+  // calls total instead of one set per station.
+  const floorW = CELL_W - 0.05, floorD = DEPTH - 0.05;
+  const floorInstances = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(floorW, 0.12, floorD), getFloorMaterial(), count
+  );
+  const floorStationIdByInstance = new Array(count);
+  const zebra = getZebraAssets();
+  const zebraFillMesh = new THREE.InstancedMesh(zebra.fillGeo, zebra.fillMat, count);
+  const zebraBorderMeshes = zebra.borderGeos.map(geo => new THREE.InstancedMesh(geo, zebra.borderMat, count));
+  const _mat = new THREE.Matrix4();
+  const _rotX90 = new THREE.Matrix4().makeRotationX(-Math.PI / 2);
+
   for (let i = 0; i < count; i++) {
     const cellX  = originX + i * CELL_W;
     const cellCX = cellX + CELL_W / 2;
@@ -987,18 +1012,19 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     const stnId  = stationIds[i] || `STN-${i + 1}`;
     const color  = STATUS_HEX[statusMap[stnId] || null] ?? STATUS_HEX.null;
 
-    // Concrete-look floor (baked texture, shared across all stations) with blue border line
-    const floorW = CELL_W - 0.05, floorD = DEPTH - 0.05;
-    const floor  = new THREE.Mesh(
-      new THREE.BoxGeometry(floorW, 0.12, floorD),
-      getFloorMaterial()
-    );
-    floor.position.set(cellCX, 0.06, cellCZ);
-    floor.userData.stationId = stnId;
-    group.add(floor);
+    // Concrete-look floor tile — one instance of the shared per-box mesh
+    _mat.makeTranslation(cellCX, 0.06, cellCZ);
+    floorInstances.setMatrixAt(i, _mat);
+    floorStationIdByInstance[i] = stnId;
 
-    // Green center path strip running through middle of this station
-    buildZebraCrossing(cellCX, originZ, group);
+    // Green center path strip — one instance per shape of the shared per-box meshes
+    _mat.copy(_rotX90); _mat.setPosition(cellCX, 0.19, cellCZ);
+    zebraFillMesh.setMatrixAt(i, _mat);
+    zebraBorderMeshes.forEach((mesh, gi) => {
+      const [dx, dz] = zebra.borderOffsets[gi];
+      _mat.copy(_rotX90); _mat.setPosition(cellCX + dx, 0.20, cellCZ + dz);
+      mesh.setMatrixAt(i, _mat);
+    });
 
     // Floor station-ID label
     if (stnId) {
@@ -1018,6 +1044,16 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     sign.position.set(cellCX, HEIGHT, originZ + DEPTH);
     group.add(sign);
   }
+
+  floorInstances.instanceMatrix.needsUpdate = true;
+  // Double-click station lookup (below) reads this off the hit InstancedMesh
+  // via its instanceId, replacing the per-tile userData.stationId this used
+  // to carry back when it was one Mesh per station.
+  floorInstances.userData.stationIdByInstance = floorStationIdByInstance;
+  group.add(floorInstances);
+  zebraFillMesh.instanceMatrix.needsUpdate = true;
+  group.add(zebraFillMesh);
+  zebraBorderMeshes.forEach(mesh => { mesh.instanceMatrix.needsUpdate = true; group.add(mesh); });
 
   // ── Yellow/black hazard-stripe border around the entire line ──────────────────
   // Same stripe treatment as the column-base safety markers, run around the
@@ -2437,6 +2473,14 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     const allHits = ray.intersectObjects(scene.children, true);
     for (const hit of allHits) {
       let obj = hit.object;
+      // Floor tiles are one batched InstancedMesh per box now (see
+      // buildStationShell) rather than one Mesh per station, so a hit on one
+      // no longer carries its own userData.stationId — look it up by which
+      // instance (station) within the box was actually hit instead.
+      if (obj.isInstancedMesh && obj.userData.stationIdByInstance && hit.instanceId != null) {
+        const sid = obj.userData.stationIdByInstance[hit.instanceId];
+        if (sid) { onStationClick && onStationClick(sid); return; }
+      }
       while (obj && obj !== scene) {
         if (obj.userData.stationId) {
           onStationClick && onStationClick(obj.userData.stationId);
