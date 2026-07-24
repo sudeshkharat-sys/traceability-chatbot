@@ -1107,6 +1107,11 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  /* Parent .sdm-body has overflow:hidden (it's the table tabs that scroll
+     via .sdm-table-wrap) — this tab has no such wrapper, so content taller
+     than the modal was silently clipped with no way to reach it. */
+  flex: 1;
+  overflow-y: auto;
 }
 
 .sdm-docs-concern {

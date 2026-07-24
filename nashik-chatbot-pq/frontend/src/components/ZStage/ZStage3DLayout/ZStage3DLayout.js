@@ -634,6 +634,27 @@ function makeCantileverSign(stnId, ze, zeStatus) {
   return group;
 }
 
+// Reconciles every station's Z/E sign against fresh zeMap data — called
+// reactively whenever zeMap changes (see the effect in useThreeScene), not
+// just at initial scene build. The Z/E fetch that produces zeMap runs async
+// and independently of the scene build, so the scene can (and often does)
+// finish building before that fetch resolves; without this, a station built
+// during that window keeps a permanently blank Z/E board until something
+// else happens to trigger a full scene rebuild.
+function syncZeSigns(scene, zeMap) {
+  if (!scene?.userData?.zeSigns) return;
+  scene.userData.zeSigns.forEach((entry, stnId) => {
+    const { ze = null, zeStatus = null } = zeMap[stnId] || {};
+    if (ze === entry.ze && zeStatus === entry.zeStatus) return; // unchanged
+    entry.parent.remove(entry.group);
+    const sign = makeCantileverSign(stnId, ze, zeStatus);
+    sign.traverse(child => { child.userData.stationId = stnId; });
+    sign.position.set(entry.x, HEIGHT, entry.z);
+    entry.parent.add(sign);
+    scene.userData.zeSigns.set(stnId, { ...entry, group: sign, ze, zeStatus });
+  });
+}
+
 // ── Streak texture generator for the structural frame ───────────────────────────
 // Horizontal streak variation baked into one small texture, tiled — reads as
 // brushed metal instead of a flat plastic color, no extra material cost.
@@ -959,7 +980,15 @@ function buildStationShell(box, statusMap, zeMap, scene) {
 
     const stnName = stationNames[i] || '';
 
-    // Z/E data from input records (via zeMap)
+    // Z/E data from input records (via zeMap). The records this comes from
+    // are fetched asynchronously and can resolve AFTER this scene has
+    // already built (a race, not an ordering guarantee) — a sign built here
+    // with ze=null because the fetch hadn't landed yet would otherwise show
+    // no badge permanently, until something happened to force a full scene
+    // rebuild (e.g. revisiting the layout later). Track each sign on the
+    // scene keyed by station so syncZeSigns (called reactively whenever the
+    // Z/E data changes) can swap just the affected boards in place, without
+    // needing to guess this scene's build ever happened at the right time.
     const { ze = null, zeStatus = null } = zeMap[stnId] || {};
 
     // Cantilever rod + boards at front beam centre, sticking out toward viewer
@@ -967,6 +996,8 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     sign.traverse(child => { child.userData.stationId = stnId; });
     sign.position.set(cellCX, HEIGHT, originZ + DEPTH);
     group.add(sign);
+    if (!scene.userData.zeSigns) scene.userData.zeSigns = new Map(); // stationId → { group, parent, ze, zeStatus, x, z }
+    scene.userData.zeSigns.set(stnId, { group: sign, parent: group, ze, zeStatus, x: cellCX, z: originZ + DEPTH });
   }
 
   // ── Yellow/black hazard-stripe border around the entire line ──────────────────
@@ -1125,7 +1156,16 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
   const statusMapRef = useRef(statusMapProp);
   const zeMapRef     = useRef(zeMapProp);
   useEffect(() => { statusMapRef.current = statusMapProp; }, [statusMapProp]);
-  useEffect(() => { zeMapRef.current     = zeMapProp;     }, [zeMapProp]);
+  useEffect(() => {
+    zeMapRef.current = zeMapProp;
+    // zeMap is fetched asynchronously and can resolve AFTER the scene build
+    // effect below already ran with stale/empty data (see syncZeSigns) —
+    // reconcile every station's Z/E board against whatever the latest data
+    // says now, instead of leaving stations stuck with whatever happened to
+    // be available at build time.
+    syncZeSigns(sceneRef.current, zeMapProp);
+    dirtyRef.current = true;
+  }, [zeMapProp]);
   const sceneRef       = useRef(null);
   const rendererRef    = useRef(null);
   const cameraRef      = useRef(null);
