@@ -1205,20 +1205,27 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     // MSAA is one of the biggest fill-rate costs on integrated GPUs, and on
     // high-DPI screens the extra physical pixels already smooth edges — only
     // enable it on standard-DPI displays where jaggies are actually visible.
-    const renderer = new THREE.WebGLRenderer({
-      canvas,
-      antialias: window.devicePixelRatio < 1.5,
-      powerPreference: 'high-performance',
-    });
+    //
     // Cap pixel ratio at 1.5 — full devicePixelRatio (2-3×) multiplies GPU work
     // by 4-9× for no visible benefit. Only drop to 1.0 on genuinely low-spec
     // machines (<=2 cores or <=2GB RAM) — 4 cores/4GB is an ordinary laptop,
     // not a weak one, and capping those too made text/nameplates visibly
-    // blurry for most users. The adaptive resolution logic below (in the
-    // render loop) handles the actually-struggling case at runtime instead.
+    // blurry for most users.
     const lowEndDevice = (navigator.deviceMemory && navigator.deviceMemory <= 2) ||
       (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2);
     const basePixelRatio = Math.min(window.devicePixelRatio, lowEndDevice ? 1.0 : 1.5);
+    // AA-skip decision must key off the ACTUAL render resolution
+    // (basePixelRatio), not the raw screen DPI — a low-spec device with a
+    // high-DPI screen gets its pixel ratio capped down above, which throws
+    // away the "extra physical pixels smooth edges" effect this was relying
+    // on. Deciding from raw devicePixelRatio in that case skipped AA with
+    // nothing left to compensate for it, producing visibly jagged/dull edges
+    // on exactly the weaker machines this was supposed to help.
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: basePixelRatio < 1.5,
+      powerPreference: 'high-performance',
+    });
     renderer.setPixelRatio(basePixelRatio);
     // Guard against 0×0 when tab is hidden — ResizeObserver will correct once visible
     renderer.setSize(Math.max(1, canvas.clientWidth), Math.max(1, canvas.clientHeight));
