@@ -1521,6 +1521,14 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     const orbit = new OrbitControls(camera, renderer.domElement);
     orbit.enableDamping = true; orbit.dampingFactor = 0.08;
     orbit.minDistance = 2; orbit.maxDistance = 200;
+    // Vertical orbit had no polar-angle limit at all, so a normal drag could
+    // swing the camera past straight-up or straight-down and flip/disorient
+    // ("sometimes goes too far up, sometimes too far down"). Clamp it to just
+    // shy of the poles — still lets "Top" snap-view work (near 0) — and slow
+    // rotation down a bit so vertical drags feel controlled instead of twitchy.
+    orbit.minPolarAngle = 0.05;
+    orbit.maxPolarAngle = Math.PI - 0.05;
+    orbit.rotateSpeed = 0.7;
     orbitRef.current = orbit;
 
     // TransformControls
