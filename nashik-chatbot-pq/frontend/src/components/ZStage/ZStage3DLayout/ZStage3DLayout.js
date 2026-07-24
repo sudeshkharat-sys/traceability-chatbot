@@ -1194,10 +1194,13 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       powerPreference: 'high-performance',
     });
     // Cap pixel ratio at 1.5 — full devicePixelRatio (2-3×) multiplies GPU work
-    // by 4-9× for no visible benefit. On low-memory machines (typically paired
-    // with weak integrated GPUs) cap at 1.0 outright.
-    const lowEndDevice = (navigator.deviceMemory && navigator.deviceMemory <= 4) ||
-      (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4);
+    // by 4-9× for no visible benefit. Only drop to 1.0 on genuinely low-spec
+    // machines (<=2 cores or <=2GB RAM) — 4 cores/4GB is an ordinary laptop,
+    // not a weak one, and capping those too made text/nameplates visibly
+    // blurry for most users. The adaptive resolution logic below (in the
+    // render loop) handles the actually-struggling case at runtime instead.
+    const lowEndDevice = (navigator.deviceMemory && navigator.deviceMemory <= 2) ||
+      (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2);
     const basePixelRatio = Math.min(window.devicePixelRatio, lowEndDevice ? 1.0 : 1.5);
     renderer.setPixelRatio(basePixelRatio);
     // Guard against 0×0 when tab is hidden — ResizeObserver will correct once visible
@@ -2084,7 +2087,7 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
               if (slowFrames >= 8 && curRatio > 0.6) {
                 applyRatio(Math.max(0.6, curRatio - 0.2));
                 slowFrames = 0;
-              } else if (fastFrames >= 180 && curRatio < basePixelRatio) {
+              } else if (fastFrames >= 60 && curRatio < basePixelRatio) {
                 applyRatio(Math.min(basePixelRatio, curRatio + 0.2));
                 fastFrames = 0;
               }
@@ -2093,6 +2096,15 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
           lastFrameT = nowT;
         } else {
           lastFrameT = 0; // idle — reset sampling window
+          slowFrames = 0; fastFrames = 0;
+          // Nothing is moving (not orbiting/animating), so there's no
+          // performance pressure right now — a static frame costs the same
+          // GPU time regardless of resolution. Restore full sharpness
+          // immediately instead of waiting for however many fast frames it'd
+          // take to earn it back, which for short orbit bursts could be
+          // never — the earlier version of this left nameplates/labels
+          // permanently blurry after just one brief slow patch.
+          if (curRatio < basePixelRatio) applyRatio(basePixelRatio);
         }
       } catch (err) {
         console.error('[Z3D animate error]', err);
