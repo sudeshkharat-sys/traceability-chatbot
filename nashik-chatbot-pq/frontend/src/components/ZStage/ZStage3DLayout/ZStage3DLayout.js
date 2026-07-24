@@ -7,6 +7,7 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader';
 import { VRMLLoader } from 'three/examples/jsm/loaders/VRMLLoader';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils';
 import { RefreshCw } from 'lucide-react';
 import { layoutApi, inputApi, z3dModelApi, lineModelMappingApi } from '../../../services/api/layoutApi';
 import { layeredAuditApi } from '../../../services/api/layoutApi';
@@ -401,21 +402,6 @@ function makeIBeamGeometry(width, height, length) {
   geo.translate(0, 0, -length / 2); // center along the extrusion (length) axis
   return geo;
 }
-function makeIBeam(length, mat, orientation) {
-  let geo, rotX = 0, rotY = 0;
-  if (orientation === 'vertical') {
-    geo = makeIBeamGeometry(COL_W, COL_W, length);
-    rotX = -Math.PI / 2; // extrusion (local Z) axis -> world Y
-  } else if (orientation === 'horizontal-x') {
-    geo = makeIBeamGeometry(COL_W, COL_H, length);
-    rotY = -Math.PI / 2; // extrusion (local Z) axis -> world X
-  } else {
-    geo = makeIBeamGeometry(COL_W, COL_H, length); // extrusion axis already world Z
-  }
-  const mesh = new THREE.Mesh(geo, mat);
-  mesh.rotation.set(rotX, rotY, 0);
-  return mesh;
-}
 
 // ── Hanger support bar ─────────────────────────────────────────────────────────
 // Stations whose placed model is a "hanger" get an extra horizontal rail
@@ -743,10 +729,40 @@ function getHazardStripeTexture() {
 const HAZARD_H = 0.12; // matches floor slab thickness so the base sits flush, no visible step
 const _hazardGeo = new THREE.BoxGeometry(COL_W + 0.02, HAZARD_H, COL_W + 0.02);
 const _hazardMat = new THREE.MeshBasicMaterial({ map: getHazardStripeTexture() });
-function makeHazardBase() {
-  const mesh = new THREE.Mesh(_hazardGeo, _hazardMat);
-  mesh.position.y = HAZARD_H / 2;
-  return mesh;
+
+// ── Structural-steel batching ───────────────────────────────────────────────
+// A line with N stations creates ~4N separate column/beam/hazard-base meshes
+// — real drivers of orbit lag on weaker GPUs (draw-call overhead scales with
+// object count, not pixel count). None of these are ever picked/interacted
+// with individually, so instead of one mesh per piece, each piece's geometry
+// is baked (rotation+position transform applied directly to its vertices)
+// and merged into a single mesh per box: one draw call for all columns/beams,
+// one for all hazard-stripe bases. This cuts draw calls without touching
+// resolution or shading — no blur trade-off, unlike scaling pixel ratio.
+function bakeIBeamGeometry(length, orientation, position) {
+  let geo, rotX = 0, rotY = 0;
+  if (orientation === 'vertical') {
+    geo = makeIBeamGeometry(COL_W, COL_W, length);
+    rotX = -Math.PI / 2;
+  } else if (orientation === 'horizontal-x') {
+    geo = makeIBeamGeometry(COL_W, COL_H, length);
+    rotY = -Math.PI / 2;
+  } else {
+    geo = makeIBeamGeometry(COL_W, COL_H, length);
+  }
+  // Freshly created above (never shared), safe to bake the transform in place.
+  const quat = new THREE.Quaternion().setFromEuler(new THREE.Euler(rotX, rotY, 0));
+  const m = new THREE.Matrix4().compose(new THREE.Vector3(...position), quat, new THREE.Vector3(1, 1, 1));
+  geo.applyMatrix4(m);
+  return geo;
+}
+function bakeHazardGeometry(position) {
+  // _hazardGeo is a shared module-level instance — must clone before baking
+  // a per-instance transform into it, or every hazard base across every
+  // layout would end up translated to this one's position.
+  const geo = _hazardGeo.clone();
+  geo.translate(...position);
+  return geo;
 }
 
 // One flat hazard-stripe segment used to build the line-perimeter border —
@@ -863,16 +879,18 @@ function buildStationShell(box, statusMap, zeMap, scene) {
   const originZ = box._z3d ?? (box.position_y || 0) * SCALE;
   const structMat = getStructMaterial();
 
+  // Columns, hazard bases and beams are never individually picked/dragged —
+  // accumulate their geometry and add ONE merged mesh per material instead
+  // of one mesh per piece (see bakeIBeamGeometry/bakeHazardGeometry above).
+  const structGeoms = [];
+  const hazardGeoms = [];
+
   // ── 4 corner columns (+ hazard-stripe base) ──
   [[originX, originZ], [originX + totalW, originZ],
    [originX, originZ + DEPTH], [originX + totalW, originZ + DEPTH]]
     .forEach(([cx, cz]) => {
-      const col = makeIBeam(HEIGHT, structMat, 'vertical');
-      col.position.set(cx, HEIGHT / 2, cz);
-      group.add(col);
-      const hazard = makeHazardBase();
-      hazard.position.set(cx, 0, cz);
-      group.add(hazard);
+      structGeoms.push(bakeIBeamGeometry(HEIGHT, 'vertical', [cx, HEIGHT / 2, cz]));
+      hazardGeoms.push(bakeHazardGeometry([cx, 0, cz]));
     });
 
   // ── Middle columns on FRONT and BACK faces only (door-frame look) ──
@@ -880,12 +898,8 @@ function buildStationShell(box, statusMap, zeMap, scene) {
   for (let i = 1; i < count; i++) {
     const mx = originX + i * CELL_W;
     [originZ, originZ + DEPTH].forEach(cz => {
-      const col = makeIBeam(HEIGHT, structMat, 'vertical');
-      col.position.set(mx, HEIGHT / 2, cz);
-      group.add(col);
-      const hazard = makeHazardBase();
-      hazard.position.set(mx, 0, cz);
-      group.add(hazard);
+      structGeoms.push(bakeIBeamGeometry(HEIGHT, 'vertical', [mx, HEIGHT / 2, cz]));
+      hazardGeoms.push(bakeHazardGeometry([mx, 0, cz]));
     });
   }
 
@@ -896,10 +910,13 @@ function buildStationShell(box, statusMap, zeMap, scene) {
     { orient: 'horizontal-z', pos: [originX,          HEIGHT, originZ + DEPTH / 2], len: DEPTH  },
     { orient: 'horizontal-z', pos: [originX + totalW, HEIGHT, originZ + DEPTH / 2], len: DEPTH  },
   ].forEach(({ orient, pos, len }) => {
-    const beam = makeIBeam(len, structMat, orient);
-    beam.position.set(...pos);
-    group.add(beam);
+    structGeoms.push(bakeIBeamGeometry(len, orient, pos));
   });
+
+  const mergedStruct = mergeGeometries(structGeoms, false);
+  if (mergedStruct) group.add(new THREE.Mesh(mergedStruct, structMat));
+  const mergedHazard = mergeGeometries(hazardGeoms, false);
+  if (mergedHazard) group.add(new THREE.Mesh(mergedHazard, _hazardMat));
 
   // ── Per-cell: floor + status sphere + floor label + nameplate ──
   // Parse station_data for names and description
@@ -2040,14 +2057,14 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     // comfortably fast again it steps back up toward the base ratio. This is
     // what keeps orbiting smooth on integrated-GPU laptops without costing
     // workstations any quality.
-    let curRatio = basePixelRatio;
-    let slowFrames = 0, fastFrames = 0, lastFrameT = 0;
-    const applyRatio = (r) => {
-      curRatio = r;
-      renderer.setPixelRatio(r);
-      renderer.setSize(Math.max(1, canvas.clientWidth), Math.max(1, canvas.clientHeight));
-      dirtyRef.current = true;
-    };
+    //
+    // NOTE: resolution scaling was tried here and reverted — dropping pixel
+    // ratio mid-orbit made the whole scene visibly soften ("blurry" / "TV
+    // static" during motion), which is a worse tradeoff than the lag it was
+    // meant to fix. The real fix for orbit lag is fewer draw calls (see
+    // bakeIBeamGeometry/mergeGeometries in buildStationShell — merges what
+    // used to be ~4 meshes per station into 2 total per line), which costs
+    // nothing visually. Pixel ratio now stays fixed at basePixelRatio always.
 
     const animate = () => {
       rafRef.current = requestAnimationFrame(animate);
@@ -2075,36 +2092,6 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         if (dirtyRef.current) {
           renderer.render(scene, camera);
           dirtyRef.current = false;
-
-          // Frame-time sampling only across consecutive rendered frames — an
-          // idle gap (no renders) must not count as a "slow frame".
-          const nowT = performance.now();
-          if (lastFrameT > 0) {
-            const dt = nowT - lastFrameT;
-            if (dt < 100) { // ignore tab-switch / GC hiccups
-              if (dt > 34) { slowFrames++; fastFrames = 0; }
-              else if (dt < 20) { fastFrames++; slowFrames = 0; }
-              if (slowFrames >= 8 && curRatio > 0.6) {
-                applyRatio(Math.max(0.6, curRatio - 0.2));
-                slowFrames = 0;
-              } else if (fastFrames >= 60 && curRatio < basePixelRatio) {
-                applyRatio(Math.min(basePixelRatio, curRatio + 0.2));
-                fastFrames = 0;
-              }
-            }
-          }
-          lastFrameT = nowT;
-        } else {
-          lastFrameT = 0; // idle — reset sampling window
-          slowFrames = 0; fastFrames = 0;
-          // Nothing is moving (not orbiting/animating), so there's no
-          // performance pressure right now — a static frame costs the same
-          // GPU time regardless of resolution. Restore full sharpness
-          // immediately instead of waiting for however many fast frames it'd
-          // take to earn it back, which for short orbit bursts could be
-          // never — the earlier version of this left nameplates/labels
-          // permanently blurry after just one brief slow patch.
-          if (curRatio < basePixelRatio) applyRatio(basePixelRatio);
         }
       } catch (err) {
         console.error('[Z3D animate error]', err);
