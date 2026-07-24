@@ -643,6 +643,12 @@
 /* ── Modal body — scrollable ─────────────────────────────────────────────── */
 .sdm-body {
   flex: 1;
+  /* Flex items default to min-height:auto, which sizes to CONTENT height —
+     without this, .sdm-body refuses to shrink to the modal's fixed height
+     and just grows past it, silently clipped by .sdm-modal's overflow:hidden
+     with no scrollbar ever appearing. Same fix needed on .sdm-table-wrap and
+     .sdm-docs-container below, since they're flex children of THIS element. */
+  min-height: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -674,6 +680,7 @@
 /* ── Table wrapper ───────────────────────────────────────────────────────── */
 .sdm-table-wrap {
   flex: 1;
+  min-height: 0;
   overflow: auto;
 }
 
@@ -1109,8 +1116,12 @@
   gap: 16px;
   /* Parent .sdm-body has overflow:hidden (it's the table tabs that scroll
      via .sdm-table-wrap) — this tab has no such wrapper, so content taller
-     than the modal was silently clipped with no way to reach it. */
+     than the modal was silently clipped with no way to reach it. min-height:0
+     is required too — flex items default to sizing to their content's
+     height, which would otherwise just push past the modal instead of
+     shrinking to it and scrolling (see the matching note on .sdm-body). */
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
