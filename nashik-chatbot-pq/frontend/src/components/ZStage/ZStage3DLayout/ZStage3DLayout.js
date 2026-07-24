@@ -1138,6 +1138,10 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
   // are still created fresh every time (untouched, same as before this
   // change) — only the expensive scene *content* is what gets reused.
   const layoutSceneCacheRef = useRef(new Map()); // layoutId → { scene, signature, stationPosMap, center, span, placedEntries }
+  // Bumped when the WebGL context is lost and later restored — re-runs the
+  // scene effect so the renderer, env-map bake and controls are rebuilt
+  // against the fresh context instead of leaving a permanently white canvas.
+  const [ctxEpoch, setCtxEpoch] = useState(0);
   useEffect(() => { walkModeRef.current = walkMode; }, [walkMode]);
 
   // Applies a background/lighting preset to the live renderer + scene +
@@ -1181,13 +1185,53 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     const canvas = canvasRef.current;
     if (!canvas || !layout) return;
 
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-    // Cap pixel ratio at 1.5 — full devicePixelRatio (2-3×) multiplies GPU work by 4-9× for no visible benefit
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    // MSAA is one of the biggest fill-rate costs on integrated GPUs, and on
+    // high-DPI screens the extra physical pixels already smooth edges — only
+    // enable it on standard-DPI displays where jaggies are actually visible.
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: window.devicePixelRatio < 1.5,
+      powerPreference: 'high-performance',
+    });
+    // Cap pixel ratio at 1.5 — full devicePixelRatio (2-3×) multiplies GPU work
+    // by 4-9× for no visible benefit. On low-memory machines (typically paired
+    // with weak integrated GPUs) cap at 1.0 outright.
+    const lowEndDevice = (navigator.deviceMemory && navigator.deviceMemory <= 4) ||
+      (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4);
+    const basePixelRatio = Math.min(window.devicePixelRatio, lowEndDevice ? 1.0 : 1.5);
+    renderer.setPixelRatio(basePixelRatio);
     // Guard against 0×0 when tab is hidden — ResizeObserver will correct once visible
     renderer.setSize(Math.max(1, canvas.clientWidth), Math.max(1, canvas.clientHeight));
     renderer.setClearColor(0xf0f2f5);
     rendererRef.current = renderer;
+
+    // ── WebGL context-loss recovery ────────────────────────────────────────
+    // Heavy models / many refreshes can exhaust GPU memory, at which point the
+    // browser kills the context: canvas goes white, grid/floor go black, and
+    // nothing ever renders again. Three.js re-uploads resources when the
+    // context comes back, but the browser doesn't always restore it on its
+    // own — so if restoration hasn't happened after a short wait, force it
+    // via WEBGL_lose_context, then rebuild the whole renderer stack (env-map
+    // bake included, it's tied to the dead context) by bumping ctxEpoch.
+    let ctxRestoreTimer = null;
+    let disposed = false;
+    const onCtxLost = () => {
+      console.warn('[Z3D] WebGL context lost — waiting for restore…');
+      ctxRestoreTimer = setTimeout(() => {
+        if (disposed) return;
+        try {
+          const glExt = renderer.getContext().getExtension('WEBGL_lose_context');
+          if (glExt) glExt.restoreContext();
+        } catch (_) {}
+      }, 1500);
+    };
+    const onCtxRestored = () => {
+      if (ctxRestoreTimer) { clearTimeout(ctxRestoreTimer); ctxRestoreTimer = null; }
+      console.info('[Z3D] WebGL context restored — rebuilding renderer.');
+      if (!disposed) setCtxEpoch(v => v + 1);
+    };
+    canvas.addEventListener('webglcontextlost', onCtxLost, false);
+    canvas.addEventListener('webglcontextrestored', onCtxRestored, false);
 
     // Try to reuse a previously-built scene for this exact layout instead of
     // redoing the full structure-build + model-download pipeline. Invalidated
@@ -1370,6 +1414,15 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       dir.position.set(sunCX + sunDist * 0.5, sunDist * 0.9, sunCZ + sunDist * 0.4);
       dir.target.position.set(sunCX, 0, sunCZ);
       dir.target.updateMatrixWorld();
+
+      // The structure (beams, floors, labels, grid, paths, lights) never
+      // moves — compute its world matrices once and freeze them. On a layout
+      // with many stations this removes thousands of per-frame matrix
+      // recompositions, one of the main CPU costs behind laggy orbiting on
+      // slower machines. Objects added later (placed models, gizmo, hanger
+      // bars) keep the default matrixAutoUpdate=true and are unaffected.
+      scene.updateMatrixWorld(true);
+      scene.traverse(o => { o.matrixAutoUpdate = false; });
     }
 
     // Environment map is tied to the WebGL context of the renderer that
@@ -1977,9 +2030,26 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     orbit.addEventListener('change', () => { dirtyRef.current = true; });
     tc.addEventListener('change',    () => { dirtyRef.current = true; });
 
+    // ── Adaptive render resolution ─────────────────────────────────────────
+    // Watches the real frame cadence while frames are actually being rendered
+    // (orbiting, animating). If the GPU can't hold ~30fps, the internal render
+    // resolution steps down (never below 0.6×) until it can; once frames are
+    // comfortably fast again it steps back up toward the base ratio. This is
+    // what keeps orbiting smooth on integrated-GPU laptops without costing
+    // workstations any quality.
+    let curRatio = basePixelRatio;
+    let slowFrames = 0, fastFrames = 0, lastFrameT = 0;
+    const applyRatio = (r) => {
+      curRatio = r;
+      renderer.setPixelRatio(r);
+      renderer.setSize(Math.max(1, canvas.clientWidth), Math.max(1, canvas.clientHeight));
+      dirtyRef.current = true;
+    };
+
     const animate = () => {
       rafRef.current = requestAnimationFrame(animate);
       try {
+        if (renderer.getContext().isContextLost()) return; // recovery handler will rebuild
         if (walkModeRef.current) { walk.update(); dirtyRef.current = true; orbit.enabled = false; }
         else { if (!tc.dragging) orbit.enabled = true; orbit.update(); }
 
@@ -2002,6 +2072,27 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
         if (dirtyRef.current) {
           renderer.render(scene, camera);
           dirtyRef.current = false;
+
+          // Frame-time sampling only across consecutive rendered frames — an
+          // idle gap (no renders) must not count as a "slow frame".
+          const nowT = performance.now();
+          if (lastFrameT > 0) {
+            const dt = nowT - lastFrameT;
+            if (dt < 100) { // ignore tab-switch / GC hiccups
+              if (dt > 34) { slowFrames++; fastFrames = 0; }
+              else if (dt < 20) { fastFrames++; slowFrames = 0; }
+              if (slowFrames >= 8 && curRatio > 0.6) {
+                applyRatio(Math.max(0.6, curRatio - 0.2));
+                slowFrames = 0;
+              } else if (fastFrames >= 180 && curRatio < basePixelRatio) {
+                applyRatio(Math.min(basePixelRatio, curRatio + 0.2));
+                fastFrames = 0;
+              }
+            }
+          }
+          lastFrameT = nowT;
+        } else {
+          lastFrameT = 0; // idle — reset sampling window
         }
       } catch (err) {
         console.error('[Z3D animate error]', err);
@@ -2010,6 +2101,10 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     animate();
 
     return () => {
+      disposed = true;
+      if (ctxRestoreTimer) clearTimeout(ctxRestoreTimer);
+      canvas.removeEventListener('webglcontextlost', onCtxLost, false);
+      canvas.removeEventListener('webglcontextrestored', onCtxRestored, false);
       cancelAnimationFrame(rafRef.current);
       ro.disconnect();
       walk.destroy();
@@ -2026,7 +2121,8 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
       selectedRef.current = null;
     };
   // statusMap/zeMap intentionally excluded — they update via refs to avoid scene rebuilds
-  }, [canvasRef, layout]); // eslint-disable-line
+  // ctxEpoch included so a lost-then-restored WebGL context rebuilds everything
+  }, [canvasRef, layout, ctxEpoch]); // eslint-disable-line
 
   // Walk mode toggle
   useEffect(() => {
