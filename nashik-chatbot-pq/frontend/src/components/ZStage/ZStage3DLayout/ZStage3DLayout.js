@@ -1202,9 +1202,15 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     const canvas = canvasRef.current;
     if (!canvas || !layout) return;
 
-    // MSAA is one of the biggest fill-rate costs on integrated GPUs, and on
-    // high-DPI screens the extra physical pixels already smooth edges — only
-    // enable it on standard-DPI displays where jaggies are actually visible.
+    // Always enable real MSAA. Relying on high device pixel ratio alone to
+    // "hide" jaggies instead of true antialiasing was tried and reverted —
+    // thin structural beams are only a few screen pixels wide, so DPI
+    // supersampling alone isn't enough samples to look smooth, and it left
+    // visibly jagged/faceted edges even on capable machines. The real
+    // performance win here comes from the draw-call merging below (columns/
+    // beams/hazard bases collapsed from ~4N meshes to 2 per line), which
+    // costs far more than MSAA ever did — so AA can stay on unconditionally
+    // without reintroducing the lag that was actually fixed.
     //
     // Cap pixel ratio at 1.5 — full devicePixelRatio (2-3×) multiplies GPU work
     // by 4-9× for no visible benefit. Only drop to 1.0 on genuinely low-spec
@@ -1214,16 +1220,9 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     const lowEndDevice = (navigator.deviceMemory && navigator.deviceMemory <= 2) ||
       (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2);
     const basePixelRatio = Math.min(window.devicePixelRatio, lowEndDevice ? 1.0 : 1.5);
-    // AA-skip decision must key off the ACTUAL render resolution
-    // (basePixelRatio), not the raw screen DPI — a low-spec device with a
-    // high-DPI screen gets its pixel ratio capped down above, which throws
-    // away the "extra physical pixels smooth edges" effect this was relying
-    // on. Deciding from raw devicePixelRatio in that case skipped AA with
-    // nothing left to compensate for it, producing visibly jagged/dull edges
-    // on exactly the weaker machines this was supposed to help.
     const renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: basePixelRatio < 1.5,
+      antialias: true,
       powerPreference: 'high-performance',
     });
     renderer.setPixelRatio(basePixelRatio);
