@@ -1519,16 +1519,23 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
     applyEnvPresetInternal(getEnvPreset(layout.id).key);
 
     const orbit = new OrbitControls(camera, renderer.domElement);
-    orbit.enableDamping = true; orbit.dampingFactor = 0.08;
+    // Damping/inertia was making the camera keep coasting for a beat after
+    // the mouse was released ("swings up/left/right after I stop") — nice
+    // for a game camera, wrong for precise factory-floor navigation where
+    // the view should stop exactly where the user lets go. Disabled outright
+    // instead of just tuning dampingFactor, since ANY residual momentum
+    // reproduces the same "it moved after I stopped" complaint.
+    orbit.enableDamping = false;
     orbit.minDistance = 2; orbit.maxDistance = 200;
     // Vertical orbit had no polar-angle limit at all, so a normal drag could
     // swing the camera past straight-up or straight-down and flip/disorient
     // ("sometimes goes too far up, sometimes too far down"). Clamp it to just
-    // shy of the poles — still lets "Top" snap-view work (near 0) — and slow
-    // rotation down a bit so vertical drags feel controlled instead of twitchy.
+    // shy of the poles — still lets "Top" snap-view work (near 0).
     orbit.minPolarAngle = 0.05;
     orbit.maxPolarAngle = Math.PI - 0.05;
-    orbit.rotateSpeed = 0.7;
+    // Slowed from the 1.0 default so both axes track the mouse more gently
+    // instead of feeling twitchy/oversensitive on a drag.
+    orbit.rotateSpeed = 0.5;
     orbitRef.current = orbit;
 
     // TransformControls
