@@ -1,0 +1,71 @@
+QLense Quality Bots - LLM Details
+===================================
+Project: nashik-chatbot-pq (Traceability / Quality Chatbot Suite)
+Prepared by: Sudesh Kharat
+Date: 2026-07-31
+
+1. LLM PROVIDER
+----------------
+Provider: Microsoft Azure OpenAI Service
+Integration library: LangChain (langchain_openai - AzureChatOpenAI / AzureOpenAIEmbeddings)
+Client setup file: app/models/azure_openai_handler.py
+Model selection logic: app/models/model_factory.py
+Central config file: app/config/config.py
+
+2. MODELS USED
+----------------
+a) Default Chat Model
+   - Deployment: gpt-4o-mini
+   - API version: 2024-12-01-preview
+   - Temperature: 0.1
+   - Max tokens: 4096
+   - Used for: quick/summarization tasks (e.g. chat history summarization)
+
+b) Reasoning Model (Analyst / Cypher agents)
+   - Deployment: gpt-5
+   - API version: 2025-01-01-preview
+   - Reasoning effort: minimal
+   - Max tokens: 32096
+   - Used for: complex reasoning tasks - Cypher query generation, data analysis
+
+c) Embedding Model
+   - Deployment: text-embedding-ada-002
+   - API version: 2023-05-15
+   - Used for: document embeddings (semantic search / retrieval)
+
+3. WHICH BOT USES WHICH MODEL
+--------------------------------
+- QLense Agent               -> Reasoning model (gpt-5, minimal effort)
+- Analyst Agent               -> Reasoning model (gpt-5, minimal effort)
+- Cypher Agent (Neo4j queries) -> Reasoning model (gpt-5, minimal effort, 32096 max tokens)
+- Standards & Guidelines Agent -> Reasoning model (gpt-5, minimal effort)
+- Part Labeler Dashboard Agent -> Reasoning model (gpt-5, minimal effort)
+- Part Labeler Chart Agent     -> Default chat model (gpt-4o-mini)
+- Chat history summarization (all agents) -> Default chat model (gpt-4o-mini)
+
+4. SUPPORTING SYSTEMS (not LLMs, but part of the RAG/agent pipeline)
+------------------------------------------------------------------
+- Neo4j (graph database) - used by Cypher Agent for structured queries
+- PostgreSQL - stores chat history
+- OpenSearch - stores document embeddings for retrieval (index: qlense_assistant_index)
+- Docling - document parsing / OCR pipeline
+  - VLM model: ds4sd/SmolDocling-256M-preview
+  - Layout model: docling-layout-heron
+
+5. PROMPTS
+------------
+Prompts are maintained as separate Python files (sent separately as a zip):
+- qlense_prompt.py
+- analyst_prompt.py
+- cypher_agent_prompt.py
+- standards_guidelines_prompt.py
+- part_labeler_dashboard_prompt.py
+- todo_list_middleware_prompt.py
+
+Prompt orchestration/management: app/services/prompt_manager.py
+Prompt-related DB queries: app/queries/prompt_queries.py
+
+6. SECURITY NOTE
+------------------
+Actual API keys, endpoints, and passwords are stored in a local .env file
+(not committed to source control) and are NOT included in this document.
