@@ -719,6 +719,37 @@ function PartLabeler() {
     slide.addImage({ data: imgData, x, y: 0.75, w, h });
   };
 
+  // Adds one slide with a native, editable PPT bar chart (not a screenshot) -
+  // sharp at any zoom, unlike addCaptureSlide's rasterized image.
+  const addNativeBarChartSlide = (pptx, dataArr, slideTitle, hexColor) => {
+    const slide = pptx.addSlide();
+    slide.addText(slideTitle, {
+      x: 0.3, y: 0.1, w: 12.73, h: 0.5,
+      fontSize: 20, bold: true, color: 'DC0028'
+    });
+
+    if (!dataArr || dataArr.length === 0) {
+      slide.addText('No data found', { x: 0.3, y: 3.3, w: 12.73, h: 0.6, fontSize: 16, align: 'center', color: '888888' });
+      return;
+    }
+
+    slide.addChart(pptx.ChartType.bar, [{
+      name: slideTitle,
+      labels: dataArr.map(d => String(d.label)),
+      values: dataArr.map(d => Number(d.value) || 0)
+    }], {
+      x: 0.3, y: 0.75, w: 12.73, h: 6.4,
+      barDir: 'col',
+      chartColors: [hexColor.replace('#', '')],
+      showLegend: false,
+      showValue: true,
+      dataLabelPosition: 'outEnd',
+      catAxisLabelFontSize: 10,
+      valAxisLabelFontSize: 10,
+      valAxisMinVal: 0
+    });
+  };
+
   // One .pptx file PER component (not one combined deck): 1) the full CAD
   // image + all 4 charts together (the purple-boxed workspace area), 2-5)
   // each of the 4 charts again on its own slide. Sidebar/header never captured.
@@ -740,12 +771,18 @@ function PartLabeler() {
 
         const pptx = new PptxGenJS();
         pptx.layout = 'LAYOUT_WIDE'; // 13.33" x 7.5"
+        const viewConfig = allModeActiveSource ? DATA_SOURCES[allModeActiveSource.src] : sourceConfig;
 
         await addCaptureSlide(pptx, workspaceCaptureRef.current, label.partName);
-        await addCaptureSlide(pptx, mfgMonthChartRef.current, `${label.partName} - Vehicle Mfg Month Wise Data`);
-        await addCaptureSlide(pptx, reportingMonthChartRef.current, `${label.partName} - Reporting Month Wise Data`);
-        await addCaptureSlide(pptx, kmsChartRef.current, `${label.partName} - Kms Wise Data`);
-        await addCaptureSlide(pptx, regionChartRef.current, `${label.partName} - Locationwise Distribution`);
+        addNativeBarChartSlide(pptx, dashboardData.mfgMonth, `${label.partName} - ${viewConfig.chartTitles.mfgMonth}`, '#f6ad55');
+        addNativeBarChartSlide(pptx, dashboardData.reportingMonth, `${label.partName} - ${viewConfig.chartTitles.reportingMonth}`, '#68d391');
+        addNativeBarChartSlide(pptx, dashboardData.kms, `${label.partName} - ${viewConfig.chartTitles.kms}`, '#76e4f7');
+        if (viewConfig.useMapForRegion) {
+          // no native "PPT map chart" equivalent - keep this one as a screenshot
+          await addCaptureSlide(pptx, regionChartRef.current, `${label.partName} - ${viewConfig.chartTitles.region}`);
+        } else {
+          addNativeBarChartSlide(pptx, dashboardData.region, `${label.partName} - ${viewConfig.chartTitles.region}`, '#667eea');
+        }
 
         const safeName = label.partName.replace(/[^a-z0-9]+/gi, '_');
         await pptx.writeFile({ fileName: `${safeName}_${dateStr}.pptx` });
