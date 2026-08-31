@@ -732,10 +732,12 @@ function PartLabeler() {
 
       for (const label of labels) {
         setActivePopup(label);
-        await fetchDashboardData(label.partName);
-        await fetchActivePartHistory(label);
+        await Promise.all([
+          fetchDashboardData(label.partName),
+          fetchActivePartHistory(label)
+        ]);
         // let React re-render and the recharts animation settle before capture
-        await new Promise(resolve => setTimeout(resolve, 1200));
+        await new Promise(resolve => setTimeout(resolve, 800));
 
         await addCaptureSlide(pptx, workspaceCaptureRef.current, label.partName);
         await addCaptureSlide(pptx, mfgMonthChartRef.current, `${label.partName} - Vehicle Mfg Month Wise Data`);
