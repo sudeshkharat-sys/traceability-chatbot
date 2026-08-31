@@ -1726,9 +1726,6 @@ function PartLabeler() {
             <button className={`sidebar-btn secondary ${isSummaryActive ? 'active' : ''}`} onClick={handleShowAll} disabled={isLoading || !selectedImage}>
               <BarChart2 size={18} /><span>{isSummaryActive ? 'Hide Visuals' : 'Show Visuals'}</span>
             </button>
-            <button className="sidebar-btn secondary" onClick={handleDownloadVisualPPT} disabled={isExportingPpt || !selectedImage || labels.length === 0} title="One slide per component: CAD snapshot + its 4 charts">
-              <Presentation size={18} /><span>{isExportingPpt ? 'Generating PPT...' : 'Download PPT'}</span>
-            </button>
           </div>
           <div className="sidebar-section">
             <h3 className="section-title">CAD Drawings</h3>
@@ -2182,6 +2179,9 @@ function PartLabeler() {
                                 params.append('format', 'pdf');
                                 window.open(`${API_BASE}/download-warranty?${params.toString()}`, '_blank');
                               }}><FileText size={14} /><span>PDF</span></button>
+                              <button className="download-csv-btn-integrated" onClick={handleDownloadVisualPPT} disabled={isExportingPpt || labels.length === 0} title="One slide per component: CAD snapshot + its 4 charts">
+                                <Presentation size={14} /><span>{isExportingPpt ? 'Generating...' : 'PPT'}</span>
+                              </button>
                             </div>
                           </div>
                         </motion.div>
