@@ -689,10 +689,34 @@ function PartLabeler() {
     }
   };
 
-  // Builds a PPT with one slide per component: a snapshot of the CAD image
-  // (with markers) plus its 4 analysis charts, excluding sidebar/header chrome.
+  // Adds one slide to `pptx` from a screenshot of `element`, titled `slideTitle`.
+  const addCaptureSlide = async (pptx, element, slideTitle) => {
+    if (!element) return;
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff'
+    });
+    const imgData = canvas.toDataURL('image/png');
+
+    const slide = pptx.addSlide();
+    slide.addText(slideTitle, {
+      x: 0.3, y: 0.1, w: 12.73, h: 0.5,
+      fontSize: 20, bold: true, color: 'DC0028'
+    });
+
+    const imgRatio = canvas.width / canvas.height;
+    const maxW = 12.73, maxH = 6.4;
+    let w = maxW, h = maxW / imgRatio;
+    if (h > maxH) { h = maxH; w = maxH * imgRatio; }
+    const x = 0.3 + (maxW - w) / 2;
+    slide.addImage({ data: imgData, x, y: 0.75, w, h });
+  };
+
+  // Per component: 1) the highlighted detail card, 2) all 4 charts together,
+  // 3-6) each of the 4 charts on its own slide. Sidebar/header are never captured.
   const handleDownloadVisualPPT = async () => {
-    if (!labels.length || !workspaceCaptureRef.current) return;
+    if (!labels.length) return;
     setIsExportingPpt(true);
     const previousPopup = activePopup;
     try {
@@ -706,24 +730,12 @@ function PartLabeler() {
         // let React re-render and the recharts animation settle before capture
         await new Promise(resolve => setTimeout(resolve, 700));
 
-        const canvas = await html2canvas(workspaceCaptureRef.current, {
-          scale: 2,
-          useCORS: true,
-          backgroundColor: '#ffffff'
-        });
-        const imgData = canvas.toDataURL('image/png');
-
-        const slide = pptx.addSlide();
-        slide.addText(label.partName, {
-          x: 0.3, y: 0.1, w: 12.73, h: 0.5,
-          fontSize: 20, bold: true, color: 'DC0028'
-        });
-
-        const imgRatio = canvas.width / canvas.height;
-        const maxW = 12.73, maxH = 6.7;
-        let w = maxW, h = maxW / imgRatio;
-        if (h > maxH) { h = maxH; w = maxH * imgRatio; }
-        slide.addImage({ data: imgData, x: 0.3, y: 0.75, w, h });
+        await addCaptureSlide(pptx, detailCardRef.current, label.partName);
+        await addCaptureSlide(pptx, allChartsRef.current, `${label.partName} - All Charts`);
+        await addCaptureSlide(pptx, mfgMonthChartRef.current, `${label.partName} - Vehicle Mfg Month Wise Data`);
+        await addCaptureSlide(pptx, reportingMonthChartRef.current, `${label.partName} - Reporting Month Wise Data`);
+        await addCaptureSlide(pptx, kmsChartRef.current, `${label.partName} - Kms Wise Data`);
+        await addCaptureSlide(pptx, regionChartRef.current, `${label.partName} - Locationwise Distribution`);
       }
 
       const fileName = `PartsVisualizer_${new Date().toISOString().slice(0, 10)}.pptx`;
@@ -853,6 +865,12 @@ function PartLabeler() {
   const cadInputRef = useRef(null);
   const warrantyInputRef = useRef(null);
   const workspaceCaptureRef = useRef(null);
+  const detailCardRef = useRef(null);
+  const allChartsRef = useRef(null);
+  const mfgMonthChartRef = useRef(null);
+  const reportingMonthChartRef = useRef(null);
+  const kmsChartRef = useRef(null);
+  const regionChartRef = useRef(null);
   const [isExportingPpt, setIsExportingPpt] = useState(false);
   const [connectorPath, setConnectorPath] = useState("");
   const [expandedImageId, setExpandedImageId] = useState(null);
@@ -2091,7 +2109,8 @@ function PartLabeler() {
                     </div>
                                         <AnimatePresence>
                                           {activePopup && (
-                                            <motion.div 
+                                            <motion.div
+                                              ref={detailCardRef}
                                               initial={{ opacity: 0, y: 10 }}
                                               animate={{ opacity: 1, y: 0 }}
                                               className="active-part-details"
@@ -2171,7 +2190,7 @@ function PartLabeler() {
             {selectedImage && activePopup && (dataSource !== 'all' || allModeActiveSource) && (() => {
               const viewConfig = allModeActiveSource ? DATA_SOURCES[allModeActiveSource.src] : sourceConfig;
               return (
-                <div className="dashboard-analysis-section">
+                <div className="dashboard-analysis-section" ref={allChartsRef}>
                   {allModeActiveSource && (
                     <div className="all-mode-view-badge">
                       <Database size={13} />
@@ -2184,17 +2203,25 @@ function PartLabeler() {
                     </div>
                   )}
                   <div className="dashboard-grid">
-                    <CustomBarChart title={viewConfig.chartTitles.mfgMonth} data={dashboardData.mfgMonth} color="#f6ad55" icon={History} />
-                    <CustomBarChart title={viewConfig.chartTitles.reportingMonth} data={dashboardData.reportingMonth} color="#68d391" icon={FileSpreadsheet} />
-                    <CustomBarChart title={viewConfig.chartTitles.kms} data={dashboardData.kms} color="#76e4f7" icon={Activity} />
-                    {viewConfig.useMapForRegion ? (
-                      <div className="dashboard-chart-card">
-                        <div className="chart-header"><MapIcon size={16} /><span>{viewConfig.chartTitles.region}</span></div>
-                        <div className="chart-container-inner india-map-container"><IndiaMap data={dashboardData.region} /></div>
-                      </div>
-                    ) : (
-                      <LocationBarChart title={viewConfig.chartTitles.region} data={dashboardData.region} />
-                    )}
+                    <div ref={mfgMonthChartRef}>
+                      <CustomBarChart title={viewConfig.chartTitles.mfgMonth} data={dashboardData.mfgMonth} color="#f6ad55" icon={History} />
+                    </div>
+                    <div ref={reportingMonthChartRef}>
+                      <CustomBarChart title={viewConfig.chartTitles.reportingMonth} data={dashboardData.reportingMonth} color="#68d391" icon={FileSpreadsheet} />
+                    </div>
+                    <div ref={kmsChartRef}>
+                      <CustomBarChart title={viewConfig.chartTitles.kms} data={dashboardData.kms} color="#76e4f7" icon={Activity} />
+                    </div>
+                    <div ref={regionChartRef}>
+                      {viewConfig.useMapForRegion ? (
+                        <div className="dashboard-chart-card">
+                          <div className="chart-header"><MapIcon size={16} /><span>{viewConfig.chartTitles.region}</span></div>
+                          <div className="chart-container-inner india-map-container"><IndiaMap data={dashboardData.region} /></div>
+                        </div>
+                      ) : (
+                        <LocationBarChart title={viewConfig.chartTitles.region} data={dashboardData.region} />
+                      )}
+                    </div>
                   </div>
                 </div>
               );
