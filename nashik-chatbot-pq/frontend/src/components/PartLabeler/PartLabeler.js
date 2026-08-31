@@ -690,19 +690,32 @@ function PartLabeler() {
   };
 
   // Adds one slide to `pptx` from a screenshot of `element`, titled `slideTitle`.
-  const addCaptureSlide = async (pptx, element, slideTitle) => {
+  // `scale` raises capture resolution; `enhance` applies a light contrast/
+  // saturation boost so a flat screenshot doesn't look washed-out in the deck.
+  const addCaptureSlide = async (pptx, element, slideTitle, { scale = 2, enhance = false } = {}) => {
     if (!element) return;
     // Nudge recharts' ResponsiveContainer to (re)measure before we snapshot -
     // without this, charts can capture blank if their SVG hadn't sized yet.
     window.dispatchEvent(new Event('resize'));
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
-    const canvas = await html2canvas(element, {
-      scale: 2,
+    let canvas = await html2canvas(element, {
+      scale,
       useCORS: true,
       backgroundColor: '#ffffff',
       foreignObjectRendering: false // true silently blanks out recharts' SVG (gradients/clip-paths)
     });
+
+    if (enhance) {
+      const boosted = document.createElement('canvas');
+      boosted.width = canvas.width;
+      boosted.height = canvas.height;
+      const ctx = boosted.getContext('2d');
+      ctx.filter = 'saturate(1.25) contrast(1.08) brightness(1.02)';
+      ctx.drawImage(canvas, 0, 0);
+      canvas = boosted;
+    }
+
     const imgData = canvas.toDataURL('image/png');
 
     const slide = pptx.addSlide();
@@ -773,13 +786,13 @@ function PartLabeler() {
         pptx.layout = 'LAYOUT_WIDE'; // 13.33" x 7.5"
         const viewConfig = allModeActiveSource ? DATA_SOURCES[allModeActiveSource.src] : sourceConfig;
 
-        await addCaptureSlide(pptx, workspaceCaptureRef.current, label.partName);
+        await addCaptureSlide(pptx, workspaceCaptureRef.current, label.partName, { scale: 3, enhance: true });
         addNativeBarChartSlide(pptx, dashboardData.mfgMonth, `${label.partName} - ${viewConfig.chartTitles.mfgMonth}`, '#f6ad55');
         addNativeBarChartSlide(pptx, dashboardData.reportingMonth, `${label.partName} - ${viewConfig.chartTitles.reportingMonth}`, '#68d391');
         addNativeBarChartSlide(pptx, dashboardData.kms, `${label.partName} - ${viewConfig.chartTitles.kms}`, '#76e4f7');
         if (viewConfig.useMapForRegion) {
           // no native "PPT map chart" equivalent - keep this one as a screenshot
-          await addCaptureSlide(pptx, regionChartRef.current, `${label.partName} - ${viewConfig.chartTitles.region}`);
+          await addCaptureSlide(pptx, regionChartRef.current, `${label.partName} - ${viewConfig.chartTitles.region}`, { scale: 3, enhance: true });
         } else {
           addNativeBarChartSlide(pptx, dashboardData.region, `${label.partName} - ${viewConfig.chartTitles.region}`, '#667eea');
         }
