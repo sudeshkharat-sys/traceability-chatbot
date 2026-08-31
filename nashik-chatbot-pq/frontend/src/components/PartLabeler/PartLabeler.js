@@ -698,10 +698,10 @@ function PartLabeler() {
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
     const canvas = await html2canvas(element, {
-      scale: 2,
+      scale: 1.5,
       useCORS: true,
       backgroundColor: '#ffffff',
-      foreignObjectRendering: true
+      foreignObjectRendering: false // true silently blanks out recharts' SVG (gradients/clip-paths)
     });
     const imgData = canvas.toDataURL('image/png');
 
