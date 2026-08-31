@@ -692,10 +692,16 @@ function PartLabeler() {
   // Adds one slide to `pptx` from a screenshot of `element`, titled `slideTitle`.
   const addCaptureSlide = async (pptx, element, slideTitle) => {
     if (!element) return;
+    // Nudge recharts' ResponsiveContainer to (re)measure before we snapshot -
+    // without this, charts can capture blank if their SVG hadn't sized yet.
+    window.dispatchEvent(new Event('resize'));
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
     const canvas = await html2canvas(element, {
       scale: 2,
       useCORS: true,
-      backgroundColor: '#ffffff'
+      backgroundColor: '#ffffff',
+      foreignObjectRendering: true
     });
     const imgData = canvas.toDataURL('image/png');
 
@@ -713,8 +719,9 @@ function PartLabeler() {
     slide.addImage({ data: imgData, x, y: 0.75, w, h });
   };
 
-  // Per component: 1) the highlighted detail card, 2) all 4 charts together,
-  // 3-6) each of the 4 charts on its own slide. Sidebar/header are never captured.
+  // Per component: 1) the full CAD image + all 4 charts together (the purple-
+  // boxed workspace area), 2-5) each of the 4 charts again on its own slide.
+  // Sidebar/header are never captured.
   const handleDownloadVisualPPT = async () => {
     if (!labels.length) return;
     setIsExportingPpt(true);
@@ -728,9 +735,9 @@ function PartLabeler() {
         await fetchDashboardData(label.partName);
         await fetchActivePartHistory(label);
         // let React re-render and the recharts animation settle before capture
-        await new Promise(resolve => setTimeout(resolve, 700));
+        await new Promise(resolve => setTimeout(resolve, 1200));
 
-        await addCaptureSlide(pptx, detailCardRef.current, label.partName);
+        await addCaptureSlide(pptx, workspaceCaptureRef.current, label.partName);
         await addCaptureSlide(pptx, mfgMonthChartRef.current, `${label.partName} - Vehicle Mfg Month Wise Data`);
         await addCaptureSlide(pptx, reportingMonthChartRef.current, `${label.partName} - Reporting Month Wise Data`);
         await addCaptureSlide(pptx, kmsChartRef.current, `${label.partName} - Kms Wise Data`);
