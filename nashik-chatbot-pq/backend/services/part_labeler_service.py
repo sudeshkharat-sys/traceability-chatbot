@@ -327,20 +327,31 @@ class PartLabelerService:
             else:
                 # Keep cells readable: wrap header/body text in paragraphs
                 cell_style = styles["BodyText"]
-                cell_style.fontSize = 7
+                cell_style.fontSize = 5.5
+                cell_style.leading = 6.5
                 table_data = [[Paragraph(str(h), cell_style) for h in headers]]
                 for row in rows:
                     table_data.append([Paragraph("" if v is None else str(v), cell_style) for v in row])
 
-                table = Table(table_data, repeatRows=1)
+                # reportlab does NOT auto-shrink columns to fit the page like PPT does -
+                # without explicit colWidths a wide table (many columns) raises a
+                # LayoutError ("Flowable too large on page") instead of rendering.
+                # Force every column into an equal share of the available page width.
+                available_width = landscape(A4)[0] - doc.leftMargin - doc.rightMargin
+                col_width = available_width / len(headers)
+                table = Table(table_data, colWidths=[col_width] * len(headers), repeatRows=1)
                 table.setStyle(TableStyle([
                     ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#DC0028")),
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-                    ("FONTSIZE", (0, 0), (-1, 0), 7),
+                    ("FONTSIZE", (0, 0), (-1, 0), 5.5),
                     ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+                    ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#e2e8f0")),
                     ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 2),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 2),
+                    ("TOPPADDING", (0, 0), (-1, -1), 2),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
                 ]))
                 elements.append(table)
 
