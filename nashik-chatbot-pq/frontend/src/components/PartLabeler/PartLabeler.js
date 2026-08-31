@@ -731,7 +731,6 @@ function PartLabeler() {
         await new Promise(resolve => setTimeout(resolve, 700));
 
         await addCaptureSlide(pptx, detailCardRef.current, label.partName);
-        await addCaptureSlide(pptx, allChartsRef.current, `${label.partName} - All Charts`);
         await addCaptureSlide(pptx, mfgMonthChartRef.current, `${label.partName} - Vehicle Mfg Month Wise Data`);
         await addCaptureSlide(pptx, reportingMonthChartRef.current, `${label.partName} - Reporting Month Wise Data`);
         await addCaptureSlide(pptx, kmsChartRef.current, `${label.partName} - Kms Wise Data`);
@@ -866,7 +865,6 @@ function PartLabeler() {
   const warrantyInputRef = useRef(null);
   const workspaceCaptureRef = useRef(null);
   const detailCardRef = useRef(null);
-  const allChartsRef = useRef(null);
   const mfgMonthChartRef = useRef(null);
   const reportingMonthChartRef = useRef(null);
   const kmsChartRef = useRef(null);
@@ -2190,7 +2188,7 @@ function PartLabeler() {
             {selectedImage && activePopup && (dataSource !== 'all' || allModeActiveSource) && (() => {
               const viewConfig = allModeActiveSource ? DATA_SOURCES[allModeActiveSource.src] : sourceConfig;
               return (
-                <div className="dashboard-analysis-section" ref={allChartsRef}>
+                <div className="dashboard-analysis-section">
                   {allModeActiveSource && (
                     <div className="all-mode-view-badge">
                       <Database size={13} />
