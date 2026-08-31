@@ -719,16 +719,15 @@ function PartLabeler() {
     slide.addImage({ data: imgData, x, y: 0.75, w, h });
   };
 
-  // Per component: 1) the full CAD image + all 4 charts together (the purple-
-  // boxed workspace area), 2-5) each of the 4 charts again on its own slide.
-  // Sidebar/header are never captured.
+  // One .pptx file PER component (not one combined deck): 1) the full CAD
+  // image + all 4 charts together (the purple-boxed workspace area), 2-5)
+  // each of the 4 charts again on its own slide. Sidebar/header never captured.
   const handleDownloadVisualPPT = async () => {
     if (!labels.length) return;
     setIsExportingPpt(true);
     const previousPopup = activePopup;
     try {
-      const pptx = new PptxGenJS();
-      pptx.layout = 'LAYOUT_WIDE'; // 13.33" x 7.5"
+      const dateStr = new Date().toISOString().slice(0, 10);
 
       for (const label of labels) {
         setActivePopup(label);
@@ -739,15 +738,20 @@ function PartLabeler() {
         // let React re-render and the recharts animation settle before capture
         await new Promise(resolve => setTimeout(resolve, 800));
 
+        const pptx = new PptxGenJS();
+        pptx.layout = 'LAYOUT_WIDE'; // 13.33" x 7.5"
+
         await addCaptureSlide(pptx, workspaceCaptureRef.current, label.partName);
         await addCaptureSlide(pptx, mfgMonthChartRef.current, `${label.partName} - Vehicle Mfg Month Wise Data`);
         await addCaptureSlide(pptx, reportingMonthChartRef.current, `${label.partName} - Reporting Month Wise Data`);
         await addCaptureSlide(pptx, kmsChartRef.current, `${label.partName} - Kms Wise Data`);
         await addCaptureSlide(pptx, regionChartRef.current, `${label.partName} - Locationwise Distribution`);
-      }
 
-      const fileName = `PartsVisualizer_${new Date().toISOString().slice(0, 10)}.pptx`;
-      await pptx.writeFile({ fileName });
+        const safeName = label.partName.replace(/[^a-z0-9]+/gi, '_');
+        await pptx.writeFile({ fileName: `${safeName}_${dateStr}.pptx` });
+        // small gap so the browser doesn't block/merge back-to-back downloads
+        await new Promise(resolve => setTimeout(resolve, 400));
+      }
     } catch (err) {
       console.error("Failed to generate PPT", err);
       alert("Failed to generate PPT export");
