@@ -696,6 +696,11 @@
   color: #64748b;
 }
 
+.download-btn-group {
+  display: flex;
+  gap: 6px;
+}
+
 .download-csv-btn-integrated {
   display: flex;
   align-items: center;

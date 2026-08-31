@@ -22,6 +22,7 @@ import {
   Download,
   Database,
   FileSpreadsheet,
+  FileText,
   Layers,
   Map as MapIcon,
   Activity,
@@ -2078,16 +2079,30 @@ function PartLabeler() {
                               </span>
                               <span className="value">{currentMonthFailures}</span><span className="sub">Failures</span>
                             </div>
-                            <button className="download-csv-btn-integrated" onClick={() => {
-                              const params = new URLSearchParams();
-                              params.append('userId', userId);
-                              params.append('partName', activePopup.partName);
-                              filterMonth.forEach(m => params.append('month', m));
-                              filterModel.forEach(m => params.append('baseModel', m));
-                              filterMIS.forEach(m => params.append('misBucket', m));
-                              filterMfgQtr.forEach(m => params.append('mfgQtr', m));
-                              window.open(`${API_BASE}/download-warranty?${params.toString()}`, '_blank');
-                            }}><Download size={14} /><span>Download Data</span></button>
+                            <div className="download-btn-group">
+                              <button className="download-csv-btn-integrated" onClick={() => {
+                                const params = new URLSearchParams();
+                                params.append('userId', userId);
+                                params.append('partName', activePopup.partName);
+                                filterMonth.forEach(m => params.append('month', m));
+                                filterModel.forEach(m => params.append('baseModel', m));
+                                filterMIS.forEach(m => params.append('misBucket', m));
+                                filterMfgQtr.forEach(m => params.append('mfgQtr', m));
+                                params.append('format', 'csv');
+                                window.open(`${API_BASE}/download-warranty?${params.toString()}`, '_blank');
+                              }}><Download size={14} /><span>CSV</span></button>
+                              <button className="download-csv-btn-integrated" onClick={() => {
+                                const params = new URLSearchParams();
+                                params.append('userId', userId);
+                                params.append('partName', activePopup.partName);
+                                filterMonth.forEach(m => params.append('month', m));
+                                filterModel.forEach(m => params.append('baseModel', m));
+                                filterMIS.forEach(m => params.append('misBucket', m));
+                                filterMfgQtr.forEach(m => params.append('mfgQtr', m));
+                                params.append('format', 'pdf');
+                                window.open(`${API_BASE}/download-warranty?${params.toString()}`, '_blank');
+                              }}><FileText size={14} /><span>PDF</span></button>
+                            </div>
                           </div>
                         </motion.div>
                       )}

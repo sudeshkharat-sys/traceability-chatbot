@@ -111,16 +111,26 @@ async def download_warranty(
     month: Optional[list[str]] = Query(None),
     baseModel: Optional[list[str]] = Query(None),
     misBucket: Optional[list[str]] = Query(None),
-    mfgQtr: Optional[list[str]] = Query(None)
+    mfgQtr: Optional[list[str]] = Query(None),
+    format: str = Query("csv", pattern="^(csv|pdf)$")
 ):
     from fastapi.responses import StreamingResponse
     import io
+    safe_name = partName.replace(' ', '_')
     try:
+        if format == "pdf":
+            pdf_bytes = get_service().get_detailed_warranty_pdf(userId, partName, month, baseModel, misBucket, mfgQtr)
+            return StreamingResponse(
+                io.BytesIO(pdf_bytes),
+                media_type="application/pdf",
+                headers={"Content-Disposition": f"attachment; filename={safe_name}_warranty_data.pdf"}
+            )
+
         csv_data = get_service().get_detailed_warranty_csv(userId, partName, month, baseModel, misBucket, mfgQtr)
         return StreamingResponse(
             io.StringIO(csv_data),
             media_type="text/csv",
-            headers={"Content-Disposition": f"attachment; filename={partName.replace(' ', '_')}_warranty_data.csv"}
+            headers={"Content-Disposition": f"attachment; filename={safe_name}_warranty_data.csv"}
         )
     except Exception as e:
         logger.error(f"Download error: {e}")

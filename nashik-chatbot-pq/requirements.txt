@@ -33,6 +33,7 @@ invoke
 openpyxl
 aiofiles
 python-json-logger
+reportlab
 
 # Development Tools
 pytest

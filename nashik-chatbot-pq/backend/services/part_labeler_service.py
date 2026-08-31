@@ -284,6 +284,72 @@ class PartLabelerService:
             logger.error(f"Error generating CSV: {e}")
             return f"Error generating CSV: {str(e)}"
 
+    def get_detailed_warranty_pdf(self, user_id: int, part_name: str, month: Optional[list[str]] = None, base_model: Optional[list[str]] = None, mis_bucket: Optional[list[str]] = None, mfg_qtr: Optional[list[str]] = None) -> bytes:
+        """Fetch all columns for a part and return as a PDF (bytes)"""
+        import io
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import getSampleStyleSheet
+        from reportlab.lib.units import mm
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+
+        try:
+            normalized_search = f"%{part_name.lower().replace(' ', '')}%"
+            params = {
+                "search_term": normalized_search,
+                "base_model": base_model if base_model and "All" not in base_model else None,
+                "mis_bucket": mis_bucket if mis_bucket and "All" not in mis_bucket else None,
+                "mfg_qtr": mfg_qtr if mfg_qtr and "All" not in mfg_qtr else None,
+                "month_val": month if month and "All" not in month else None,
+                "user_id": user_id
+            }
+
+            headers, rows = self.db.execute_query_with_headers(
+                PartLabelerQueries.GET_ALL_WARRANTY_FOR_PART,
+                params
+            )
+
+            output = io.BytesIO()
+            doc = SimpleDocTemplate(
+                output,
+                pagesize=landscape(A4),
+                leftMargin=12 * mm, rightMargin=12 * mm,
+                topMargin=12 * mm, bottomMargin=12 * mm
+            )
+            styles = getSampleStyleSheet()
+            elements = [
+                Paragraph(f"Warranty Data - {part_name}", styles["Title"]),
+                Spacer(1, 6)
+            ]
+
+            if not rows:
+                elements.append(Paragraph("No data found", styles["Normal"]))
+            else:
+                # Keep cells readable: wrap header/body text in paragraphs
+                cell_style = styles["BodyText"]
+                cell_style.fontSize = 7
+                table_data = [[Paragraph(str(h), cell_style) for h in headers]]
+                for row in rows:
+                    table_data.append([Paragraph("" if v is None else str(v), cell_style) for v in row])
+
+                table = Table(table_data, repeatRows=1)
+                table.setStyle(TableStyle([
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#DC0028")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTSIZE", (0, 0), (-1, 0), 7),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#e2e8f0")),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8fafc")]),
+                    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ]))
+                elements.append(table)
+
+            doc.build(elements)
+            return output.getvalue()
+        except Exception as e:
+            logger.error(f"Error generating PDF: {e}")
+            raise
+
     def upload_image(self, filename: str, user_id: int, display_name: Optional[str] = None) -> Dict[str, Any]:
         """Save image record to database"""
         image_id = self.db.execute_insert(
