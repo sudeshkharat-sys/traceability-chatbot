@@ -4,6 +4,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { fixMarkdownTables } from '../../utils/markdownUtils';
+import html2canvas from 'html2canvas';
+import PptxGenJS from 'pptxgenjs';
 import {
   ArrowLeft,
   Upload,
@@ -687,6 +689,54 @@ function PartLabeler() {
     }
   };
 
+  // Builds a PPT with one slide per component: a snapshot of the CAD image
+  // (with markers) plus its 4 analysis charts, excluding sidebar/header chrome.
+  const handleDownloadVisualPPT = async () => {
+    if (!labels.length || !workspaceCaptureRef.current) return;
+    setIsExportingPpt(true);
+    const previousPopup = activePopup;
+    try {
+      const pptx = new PptxGenJS();
+      pptx.layout = 'LAYOUT_WIDE'; // 13.33" x 7.5"
+
+      for (const label of labels) {
+        setActivePopup(label);
+        await fetchDashboardData(label.partName);
+        await fetchActivePartHistory(label);
+        // let React re-render and the recharts animation settle before capture
+        await new Promise(resolve => setTimeout(resolve, 700));
+
+        const canvas = await html2canvas(workspaceCaptureRef.current, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: '#ffffff'
+        });
+        const imgData = canvas.toDataURL('image/png');
+
+        const slide = pptx.addSlide();
+        slide.addText(label.partName, {
+          x: 0.3, y: 0.1, w: 12.73, h: 0.5,
+          fontSize: 20, bold: true, color: 'DC0028'
+        });
+
+        const imgRatio = canvas.width / canvas.height;
+        const maxW = 12.73, maxH = 6.7;
+        let w = maxW, h = maxW / imgRatio;
+        if (h > maxH) { h = maxH; w = maxH * imgRatio; }
+        slide.addImage({ data: imgData, x: 0.3, y: 0.75, w, h });
+      }
+
+      const fileName = `PartsVisualizer_${new Date().toISOString().slice(0, 10)}.pptx`;
+      await pptx.writeFile({ fileName });
+    } catch (err) {
+      console.error("Failed to generate PPT", err);
+      alert("Failed to generate PPT export");
+    } finally {
+      setActivePopup(previousPopup);
+      setIsExportingPpt(false);
+    }
+  };
+
   const updateAllLabelFailures = async (currentLabels, month, model, mis, qtr, src) => {
     if (!userId) return;
     const src_ = src || dataSource;
@@ -802,6 +852,8 @@ function PartLabeler() {
   const imgRef = useRef(null);
   const cadInputRef = useRef(null);
   const warrantyInputRef = useRef(null);
+  const workspaceCaptureRef = useRef(null);
+  const [isExportingPpt, setIsExportingPpt] = useState(false);
   const [connectorPath, setConnectorPath] = useState("");
   const [expandedImageId, setExpandedImageId] = useState(null);
 
@@ -1651,6 +1703,9 @@ function PartLabeler() {
             <button className={`sidebar-btn secondary ${isSummaryActive ? 'active' : ''}`} onClick={handleShowAll} disabled={isLoading || !selectedImage}>
               <BarChart2 size={18} /><span>{isSummaryActive ? 'Hide Visuals' : 'Show Visuals'}</span>
             </button>
+            <button className="sidebar-btn secondary" onClick={handleDownloadVisualPPT} disabled={isExportingPpt || !selectedImage || labels.length === 0} title="One slide per component: CAD snapshot + its 4 charts">
+              <Presentation size={18} /><span>{isExportingPpt ? 'Generating PPT...' : 'Download PPT'}</span>
+            </button>
           </div>
           <div className="sidebar-section">
             <h3 className="section-title">CAD Drawings</h3>
@@ -1924,7 +1979,7 @@ function PartLabeler() {
             })()}
           </div>
 
-          <div className={`workspace-scroll-container ${!selectedImage ? 'empty-state' : ''}`}>
+          <div ref={workspaceCaptureRef} className={`workspace-scroll-container ${!selectedImage ? 'empty-state' : ''}`}>
             <div className="top-visual-section">
               {!selectedImage ? (
                 <div className="upload-prompt">
@@ -2103,17 +2158,6 @@ function PartLabeler() {
                                 params.append('format', 'pdf');
                                 window.open(`${API_BASE}/download-warranty?${params.toString()}`, '_blank');
                               }}><FileText size={14} /><span>PDF</span></button>
-                              <button className="download-csv-btn-integrated" onClick={() => {
-                                const params = new URLSearchParams();
-                                params.append('userId', userId);
-                                params.append('partName', activePopup.partName);
-                                filterMonth.forEach(m => params.append('month', m));
-                                filterModel.forEach(m => params.append('baseModel', m));
-                                filterMIS.forEach(m => params.append('misBucket', m));
-                                filterMfgQtr.forEach(m => params.append('mfgQtr', m));
-                                params.append('format', 'pptx');
-                                window.open(`${API_BASE}/download-warranty?${params.toString()}`, '_blank');
-                              }}><Presentation size={14} /><span>PPT</span></button>
                             </div>
                           </div>
                         </motion.div>
