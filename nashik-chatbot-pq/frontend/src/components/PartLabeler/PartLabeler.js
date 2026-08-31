@@ -698,7 +698,7 @@ function PartLabeler() {
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
     const canvas = await html2canvas(element, {
-      scale: 1.5,
+      scale: 2,
       useCORS: true,
       backgroundColor: '#ffffff',
       foreignObjectRendering: false // true silently blanks out recharts' SVG (gradients/clip-paths)
@@ -2020,7 +2020,7 @@ function PartLabeler() {
                     <div className="cad-viewer centering">
                       <div className="image-wrapper">
                         <div className="cad-img-container" ref={imgRef} onClick={handleImageClick}>
-                          <img src={`${UPLOAD_BASE}/${selectedImage.filename}`} alt="CAD Drawing" className="cad-img" />
+                          <img src={`${UPLOAD_BASE}/${selectedImage.filename}`} alt="CAD Drawing" className="cad-img" crossOrigin="anonymous" />
                           {labels.map((label, index) => (
                             <React.Fragment key={label.id}>
                               <div className={`label-marker ${activePopup?.id === label.id ? 'active' : ''}`}
