@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm';
 import { fixMarkdownTables } from '../../utils/markdownUtils';
 import html2canvas from 'html2canvas';
 import PptxGenJS from 'pptxgenjs';
+import { jsPDF } from 'jspdf';
 import {
   ArrowLeft,
   Upload,
@@ -763,6 +764,83 @@ function PartLabeler() {
     });
   };
 
+  // Captures `element` and adds it as one page of `doc` (jsPDF), titled `pageTitle`.
+  // jsPDF has no native-chart equivalent, so every PDF page is a screenshot.
+  const addPdfImagePage = async (doc, element, pageTitle, { scale = 2, enhance = false, isFirstPage = false } = {}) => {
+    if (!element) return;
+    window.dispatchEvent(new Event('resize'));
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+    let canvas = await html2canvas(element, {
+      scale,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      foreignObjectRendering: false
+    });
+
+    if (enhance) {
+      const boosted = document.createElement('canvas');
+      boosted.width = canvas.width;
+      boosted.height = canvas.height;
+      const ctx = boosted.getContext('2d');
+      ctx.filter = 'saturate(1.25) contrast(1.08) brightness(1.02)';
+      ctx.drawImage(canvas, 0, 0);
+      canvas = boosted;
+    }
+
+    if (!isFirstPage) doc.addPage([13.33, 7.5], 'l');
+    doc.setFontSize(20);
+    doc.setTextColor(220, 0, 40);
+    doc.text(pageTitle, 0.3, 0.45);
+
+    const imgData = canvas.toDataURL('image/png');
+    const imgRatio = canvas.width / canvas.height;
+    const maxW = 12.73, maxH = 6.4;
+    let w = maxW, h = maxW / imgRatio;
+    if (h > maxH) { h = maxH; w = maxH * imgRatio; }
+    const x = 0.3 + (maxW - w) / 2;
+    doc.addImage(imgData, 'PNG', x, 0.75, w, h);
+  };
+
+  // One .pdf file PER component, mirroring the PPT export's structure:
+  // 1) overview screenshot, 2-5) each of the 4 charts on its own page.
+  const handleDownloadVisualPDF = async () => {
+    if (!labels.length) return;
+    setIsExportingPdf(true);
+    const previousPopup = activePopup;
+    try {
+      const dateStr = new Date().toISOString().slice(0, 10);
+
+      for (const label of labels) {
+        setActivePopup(label);
+        await Promise.all([
+          fetchDashboardData(label.partName),
+          fetchActivePartHistory(label)
+        ]);
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        const doc = new jsPDF({ orientation: 'l', unit: 'in', format: [13.33, 7.5] });
+        const viewConfig = allModeActiveSource ? DATA_SOURCES[allModeActiveSource.src] : sourceConfig;
+
+        await addPdfImagePage(doc, workspaceCaptureRef.current, label.partName, { scale: 3, enhance: true, isFirstPage: true });
+        await addPdfImagePage(doc, mfgMonthChartRef.current, `${label.partName} - ${viewConfig.chartTitles.mfgMonth}`);
+        await addPdfImagePage(doc, reportingMonthChartRef.current, `${label.partName} - ${viewConfig.chartTitles.reportingMonth}`);
+        await addPdfImagePage(doc, kmsChartRef.current, `${label.partName} - ${viewConfig.chartTitles.kms}`);
+        await addPdfImagePage(doc, regionChartRef.current, `${label.partName} - ${viewConfig.chartTitles.region}`, { scale: 3, enhance: true });
+
+        const safeName = label.partName.replace(/[^a-z0-9]+/gi, '_');
+        doc.save(`${safeName}_${dateStr}.pdf`);
+        await new Promise(resolve => setTimeout(resolve, 400));
+      }
+    } catch (err) {
+      console.error("Failed to generate PDF", err);
+      alert("Failed to generate PDF export");
+    } finally {
+      setActivePopup(previousPopup);
+      setIsExportingPdf(false);
+    }
+  };
+
   // One .pptx file PER component (not one combined deck): 1) the full CAD
   // image + all 4 charts together (the purple-boxed workspace area), 2-5)
   // each of the 4 charts again on its own slide. Sidebar/header never captured.
@@ -933,6 +1011,7 @@ function PartLabeler() {
   const kmsChartRef = useRef(null);
   const regionChartRef = useRef(null);
   const [isExportingPpt, setIsExportingPpt] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const [connectorPath, setConnectorPath] = useState("");
   const [expandedImageId, setExpandedImageId] = useState(null);
 
@@ -2224,17 +2303,9 @@ function PartLabeler() {
                                 params.append('format', 'csv');
                                 window.open(`${API_BASE}/download-warranty?${params.toString()}`, '_blank');
                               }}><Download size={14} /><span>CSV</span></button>
-                              <button className="download-csv-btn-integrated" onClick={() => {
-                                const params = new URLSearchParams();
-                                params.append('userId', userId);
-                                params.append('partName', activePopup.partName);
-                                filterMonth.forEach(m => params.append('month', m));
-                                filterModel.forEach(m => params.append('baseModel', m));
-                                filterMIS.forEach(m => params.append('misBucket', m));
-                                filterMfgQtr.forEach(m => params.append('mfgQtr', m));
-                                params.append('format', 'pdf');
-                                window.open(`${API_BASE}/download-warranty?${params.toString()}`, '_blank');
-                              }}><FileText size={14} /><span>PDF</span></button>
+                              <button className="download-csv-btn-integrated" onClick={handleDownloadVisualPDF} disabled={isExportingPdf || labels.length === 0} title="Overview page + 4 chart pages per component">
+                                <FileText size={14} /><span>{isExportingPdf ? 'Generating...' : 'PDF'}</span>
+                              </button>
                               <button className="download-csv-btn-integrated" onClick={handleDownloadVisualPPT} disabled={isExportingPpt || labels.length === 0} title="One slide per component: CAD snapshot + its 4 charts">
                                 <Presentation size={14} /><span>{isExportingPpt ? 'Generating...' : 'PPT'}</span>
                               </button>
