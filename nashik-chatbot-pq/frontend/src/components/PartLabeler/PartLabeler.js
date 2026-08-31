@@ -2208,16 +2208,16 @@ function PartLabeler() {
                     </div>
                   )}
                   <div className="dashboard-grid">
-                    <div ref={mfgMonthChartRef}>
+                    <div ref={mfgMonthChartRef} className="chart-capture-wrapper">
                       <CustomBarChart title={viewConfig.chartTitles.mfgMonth} data={dashboardData.mfgMonth} color="#f6ad55" icon={History} />
                     </div>
-                    <div ref={reportingMonthChartRef}>
+                    <div ref={reportingMonthChartRef} className="chart-capture-wrapper">
                       <CustomBarChart title={viewConfig.chartTitles.reportingMonth} data={dashboardData.reportingMonth} color="#68d391" icon={FileSpreadsheet} />
                     </div>
-                    <div ref={kmsChartRef}>
+                    <div ref={kmsChartRef} className="chart-capture-wrapper">
                       <CustomBarChart title={viewConfig.chartTitles.kms} data={dashboardData.kms} color="#76e4f7" icon={Activity} />
                     </div>
-                    <div ref={regionChartRef}>
+                    <div ref={regionChartRef} className="chart-capture-wrapper">
                       {viewConfig.useMapForRegion ? (
                         <div className="dashboard-chart-card">
                           <div className="chart-header"><MapIcon size={16} /><span>{viewConfig.chartTitles.region}</span></div>

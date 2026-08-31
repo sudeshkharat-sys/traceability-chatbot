@@ -799,6 +799,20 @@
   min-height: 0;
 }
 
+/* Wraps each chart for individual PPT capture without breaking the grid's
+   stretch sizing that .dashboard-chart-card needs to size its chart height. */
+.chart-capture-wrapper {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.chart-capture-wrapper > * {
+  flex: 1;
+  min-height: 0;
+}
+
 .chart-header {
   display: flex;
   align-items: center;
