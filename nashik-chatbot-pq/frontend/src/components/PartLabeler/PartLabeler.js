@@ -23,6 +23,7 @@ import {
   Database,
   FileSpreadsheet,
   FileText,
+  Presentation,
   Layers,
   Map as MapIcon,
   Activity,
@@ -2102,6 +2103,17 @@ function PartLabeler() {
                                 params.append('format', 'pdf');
                                 window.open(`${API_BASE}/download-warranty?${params.toString()}`, '_blank');
                               }}><FileText size={14} /><span>PDF</span></button>
+                              <button className="download-csv-btn-integrated" onClick={() => {
+                                const params = new URLSearchParams();
+                                params.append('userId', userId);
+                                params.append('partName', activePopup.partName);
+                                filterMonth.forEach(m => params.append('month', m));
+                                filterModel.forEach(m => params.append('baseModel', m));
+                                filterMIS.forEach(m => params.append('misBucket', m));
+                                filterMfgQtr.forEach(m => params.append('mfgQtr', m));
+                                params.append('format', 'pptx');
+                                window.open(`${API_BASE}/download-warranty?${params.toString()}`, '_blank');
+                              }}><Presentation size={14} /><span>PPT</span></button>
                             </div>
                           </div>
                         </motion.div>

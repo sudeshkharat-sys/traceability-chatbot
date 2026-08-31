@@ -34,6 +34,7 @@ openpyxl
 aiofiles
 python-json-logger
 reportlab
+python-pptx
 
 # Development Tools
 pytest

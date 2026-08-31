@@ -112,7 +112,7 @@ async def download_warranty(
     baseModel: Optional[list[str]] = Query(None),
     misBucket: Optional[list[str]] = Query(None),
     mfgQtr: Optional[list[str]] = Query(None),
-    format: str = Query("csv", pattern="^(csv|pdf)$")
+    format: str = Query("csv", pattern="^(csv|pdf|pptx)$")
 ):
     from fastapi.responses import StreamingResponse
     import io
@@ -124,6 +124,14 @@ async def download_warranty(
                 io.BytesIO(pdf_bytes),
                 media_type="application/pdf",
                 headers={"Content-Disposition": f"attachment; filename={safe_name}_warranty_data.pdf"}
+            )
+
+        if format == "pptx":
+            pptx_bytes = get_service().get_detailed_warranty_pptx(userId, partName, month, baseModel, misBucket, mfgQtr)
+            return StreamingResponse(
+                io.BytesIO(pptx_bytes),
+                media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                headers={"Content-Disposition": f"attachment; filename={safe_name}_warranty_data.pptx"}
             )
 
         csv_data = get_service().get_detailed_warranty_csv(userId, partName, month, baseModel, misBucket, mfgQtr)
