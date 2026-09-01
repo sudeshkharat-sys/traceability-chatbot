@@ -2503,27 +2503,32 @@ function PartLabeler() {
             display: 'flex', gap: '24px', padding: '20px', boxSizing: 'border-box'
           }}
         >
-          <div style={{ position: 'relative', flex: '0 0 68%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img
-              src={`${UPLOAD_BASE}/${selectedImage.filename}`}
-              alt="CAD Drawing"
-              crossOrigin="anonymous"
-              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-            />
-            {labels.map((label, index) => (
-              <div
-                key={label.id}
-                style={{
-                  position: 'absolute', left: `${label.x}%`, top: `${label.y}%`,
-                  transform: 'translate(-50%, -50%)',
-                  width: '30px', height: '30px', borderRadius: '50%',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '14px', fontWeight: 700, color: '#fff',
-                  background: activePopup?.id === label.id ? '#1a2b4c' : '#DC0028',
-                  border: '2px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,0.3)'
-                }}
-              >{index + 1}</div>
-            ))}
+          <div style={{ flex: '0 0 68%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {/* This inner box shrink-wraps to the image's actual rendered size
+                (like .cad-img-container does live) so the marker percentages
+                below land on the real image bounds, not the outer flex slot. */}
+            <div style={{ position: 'relative', display: 'inline-flex', maxWidth: '100%', maxHeight: '100%' }}>
+              <img
+                src={`${UPLOAD_BASE}/${selectedImage.filename}`}
+                alt="CAD Drawing"
+                crossOrigin="anonymous"
+                style={{ display: 'block', maxWidth: '920px', maxHeight: '580px', objectFit: 'contain' }}
+              />
+              {labels.map((label, index) => (
+                <div
+                  key={label.id}
+                  style={{
+                    position: 'absolute', left: `${label.x}%`, top: `${label.y}%`,
+                    transform: 'translate(-50%, -50%)',
+                    width: '30px', height: '30px', borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '14px', fontWeight: 700, color: '#fff',
+                    background: activePopup?.id === label.id ? '#1a2b4c' : '#DC0028',
+                    border: '2px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,0.3)'
+                  }}
+                >{index + 1}</div>
+              ))}
+            </div>
           </div>
           <div style={{ flex: '0 0 30%', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '14px' }}>
             <h2 style={{ margin: 0, color: '#DC0028', fontSize: '32px', fontWeight: 800 }}>{activePopup?.partName}</h2>
