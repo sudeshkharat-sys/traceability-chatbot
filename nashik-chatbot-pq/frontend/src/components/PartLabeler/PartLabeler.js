@@ -793,7 +793,8 @@ function PartLabeler() {
         // No native PPT map-chart type exists, so this one stays a screenshot
         // (contrast-boosted, stretched to fill the same box as the other 3
         // cards so it doesn't look small/dull next to them).
-        const map = await captureElement(regionChartRef.current, { scale: 2.5, enhance: true });
+        // Capture the large off-screen render, not the small on-screen widget
+        const map = await captureElement(pptMapRef.current, { scale: 3, enhance: true });
         if (map) {
           slide.addImage({ data: map.data, x: x + 0.1, y: chartY, w: chartW - 0.2, h: chartH - 0.15 });
         } else {
@@ -967,6 +968,7 @@ function PartLabeler() {
   const workspaceCaptureRef = useRef(null);
   const detailCardRef = useRef(null);
   const pptTopSectionRef = useRef(null);
+  const pptMapRef = useRef(null);
   const mfgMonthChartRef = useRef(null);
   const reportingMonthChartRef = useRef(null);
   const kmsChartRef = useRef(null);
@@ -2569,6 +2571,22 @@ function PartLabeler() {
           </div>
         </div>
       )}
+
+      {/* Off-screen, PPT-only map render. The on-screen map widget is only
+          ~300px wide, so capturing that and upscaling looks soft. The map is
+          SVG, so re-rendering it large here yields real detail instead of an
+          upscaled blur. Sized to the slide's chart box ratio (~0.94) so it
+          fills the card without distortion. */}
+      <div
+        ref={pptMapRef}
+        style={{
+          position: 'fixed', top: '-10000px', left: '-10000px',
+          width: '760px', height: '810px', background: '#ffffff',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', boxSizing: 'border-box'
+        }}
+      >
+        <IndiaMap data={dashboardData.region || []} />
+      </div>
     </div>
   );
 }
