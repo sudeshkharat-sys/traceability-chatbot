@@ -717,10 +717,8 @@ function PartLabeler() {
   };
 
   // One slide, ONE component, top to bottom:
-  // 1) title, 2) bigger CAD image (annotated, no table/buttons - built from
-  // the dedicated off-screen pptTopSectionRef template), 3) an info strip
-  // (name / primary concern / failures) as native PPT text - crisp at any
-  // size, unlike baking it into a screenshot, 4) all 4 "wise data" charts,
+  // 1) title, 2) CAD image (left) + component detail as native PPT text
+  // (right, top-right corner) side by side, 3) all 4 "wise data" charts,
   // same size/shape, all native PPT charts (no map - PowerPoint has no
   // native map-chart type, so region uses the same data as a bar chart too).
   const addComponentSlide = async (pptx, label, viewConfig) => {
@@ -731,24 +729,30 @@ function PartLabeler() {
       fontSize: 18, bold: true, color: 'DC0028'
     });
 
+    // Top row: image on the left (~68%), detail panel on the right (~30%)
+    const topY = 0.5, topH = 2.85;
+    const imgAreaW = 8.6, panelX = 0.3 + imgAreaW + 0.2, panelW = 12.73 - imgAreaW - 0.2;
+
     const top = await captureElement(pptTopSectionRef.current, { scale: 2.5, enhance: true });
     if (top) {
-      const maxW = 12.73, maxH = 2.55;
       const ratio = top.width / top.height;
-      let w = maxW, h = maxW / ratio;
-      if (h > maxH) { h = maxH; w = maxH * ratio; }
-      slide.addImage({ data: top.data, x: 0.3 + (maxW - w) / 2, y: 0.48, w, h });
+      let w = imgAreaW, h = w / ratio;
+      if (h > topH) { h = topH; w = h * ratio; }
+      slide.addImage({ data: top.data, x: 0.3 + (imgAreaW - w) / 2, y: topY, w, h });
     }
 
-    // Shared header zone above all 4 chart boxes. Columns 1-3 just get a
-    // title right above their chart (blank space above that); column 4
-    // (region) additionally gets the component detail text stacked above
-    // ITS title, in the same reserved zone - so every chart box below ends
-    // up the exact same size/shape, and the detail text stays confined to
-    // the RHS column instead of spanning the full width.
-    const headerY = 3.1, chartY = 4.85, chartH = 2.3, gap = 0.15, chartW = (12.73 - 3 * gap) / 4;
     const filterLabel = filterMonth.includes('All') ? 'Annual' : (filterMonth.length === 1 ? filterMonth[0] : 'Multiple');
+    slide.addText([{ text: 'COMPONENT\n', options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: label.partName, options: { fontSize: 18, bold: true, color: 'DC0028' } }],
+      { x: panelX, y: topY, w: panelW, h: 0.65, valign: 'top' });
+    slide.addText([{ text: 'PRIMARY CONCERN\n', options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: currentDescription || '-', options: { fontSize: 12, color: '2d3748' } }],
+      { x: panelX, y: topY + 0.75, w: panelW, h: 1.1, valign: 'top', wrap: true, fit: 'shrink' });
+    slide.addText([{ text: `${filterLabel.toUpperCase()} FAILURES\n`, options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: String(currentMonthFailures), options: { fontSize: 26, bold: true, color: '1a2b4c' } }],
+      { x: panelX, y: topY + 1.95, w: panelW, h: 0.8, valign: 'top' });
 
+    // 4 uniform charts, same size/shape, in a row below - back to the
+    // pre-styling-pass sizing (chartH 3.2, title 0.3 above each chart),
+    // keeping the card/shadow/gridline polish from the styling pass.
+    const chartY = 3.95, chartH = 3.2, gap = 0.15, chartW = (12.73 - 3 * gap) / 4;
     const chartDefs = [
       { data: dashboardData.mfgMonth, title: viewConfig.chartTitles.mfgMonth, color: 'f6ad55' },
       { data: dashboardData.reportingMonth, title: viewConfig.chartTitles.reportingMonth, color: '68d391' },
@@ -773,24 +777,14 @@ function PartLabeler() {
     chartDefs.forEach((def, i) => {
       const x = 0.3 + i * (chartW + gap);
 
-      // Card background behind the chart (title + plot area)
+      // Card background behind the title + plot area
       slide.addShape(pptx.ShapeType.roundRect, {
-        x, y: headerY, w: chartW, h: (chartY + chartH) - headerY,
+        x, y: chartY - 0.32, w: chartW, h: chartH + 0.32,
         rectRadius: 0.06, fill: { color: 'ffffff' }, line: { color: 'e2e8f0', width: 0.75 },
         shadow: { type: 'outer', color: '000000', opacity: 0.08, blur: 6, offset: 2, angle: 90 }
       });
 
-      if (i === 3) {
-        // Region column: component detail stacked above its title/chart
-        slide.addText([{ text: 'COMPONENT\n', options: { fontSize: 6.5, bold: true, color: '7f8c8d' } }, { text: label.partName, options: { fontSize: 11, bold: true, color: 'DC0028' } }],
-          { x: x + 0.1, y: headerY + 0.06, w: chartW - 0.2, h: 0.4, valign: 'top' });
-        slide.addText([{ text: 'PRIMARY CONCERN\n', options: { fontSize: 6.5, bold: true, color: '7f8c8d' } }, { text: currentDescription || '-', options: { fontSize: 7.5, color: '2d3748' } }],
-          { x: x + 0.1, y: headerY + 0.48, w: chartW - 0.2, h: 0.55, valign: 'top', wrap: true, fit: 'shrink' });
-        slide.addText([{ text: `${filterLabel.toUpperCase()} FAILURES  `, options: { fontSize: 6.5, bold: true, color: '7f8c8d' } }, { text: String(currentMonthFailures), options: { fontSize: 12, bold: true, color: '1a2b4c' } }],
-          { x: x + 0.1, y: headerY + 1.05, w: chartW - 0.2, h: 0.3, valign: 'top' });
-      }
-
-      slide.addText(def.title, { x: x + 0.1, y: chartY - 0.32, w: chartW - 0.2, h: 0.28, fontSize: 8.5, bold: true, color: 'DC0028' });
+      slide.addText(def.title, { x: x + 0.1, y: chartY - 0.32, w: chartW - 0.2, h: 0.28, fontSize: 9, bold: true, color: 'DC0028' });
 
       if (def.data && def.data.length > 0) {
         slide.addChart(pptx.ChartType.bar, [{
@@ -803,7 +797,7 @@ function PartLabeler() {
           ...chartStyle
         });
       } else {
-        slide.addText('No data', { x, y: chartY + chartH / 2 - 0.2, w: chartW, h: 0.4, fontSize: 9, align: 'center', color: '888888' });
+        slide.addText('No data', { x, y: chartY + chartH / 2 - 0.2, w: chartW, h: 0.4, fontSize: 10, align: 'center', color: '888888' });
       }
     });
   };
