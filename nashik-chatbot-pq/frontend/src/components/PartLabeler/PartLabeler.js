@@ -690,12 +690,9 @@ function PartLabeler() {
   };
 
   // Adds one slide to `pptx` from a screenshot of `element`, titled `slideTitle`.
-  // `scale` raises capture resolution; `enhance` applies a light contrast/
-  // saturation boost so a flat screenshot doesn't look washed-out in the deck.
-  const addCaptureSlide = async (pptx, element, slideTitle, { scale = 2, enhance = false } = {}) => {
-    if (!element) return;
-    // Nudge recharts' ResponsiveContainer to (re)measure before we snapshot -
-    // without this, charts can capture blank if their SVG hadn't sized yet.
+  // Screenshots `element` and returns its raw image data + pixel size.
+  const captureElement = async (element, { scale = 2, enhance = false } = {}) => {
+    if (!element) return null;
     window.dispatchEvent(new Event('resize'));
     await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
@@ -716,62 +713,88 @@ function PartLabeler() {
       canvas = boosted;
     }
 
-    const imgData = canvas.toDataURL('image/png');
-
-    const slide = pptx.addSlide();
-    slide.addText(slideTitle, {
-      x: 0.3, y: 0.1, w: 12.73, h: 0.5,
-      fontSize: 20, bold: true, color: 'DC0028'
-    });
-
-    const imgRatio = canvas.width / canvas.height;
-    const maxW = 12.73, maxH = 6.4;
-    let w = maxW, h = maxW / imgRatio;
-    if (h > maxH) { h = maxH; w = maxH * imgRatio; }
-    const x = 0.3 + (maxW - w) / 2;
-    slide.addImage({ data: imgData, x, y: 0.75, w, h });
+    return { data: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height };
   };
 
-  // Adds one slide with a native, editable PPT bar chart (not a screenshot) -
-  // sharp at any zoom, unlike addCaptureSlide's rasterized image.
-  const addNativeBarChartSlide = (pptx, dataArr, slideTitle, hexColor) => {
+  // One slide, ONE component: top = bigger CAD image (annotated) + a clean
+  // name/primary-concern/failures panel (no table, no download buttons - that's
+  // the dedicated off-screen pptTopSectionRef template, not the live popup).
+  // Bottom = all 4 "wise data" charts in a row (native PPT charts where
+  // possible; the region chart falls back to a screenshot only for the map).
+  const addComponentSlide = async (pptx, label, viewConfig) => {
     const slide = pptx.addSlide();
-    slide.addText(slideTitle, {
-      x: 0.3, y: 0.1, w: 12.73, h: 0.5,
-      fontSize: 20, bold: true, color: 'DC0028'
-    });
 
-    if (!dataArr || dataArr.length === 0) {
-      slide.addText('No data found', { x: 0.3, y: 3.3, w: 12.73, h: 0.6, fontSize: 16, align: 'center', color: '888888' });
-      return;
+    const top = await captureElement(pptTopSectionRef.current, { scale: 2.5, enhance: true });
+    if (top) {
+      const maxW = 12.73, maxH = 3.1;
+      const ratio = top.width / top.height;
+      let w = maxW, h = maxW / ratio;
+      if (h > maxH) { h = maxH; w = maxH * ratio; }
+      slide.addImage({ data: top.data, x: 0.3 + (maxW - w) / 2, y: 0.2, w, h });
     }
 
-    slide.addChart(pptx.ChartType.bar, [{
-      name: slideTitle,
-      labels: dataArr.map(d => String(d.label)),
-      values: dataArr.map(d => Number(d.value) || 0)
-    }], {
-      x: 0.3, y: 0.75, w: 12.73, h: 6.4,
-      barDir: 'col',
-      chartColors: [hexColor.replace('#', '')],
-      showLegend: false,
-      showValue: true,
-      dataLabelPosition: 'outEnd',
-      catAxisLabelFontSize: 10,
-      valAxisLabelFontSize: 10,
-      valAxisMinVal: 0
+    const chartY = 3.55, chartH = 3.6, gap = 0.15, chartW = (12.73 - 3 * gap) / 4;
+    const chartDefs = [
+      { data: dashboardData.mfgMonth, title: viewConfig.chartTitles.mfgMonth, color: '#f6ad55' },
+      { data: dashboardData.reportingMonth, title: viewConfig.chartTitles.reportingMonth, color: '#68d391' },
+      { data: dashboardData.kms, title: viewConfig.chartTitles.kms, color: '#76e4f7' }
+    ];
+
+    chartDefs.forEach((def, i) => {
+      const x = 0.3 + i * (chartW + gap);
+      slide.addText(def.title, { x, y: chartY, w: chartW, h: 0.3, fontSize: 9, bold: true, color: 'DC0028' });
+      if (def.data && def.data.length > 0) {
+        slide.addChart(pptx.ChartType.bar, [{
+          name: def.title,
+          labels: def.data.map(d => String(d.label)),
+          values: def.data.map(d => Number(d.value) || 0)
+        }], {
+          x, y: chartY + 0.3, w: chartW, h: chartH - 0.3,
+          barDir: 'col', chartColors: [def.color.replace('#', '')],
+          showLegend: false, showValue: true, dataLabelPosition: 'outEnd',
+          catAxisLabelFontSize: 7, valAxisLabelFontSize: 7, valAxisMinVal: 0
+        });
+      } else {
+        slide.addText('No data', { x, y: chartY + 1.5, w: chartW, h: 0.4, fontSize: 10, align: 'center', color: '888888' });
+      }
     });
+
+    // 4th slot: region - native bar chart, or a screenshot when it's the map (no native equivalent)
+    const regionX = 0.3 + 3 * (chartW + gap);
+    slide.addText(viewConfig.chartTitles.region, { x: regionX, y: chartY, w: chartW, h: 0.3, fontSize: 9, bold: true, color: 'DC0028' });
+    if (viewConfig.useMapForRegion) {
+      const map = await captureElement(regionChartRef.current, { scale: 2.5, enhance: true });
+      if (map) {
+        const ratio = map.width / map.height;
+        let w = chartW, h = w / ratio;
+        if (h > chartH - 0.3) { h = chartH - 0.3; w = h * ratio; }
+        slide.addImage({ data: map.data, x: regionX + (chartW - w) / 2, y: chartY + 0.3, w, h });
+      }
+    } else if (dashboardData.region && dashboardData.region.length > 0) {
+      slide.addChart(pptx.ChartType.bar, [{
+        name: viewConfig.chartTitles.region,
+        labels: dashboardData.region.map(d => String(d.label)),
+        values: dashboardData.region.map(d => Number(d.value) || 0)
+      }], {
+        x: regionX, y: chartY + 0.3, w: chartW, h: chartH - 0.3,
+        barDir: 'col', chartColors: ['667eea'],
+        showLegend: false, showValue: true, dataLabelPosition: 'outEnd',
+        catAxisLabelFontSize: 7, valAxisLabelFontSize: 7, valAxisMinVal: 0
+      });
+    } else {
+      slide.addText('No data', { x: regionX, y: chartY + 1.5, w: chartW, h: 0.4, fontSize: 10, align: 'center', color: '888888' });
+    }
   };
 
-  // One .pptx file PER component (not one combined deck): 1) the full CAD
-  // image + all 4 charts together (the purple-boxed workspace area), 2-5)
-  // each of the 4 charts again on its own slide. Sidebar/header never captured.
+  // ONE .pptx file covering every mapped component: one slide each, per
+  // addComponentSlide above. Sidebar/header/table/buttons are never captured.
   const handleDownloadVisualPPT = async () => {
     if (!labels.length) return;
     setIsExportingPpt(true);
     const previousPopup = activePopup;
     try {
-      const dateStr = new Date().toISOString().slice(0, 10);
+      const pptx = new PptxGenJS();
+      pptx.layout = 'LAYOUT_WIDE'; // 13.33" x 7.5"
 
       for (const label of labels) {
         setActivePopup(label);
@@ -782,26 +805,12 @@ function PartLabeler() {
         // let React re-render and the recharts animation settle before capture
         await new Promise(resolve => setTimeout(resolve, 800));
 
-        const pptx = new PptxGenJS();
-        pptx.layout = 'LAYOUT_WIDE'; // 13.33" x 7.5"
         const viewConfig = allModeActiveSource ? DATA_SOURCES[allModeActiveSource.src] : sourceConfig;
-
-        await addCaptureSlide(pptx, workspaceCaptureRef.current, label.partName, { scale: 3, enhance: true });
-        addNativeBarChartSlide(pptx, dashboardData.mfgMonth, `${label.partName} - ${viewConfig.chartTitles.mfgMonth}`, '#f6ad55');
-        addNativeBarChartSlide(pptx, dashboardData.reportingMonth, `${label.partName} - ${viewConfig.chartTitles.reportingMonth}`, '#68d391');
-        addNativeBarChartSlide(pptx, dashboardData.kms, `${label.partName} - ${viewConfig.chartTitles.kms}`, '#76e4f7');
-        if (viewConfig.useMapForRegion) {
-          // no native "PPT map chart" equivalent - keep this one as a screenshot
-          await addCaptureSlide(pptx, regionChartRef.current, `${label.partName} - ${viewConfig.chartTitles.region}`, { scale: 3, enhance: true });
-        } else {
-          addNativeBarChartSlide(pptx, dashboardData.region, `${label.partName} - ${viewConfig.chartTitles.region}`, '#667eea');
-        }
-
-        const safeName = label.partName.replace(/[^a-z0-9]+/gi, '_');
-        await pptx.writeFile({ fileName: `${safeName}_${dateStr}.pptx` });
-        // small gap so the browser doesn't block/merge back-to-back downloads
-        await new Promise(resolve => setTimeout(resolve, 400));
+        await addComponentSlide(pptx, label, viewConfig);
       }
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      await pptx.writeFile({ fileName: `PartsVisualizer_${dateStr}.pptx` });
     } catch (err) {
       console.error("Failed to generate PPT", err);
       alert("Failed to generate PPT export");
@@ -928,6 +937,7 @@ function PartLabeler() {
   const warrantyInputRef = useRef(null);
   const workspaceCaptureRef = useRef(null);
   const detailCardRef = useRef(null);
+  const pptTopSectionRef = useRef(null);
   const mfgMonthChartRef = useRef(null);
   const reportingMonthChartRef = useRef(null);
   const kmsChartRef = useRef(null);
@@ -1782,6 +1792,9 @@ function PartLabeler() {
             <button className={`sidebar-btn secondary ${isSummaryActive ? 'active' : ''}`} onClick={handleShowAll} disabled={isLoading || !selectedImage}>
               <BarChart2 size={18} /><span>{isSummaryActive ? 'Hide Visuals' : 'Show Visuals'}</span>
             </button>
+            <button className="sidebar-btn secondary" onClick={handleDownloadVisualPPT} disabled={isExportingPpt || !selectedImage || labels.length === 0} title="One combined PPT: one slide per component">
+              <Presentation size={18} /><span>{isExportingPpt ? 'Generating PPT...' : 'Download PPT'}</span>
+            </button>
           </div>
           <div className="sidebar-section">
             <h3 className="section-title">CAD Drawings</h3>
@@ -2224,9 +2237,6 @@ function PartLabeler() {
                                 params.append('format', 'csv');
                                 window.open(`${API_BASE}/download-warranty?${params.toString()}`, '_blank');
                               }}><Download size={14} /><span>CSV</span></button>
-                              <button className="download-csv-btn-integrated" onClick={handleDownloadVisualPPT} disabled={isExportingPpt || labels.length === 0} title="One slide per component: CAD snapshot + its 4 charts">
-                                <Presentation size={14} /><span>{isExportingPpt ? 'Generating...' : 'PPT'}</span>
-                              </button>
                             </div>
                           </div>
                         </motion.div>
@@ -2480,6 +2490,56 @@ function PartLabeler() {
         </AnimatePresence>
 
       </div>
+
+      {/* Off-screen, PPT-only layout: bigger CAD image + a clean name/concern/
+          failures panel (no Mapped Components table, no download buttons).
+          Rendered off-screen (not display:none) so html2canvas can capture it. */}
+      {selectedImage && (
+        <div
+          ref={pptTopSectionRef}
+          style={{
+            position: 'fixed', top: '-10000px', left: '-10000px',
+            width: '1400px', height: '620px', background: '#ffffff',
+            display: 'flex', gap: '24px', padding: '20px', boxSizing: 'border-box'
+          }}
+        >
+          <div style={{ position: 'relative', flex: '0 0 68%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <img
+              src={`${UPLOAD_BASE}/${selectedImage.filename}`}
+              alt="CAD Drawing"
+              crossOrigin="anonymous"
+              style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
+            />
+            {labels.map((label, index) => (
+              <div
+                key={label.id}
+                style={{
+                  position: 'absolute', left: `${label.x}%`, top: `${label.y}%`,
+                  transform: 'translate(-50%, -50%)',
+                  width: '30px', height: '30px', borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '14px', fontWeight: 700, color: '#fff',
+                  background: activePopup?.id === label.id ? '#1a2b4c' : '#DC0028',
+                  border: '2px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,0.3)'
+                }}
+              >{index + 1}</div>
+            ))}
+          </div>
+          <div style={{ flex: '0 0 30%', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '14px' }}>
+            <h2 style={{ margin: 0, color: '#DC0028', fontSize: '32px', fontWeight: 800 }}>{activePopup?.partName}</h2>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#7f8c8d', textTransform: 'uppercase' }}>Primary Concern</div>
+              <p style={{ margin: '4px 0 0', fontSize: '18px', color: '#2d3748' }}>{currentDescription}</p>
+            </div>
+            <div>
+              <div style={{ fontSize: '13px', fontWeight: 700, color: '#7f8c8d', textTransform: 'uppercase' }}>
+                {filterMonth.includes('All') ? 'Annual' : (filterMonth.length === 1 ? filterMonth[0] : 'Multiple')}
+              </div>
+              <div style={{ fontSize: '48px', fontWeight: 800, color: '#1a2b4c' }}>{currentMonthFailures}<span style={{ fontSize: '18px', fontWeight: 600, color: '#7f8c8d', marginLeft: '10px' }}>Failures</span></div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
