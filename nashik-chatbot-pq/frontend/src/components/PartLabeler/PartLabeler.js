@@ -740,45 +740,70 @@ function PartLabeler() {
       slide.addImage({ data: top.data, x: 0.3 + (maxW - w) / 2, y: 0.48, w, h });
     }
 
-    // Info strip - full width, above the chart row
-    const infoY = 3.15;
+    // Shared header zone above all 4 chart boxes. Columns 1-3 just get a
+    // title right above their chart (blank space above that); column 4
+    // (region) additionally gets the component detail text stacked above
+    // ITS title, in the same reserved zone - so every chart box below ends
+    // up the exact same size/shape, and the detail text stays confined to
+    // the RHS column instead of spanning the full width.
+    const headerY = 3.1, chartY = 4.85, chartH = 2.3, gap = 0.15, chartW = (12.73 - 3 * gap) / 4;
     const filterLabel = filterMonth.includes('All') ? 'Annual' : (filterMonth.length === 1 ? filterMonth[0] : 'Multiple');
-    const nameW = 2.4, failW = 2.6, concernW = 12.73 - nameW - failW - 0.3;
-    const concernX = 0.3 + nameW + 0.15, failX = concernX + concernW + 0.15;
 
-    slide.addText([{ text: 'COMPONENT\n', options: { fontSize: 7, bold: true, color: '7f8c8d' } }, { text: label.partName, options: { fontSize: 14, bold: true, color: 'DC0028' } }],
-      { x: 0.3, y: infoY, w: nameW, h: 0.65, valign: 'top' });
-    slide.addText([{ text: 'PRIMARY CONCERN\n', options: { fontSize: 7, bold: true, color: '7f8c8d' } }, { text: currentDescription || '-', options: { fontSize: 10, color: '2d3748' } }],
-      { x: concernX, y: infoY, w: concernW, h: 0.65, valign: 'top', wrap: true, fit: 'shrink' });
-    slide.addText([{ text: `${filterLabel.toUpperCase()} FAILURES\n`, options: { fontSize: 7, bold: true, color: '7f8c8d' } }, { text: String(currentMonthFailures), options: { fontSize: 18, bold: true, color: '1a2b4c' } }],
-      { x: failX, y: infoY, w: failW, h: 0.65, valign: 'top' });
-
-    // 4 uniform charts, same size/shape, in a row below the info strip
-    const chartY = 3.95, chartH = 3.2, gap = 0.15, chartW = (12.73 - 3 * gap) / 4;
     const chartDefs = [
-      { data: dashboardData.mfgMonth, title: viewConfig.chartTitles.mfgMonth, color: '#f6ad55' },
-      { data: dashboardData.reportingMonth, title: viewConfig.chartTitles.reportingMonth, color: '#68d391' },
-      { data: dashboardData.kms, title: viewConfig.chartTitles.kms, color: '#76e4f7' },
-      { data: dashboardData.region, title: viewConfig.chartTitles.region, color: '#667eea' }
+      { data: dashboardData.mfgMonth, title: viewConfig.chartTitles.mfgMonth, color: 'f6ad55' },
+      { data: dashboardData.reportingMonth, title: viewConfig.chartTitles.reportingMonth, color: '68d391' },
+      { data: dashboardData.kms, title: viewConfig.chartTitles.kms, color: '76e4f7' },
+      { data: dashboardData.region, title: viewConfig.chartTitles.region, color: '667eea' }
     ];
+
+    // Styling pass so these read as designed cards, not a default PPT chart:
+    // a light card background + shadow behind each chart, muted gridlines,
+    // thin axis lines, tighter bar gap, gray data labels instead of default black.
+    const chartStyle = {
+      showLegend: false, showValue: true, dataLabelPosition: 'outEnd',
+      dataLabelColor: '7f8c8d', dataLabelFontSize: 7,
+      catAxisLabelFontSize: 7, valAxisLabelFontSize: 7, valAxisMinVal: 0,
+      catAxisLabelRotate: 45, // long month labels ("Jan-2026") would overlap unrotated at this width
+      catAxisLineColor: 'd8dde3', valAxisLineColor: 'd8dde3', catAxisLineShow: true, valAxisLineShow: false,
+      valGridLine: { color: 'eef1f4', style: 'solid', size: 0.75 },
+      catGridLine: { style: 'none' },
+      barGapWidthPct: 35
+    };
 
     chartDefs.forEach((def, i) => {
       const x = 0.3 + i * (chartW + gap);
-      slide.addText(def.title, { x, y: chartY, w: chartW, h: 0.3, fontSize: 9, bold: true, color: 'DC0028' });
+
+      // Card background behind the chart (title + plot area)
+      slide.addShape(pptx.ShapeType.roundRect, {
+        x, y: headerY, w: chartW, h: (chartY + chartH) - headerY,
+        rectRadius: 0.06, fill: { color: 'ffffff' }, line: { color: 'e2e8f0', width: 0.75 },
+        shadow: { type: 'outer', color: '000000', opacity: 0.08, blur: 6, offset: 2, angle: 90 }
+      });
+
+      if (i === 3) {
+        // Region column: component detail stacked above its title/chart
+        slide.addText([{ text: 'COMPONENT\n', options: { fontSize: 6.5, bold: true, color: '7f8c8d' } }, { text: label.partName, options: { fontSize: 11, bold: true, color: 'DC0028' } }],
+          { x: x + 0.1, y: headerY + 0.06, w: chartW - 0.2, h: 0.4, valign: 'top' });
+        slide.addText([{ text: 'PRIMARY CONCERN\n', options: { fontSize: 6.5, bold: true, color: '7f8c8d' } }, { text: currentDescription || '-', options: { fontSize: 7.5, color: '2d3748' } }],
+          { x: x + 0.1, y: headerY + 0.48, w: chartW - 0.2, h: 0.55, valign: 'top', wrap: true, fit: 'shrink' });
+        slide.addText([{ text: `${filterLabel.toUpperCase()} FAILURES  `, options: { fontSize: 6.5, bold: true, color: '7f8c8d' } }, { text: String(currentMonthFailures), options: { fontSize: 12, bold: true, color: '1a2b4c' } }],
+          { x: x + 0.1, y: headerY + 1.05, w: chartW - 0.2, h: 0.3, valign: 'top' });
+      }
+
+      slide.addText(def.title, { x: x + 0.1, y: chartY - 0.32, w: chartW - 0.2, h: 0.28, fontSize: 8.5, bold: true, color: 'DC0028' });
+
       if (def.data && def.data.length > 0) {
         slide.addChart(pptx.ChartType.bar, [{
           name: def.title,
           labels: def.data.map(d => String(d.label)),
           values: def.data.map(d => Number(d.value) || 0)
         }], {
-          x, y: chartY + 0.3, w: chartW, h: chartH - 0.3,
-          barDir: 'col', chartColors: [def.color.replace('#', '')],
-          showLegend: false, showValue: true, dataLabelPosition: 'outEnd',
-          catAxisLabelFontSize: 7, valAxisLabelFontSize: 7, valAxisMinVal: 0,
-          catAxisLabelRotate: 45 // long month labels ("Jan-2026") would overlap unrotated at this width
+          x: x + 0.1, y: chartY, w: chartW - 0.2, h: chartH - 0.15,
+          barDir: 'col', chartColors: [def.color],
+          ...chartStyle
         });
       } else {
-        slide.addText('No data', { x, y: chartY + 1.5, w: chartW, h: 0.4, fontSize: 10, align: 'center', color: '888888' });
+        slide.addText('No data', { x, y: chartY + chartH / 2 - 0.2, w: chartW, h: 0.4, fontSize: 9, align: 'center', color: '888888' });
       }
     });
   };
