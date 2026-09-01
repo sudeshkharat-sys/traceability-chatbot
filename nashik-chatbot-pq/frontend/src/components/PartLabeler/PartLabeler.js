@@ -442,11 +442,7 @@ const CustomBarChart = ({ title, data, color, icon: Icon }) => (
   </div>
 );
 
-// `forExport` tweaks the map for the PPT screenshot: same light fills as the
-// UI, but a darker boundary line so state outlines stay crisp against a white
-// slide, plus the failure count printed on each state - a static image can't
-// show the hover tooltip the live dashboard has.
-const IndiaMap = ({ data, forExport = false }) => {
+const IndiaMap = ({ data }) => {
   const [hoveredState, setHoveredState] = useState(null);
   const maxValue = Math.max(...data.map(d => d.value), 1);
   const colorScale = scaleLinear().domain([0, maxValue]).range(["#f0fdf4", "#166534"]);
@@ -460,46 +456,24 @@ const IndiaMap = ({ data, forExport = false }) => {
             height={400}
             style={{ width: "100%", height: "100%", maxWidth: "100%", maxHeight: "100%" }}
           >        <Geographies geography={INDIA_TOPO_JSON}>
-          {({ geographies, path }) =>
+          {({ geographies }) =>
             geographies.map((geo) => {
               const stateName = geo.properties.st_nm || geo.properties.ST_NM;
               const match = data.find(d => d.label.toLowerCase() === stateName?.toLowerCase());
               const count = match ? match.value : 0;
-              // Label position: centre of the state, in SVG coords
-              const centroid = forExport && count > 0 && path ? path.centroid(geo) : null;
-              const hasCentroid = centroid && !isNaN(centroid[0]) && !isNaN(centroid[1]);
               return (
-                <React.Fragment key={geo.rsmKey}>
-                  <Geography
-                    geography={geo}
-                    onMouseEnter={(e) => setHoveredState({ name: stateName, count, x: e.clientX, y: e.clientY })}
-                    onMouseMove={(e) => setHoveredState({ name: stateName, count, x: e.clientX, y: e.clientY })}
-                    onMouseLeave={() => setHoveredState(null)}
-                    style={{
-                      default: {
-                        fill: colorScale(count),
-                        stroke: forExport ? "#64748b" : "#cbd5e1",
-                        strokeWidth: forExport ? 0.8 : 0.5,
-                        outline: "none"
-                      },
-                      hover: { fill: "#22c55e", stroke: "#166534", strokeWidth: 1, outline: "none", cursor: "pointer" },
-                      pressed: { fill: "#15803d", outline: "none" }
-                    }}
-                  />
-                  {hasCentroid && (
-                    <text
-                      x={centroid[0]}
-                      y={centroid[1]}
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      style={{
-                        fontSize: 9, fontWeight: 800, fill: '#0f172a',
-                        stroke: '#ffffff', strokeWidth: 2.5, paintOrder: 'stroke',
-                        pointerEvents: 'none'
-                      }}
-                    >{count}</text>
-                  )}
-                </React.Fragment>
+                <Geography
+                  key={geo.rsmKey}
+                  geography={geo}
+                  onMouseEnter={(e) => setHoveredState({ name: stateName, count, x: e.clientX, y: e.clientY })}
+                  onMouseMove={(e) => setHoveredState({ name: stateName, count, x: e.clientX, y: e.clientY })}
+                  onMouseLeave={() => setHoveredState(null)}
+                  style={{
+                    default: { fill: colorScale(count), stroke: "#cbd5e1", strokeWidth: 0.5, outline: "none" },
+                    hover: { fill: "#22c55e", stroke: "#166534", strokeWidth: 1, outline: "none", cursor: "pointer" },
+                    pressed: { fill: "#15803d", outline: "none" }
+                  }}
+                />
               );
             })
           }
@@ -2601,19 +2575,35 @@ function PartLabeler() {
       )}
 
       {/* Off-screen, PPT-only map render. The on-screen map widget is only
-          ~300px wide, so capturing that and upscaling looks soft. The map is
-          SVG, so re-rendering it large here yields real detail instead of an
-          upscaled blur. Sized to the slide's chart box ratio (~0.94) so it
-          fills the card without distortion. */}
+          ~300px wide, so capturing that and upscaling looks soft - rendering
+          large here yields real detail instead of an upscaled blur. Map is
+          untouched/identical to the live UI (no dark boundary, no clutter of
+          numbers on every state); since a static image can't show the hover
+          tooltip, a clean region/count legend sits on the right instead. */}
       <div
         ref={pptMapRef}
         style={{
           position: 'fixed', top: '-10000px', left: '-10000px',
-          width: '760px', height: '810px', background: '#ffffff',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', boxSizing: 'border-box'
+          width: '900px', height: '760px', background: '#ffffff',
+          display: 'flex', alignItems: 'center', padding: '20px', gap: '20px', boxSizing: 'border-box'
         }}
       >
-        <IndiaMap data={dashboardData.region || []} forExport />
+        <div style={{ flex: '0 0 62%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <IndiaMap data={dashboardData.region || []} />
+        </div>
+        <div style={{ flex: '1', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ fontSize: '15px', fontWeight: 800, color: '#7f8c8d', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>By Region</div>
+          {[...(dashboardData.region || [])]
+            .filter(d => d.value > 0)
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 10)
+            .map((d, i) => (
+              <div key={d.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: i % 2 === 0 ? '#f8fafc' : '#ffffff', borderRadius: '4px' }}>
+                <span style={{ fontSize: '15px', fontWeight: 600, color: '#2d3748' }}>{d.label}</span>
+                <span style={{ fontSize: '17px', fontWeight: 800, color: 'var(--mahindra-red, #DC0028)' }}>{d.value}</span>
+              </div>
+            ))}
+        </div>
       </div>
     </div>
   );
