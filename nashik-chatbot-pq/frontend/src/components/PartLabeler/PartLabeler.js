@@ -725,8 +725,8 @@ function PartLabeler() {
     const slide = pptx.addSlide();
 
     slide.addText(label.partName, {
-      x: 0.3, y: 0.08, w: 12.73, h: 0.35,
-      fontSize: 18, bold: true, color: 'DC0028'
+      x: 0.3, y: 0.05, w: 12.73, h: 0.42,
+      fontSize: 24, bold: true, color: 'DC0028'
     });
 
     // Top row: image on the left (~68%), detail panel on the right (~30%)
@@ -745,9 +745,9 @@ function PartLabeler() {
     slide.addText([{ text: 'COMPONENT\n', options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: label.partName, options: { fontSize: 18, bold: true, color: 'DC0028' } }],
       { x: panelX, y: topY, w: panelW, h: 0.65, valign: 'top' });
     slide.addText([{ text: 'PRIMARY CONCERN\n', options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: currentDescription || '-', options: { fontSize: 12, color: '2d3748' } }],
-      { x: panelX, y: topY + 0.75, w: panelW, h: 1.1, valign: 'top', wrap: true, fit: 'shrink' });
+      { x: panelX, y: topY + 0.75, w: panelW, h: 0.85, valign: 'top', wrap: true, fit: 'shrink' });
     slide.addText([{ text: `${filterLabel.toUpperCase()} FAILURES\n`, options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: String(currentMonthFailures), options: { fontSize: 26, bold: true, color: '1a2b4c' } }],
-      { x: panelX, y: topY + 1.95, w: panelW, h: 0.8, valign: 'top' });
+      { x: panelX, y: topY + 1.7, w: panelW, h: 0.8, valign: 'top' });
 
     // 4 uniform charts, same size/shape, in a row below - back to the
     // pre-styling-pass sizing (chartH 3.2, title 0.3 above each chart),
