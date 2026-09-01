@@ -2531,20 +2531,28 @@ function PartLabeler() {
               crossOrigin="anonymous"
               style={{ display: 'block', maxWidth: '1360px', maxHeight: '580px', objectFit: 'contain' }}
             />
-            {labels.map((label, index) => (
-              <div
-                key={label.id}
-                style={{
-                  position: 'absolute', left: `${label.x}%`, top: `${label.y}%`,
-                  transform: 'translate(-50%, -50%)',
-                  width: '30px', height: '30px', borderRadius: '50%',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: '14px', fontWeight: 700, color: '#fff',
-                  background: activePopup?.id === label.id ? '#1a2b4c' : '#DC0028',
-                  border: '2px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,0.3)'
-                }}
-              >{index + 1}</div>
-            ))}
+            {labels.map((label, index) => {
+              const isActive = activePopup?.id === label.id;
+              // Mirrors the live .label-marker.active style: bigger (not just
+              // a color swap), dark fill, red border ring - so the selected
+              // component stays as noticeable here as it is on screen.
+              const size = isActive ? 39 : 30;
+              return (
+                <div
+                  key={label.id}
+                  style={{
+                    position: 'absolute', left: `${label.x}%`, top: `${label.y}%`,
+                    transform: 'translate(-50%, -50%)',
+                    width: `${size}px`, height: `${size}px`, borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: isActive ? '16px' : '14px', fontWeight: 700, color: '#fff',
+                    background: isActive ? '#1a2b4c' : '#DC0028',
+                    border: isActive ? '3px solid #DC0028' : '2px solid #fff',
+                    boxShadow: isActive ? '0 0 0 2px #fff, 0 3px 10px rgba(0,0,0,0.4)' : '0 2px 6px rgba(0,0,0,0.3)'
+                  }}
+                >{index + 1}</div>
+              );
+            })}
           </div>
         </div>
       )}
