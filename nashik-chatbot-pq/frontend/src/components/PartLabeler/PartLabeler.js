@@ -774,8 +774,11 @@ function PartLabeler() {
       barGapWidthPct: 35
     };
 
-    chartDefs.forEach((def, i) => {
+    for (let i = 0; i < chartDefs.length; i++) {
+      const def = chartDefs[i];
       const x = 0.3 + i * (chartW + gap);
+      const isRegion = i === 3;
+      const isMapSlot = isRegion && viewConfig.useMapForRegion;
 
       // Card background behind the title + plot area
       slide.addShape(pptx.ShapeType.roundRect, {
@@ -786,7 +789,17 @@ function PartLabeler() {
 
       slide.addText(def.title, { x: x + 0.1, y: chartY - 0.32, w: chartW - 0.2, h: 0.28, fontSize: 9, bold: true, color: 'DC0028' });
 
-      if (def.data && def.data.length > 0) {
+      if (isMapSlot) {
+        // No native PPT map-chart type exists, so this one stays a screenshot
+        // (contrast-boosted, stretched to fill the same box as the other 3
+        // cards so it doesn't look small/dull next to them).
+        const map = await captureElement(regionChartRef.current, { scale: 2.5, enhance: true });
+        if (map) {
+          slide.addImage({ data: map.data, x: x + 0.1, y: chartY, w: chartW - 0.2, h: chartH - 0.15 });
+        } else {
+          slide.addText('No data', { x, y: chartY + chartH / 2 - 0.2, w: chartW, h: 0.4, fontSize: 10, align: 'center', color: '888888' });
+        }
+      } else if (def.data && def.data.length > 0) {
         slide.addChart(pptx.ChartType.bar, [{
           name: def.title,
           labels: def.data.map(d => String(d.label)),
@@ -799,7 +812,7 @@ function PartLabeler() {
       } else {
         slide.addText('No data', { x, y: chartY + chartH / 2 - 0.2, w: chartW, h: 0.4, fontSize: 10, align: 'center', color: '888888' });
       }
-    });
+    }
   };
 
   // ONE .pptx file covering every mapped component: one slide each, per
