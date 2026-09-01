@@ -724,13 +724,18 @@ function PartLabeler() {
   const addComponentSlide = async (pptx, label, viewConfig) => {
     const slide = pptx.addSlide();
 
+    slide.addText(label.partName, {
+      x: 0.3, y: 0.08, w: 12.73, h: 0.35,
+      fontSize: 18, bold: true, color: 'DC0028'
+    });
+
     const top = await captureElement(pptTopSectionRef.current, { scale: 2.5, enhance: true });
     if (top) {
-      const maxW = 12.73, maxH = 3.1;
+      const maxW = 12.73, maxH = 2.95;
       const ratio = top.width / top.height;
       let w = maxW, h = maxW / ratio;
       if (h > maxH) { h = maxH; w = maxH * ratio; }
-      slide.addImage({ data: top.data, x: 0.3 + (maxW - w) / 2, y: 0.2, w, h });
+      slide.addImage({ data: top.data, x: 0.3 + (maxW - w) / 2, y: 0.5, w, h });
     }
 
     const chartY = 3.55, chartH = 3.6, gap = 0.15, chartW = (12.73 - 3 * gap) / 4;
@@ -752,7 +757,8 @@ function PartLabeler() {
           x, y: chartY + 0.3, w: chartW, h: chartH - 0.3,
           barDir: 'col', chartColors: [def.color.replace('#', '')],
           showLegend: false, showValue: true, dataLabelPosition: 'outEnd',
-          catAxisLabelFontSize: 7, valAxisLabelFontSize: 7, valAxisMinVal: 0
+          catAxisLabelFontSize: 7, valAxisLabelFontSize: 7, valAxisMinVal: 0,
+          catAxisLabelRotate: 45 // long month labels ("Jan-2026") would overlap unrotated at this width
         });
       } else {
         slide.addText('No data', { x, y: chartY + 1.5, w: chartW, h: 0.4, fontSize: 10, align: 'center', color: '888888' });
@@ -765,10 +771,10 @@ function PartLabeler() {
     if (viewConfig.useMapForRegion) {
       const map = await captureElement(regionChartRef.current, { scale: 2.5, enhance: true });
       if (map) {
-        const ratio = map.width / map.height;
-        let w = chartW, h = w / ratio;
-        if (h > chartH - 0.3) { h = chartH - 0.3; w = h * ratio; }
-        slide.addImage({ data: map.data, x: regionX + (chartW - w) / 2, y: chartY + 0.3, w, h });
+        // Stretch to fully fill the same box the other 3 charts use, rather
+        // than shrink-to-fit-preserving-aspect (which left it looking small
+        // next to them) - the map's own whitespace margin absorbs the skew.
+        slide.addImage({ data: map.data, x: regionX, y: chartY + 0.3, w: chartW, h: chartH - 0.3 });
       }
     } else if (dashboardData.region && dashboardData.region.length > 0) {
       slide.addChart(pptx.ChartType.bar, [{
@@ -779,7 +785,8 @@ function PartLabeler() {
         x: regionX, y: chartY + 0.3, w: chartW, h: chartH - 0.3,
         barDir: 'col', chartColors: ['667eea'],
         showLegend: false, showValue: true, dataLabelPosition: 'outEnd',
-        catAxisLabelFontSize: 7, valAxisLabelFontSize: 7, valAxisMinVal: 0
+        catAxisLabelFontSize: 7, valAxisLabelFontSize: 7, valAxisMinVal: 0,
+        catAxisLabelRotate: 45
       });
     } else {
       slide.addText('No data', { x: regionX, y: chartY + 1.5, w: chartW, h: 0.4, fontSize: 10, align: 'center', color: '888888' });
