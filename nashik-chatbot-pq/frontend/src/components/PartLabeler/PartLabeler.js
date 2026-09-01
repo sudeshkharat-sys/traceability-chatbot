@@ -765,31 +765,35 @@ function PartLabeler() {
       }
     });
 
-    // 4th slot: region - native bar chart, or a screenshot when it's the map (no native equivalent)
+    // 4th slot: component info as native PPT text (crisp at any size, unlike
+    // the old screenshot text) + a native region bar chart underneath - a map
+    // screenshot always looked pale/dull next to the other 3, and PowerPoint
+    // has no native map-chart type, so a bar chart of the same data replaces it.
     const regionX = 0.3 + 3 * (chartW + gap);
-    slide.addText(viewConfig.chartTitles.region, { x: regionX, y: chartY, w: chartW, h: 0.3, fontSize: 9, bold: true, color: 'DC0028' });
-    if (viewConfig.useMapForRegion) {
-      const map = await captureElement(regionChartRef.current, { scale: 2.5, enhance: true });
-      if (map) {
-        // Stretch to fully fill the same box the other 3 charts use, rather
-        // than shrink-to-fit-preserving-aspect (which left it looking small
-        // next to them) - the map's own whitespace margin absorbs the skew.
-        slide.addImage({ data: map.data, x: regionX, y: chartY + 0.3, w: chartW, h: chartH - 0.3 });
-      }
-    } else if (dashboardData.region && dashboardData.region.length > 0) {
+    const filterLabel = filterMonth.includes('All') ? 'Annual' : (filterMonth.length === 1 ? filterMonth[0] : 'Multiple');
+
+    slide.addText(label.partName, { x: regionX, y: chartY, w: chartW, h: 0.3, fontSize: 13, bold: true, color: 'DC0028' });
+    slide.addText('PRIMARY CONCERN', { x: regionX, y: chartY + 0.32, w: chartW, h: 0.18, fontSize: 7, bold: true, color: '7f8c8d' });
+    slide.addText(currentDescription || '', { x: regionX, y: chartY + 0.5, w: chartW, h: 0.55, fontSize: 8.5, color: '2d3748', valign: 'top', wrap: true, fit: 'shrink' });
+    slide.addText(`${filterLabel.toUpperCase()} FAILURES`, { x: regionX, y: chartY + 1.08, w: chartW, h: 0.18, fontSize: 7, bold: true, color: '7f8c8d' });
+    slide.addText(String(currentMonthFailures), { x: regionX, y: chartY + 1.26, w: chartW, h: 0.5, fontSize: 22, bold: true, color: '1a2b4c' });
+
+    const regionChartY = chartY + 1.85;
+    slide.addText(viewConfig.chartTitles.region, { x: regionX, y: regionChartY, w: chartW, h: 0.25, fontSize: 8, bold: true, color: 'DC0028' });
+    if (dashboardData.region && dashboardData.region.length > 0) {
       slide.addChart(pptx.ChartType.bar, [{
         name: viewConfig.chartTitles.region,
         labels: dashboardData.region.map(d => String(d.label)),
         values: dashboardData.region.map(d => Number(d.value) || 0)
       }], {
-        x: regionX, y: chartY + 0.3, w: chartW, h: chartH - 0.3,
+        x: regionX, y: regionChartY + 0.25, w: chartW, h: (chartY + chartH) - (regionChartY + 0.25),
         barDir: 'col', chartColors: ['667eea'],
         showLegend: false, showValue: true, dataLabelPosition: 'outEnd',
-        catAxisLabelFontSize: 7, valAxisLabelFontSize: 7, valAxisMinVal: 0,
+        catAxisLabelFontSize: 6, valAxisLabelFontSize: 6, valAxisMinVal: 0,
         catAxisLabelRotate: 45
       });
     } else {
-      slide.addText('No data', { x: regionX, y: chartY + 1.5, w: chartW, h: 0.4, fontSize: 10, align: 'center', color: '888888' });
+      slide.addText('No data', { x: regionX, y: regionChartY + 0.6, w: chartW, h: 0.4, fontSize: 9, align: 'center', color: '888888' });
     }
   };
 
@@ -2498,8 +2502,10 @@ function PartLabeler() {
 
       </div>
 
-      {/* Off-screen, PPT-only layout: bigger CAD image + a clean name/concern/
-          failures panel (no Mapped Components table, no download buttons).
+      {/* Off-screen, PPT-only layout: just the CAD image + markers, full width
+          (no side panel here anymore - name/concern/failures are added as
+          native PPT text next to the region chart instead, so they stay
+          crisp/readable instead of shrinking along with a screenshot).
           Rendered off-screen (not display:none) so html2canvas can capture it. */}
       {selectedImage && (
         <div
@@ -2507,48 +2513,33 @@ function PartLabeler() {
           style={{
             position: 'fixed', top: '-10000px', left: '-10000px',
             width: '1400px', height: '620px', background: '#ffffff',
-            display: 'flex', gap: '24px', padding: '20px', boxSizing: 'border-box'
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px', boxSizing: 'border-box'
           }}
         >
-          <div style={{ flex: '0 0 68%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {/* This inner box shrink-wraps to the image's actual rendered size
-                (like .cad-img-container does live) so the marker percentages
-                below land on the real image bounds, not the outer flex slot. */}
-            <div style={{ position: 'relative', display: 'inline-flex', maxWidth: '100%', maxHeight: '100%' }}>
-              <img
-                src={`${UPLOAD_BASE}/${selectedImage.filename}`}
-                alt="CAD Drawing"
-                crossOrigin="anonymous"
-                style={{ display: 'block', maxWidth: '920px', maxHeight: '580px', objectFit: 'contain' }}
-              />
-              {labels.map((label, index) => (
-                <div
-                  key={label.id}
-                  style={{
-                    position: 'absolute', left: `${label.x}%`, top: `${label.y}%`,
-                    transform: 'translate(-50%, -50%)',
-                    width: '30px', height: '30px', borderRadius: '50%',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '14px', fontWeight: 700, color: '#fff',
-                    background: activePopup?.id === label.id ? '#1a2b4c' : '#DC0028',
-                    border: '2px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,0.3)'
-                  }}
-                >{index + 1}</div>
-              ))}
-            </div>
-          </div>
-          <div style={{ flex: '0 0 30%', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '14px' }}>
-            <h2 style={{ margin: 0, color: '#DC0028', fontSize: '32px', fontWeight: 800 }}>{activePopup?.partName}</h2>
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#7f8c8d', textTransform: 'uppercase' }}>Primary Concern</div>
-              <p style={{ margin: '4px 0 0', fontSize: '18px', color: '#2d3748' }}>{currentDescription}</p>
-            </div>
-            <div>
-              <div style={{ fontSize: '13px', fontWeight: 700, color: '#7f8c8d', textTransform: 'uppercase' }}>
-                {filterMonth.includes('All') ? 'Annual' : (filterMonth.length === 1 ? filterMonth[0] : 'Multiple')}
-              </div>
-              <div style={{ fontSize: '48px', fontWeight: 800, color: '#1a2b4c' }}>{currentMonthFailures}<span style={{ fontSize: '18px', fontWeight: 600, color: '#7f8c8d', marginLeft: '10px' }}>Failures</span></div>
-            </div>
+          {/* This inner box shrink-wraps to the image's actual rendered size
+              (like .cad-img-container does live) so the marker percentages
+              below land on the real image bounds, not the outer fixed box. */}
+          <div style={{ position: 'relative', display: 'inline-flex', maxWidth: '100%', maxHeight: '100%' }}>
+            <img
+              src={`${UPLOAD_BASE}/${selectedImage.filename}`}
+              alt="CAD Drawing"
+              crossOrigin="anonymous"
+              style={{ display: 'block', maxWidth: '1360px', maxHeight: '580px', objectFit: 'contain' }}
+            />
+            {labels.map((label, index) => (
+              <div
+                key={label.id}
+                style={{
+                  position: 'absolute', left: `${label.x}%`, top: `${label.y}%`,
+                  transform: 'translate(-50%, -50%)',
+                  width: '30px', height: '30px', borderRadius: '50%',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '14px', fontWeight: 700, color: '#fff',
+                  background: activePopup?.id === label.id ? '#1a2b4c' : '#DC0028',
+                  border: '2px solid #fff', boxShadow: '0 2px 6px rgba(0,0,0,0.3)'
+                }}
+              >{index + 1}</div>
+            ))}
           </div>
         </div>
       )}
