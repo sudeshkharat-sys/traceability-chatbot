@@ -716,11 +716,13 @@ function PartLabeler() {
     return { data: canvas.toDataURL('image/png'), width: canvas.width, height: canvas.height };
   };
 
-  // One slide, ONE component: top = bigger CAD image (annotated) + a clean
-  // name/primary-concern/failures panel (no table, no download buttons - that's
-  // the dedicated off-screen pptTopSectionRef template, not the live popup).
-  // Bottom = all 4 "wise data" charts in a row (native PPT charts where
-  // possible; the region chart falls back to a screenshot only for the map).
+  // One slide, ONE component, top to bottom:
+  // 1) title, 2) bigger CAD image (annotated, no table/buttons - built from
+  // the dedicated off-screen pptTopSectionRef template), 3) an info strip
+  // (name / primary concern / failures) as native PPT text - crisp at any
+  // size, unlike baking it into a screenshot, 4) all 4 "wise data" charts,
+  // same size/shape, all native PPT charts (no map - PowerPoint has no
+  // native map-chart type, so region uses the same data as a bar chart too).
   const addComponentSlide = async (pptx, label, viewConfig) => {
     const slide = pptx.addSlide();
 
@@ -731,18 +733,33 @@ function PartLabeler() {
 
     const top = await captureElement(pptTopSectionRef.current, { scale: 2.5, enhance: true });
     if (top) {
-      const maxW = 12.73, maxH = 2.95;
+      const maxW = 12.73, maxH = 2.55;
       const ratio = top.width / top.height;
       let w = maxW, h = maxW / ratio;
       if (h > maxH) { h = maxH; w = maxH * ratio; }
-      slide.addImage({ data: top.data, x: 0.3 + (maxW - w) / 2, y: 0.5, w, h });
+      slide.addImage({ data: top.data, x: 0.3 + (maxW - w) / 2, y: 0.48, w, h });
     }
 
-    const chartY = 3.55, chartH = 3.6, gap = 0.15, chartW = (12.73 - 3 * gap) / 4;
+    // Info strip - full width, above the chart row
+    const infoY = 3.15;
+    const filterLabel = filterMonth.includes('All') ? 'Annual' : (filterMonth.length === 1 ? filterMonth[0] : 'Multiple');
+    const nameW = 2.4, failW = 2.6, concernW = 12.73 - nameW - failW - 0.3;
+    const concernX = 0.3 + nameW + 0.15, failX = concernX + concernW + 0.15;
+
+    slide.addText([{ text: 'COMPONENT\n', options: { fontSize: 7, bold: true, color: '7f8c8d' } }, { text: label.partName, options: { fontSize: 14, bold: true, color: 'DC0028' } }],
+      { x: 0.3, y: infoY, w: nameW, h: 0.65, valign: 'top' });
+    slide.addText([{ text: 'PRIMARY CONCERN\n', options: { fontSize: 7, bold: true, color: '7f8c8d' } }, { text: currentDescription || '-', options: { fontSize: 10, color: '2d3748' } }],
+      { x: concernX, y: infoY, w: concernW, h: 0.65, valign: 'top', wrap: true, fit: 'shrink' });
+    slide.addText([{ text: `${filterLabel.toUpperCase()} FAILURES\n`, options: { fontSize: 7, bold: true, color: '7f8c8d' } }, { text: String(currentMonthFailures), options: { fontSize: 18, bold: true, color: '1a2b4c' } }],
+      { x: failX, y: infoY, w: failW, h: 0.65, valign: 'top' });
+
+    // 4 uniform charts, same size/shape, in a row below the info strip
+    const chartY = 3.95, chartH = 3.2, gap = 0.15, chartW = (12.73 - 3 * gap) / 4;
     const chartDefs = [
       { data: dashboardData.mfgMonth, title: viewConfig.chartTitles.mfgMonth, color: '#f6ad55' },
       { data: dashboardData.reportingMonth, title: viewConfig.chartTitles.reportingMonth, color: '#68d391' },
-      { data: dashboardData.kms, title: viewConfig.chartTitles.kms, color: '#76e4f7' }
+      { data: dashboardData.kms, title: viewConfig.chartTitles.kms, color: '#76e4f7' },
+      { data: dashboardData.region, title: viewConfig.chartTitles.region, color: '#667eea' }
     ];
 
     chartDefs.forEach((def, i) => {
@@ -764,37 +781,6 @@ function PartLabeler() {
         slide.addText('No data', { x, y: chartY + 1.5, w: chartW, h: 0.4, fontSize: 10, align: 'center', color: '888888' });
       }
     });
-
-    // 4th slot: component info as native PPT text (crisp at any size, unlike
-    // the old screenshot text) + a native region bar chart underneath - a map
-    // screenshot always looked pale/dull next to the other 3, and PowerPoint
-    // has no native map-chart type, so a bar chart of the same data replaces it.
-    const regionX = 0.3 + 3 * (chartW + gap);
-    const filterLabel = filterMonth.includes('All') ? 'Annual' : (filterMonth.length === 1 ? filterMonth[0] : 'Multiple');
-
-    slide.addText(label.partName, { x: regionX, y: chartY, w: chartW, h: 0.3, fontSize: 13, bold: true, color: 'DC0028' });
-    slide.addText('PRIMARY CONCERN', { x: regionX, y: chartY + 0.32, w: chartW, h: 0.18, fontSize: 7, bold: true, color: '7f8c8d' });
-    slide.addText(currentDescription || '', { x: regionX, y: chartY + 0.5, w: chartW, h: 0.55, fontSize: 8.5, color: '2d3748', valign: 'top', wrap: true, fit: 'shrink' });
-    slide.addText(`${filterLabel.toUpperCase()} FAILURES`, { x: regionX, y: chartY + 1.08, w: chartW, h: 0.18, fontSize: 7, bold: true, color: '7f8c8d' });
-    slide.addText(String(currentMonthFailures), { x: regionX, y: chartY + 1.26, w: chartW, h: 0.5, fontSize: 22, bold: true, color: '1a2b4c' });
-
-    const regionChartY = chartY + 1.85;
-    slide.addText(viewConfig.chartTitles.region, { x: regionX, y: regionChartY, w: chartW, h: 0.25, fontSize: 8, bold: true, color: 'DC0028' });
-    if (dashboardData.region && dashboardData.region.length > 0) {
-      slide.addChart(pptx.ChartType.bar, [{
-        name: viewConfig.chartTitles.region,
-        labels: dashboardData.region.map(d => String(d.label)),
-        values: dashboardData.region.map(d => Number(d.value) || 0)
-      }], {
-        x: regionX, y: regionChartY + 0.25, w: chartW, h: (chartY + chartH) - (regionChartY + 0.25),
-        barDir: 'col', chartColors: ['667eea'],
-        showLegend: false, showValue: true, dataLabelPosition: 'outEnd',
-        catAxisLabelFontSize: 6, valAxisLabelFontSize: 6, valAxisMinVal: 0,
-        catAxisLabelRotate: 45
-      });
-    } else {
-      slide.addText('No data', { x: regionX, y: regionChartY + 0.6, w: chartW, h: 0.4, fontSize: 9, align: 'center', color: '888888' });
-    }
   };
 
   // ONE .pptx file covering every mapped component: one slide each, per
