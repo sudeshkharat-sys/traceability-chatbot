@@ -442,15 +442,14 @@ const CustomBarChart = ({ title, data, color, icon: Icon }) => (
   </div>
 );
 
-// `forExport` renders a higher-contrast variant for the PPT screenshot: the
-// on-screen stroke (#cbd5e1) and near-white low end wash out against a slide's
-// white background. Live dashboard styling is unchanged.
+// `forExport` tweaks the map for the PPT screenshot: same light fills as the
+// UI, but a darker boundary line so state outlines stay crisp against a white
+// slide, plus the failure count printed on each state - a static image can't
+// show the hover tooltip the live dashboard has.
 const IndiaMap = ({ data, forExport = false }) => {
   const [hoveredState, setHoveredState] = useState(null);
   const maxValue = Math.max(...data.map(d => d.value), 1);
-  const colorScale = scaleLinear()
-    .domain([0, maxValue])
-    .range(forExport ? ["#dcfce7", "#14532d"] : ["#f0fdf4", "#166534"]);
+  const colorScale = scaleLinear().domain([0, maxValue]).range(["#f0fdf4", "#166534"]);
 
       return (
         <div className="india-map-wrapper">
@@ -461,29 +460,46 @@ const IndiaMap = ({ data, forExport = false }) => {
             height={400}
             style={{ width: "100%", height: "100%", maxWidth: "100%", maxHeight: "100%" }}
           >        <Geographies geography={INDIA_TOPO_JSON}>
-          {({ geographies }) =>
+          {({ geographies, path }) =>
             geographies.map((geo) => {
               const stateName = geo.properties.st_nm || geo.properties.ST_NM;
               const match = data.find(d => d.label.toLowerCase() === stateName?.toLowerCase());
               const count = match ? match.value : 0;
+              // Label position: centre of the state, in SVG coords
+              const centroid = forExport && count > 0 && path ? path.centroid(geo) : null;
+              const hasCentroid = centroid && !isNaN(centroid[0]) && !isNaN(centroid[1]);
               return (
-                <Geography
-                  key={geo.rsmKey}
-                  geography={geo}
-                  onMouseEnter={(e) => setHoveredState({ name: stateName, count, x: e.clientX, y: e.clientY })}
-                  onMouseMove={(e) => setHoveredState({ name: stateName, count, x: e.clientX, y: e.clientY })}
-                  onMouseLeave={() => setHoveredState(null)}
-                  style={{
-                    default: {
-                      fill: colorScale(count),
-                      stroke: forExport ? "#475569" : "#cbd5e1",
-                      strokeWidth: forExport ? 0.9 : 0.5,
-                      outline: "none"
-                    },
-                    hover: { fill: "#22c55e", stroke: "#166534", strokeWidth: 1, outline: "none", cursor: "pointer" },
-                    pressed: { fill: "#15803d", outline: "none" }
-                  }}
-                />
+                <React.Fragment key={geo.rsmKey}>
+                  <Geography
+                    geography={geo}
+                    onMouseEnter={(e) => setHoveredState({ name: stateName, count, x: e.clientX, y: e.clientY })}
+                    onMouseMove={(e) => setHoveredState({ name: stateName, count, x: e.clientX, y: e.clientY })}
+                    onMouseLeave={() => setHoveredState(null)}
+                    style={{
+                      default: {
+                        fill: colorScale(count),
+                        stroke: forExport ? "#64748b" : "#cbd5e1",
+                        strokeWidth: forExport ? 0.8 : 0.5,
+                        outline: "none"
+                      },
+                      hover: { fill: "#22c55e", stroke: "#166534", strokeWidth: 1, outline: "none", cursor: "pointer" },
+                      pressed: { fill: "#15803d", outline: "none" }
+                    }}
+                  />
+                  {hasCentroid && (
+                    <text
+                      x={centroid[0]}
+                      y={centroid[1]}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      style={{
+                        fontSize: 9, fontWeight: 800, fill: '#0f172a',
+                        stroke: '#ffffff', strokeWidth: 2.5, paintOrder: 'stroke',
+                        pointerEvents: 'none'
+                      }}
+                    >{count}</text>
+                  )}
+                </React.Fragment>
               );
             })
           }
