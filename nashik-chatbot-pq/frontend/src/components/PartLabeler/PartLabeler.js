@@ -442,10 +442,15 @@ const CustomBarChart = ({ title, data, color, icon: Icon }) => (
   </div>
 );
 
-const IndiaMap = ({ data }) => {
+// `forExport` renders a higher-contrast variant for the PPT screenshot: the
+// on-screen stroke (#cbd5e1) and near-white low end wash out against a slide's
+// white background. Live dashboard styling is unchanged.
+const IndiaMap = ({ data, forExport = false }) => {
   const [hoveredState, setHoveredState] = useState(null);
   const maxValue = Math.max(...data.map(d => d.value), 1);
-  const colorScale = scaleLinear().domain([0, maxValue]).range(["#f0fdf4", "#166534"]); 
+  const colorScale = scaleLinear()
+    .domain([0, maxValue])
+    .range(forExport ? ["#dcfce7", "#14532d"] : ["#f0fdf4", "#166534"]);
 
       return (
         <div className="india-map-wrapper">
@@ -469,7 +474,12 @@ const IndiaMap = ({ data }) => {
                   onMouseMove={(e) => setHoveredState({ name: stateName, count, x: e.clientX, y: e.clientY })}
                   onMouseLeave={() => setHoveredState(null)}
                   style={{
-                    default: { fill: colorScale(count), stroke: "#cbd5e1", strokeWidth: 0.5, outline: "none" },
+                    default: {
+                      fill: colorScale(count),
+                      stroke: forExport ? "#475569" : "#cbd5e1",
+                      strokeWidth: forExport ? 0.9 : 0.5,
+                      outline: "none"
+                    },
                     hover: { fill: "#22c55e", stroke: "#166534", strokeWidth: 1, outline: "none", cursor: "pointer" },
                     pressed: { fill: "#15803d", outline: "none" }
                   }}
@@ -2548,10 +2558,12 @@ function PartLabeler() {
             />
             {labels.map((label, index) => {
               const isActive = activePopup?.id === label.id;
-              // Mirrors the live .label-marker.active style: bigger (not just
-              // a color swap), dark fill, red border ring - so the selected
-              // component stays as noticeable here as it is on screen.
-              const size = isActive ? 39 : 30;
+              // Sized proportionally to this template's much larger image so
+              // markers read the same as on screen: live is 22px on a ~650px
+              // image (~3.4%), so ~46px on this 1360px one. (30px here made
+              // them ~2.2% - noticeably smaller than the UI.) Active keeps the
+              // live 1.3x scale-up plus the red border ring.
+              const size = isActive ? 60 : 46;
               return (
                 <div
                   key={label.id}
@@ -2560,10 +2572,10 @@ function PartLabeler() {
                     transform: 'translate(-50%, -50%)',
                     width: `${size}px`, height: `${size}px`, borderRadius: '50%',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: isActive ? '16px' : '14px', fontWeight: 700, color: '#fff',
+                    fontSize: isActive ? '26px' : '20px', fontWeight: 800, color: '#fff',
                     background: isActive ? '#1a2b4c' : '#DC0028',
-                    border: isActive ? '3px solid #DC0028' : '2px solid #fff',
-                    boxShadow: isActive ? '0 0 0 2px #fff, 0 3px 10px rgba(0,0,0,0.4)' : '0 2px 6px rgba(0,0,0,0.3)'
+                    border: isActive ? '4px solid #DC0028' : '3px solid #fff',
+                    boxShadow: isActive ? '0 0 0 3px #fff, 0 4px 14px rgba(0,0,0,0.45)' : '0 3px 9px rgba(0,0,0,0.35)'
                   }}
                 >{index + 1}</div>
               );
@@ -2585,7 +2597,7 @@ function PartLabeler() {
           display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '10px', boxSizing: 'border-box'
         }}
       >
-        <IndiaMap data={dashboardData.region || []} />
+        <IndiaMap data={dashboardData.region || []} forExport />
       </div>
     </div>
   );
