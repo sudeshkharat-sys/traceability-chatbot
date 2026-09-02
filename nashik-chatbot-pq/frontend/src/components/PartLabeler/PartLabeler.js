@@ -352,6 +352,26 @@ const INDIA_OUTLINE_BOUNDS = (() => {
   return { lonMin, lonMax, latMin, latMax, lonScale };
 })();
 
+// Short codes for the PPT legend only - long names ("Andaman and Nicobar
+// Islands") were overlapping the row below at legend width. The map itself
+// still matches/colors states by their full name; this only changes what
+// the legend prints.
+const STATE_ABBR = {
+  'jammu and kashmir': 'J&K', 'ladakh': 'LA', 'himachal pradesh': 'HP',
+  'punjab': 'PB', 'uttarakhand': 'UK', 'haryana': 'HR', 'delhi': 'DL',
+  'rajasthan': 'RJ', 'uttar pradesh': 'UP', 'sikkim': 'SK',
+  'arunachal pradesh': 'AR', 'gujarat': 'GJ', 'madhya pradesh': 'MP',
+  'bihar': 'BR', 'west bengal': 'WB', 'assam': 'AS', 'nagaland': 'NL',
+  'maharashtra': 'MH', 'chhattisgarh': 'CG', 'jharkhand': 'JH',
+  'meghalaya': 'ML', 'manipur': 'MN', 'goa': 'GA', 'karnataka': 'KA',
+  'telangana': 'TG', 'odisha': 'OD', 'tripura': 'TR', 'mizoram': 'MZ',
+  'andhra pradesh': 'AP', 'kerala': 'KL', 'tamil nadu': 'TN',
+  'puducherry': 'PY', 'chandigarh': 'CH',
+  'dadra and nagar haveli and daman and diu': 'DNH', 'lakshadweep': 'LD',
+  'andaman and nicobar islands': 'A&N',
+};
+const stateAbbr = (label) => STATE_ABBR[String(label).toLowerCase().trim()] || String(label).slice(0, 3).toUpperCase();
+
 // Linear blend between two '#rrggbb'-less hex colors, t in [0,1]
 const hexLerp = (c1, c2, t) => {
   const a = parseInt(c1, 16), b = parseInt(c2, 16);
@@ -406,15 +426,24 @@ const addRegionOutlineMap = (pptx, slide, data, x, y, w, h) => {
     });
   });
 
-  // Native, editable legend (top regions by value) since the map's colors alone don't show exact counts
+  // Native, editable legend (top regions by value) since the map's colors alone don't show exact counts.
+  // Each row prints the short code (fixed-width, so it can't run into the row
+  // below like a long state name did) plus the full name underneath in
+  // smaller text, so nothing needs a separate lookup key.
   slide.addText('BY REGION', { x: x + mapW + 0.08, y, w: legendW - 0.08, h: 0.2, fontSize: 6.5, bold: true, color: '7f8c8d' });
-  const top = [...(data || [])].filter(d => d.value > 0).sort((a, b) => b.value - a.value).slice(0, 9);
-  const rowH = Math.min(0.26, (h - 0.24) / Math.max(top.length, 1));
+  const top = [...(data || [])].filter(d => d.value > 0).sort((a, b) => b.value - a.value).slice(0, 7);
+  const rowH = Math.min(0.34, (h - 0.24) / Math.max(top.length, 1));
   top.forEach((d, i) => {
     const ry = y + 0.24 + i * rowH;
     slide.addShape(pptx.ShapeType.rect, { x: x + mapW + 0.08, y: ry + rowH / 2 - 0.035, w: 0.07, h: 0.07, fill: { color: hexLerp('fde8ec', 'DC0028', d.value / maxValue) }, line: { type: 'none' } });
-    slide.addText(String(d.label), { x: x + mapW + 0.2, y: ry, w: legendW - 0.55, h: rowH, fontSize: 6, color: '4a5568', valign: 'middle' });
-    slide.addText(String(d.value), { x: x + w - 0.35, y: ry, w: 0.35, h: rowH, fontSize: 6, bold: true, color: 'DC0028', align: 'right', valign: 'middle' });
+    slide.addText(
+      [
+        { text: stateAbbr(d.label) + '  ', options: { fontSize: 6.5, bold: true, color: '2d3748' } },
+        { text: String(d.label), options: { fontSize: 4.5, color: '9aa5b1' } }
+      ],
+      { x: x + mapW + 0.2, y: ry, w: legendW - 0.55, h: rowH, valign: 'middle', wrap: false }
+    );
+    slide.addText(String(d.value), { x: x + w - 0.35, y: ry, w: 0.35, h: rowH, fontSize: 6.5, bold: true, color: 'DC0028', align: 'right', valign: 'middle' });
   });
 };
 
