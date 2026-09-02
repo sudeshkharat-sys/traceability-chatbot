@@ -420,9 +420,17 @@ const addRegionOutlineMap = (pptx, slide, data, x, y, w, h) => {
       points.push({ close: true });
     });
 
+    // Hover tooltip (a PowerPoint "ScreenTip", the same popup a hyperlink
+    // shows) - lets someone point at a state and see its name + count
+    // without needing the legend, closer to the on-screen map's hover
+    // behavior. url:'#' keeps it a harmless self-link, just for the tooltip.
+    const displayName = state.replace(/\b\w/g, c => c.toUpperCase());
+    const tooltip = hasData ? `${displayName} - ${value} failures` : `${displayName} - No data`;
+
     slide.addShape(pptx.ShapeType.custGeom, {
       x: minX, y: minY, w: shapeW, h: shapeH,
-      points, fill: { color: fill }, line: { color: 'ffffff', width: 0.5 }
+      points, fill: { color: fill }, line: { color: 'ffffff', width: 0.5 },
+      hyperlink: { url: '#', tooltip }
     });
   });
 
