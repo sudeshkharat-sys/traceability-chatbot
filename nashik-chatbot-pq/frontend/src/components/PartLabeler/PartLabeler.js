@@ -423,14 +423,19 @@ const addRegionOutlineMap = (pptx, slide, data, x, y, w, h) => {
     // Hover tooltip (a PowerPoint "ScreenTip", the same popup a hyperlink
     // shows) - lets someone point at a state and see its name + count
     // without needing the legend, closer to the on-screen map's hover
-    // behavior. url:'#' keeps it a harmless self-link, just for the tooltip.
+    // behavior. url:'#' looked harmless but PowerPoint writes it as a
+    // hyperlink to an external address literally named "#", which several
+    // PowerPoint versions treat as broken and silently drop (no tooltip,
+    // no hand cursor). Linking to this same slide instead is a genuine,
+    // valid internal link - clicking it just redisplays this slide - so the
+    // tooltip actually shows.
     const displayName = state.replace(/\b\w/g, c => c.toUpperCase());
     const tooltip = hasData ? `${displayName} - ${value} failures` : `${displayName} - No data`;
 
     slide.addShape(pptx.ShapeType.custGeom, {
       x: minX, y: minY, w: shapeW, h: shapeH,
       points, fill: { color: fill }, line: { color: 'ffffff', width: 0.5 },
-      hyperlink: { url: '#', tooltip }
+      hyperlink: { slide: slide._slideNum, tooltip }
     });
   });
 
