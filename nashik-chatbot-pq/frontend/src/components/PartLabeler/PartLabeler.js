@@ -53,6 +53,7 @@ import { backend_url, backend_url_ws } from '../../services/api/config';
 import { authService } from '../../services/api';
 import ChartComponent from '../ChartComponent';
 import logoImg from '../../assests/logo.png';
+import INDIA_STATE_OUTLINES from './indiaStatesOutline.json';
 import utilityLogo from '../../assests/image.png';
 import mahindraRiseLogo from '../../assests/mahindra_rise_logo.png';
 import './PartLabeler.css';
@@ -330,40 +331,26 @@ const DATA_SOURCES = {
 // Use the local TopoJSON file from the public folder
 const INDIA_TOPO_JSON = "/india-topo.json";
 
-// Approximate tile-grid layout of Indian states/UTs [row, col] - used only for
-// the PPT export's region "map". A real outline map can only be embedded as a
-// picture (no OOXML chart type for geo shapes exists in pptxgenjs / PowerPoint
-// generation libraries), so it's never editable there. This grid trades exact
-// borders for a layout built entirely out of native PPT shapes + text, which
-// IS editable in PowerPoint (click a tile, change its color/number) just like
-// the other 3 bar charts.
-const INDIA_STATE_GRID = {
-  'jammu and kashmir': [0, 2], 'ladakh': [0, 3],
-  'himachal pradesh': [1, 2], 'punjab': [1, 1], 'uttarakhand': [1, 3],
-  'haryana': [2, 2], 'delhi': [2, 3], 'rajasthan': [2, 1],
-  'uttar pradesh': [2, 4], 'sikkim': [2, 6], 'arunachal pradesh': [2, 7],
-  'gujarat': [3, 0], 'madhya pradesh': [3, 3], 'bihar': [3, 5],
-  'west bengal': [3, 6], 'assam': [3, 7], 'nagaland': [3, 8],
-  'maharashtra': [4, 1], 'chhattisgarh': [4, 4], 'jharkhand': [4, 5],
-  'meghalaya': [4, 7], 'manipur': [4, 8],
-  'goa': [5, 1], 'karnataka': [5, 3], 'telangana': [5, 4], 'odisha': [5, 5],
-  'tripura': [5, 7], 'mizoram': [5, 8],
-  'andhra pradesh': [6, 4],
-  'kerala': [7, 2], 'tamil nadu': [7, 3], 'puducherry': [7, 4],
-};
-const STATE_ABBR = {
-  'jammu and kashmir': 'J&K', 'ladakh': 'LA', 'himachal pradesh': 'HP',
-  'punjab': 'PB', 'uttarakhand': 'UK', 'haryana': 'HR', 'delhi': 'DL',
-  'rajasthan': 'RJ', 'uttar pradesh': 'UP', 'sikkim': 'SK',
-  'arunachal pradesh': 'AR', 'gujarat': 'GJ', 'madhya pradesh': 'MP',
-  'bihar': 'BR', 'west bengal': 'WB', 'assam': 'AS', 'nagaland': 'NL',
-  'maharashtra': 'MH', 'chhattisgarh': 'CG', 'jharkhand': 'JH',
-  'meghalaya': 'ML', 'manipur': 'MN', 'goa': 'GA', 'karnataka': 'KA',
-  'telangana': 'TG', 'odisha': 'OD', 'tripura': 'TR', 'mizoram': 'MZ',
-  'andhra pradesh': 'AP', 'kerala': 'KL', 'tamil nadu': 'TN',
-  'puducherry': 'PY',
-};
-const TILE_GRID_ROWS = 8, TILE_GRID_COLS = 9;
+// Real India state boundaries (simplified from public/india-topo.json,
+// ~35 points/state), used to build the PPT region "map" out of native
+// PowerPoint freeform shapes (pptx.ShapeType.custGeom) instead of a
+// screenshot. A freeform/custom-geometry shape is a normal, fully editable
+// PowerPoint object (click it, recolor it, move it, ungroup it) - unlike
+// PowerPoint's built-in geo "Map Chart", which is a Bing-powered feature no
+// third-party library (pptxgenjs included) can generate, this doesn't need
+// any online service: it's just polygons, the same way any other AutoShape
+// is stored in a .pptx file.
+const INDIA_OUTLINE_BOUNDS = (() => {
+  let lonMin = Infinity, lonMax = -Infinity, latMin = Infinity, latMax = -Infinity;
+  Object.values(INDIA_STATE_OUTLINES).forEach(rings => rings.forEach(ring => ring.forEach(([lon, lat]) => {
+    if (lon < lonMin) lonMin = lon;
+    if (lon > lonMax) lonMax = lon;
+    if (lat < latMin) latMin = lat;
+    if (lat > latMax) latMax = lat;
+  })));
+  const lonScale = Math.cos((latMin + latMax) / 2 * Math.PI / 180); // correct for longitude compression at this latitude
+  return { lonMin, lonMax, latMin, latMax, lonScale };
+})();
 
 // Linear blend between two '#rrggbb'-less hex colors, t in [0,1]
 const hexLerp = (c1, c2, t) => {
@@ -374,38 +361,60 @@ const hexLerp = (c1, c2, t) => {
   return [r, g, bl].map(v => v.toString(16).padStart(2, '0')).join('');
 };
 
-// Draws the region tile-map as native PPT shapes (rounded rects + text),
-// each one independently editable in PowerPoint - fill color, label, size -
-// unlike a screenshot. Not a geographically accurate outline, but every
-// state's box sits roughly where that state is, so it still reads as "map of
-// India by region" at a glance.
-const addRegionTileMap = (pptx, slide, data, x, y, w, h) => {
+// Draws the region map as native PPT freeform shapes (real state outlines,
+// colored by value) plus a native, editable text legend on the right listing
+// exact counts (a static map picture can't show the on-screen hover tooltip,
+// so the legend carries the numbers instead).
+const addRegionOutlineMap = (pptx, slide, data, x, y, w, h) => {
   const valueByState = {};
   (data || []).forEach(d => { valueByState[String(d.label).toLowerCase().trim()] = Number(d.value) || 0; });
-  const maxValue = Math.max(...Object.values(valueByState), 1);
+  const values = Object.values(valueByState);
+  const maxValue = Math.max(...values, 1);
 
-  const gap = 0.04;
-  const tileW = (w - gap * (TILE_GRID_COLS - 1)) / TILE_GRID_COLS;
-  const tileH = (h - gap * (TILE_GRID_ROWS - 1)) / TILE_GRID_ROWS;
+  const legendW = w * 0.32, mapW = w - legendW - 0.08;
+  const { lonMin, lonMax, latMin, latMax, lonScale } = INDIA_OUTLINE_BOUNDS;
+  const rangeX = (lonMax - lonMin) * lonScale, rangeY = latMax - latMin;
+  const scale = Math.min(mapW / rangeX, h / rangeY);
+  const drawW = rangeX * scale, drawH = rangeY * scale;
+  const offX = x + (mapW - drawW) / 2, offY = y + (h - drawH) / 2;
 
-  Object.entries(INDIA_STATE_GRID).forEach(([state, [row, col]]) => {
+  // lon/lat -> absolute slide inches (y flipped: latitude increases upward, slide y increases downward)
+  const project = ([lon, lat]) => [offX + (lon - lonMin) * lonScale * scale, offY + (latMax - lat) * scale];
+
+  Object.entries(INDIA_STATE_OUTLINES).forEach(([state, rings]) => {
     const value = valueByState[state] || 0;
     const hasData = state in valueByState;
-    const fill = hasData && value > 0 ? hexLerp('fde8ec', 'DC0028', value / maxValue) : 'f1f5f9';
-    const tx = x + col * (tileW + gap);
-    const ty = y + row * (tileH + gap);
+    const fill = hasData && value > 0 ? hexLerp('fde8ec', 'DC0028', value / maxValue) : 'eef1f4';
 
-    slide.addShape(pptx.ShapeType.roundRect, {
-      x: tx, y: ty, w: tileW, h: tileH,
-      rectRadius: 0.03, fill: { color: fill }, line: { color: 'ffffff', width: 1 }
+    const projRings = rings.map(ring => ring.map(project));
+    const allPts = projRings.flat();
+    const minX = Math.min(...allPts.map(p => p[0])), maxX = Math.max(...allPts.map(p => p[0]));
+    const minY = Math.min(...allPts.map(p => p[1])), maxY = Math.max(...allPts.map(p => p[1]));
+    const shapeW = Math.max(maxX - minX, 0.02), shapeH = Math.max(maxY - minY, 0.02);
+
+    const points = [];
+    projRings.forEach(ring => {
+      ring.forEach(([px, py], i) => {
+        points.push({ x: px - minX, y: py - minY, moveTo: i === 0 });
+      });
+      points.push({ close: true });
     });
-    slide.addText(
-      [
-        { text: STATE_ABBR[state] + '\n', options: { fontSize: 6, bold: true, color: value > maxValue * 0.5 ? 'ffffff' : '4a5568' } },
-        { text: hasData ? String(value) : '', options: { fontSize: 6.5, bold: true, color: value > maxValue * 0.5 ? 'ffffff' : '2d3748' } }
-      ],
-      { x: tx, y: ty, w: tileW, h: tileH, align: 'center', valign: 'middle', fontFace: 'Arial' }
-    );
+
+    slide.addShape(pptx.ShapeType.custGeom, {
+      x: minX, y: minY, w: shapeW, h: shapeH,
+      points, fill: { color: fill }, line: { color: 'ffffff', width: 0.5 }
+    });
+  });
+
+  // Native, editable legend (top regions by value) since the map's colors alone don't show exact counts
+  slide.addText('BY REGION', { x: x + mapW + 0.08, y, w: legendW - 0.08, h: 0.2, fontSize: 6.5, bold: true, color: '7f8c8d' });
+  const top = [...(data || [])].filter(d => d.value > 0).sort((a, b) => b.value - a.value).slice(0, 9);
+  const rowH = Math.min(0.26, (h - 0.24) / Math.max(top.length, 1));
+  top.forEach((d, i) => {
+    const ry = y + 0.24 + i * rowH;
+    slide.addShape(pptx.ShapeType.rect, { x: x + mapW + 0.08, y: ry + rowH / 2 - 0.035, w: 0.07, h: 0.07, fill: { color: hexLerp('fde8ec', 'DC0028', d.value / maxValue) }, line: { type: 'none' } });
+    slide.addText(String(d.label), { x: x + mapW + 0.2, y: ry, w: legendW - 0.55, h: rowH, fontSize: 6, color: '4a5568', valign: 'middle' });
+    slide.addText(String(d.value), { x: x + w - 0.35, y: ry, w: 0.35, h: rowH, fontSize: 6, bold: true, color: 'DC0028', align: 'right', valign: 'middle' });
   });
 };
 
@@ -869,12 +878,7 @@ function PartLabeler() {
       slide.addText(def.title, { x: x + 0.1, y: chartY - 0.32, w: chartW - 0.2, h: 0.28, fontSize: 9, bold: true, color: 'DC0028' });
 
       if (isMapSlot) {
-        // No native PPT map-chart type exists (that's a Bing-powered Office
-        // feature no third-party library can emit), so an exact-outline map
-        // can only ever be a flattened picture. This tile-grid layout trades
-        // exact borders for being built entirely from native PPT shapes/text,
-        // which stay editable in PowerPoint like the other 3 charts.
-        addRegionTileMap(pptx, slide, def.data, x + 0.1, chartY, chartW - 0.2, chartH - 0.15);
+        addRegionOutlineMap(pptx, slide, def.data, x + 0.1, chartY, chartW - 0.2, chartH - 0.15);
       } else if (def.data && def.data.length > 0) {
         slide.addChart(pptx.ChartType.bar, [{
           name: def.title,
