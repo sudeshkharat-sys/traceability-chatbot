@@ -330,6 +330,85 @@ const DATA_SOURCES = {
 // Use the local TopoJSON file from the public folder
 const INDIA_TOPO_JSON = "/india-topo.json";
 
+// Approximate tile-grid layout of Indian states/UTs [row, col] - used only for
+// the PPT export's region "map". A real outline map can only be embedded as a
+// picture (no OOXML chart type for geo shapes exists in pptxgenjs / PowerPoint
+// generation libraries), so it's never editable there. This grid trades exact
+// borders for a layout built entirely out of native PPT shapes + text, which
+// IS editable in PowerPoint (click a tile, change its color/number) just like
+// the other 3 bar charts.
+const INDIA_STATE_GRID = {
+  'jammu and kashmir': [0, 2], 'ladakh': [0, 3],
+  'himachal pradesh': [1, 2], 'punjab': [1, 1], 'uttarakhand': [1, 3],
+  'haryana': [2, 2], 'delhi': [2, 3], 'rajasthan': [2, 1],
+  'uttar pradesh': [2, 4], 'sikkim': [2, 6], 'arunachal pradesh': [2, 7],
+  'gujarat': [3, 0], 'madhya pradesh': [3, 3], 'bihar': [3, 5],
+  'west bengal': [3, 6], 'assam': [3, 7], 'nagaland': [3, 8],
+  'maharashtra': [4, 1], 'chhattisgarh': [4, 4], 'jharkhand': [4, 5],
+  'meghalaya': [4, 7], 'manipur': [4, 8],
+  'goa': [5, 1], 'karnataka': [5, 3], 'telangana': [5, 4], 'odisha': [5, 5],
+  'tripura': [5, 7], 'mizoram': [5, 8],
+  'andhra pradesh': [6, 4],
+  'kerala': [7, 2], 'tamil nadu': [7, 3], 'puducherry': [7, 4],
+};
+const STATE_ABBR = {
+  'jammu and kashmir': 'J&K', 'ladakh': 'LA', 'himachal pradesh': 'HP',
+  'punjab': 'PB', 'uttarakhand': 'UK', 'haryana': 'HR', 'delhi': 'DL',
+  'rajasthan': 'RJ', 'uttar pradesh': 'UP', 'sikkim': 'SK',
+  'arunachal pradesh': 'AR', 'gujarat': 'GJ', 'madhya pradesh': 'MP',
+  'bihar': 'BR', 'west bengal': 'WB', 'assam': 'AS', 'nagaland': 'NL',
+  'maharashtra': 'MH', 'chhattisgarh': 'CG', 'jharkhand': 'JH',
+  'meghalaya': 'ML', 'manipur': 'MN', 'goa': 'GA', 'karnataka': 'KA',
+  'telangana': 'TG', 'odisha': 'OD', 'tripura': 'TR', 'mizoram': 'MZ',
+  'andhra pradesh': 'AP', 'kerala': 'KL', 'tamil nadu': 'TN',
+  'puducherry': 'PY',
+};
+const TILE_GRID_ROWS = 8, TILE_GRID_COLS = 9;
+
+// Linear blend between two '#rrggbb'-less hex colors, t in [0,1]
+const hexLerp = (c1, c2, t) => {
+  const a = parseInt(c1, 16), b = parseInt(c2, 16);
+  const ar = (a >> 16) & 255, ag = (a >> 8) & 255, ab = a & 255;
+  const br = (b >> 16) & 255, bg = (b >> 8) & 255, bb = b & 255;
+  const r = Math.round(ar + (br - ar) * t), g = Math.round(ag + (bg - ag) * t), bl = Math.round(ab + (bb - ab) * t);
+  return [r, g, bl].map(v => v.toString(16).padStart(2, '0')).join('');
+};
+
+// Draws the region tile-map as native PPT shapes (rounded rects + text),
+// each one independently editable in PowerPoint - fill color, label, size -
+// unlike a screenshot. Not a geographically accurate outline, but every
+// state's box sits roughly where that state is, so it still reads as "map of
+// India by region" at a glance.
+const addRegionTileMap = (pptx, slide, data, x, y, w, h) => {
+  const valueByState = {};
+  (data || []).forEach(d => { valueByState[String(d.label).toLowerCase().trim()] = Number(d.value) || 0; });
+  const maxValue = Math.max(...Object.values(valueByState), 1);
+
+  const gap = 0.04;
+  const tileW = (w - gap * (TILE_GRID_COLS - 1)) / TILE_GRID_COLS;
+  const tileH = (h - gap * (TILE_GRID_ROWS - 1)) / TILE_GRID_ROWS;
+
+  Object.entries(INDIA_STATE_GRID).forEach(([state, [row, col]]) => {
+    const value = valueByState[state] || 0;
+    const hasData = state in valueByState;
+    const fill = hasData && value > 0 ? hexLerp('fde8ec', 'DC0028', value / maxValue) : 'f1f5f9';
+    const tx = x + col * (tileW + gap);
+    const ty = y + row * (tileH + gap);
+
+    slide.addShape(pptx.ShapeType.roundRect, {
+      x: tx, y: ty, w: tileW, h: tileH,
+      rectRadius: 0.03, fill: { color: fill }, line: { color: 'ffffff', width: 1 }
+    });
+    slide.addText(
+      [
+        { text: STATE_ABBR[state] + '\n', options: { fontSize: 6, bold: true, color: value > maxValue * 0.5 ? 'ffffff' : '4a5568' } },
+        { text: hasData ? String(value) : '', options: { fontSize: 6.5, bold: true, color: value > maxValue * 0.5 ? 'ffffff' : '2d3748' } }
+      ],
+      { x: tx, y: ty, w: tileW, h: tileH, align: 'center', valign: 'middle', fontFace: 'Arial' }
+    );
+  });
+};
+
 /**
  * Helper Components (Outside main component for better performance)
  */
@@ -790,16 +869,12 @@ function PartLabeler() {
       slide.addText(def.title, { x: x + 0.1, y: chartY - 0.32, w: chartW - 0.2, h: 0.28, fontSize: 9, bold: true, color: 'DC0028' });
 
       if (isMapSlot) {
-        // No native PPT map-chart type exists, so this one stays a screenshot
-        // (contrast-boosted, stretched to fill the same box as the other 3
-        // cards so it doesn't look small/dull next to them).
-        // Capture the large off-screen render, not the small on-screen widget
-        const map = await captureElement(pptMapRef.current, { scale: 3, enhance: true });
-        if (map) {
-          slide.addImage({ data: map.data, x: x + 0.1, y: chartY, w: chartW - 0.2, h: chartH - 0.15 });
-        } else {
-          slide.addText('No data', { x, y: chartY + chartH / 2 - 0.2, w: chartW, h: 0.4, fontSize: 10, align: 'center', color: '888888' });
-        }
+        // No native PPT map-chart type exists (that's a Bing-powered Office
+        // feature no third-party library can emit), so an exact-outline map
+        // can only ever be a flattened picture. This tile-grid layout trades
+        // exact borders for being built entirely from native PPT shapes/text,
+        // which stay editable in PowerPoint like the other 3 charts.
+        addRegionTileMap(pptx, slide, def.data, x + 0.1, chartY, chartW - 0.2, chartH - 0.15);
       } else if (def.data && def.data.length > 0) {
         slide.addChart(pptx.ChartType.bar, [{
           name: def.title,
@@ -968,7 +1043,6 @@ function PartLabeler() {
   const workspaceCaptureRef = useRef(null);
   const detailCardRef = useRef(null);
   const pptTopSectionRef = useRef(null);
-  const pptMapRef = useRef(null);
   const mfgMonthChartRef = useRef(null);
   const reportingMonthChartRef = useRef(null);
   const kmsChartRef = useRef(null);
@@ -2573,38 +2647,6 @@ function PartLabeler() {
           </div>
         </div>
       )}
-
-      {/* Off-screen, PPT-only map render. The on-screen map widget is only
-          ~300px wide, so capturing that and upscaling looks soft - rendering
-          large here yields real detail instead of an upscaled blur. Map is
-          untouched/identical to the live UI (no dark boundary, no clutter of
-          numbers on every state); since a static image can't show the hover
-          tooltip, a clean region/count legend sits on the right instead. */}
-      <div
-        ref={pptMapRef}
-        style={{
-          position: 'fixed', top: '-10000px', left: '-10000px',
-          width: '900px', height: '760px', background: '#ffffff',
-          display: 'flex', alignItems: 'center', padding: '20px', gap: '20px', boxSizing: 'border-box'
-        }}
-      >
-        <div style={{ flex: '0 0 62%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <IndiaMap data={dashboardData.region || []} />
-        </div>
-        <div style={{ flex: '1', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ fontSize: '15px', fontWeight: 800, color: '#7f8c8d', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>By Region</div>
-          {[...(dashboardData.region || [])]
-            .filter(d => d.value > 0)
-            .sort((a, b) => b.value - a.value)
-            .slice(0, 10)
-            .map((d, i) => (
-              <div key={d.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: i % 2 === 0 ? '#f8fafc' : '#ffffff', borderRadius: '4px' }}>
-                <span style={{ fontSize: '15px', fontWeight: 600, color: '#2d3748' }}>{d.label}</span>
-                <span style={{ fontSize: '17px', fontWeight: 800, color: 'var(--mahindra-red, #DC0028)' }}>{d.value}</span>
-              </div>
-            ))}
-        </div>
-      </div>
     </div>
   );
 }
