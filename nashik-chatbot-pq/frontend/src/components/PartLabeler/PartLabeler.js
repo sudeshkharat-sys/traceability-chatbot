@@ -769,8 +769,10 @@ function PartLabeler() {
       const res = await fetch(`${API_BASE}/dashboard-data?${params.toString()}`);
       const data = await res.json();
       setDashboardData(data);
+      return data;
     } catch (err) {
       console.error("Failed to fetch dashboard data", err);
+      return null;
     }
   };
 
@@ -800,10 +802,40 @@ function PartLabeler() {
 
       const res = await fetch(`${API_BASE}/warranty-lookup?${params.toString()}`);
       const data = await res.json();
-      if (!data.error) setWarrantyHistory(Array.isArray(data) ? data : [data]);
+      if (data.error) return [];
+      const history = Array.isArray(data) ? data : [data];
+      setWarrantyHistory(history);
+      return history;
     } catch (err) {
       console.error("No history found", err);
+      return [];
     }
+  };
+
+  // Pure versions of the currentMonthFailures/currentDescription logic below,
+  // usable with an explicit history array instead of the (possibly stale,
+  // inside the export loop) `warrantyHistory` state.
+  const computeMonthFailures = (history, months) => months.includes('All')
+    ? history.reduce((sum, item) => sum + item.failureCount, 0)
+    : history.filter(h => months.includes(h.month)).reduce((sum, item) => sum + item.failureCount, 0);
+
+  const computeDescription = (history, months) => {
+    if (!months.includes('All')) {
+      const match = history.find(h => months.includes(h.month));
+      if (match) return match.description;
+    }
+    if (!history || history.length === 0) return 'Aggregated warranty claims data.';
+    const descWeights = {};
+    const relevantHistory = months.includes('All') ? history : history.filter(h => months.includes(h.month));
+    relevantHistory.forEach(h => {
+      const d = h.description;
+      if (d && d !== '-' && d !== 'null') descWeights[d] = (descWeights[d] || 0) + h.failureCount;
+    });
+    let topDesc = 'Aggregated warranty claims data.', maxWeight = -1;
+    Object.entries(descWeights).forEach(([desc, weight]) => {
+      if (weight > maxWeight) { maxWeight = weight; topDesc = desc; }
+    });
+    return topDesc;
   };
 
   // Adds one slide to `pptx` from a screenshot of `element`, titled `slideTitle`.
@@ -838,7 +870,7 @@ function PartLabeler() {
   // (right, top-right corner) side by side, 3) all 4 "wise data" charts,
   // same size/shape, all native PPT charts (no map - PowerPoint has no
   // native map-chart type, so region uses the same data as a bar chart too).
-  const addComponentSlide = async (pptx, label, viewConfig) => {
+  const addComponentSlide = async (pptx, label, viewConfig, componentData, componentDescription, componentMonthFailures) => {
     const slide = pptx.addSlide();
 
     slide.addText(label.partName, {
@@ -861,20 +893,27 @@ function PartLabeler() {
     const filterLabel = filterMonth.includes('All') ? 'Annual' : (filterMonth.length === 1 ? filterMonth[0] : 'Multiple');
     slide.addText([{ text: 'COMPONENT\n', options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: label.partName, options: { fontSize: 18, bold: true, color: 'DC0028' } }],
       { x: panelX, y: topY, w: panelW, h: 0.65, valign: 'top' });
-    slide.addText([{ text: 'PRIMARY CONCERN\n', options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: currentDescription || '-', options: { fontSize: 12, color: '2d3748' } }],
+    slide.addText([{ text: 'PRIMARY CONCERN\n', options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: componentDescription || '-', options: { fontSize: 12, color: '2d3748' } }],
       { x: panelX, y: topY + 0.75, w: panelW, h: 0.55, valign: 'top', wrap: true, fit: 'shrink' });
-    slide.addText([{ text: `${filterLabel.toUpperCase()} FAILURES\n`, options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: String(currentMonthFailures), options: { fontSize: 26, bold: true, color: 'DC0028' } }],
+    slide.addText([{ text: `${filterLabel.toUpperCase()} FAILURES\n`, options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: String(componentMonthFailures ?? 0), options: { fontSize: 26, bold: true, color: 'DC0028' } }],
       { x: panelX, y: topY + 1.4, w: panelW, h: 0.8, valign: 'top' });
 
     // 4 uniform charts, same size/shape, in a row below - back to the
     // pre-styling-pass sizing (chartH 3.2, title 0.3 above each chart),
     // keeping the card/shadow/gridline polish from the styling pass.
     const chartY = 3.95, chartH = 3.2, gap = 0.15, chartW = (12.73 - 3 * gap) / 4;
+    // Use the data fetched specifically for THIS component, not the shared
+    // `dashboardData` React state - inside the export loop that state is
+    // always one step behind (setState doesn't apply until the next render,
+    // but this loop runs as one continuous function call), so every slide
+    // was silently reusing whichever part was on screen when the download
+    // button was clicked.
+    const cd = componentData || { mfgMonth: [], reportingMonth: [], kms: [], region: [] };
     const chartDefs = [
-      { data: dashboardData.mfgMonth, title: viewConfig.chartTitles.mfgMonth, color: 'f6ad55' },
-      { data: dashboardData.reportingMonth, title: viewConfig.chartTitles.reportingMonth, color: '68d391' },
-      { data: dashboardData.kms, title: viewConfig.chartTitles.kms, color: '76e4f7' },
-      { data: dashboardData.region, title: viewConfig.chartTitles.region, color: '667eea' }
+      { data: cd.mfgMonth, title: viewConfig.chartTitles.mfgMonth, color: 'f6ad55' },
+      { data: cd.reportingMonth, title: viewConfig.chartTitles.reportingMonth, color: '68d391' },
+      { data: cd.kms, title: viewConfig.chartTitles.kms, color: '76e4f7' },
+      { data: cd.region, title: viewConfig.chartTitles.region, color: '667eea' }
     ];
 
     // Styling pass so these read as designed cards, not a default PPT chart:
@@ -936,7 +975,7 @@ function PartLabeler() {
 
       for (const label of labels) {
         setActivePopup(label);
-        await Promise.all([
+        const [componentData, componentHistory] = await Promise.all([
           fetchDashboardData(label.partName),
           fetchActivePartHistory(label)
         ]);
@@ -944,7 +983,12 @@ function PartLabeler() {
         await new Promise(resolve => setTimeout(resolve, 800));
 
         const viewConfig = allModeActiveSource ? DATA_SOURCES[allModeActiveSource.src] : sourceConfig;
-        await addComponentSlide(pptx, label, viewConfig);
+        const history = componentHistory || [];
+        await addComponentSlide(
+          pptx, label, viewConfig, componentData,
+          computeDescription(history, filterMonth),
+          computeMonthFailures(history, filterMonth)
+        );
       }
 
       const dateStr = new Date().toISOString().slice(0, 10);
@@ -1705,32 +1749,8 @@ function PartLabeler() {
     }
   };
 
-  const currentMonthFailures = filterMonth.includes('All')
-    ? warrantyHistory.reduce((sum, item) => sum + item.failureCount, 0)
-    : warrantyHistory.filter(h => filterMonth.includes(h.month)).reduce((sum, item) => sum + item.failureCount, 0);
-
-  const currentDescription = (() => {
-    if (!filterMonth.includes('All')) {
-      const match = warrantyHistory.find(h => filterMonth.includes(h.month));
-      if (match) return match.description;
-    }
-    if (!warrantyHistory || warrantyHistory.length === 0) return 'Aggregated warranty claims data.';
-    const descWeights = {};
-    const relevantHistory = filterMonth.includes('All') ? warrantyHistory : warrantyHistory.filter(h => filterMonth.includes(h.month));
-    relevantHistory.forEach(h => {
-      const d = h.description;
-      if (d && d !== '-' && d !== 'null') descWeights[d] = (descWeights[d] || 0) + h.failureCount;
-    });
-    let topDesc = 'Aggregated warranty claims data.';
-    let maxWeight = -1;
-    Object.entries(descWeights).forEach(([desc, weight]) => {
-      if (weight > maxWeight) {
-        maxWeight = weight;
-        topDesc = desc;
-      }
-    });
-    return topDesc;
-  })();
+  const currentMonthFailures = computeMonthFailures(warrantyHistory, filterMonth);
+  const currentDescription = computeDescription(warrantyHistory, filterMonth);
 
   return (
     <div className="part-labeler">
