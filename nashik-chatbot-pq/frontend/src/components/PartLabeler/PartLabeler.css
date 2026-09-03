@@ -549,11 +549,12 @@
   gap: 3px;
 }
 
-/* Matches .primary-concern-row strong / .mini-stat .label styling, so the
-   note panel reads as part of the same summary card, not a bolted-on extra. */
+/* Dark, same as the component name text, so the header is actually
+   legible - the lighter gray used by the other small labels was too
+   faint here. */
 .part-note-label {
-  font-size: 0.6rem;
-  color: #94a3b8;
+  font-size: 0.65rem;
+  color: var(--text-dark);
   font-weight: 700;
   text-transform: uppercase;
 }
