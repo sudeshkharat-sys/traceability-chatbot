@@ -51,6 +51,13 @@ class PartLabelerQueries:
         WHERE image_id = :image_id AND user_id = :user_id
     """
 
+    GET_LABEL_NOTE_BY_PART_NAME = """
+        SELECT user_note FROM labels
+        WHERE part_name = :part_name AND user_id = :user_id
+        ORDER BY id DESC
+        LIMIT 1
+    """
+
     GET_UNIQUE_MODELS = """
         SELECT DISTINCT base_model FROM raw_warranty_data 
         WHERE base_model IS NOT NULL AND base_model != '' AND user_id = :user_id

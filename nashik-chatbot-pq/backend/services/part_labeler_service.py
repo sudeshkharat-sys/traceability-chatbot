@@ -268,17 +268,26 @@ class PartLabelerService:
                 PartLabelerQueries.GET_ALL_WARRANTY_FOR_PART,
                 params
             )
-            
+
             if not rows:
                 return "No data found"
 
+            # Action Notes is per-component (one value for this part), not
+            # per-warranty-claim - fetch it once and repeat it on every row,
+            # same way it's shown once per component in the UI popup and PPT.
+            note_row = self.db.execute_query(
+                PartLabelerQueries.GET_LABEL_NOTE_BY_PART_NAME,
+                {"part_name": part_name, "user_id": user_id}
+            )
+            action_note = note_row[0][0] if note_row and note_row[0][0] else ''
+
             output = io.StringIO()
             writer = csv.writer(output)
-            
+
             # Write column names first
-            writer.writerow(headers)
+            writer.writerow(list(headers) + ["Action Notes"])
             # Write data rows
-            writer.writerows(rows)
+            writer.writerows(list(row) + [action_note] for row in rows)
             return output.getvalue()
         except Exception as e:
             logger.error(f"Error generating CSV: {e}")
