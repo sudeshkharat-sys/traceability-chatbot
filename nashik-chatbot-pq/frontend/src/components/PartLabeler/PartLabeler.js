@@ -2449,18 +2449,21 @@ function PartLabeler() {
                         </motion.div>
                         <div className="part-note-panel">
                           {(partNotes[activePopup.id] ?? activePopup.note) || openNoteFor === activePopup.id ? (
-                            <textarea
-                              className="part-note-box"
-                              placeholder="Add action notes..."
-                              autoFocus={openNoteFor === activePopup.id}
-                              value={partNotes[activePopup.id] ?? activePopup.note ?? ''}
-                              onChange={(e) => setPartNotes(prev => ({ ...prev, [activePopup.id]: e.target.value }))}
-                              onFocus={() => setOpenNoteFor(activePopup.id)}
-                              onBlur={() => {
-                                saveLabelNote(activePopup.id);
-                                if (!(partNotes[activePopup.id] || '').trim()) setOpenNoteFor(null);
-                              }}
-                            />
+                            <div className="part-note-box-wrap">
+                              <span className="part-note-label">ACTION NOTES</span>
+                              <textarea
+                                className="part-note-box"
+                                placeholder="Add action notes..."
+                                autoFocus={openNoteFor === activePopup.id}
+                                value={partNotes[activePopup.id] ?? activePopup.note ?? ''}
+                                onChange={(e) => setPartNotes(prev => ({ ...prev, [activePopup.id]: e.target.value }))}
+                                onFocus={() => setOpenNoteFor(activePopup.id)}
+                                onBlur={() => {
+                                  saveLabelNote(activePopup.id);
+                                  if (!(partNotes[activePopup.id] || '').trim()) setOpenNoteFor(null);
+                                }}
+                              />
+                            </div>
                           ) : (
                             <button
                               className="note-icon-btn-panel"
