@@ -522,7 +522,7 @@
   font-weight: 600;
 }
 
-/* Active-part summary card + note panel, side by side */
+/* Active-part summary card + note panel, always side by side, 50/50 */
 .active-part-row {
   display: flex;
   align-items: stretch;
@@ -530,42 +530,15 @@
 }
 
 .active-part-row .active-part-details {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
 }
 
 .part-note-panel {
-  flex: 0 0 auto;
-  width: 44px;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 4px;
-  transition: width 0.15s ease;
-}
-
-.active-part-row.note-open .part-note-panel {
   flex: 1 1 0;
-  width: auto;
+  min-width: 0;
+  display: flex;
   align-items: stretch;
-}
-
-.note-icon-btn-panel {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: 1px dashed #d1d5db;
-  border-radius: 8px;
-  background: transparent;
-  color: #9ca3af;
-  cursor: pointer;
-}
-
-.note-icon-btn-panel:hover {
-  color: var(--mahindra-red);
-  border-color: var(--mahindra-red);
 }
 
 .part-note-box-wrap {

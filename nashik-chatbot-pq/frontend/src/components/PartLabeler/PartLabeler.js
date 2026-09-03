@@ -33,8 +33,7 @@ import {
   ChevronUp,
   Bot,
   Send,
-  ChevronLeft,
-  MessageSquarePlus
+  ChevronLeft
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -686,10 +685,9 @@ function PartLabeler() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [images, setImages] = useState([]);
   const [labels, setLabels] = useState([]);
-  // Free-text note per component (Mapped Components list). Keyed by label.id -
+  // Action note per component (active-part summary popup). Keyed by label.id -
   // hydrated from the backend on load, edited locally while typing, saved on blur.
   const [partNotes, setPartNotes] = useState({});
-  const [openNoteFor, setOpenNoteFor] = useState(null);
   const [labelFailures, setLabelFailures] = useState({});
   const [labelFailuresBySource, setLabelFailuresBySource] = useState({});
   const [allModeActiveSource, setAllModeActiveSource] = useState(null); // { label, src } when drilling into a source in All mode
@@ -2386,7 +2384,7 @@ function PartLabeler() {
                     </div>
                                         <AnimatePresence>
                                           {activePopup && (
-                                          <div className={`active-part-row ${(partNotes[activePopup.id] ?? activePopup.note) || openNoteFor === activePopup.id ? 'note-open' : ''}`}>
+                                          <div className="active-part-row note-open">
                                             <motion.div
                                               ref={detailCardRef}
                                               initial={{ opacity: 0, y: 10 }}
@@ -2448,31 +2446,16 @@ function PartLabeler() {
                           </div>
                         </motion.div>
                         <div className="part-note-panel">
-                          {(partNotes[activePopup.id] ?? activePopup.note) || openNoteFor === activePopup.id ? (
-                            <div className="part-note-box-wrap">
-                              <span className="part-note-label">ACTION NOTES</span>
-                              <textarea
-                                className="part-note-box"
-                                placeholder="Add action notes..."
-                                autoFocus={openNoteFor === activePopup.id}
-                                value={partNotes[activePopup.id] ?? activePopup.note ?? ''}
-                                onChange={(e) => setPartNotes(prev => ({ ...prev, [activePopup.id]: e.target.value }))}
-                                onFocus={() => setOpenNoteFor(activePopup.id)}
-                                onBlur={() => {
-                                  saveLabelNote(activePopup.id);
-                                  if (!(partNotes[activePopup.id] || '').trim()) setOpenNoteFor(null);
-                                }}
-                              />
-                            </div>
-                          ) : (
-                            <button
-                              className="note-icon-btn-panel"
-                              onClick={() => setOpenNoteFor(activePopup.id)}
-                              title="Add action notes"
-                            >
-                              <MessageSquarePlus size={18} />
-                            </button>
-                          )}
+                          <div className="part-note-box-wrap">
+                            <span className="part-note-label">ACTION NOTES</span>
+                            <textarea
+                              className="part-note-box"
+                              placeholder="Add action notes..."
+                              value={partNotes[activePopup.id] ?? activePopup.note ?? ''}
+                              onChange={(e) => setPartNotes(prev => ({ ...prev, [activePopup.id]: e.target.value }))}
+                              onBlur={() => saveLabelNote(activePopup.id)}
+                            />
+                          </div>
                         </div>
                       </div>
                       )}
