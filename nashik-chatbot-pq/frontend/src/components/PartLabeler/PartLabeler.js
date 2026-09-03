@@ -34,7 +34,6 @@ import {
   Bot,
   Send,
   ChevronLeft,
-  MessageSquare,
   MessageSquarePlus
 } from 'lucide-react';
 import { 
@@ -2285,14 +2284,7 @@ function PartLabeler() {
                             <React.Fragment key={label.id}>
                               <div className={`label-marker ${activePopup?.id === label.id ? 'active' : ''}`}
                                 onClick={(e) => { e.stopPropagation(); handleMarkerClick(label); }}
-                                style={{ left: `${label.x}%`, top: `${label.y}%` }}>
-                                {index + 1}
-                                {!!(partNotes[label.id] ?? label.note) && (
-                                  <span className="marker-note-badge" title="Has a note">
-                                    <MessageSquare size={8} fill="currentColor" />
-                                  </span>
-                                )}
-                              </div>
+                                style={{ left: `${label.x}%`, top: `${label.y}%` }}>{index + 1}</div>
                               {isSummaryActive && nodePositions[index] && (
                                 <DraggableNode
                                   label={label}
@@ -2449,7 +2441,7 @@ function PartLabeler() {
                           {(partNotes[activePopup.id] ?? activePopup.note) || openNoteFor === activePopup.id ? (
                             <textarea
                               className="part-note-box"
-                              placeholder="Add a note..."
+                              placeholder="Add notes..."
                               autoFocus={openNoteFor === activePopup.id}
                               value={partNotes[activePopup.id] ?? activePopup.note ?? ''}
                               onChange={(e) => setPartNotes(prev => ({ ...prev, [activePopup.id]: e.target.value }))}
@@ -2463,7 +2455,7 @@ function PartLabeler() {
                             <button
                               className="note-icon-btn-panel"
                               onClick={() => setOpenNoteFor(activePopup.id)}
-                              title="Add note"
+                              title="Add notes"
                             >
                               <MessageSquarePlus size={18} />
                             </button>

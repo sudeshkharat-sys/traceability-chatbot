@@ -591,23 +591,6 @@
   border-color: var(--mahindra-red);
 }
 
-/* Small badge on a CAD image marker showing it has a note */
-.marker-note-badge {
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #166534;
-  border: 1.5px solid #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #ffffff;
-  pointer-events: none;
-}
-
 /* All-sources columnar table */
 .all-sources-table th,
 .all-sources-table td {
