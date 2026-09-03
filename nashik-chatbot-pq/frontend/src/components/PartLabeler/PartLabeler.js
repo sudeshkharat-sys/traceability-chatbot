@@ -888,7 +888,12 @@ function PartLabeler() {
   // (right, top-right corner) side by side, 3) all 4 "wise data" charts,
   // same size/shape, all native PPT charts (no map - PowerPoint has no
   // native map-chart type, so region uses the same data as a bar chart too).
-  const addComponentSlide = async (pptx, label, viewConfig, componentData, componentDescription, componentMonthFailures) => {
+  //
+  // The image is deliberately a bit narrower than it could be, on every
+  // slide - not just the ones with a note - so the deck reads as one
+  // consistent layout rather than some slides having a bigger image and
+  // others a smaller one depending on which parts happen to have notes.
+  const addComponentSlide = async (pptx, label, viewConfig, componentData, componentDescription, componentMonthFailures, componentNote) => {
     const slide = pptx.addSlide();
 
     slide.addText(label.partName, {
@@ -896,9 +901,9 @@ function PartLabeler() {
       fontSize: 24, bold: true, color: 'DC0028'
     });
 
-    // Top row: image on the left (~68%), detail panel on the right (~30%)
+    // Top row: image on the left, detail panel (incl. Action Notes) on the right
     const topY = 0.5, topH = 2.85;
-    const imgAreaW = 8.6, panelX = 0.3 + imgAreaW + 0.2, panelW = 12.73 - imgAreaW - 0.2;
+    const imgAreaW = 7.6, panelX = 0.3 + imgAreaW + 0.2, panelW = 12.73 - imgAreaW - 0.2;
 
     const top = await captureElement(pptTopSectionRef.current, { scale: 2.5, enhance: true });
     if (top) {
@@ -914,7 +919,11 @@ function PartLabeler() {
     slide.addText([{ text: 'PRIMARY CONCERN\n', options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: componentDescription || '-', options: { fontSize: 12, color: '2d3748' } }],
       { x: panelX, y: topY + 0.75, w: panelW, h: 0.55, valign: 'top', wrap: true, fit: 'shrink' });
     slide.addText([{ text: `${filterLabel.toUpperCase()} FAILURES\n`, options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: String(componentMonthFailures ?? 0), options: { fontSize: 26, bold: true, color: 'DC0028' } }],
-      { x: panelX, y: topY + 1.4, w: panelW, h: 0.8, valign: 'top' });
+      { x: panelX, y: topY + 1.4, w: panelW, h: 0.65, valign: 'top' });
+    // Reserved on every slide, note-having or not, so the panel layout stays
+    // identical across the whole deck rather than resizing per component.
+    slide.addText([{ text: 'ACTION NOTES\n', options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: componentNote?.trim() || '-', options: { fontSize: 10, color: '2d3748' } }],
+      { x: panelX, y: topY + 2.05, w: panelW, h: 0.75, valign: 'top', wrap: true, fit: 'shrink' });
 
     // 4 uniform charts, same size/shape, in a row below - back to the
     // pre-styling-pass sizing (chartH 3.2, title 0.3 above each chart),
@@ -1005,7 +1014,8 @@ function PartLabeler() {
         await addComponentSlide(
           pptx, label, viewConfig, componentData,
           computeDescription(history, filterMonth),
-          computeMonthFailures(history, filterMonth)
+          computeMonthFailures(history, filterMonth),
+          partNotes[label.id] ?? label.note ?? ''
         );
       }
 
@@ -2441,7 +2451,7 @@ function PartLabeler() {
                           {(partNotes[activePopup.id] ?? activePopup.note) || openNoteFor === activePopup.id ? (
                             <textarea
                               className="part-note-box"
-                              placeholder="Add notes..."
+                              placeholder="Add action notes..."
                               autoFocus={openNoteFor === activePopup.id}
                               value={partNotes[activePopup.id] ?? activePopup.note ?? ''}
                               onChange={(e) => setPartNotes(prev => ({ ...prev, [activePopup.id]: e.target.value }))}
@@ -2455,7 +2465,7 @@ function PartLabeler() {
                             <button
                               className="note-icon-btn-panel"
                               onClick={() => setOpenNoteFor(activePopup.id)}
-                              title="Add notes"
+                              title="Add action notes"
                             >
                               <MessageSquarePlus size={18} />
                             </button>
