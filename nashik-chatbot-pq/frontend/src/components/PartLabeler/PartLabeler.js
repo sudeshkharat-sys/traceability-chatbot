@@ -404,7 +404,7 @@ const addRegionOutlineMap = (pptx, slide, data, x, y, w, h) => {
   Object.entries(INDIA_STATE_OUTLINES).forEach(([state, rings]) => {
     const value = valueByState[state] || 0;
     const hasData = state in valueByState;
-    const fill = hasData && value > 0 ? hexLerp('fde8ec', 'DC0028', value / maxValue) : 'eef1f4';
+    const fill = hasData && value > 0 ? hexLerp('f0fdf4', '166534', value / maxValue) : 'eef1f4';
 
     const projRings = rings.map(ring => ring.map(project));
     const allPts = projRings.flat();
@@ -448,7 +448,7 @@ const addRegionOutlineMap = (pptx, slide, data, x, y, w, h) => {
   const rowH = Math.min(0.34, (h - 0.24) / Math.max(top.length, 1));
   top.forEach((d, i) => {
     const ry = y + 0.24 + i * rowH;
-    slide.addShape(pptx.ShapeType.rect, { x: x + mapW + 0.08, y: ry + rowH / 2 - 0.035, w: 0.07, h: 0.07, fill: { color: hexLerp('fde8ec', 'DC0028', d.value / maxValue) }, line: { type: 'none' } });
+    slide.addShape(pptx.ShapeType.rect, { x: x + mapW + 0.08, y: ry + rowH / 2 - 0.035, w: 0.07, h: 0.07, fill: { color: hexLerp('f0fdf4', '166534', d.value / maxValue) }, line: { type: 'none' } });
     slide.addText(
       [
         { text: stateAbbr(d.label) + '  ', options: { fontSize: 6.5, bold: true, color: '2d3748' } },
@@ -456,7 +456,7 @@ const addRegionOutlineMap = (pptx, slide, data, x, y, w, h) => {
       ],
       { x: x + mapW + 0.2, y: ry, w: legendW - 0.55, h: rowH, valign: 'middle', wrap: false }
     );
-    slide.addText(String(d.value), { x: x + w - 0.35, y: ry, w: 0.35, h: rowH, fontSize: 6.5, bold: true, color: 'DC0028', align: 'right', valign: 'middle' });
+    slide.addText(String(d.value), { x: x + w - 0.35, y: ry, w: 0.35, h: rowH, fontSize: 6.5, bold: true, color: '166534', align: 'right', valign: 'middle' });
   });
 };
 
