@@ -333,6 +333,14 @@ class PartLabelerService:
         )
         return True
 
+    def update_label_note(self, label_id: int, note: str, user_id: int) -> bool:
+        """Update the free-text note for a label"""
+        self.db.execute_update(
+            PartLabelerQueries.UPDATE_LABEL_NOTE,
+            {"id": label_id, "note": note, "user_id": user_id}
+        )
+        return True
+
     def get_labels_for_image(self, image_id: int, user_id: int) -> List[Dict[str, Any]]:
         """Get all labels associated with an image"""
         rows = self.db.execute_query(
@@ -349,7 +357,8 @@ class PartLabelerService:
                 "failureCount": r[5],
                 "reportMonth": r[6],
                 "x": r[7],
-                "y": r[8]
+                "y": r[8],
+                "note": r[9]
             }
             for r in rows
         ]

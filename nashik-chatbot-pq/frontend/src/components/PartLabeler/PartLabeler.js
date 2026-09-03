@@ -33,7 +33,9 @@ import {
   ChevronUp,
   Bot,
   Send,
-  ChevronLeft
+  ChevronLeft,
+  MessageSquare,
+  MessageSquarePlus
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -685,6 +687,10 @@ function PartLabeler() {
   const [selectedImage, setSelectedImage] = useState(null);
   const [images, setImages] = useState([]);
   const [labels, setLabels] = useState([]);
+  // Free-text note per component (Mapped Components list). Keyed by label.id -
+  // hydrated from the backend on load, edited locally while typing, saved on blur.
+  const [partNotes, setPartNotes] = useState({});
+  const [openNoteFor, setOpenNoteFor] = useState(null);
   const [labelFailures, setLabelFailures] = useState({});
   const [labelFailuresBySource, setLabelFailuresBySource] = useState({});
   const [allModeActiveSource, setAllModeActiveSource] = useState(null); // { label, src } when drilling into a source in All mode
@@ -1305,10 +1311,30 @@ function PartLabeler() {
       const data = await res.json();
       const labelsArray = Array.isArray(data) ? data : [];
       setLabels(labelsArray);
+      // Hydrate notes from the backend, but don't clobber an in-progress edit
+      // (e.g. a re-fetch triggered by a filter change while a box is open).
+      setPartNotes(prev => {
+        const next = { ...prev };
+        labelsArray.forEach(l => { if (!(l.id in next)) next[l.id] = l.note || ''; });
+        return next;
+      });
       updateAllLabelFailures(labelsArray, filterMonth, filterModel, filterMIS, filterMfgQtr);
     } catch (err) {
       console.error("Failed to fetch labels", err);
       setLabels([]);
+    }
+  };
+
+  const saveLabelNote = async (labelId) => {
+    const note = partNotes[labelId] ?? '';
+    try {
+      await fetch(`${API_BASE}/labels/${labelId}/note`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note, userId })
+      });
+    } catch (err) {
+      console.error("Failed to save note", err);
     }
   };
 
@@ -2314,23 +2340,49 @@ function PartLabeler() {
                                 const srcCounts = labelFailuresBySource[label.id] || {};
                                 const total = (srcCounts.warranty || 0) + (srcCounts.rpt || 0) + (srcCounts.gnovac || 0) + (srcCounts.rfi || 0) + (srcCounts.esqa || 0);
                                 const isActive = allModeActiveSource?.label?.id === label.id;
+                                const hasNote = !!(partNotes[label.id] ?? label.note);
                                 return (
-                                  <tr key={label.id} className={isActive ? 'active-row-all' : ''}>
-                                    <td>{idx + 1}</td>
-                                    <td className="part-name-cell">{label.partName}</td>
-                                    {['warranty', 'rpt', 'gnovac', 'rfi', 'esqa'].map(s => (
-                                      <td
-                                        key={s}
-                                        className={`source-count-cell ${isActive && allModeActiveSource?.src === s ? 'active-source-cell' : ''}`}
-                                        style={{ textAlign: 'right', fontWeight: 700, cursor: 'pointer' }}
-                                        onClick={() => handleAllModeSourceClick(label, s)}
-                                        title={`View ${DATA_SOURCES[s].label} charts for ${label.partName}`}
-                                      >
-                                        {srcCounts[s] || 0}
+                                  <React.Fragment key={label.id}>
+                                    <tr className={isActive ? 'active-row-all' : ''}>
+                                      <td>{idx + 1}</td>
+                                      <td className="part-name-cell">
+                                        {label.partName}
+                                        <button
+                                          className="note-icon-btn"
+                                          onClick={(e) => { e.stopPropagation(); setOpenNoteFor(openNoteFor === label.id ? null : label.id); }}
+                                          title={hasNote ? 'View note' : 'Add note'}
+                                        >
+                                          {hasNote ? <MessageSquare size={13} fill="currentColor" /> : <MessageSquarePlus size={13} />}
+                                        </button>
                                       </td>
-                                    ))}
-                                    <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--mahindra-red)' }}>{total}</td>
-                                  </tr>
+                                      {['warranty', 'rpt', 'gnovac', 'rfi', 'esqa'].map(s => (
+                                        <td
+                                          key={s}
+                                          className={`source-count-cell ${isActive && allModeActiveSource?.src === s ? 'active-source-cell' : ''}`}
+                                          style={{ textAlign: 'right', fontWeight: 700, cursor: 'pointer' }}
+                                          onClick={() => handleAllModeSourceClick(label, s)}
+                                          title={`View ${DATA_SOURCES[s].label} charts for ${label.partName}`}
+                                        >
+                                          {srcCounts[s] || 0}
+                                        </td>
+                                      ))}
+                                      <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--mahindra-red)' }}>{total}</td>
+                                    </tr>
+                                    {openNoteFor === label.id && (
+                                      <tr className="note-row">
+                                        <td colSpan={8}>
+                                          <textarea
+                                            className="part-note-box"
+                                            placeholder="Add a note..."
+                                            autoFocus
+                                            value={partNotes[label.id] ?? label.note ?? ''}
+                                            onChange={(e) => setPartNotes(prev => ({ ...prev, [label.id]: e.target.value }))}
+                                            onBlur={() => saveLabelNote(label.id)}
+                                          />
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </React.Fragment>
                                 );
                               })}
                             </tbody>
@@ -2339,11 +2391,42 @@ function PartLabeler() {
                           <table className="integrated-table">
                             <thead><tr><th>#</th><th>Component Name</th><th style={{ textAlign: 'right' }}>Failures</th></tr></thead>
                             <tbody>
-                              {labels.map((label, idx) => (
-                                <tr key={label.id} className={activePopup?.id === label.id ? 'active-row' : ''} onClick={() => handleMarkerClick(label)}>
-                                  <td>{idx + 1}</td><td className="part-name-cell">{label.partName}</td><td style={{ textAlign: 'right', fontWeight: 700 }}>{labelFailures[label.id] || 0}</td>
-                                </tr>
-                              ))}
+                              {labels.map((label, idx) => {
+                                const hasNote = !!(partNotes[label.id] ?? label.note);
+                                return (
+                                  <React.Fragment key={label.id}>
+                                    <tr className={activePopup?.id === label.id ? 'active-row' : ''} onClick={() => handleMarkerClick(label)}>
+                                      <td>{idx + 1}</td>
+                                      <td className="part-name-cell">
+                                        {label.partName}
+                                        <button
+                                          className="note-icon-btn"
+                                          onClick={(e) => { e.stopPropagation(); setOpenNoteFor(openNoteFor === label.id ? null : label.id); }}
+                                          title={hasNote ? 'View note' : 'Add note'}
+                                        >
+                                          {hasNote ? <MessageSquare size={13} fill="currentColor" /> : <MessageSquarePlus size={13} />}
+                                        </button>
+                                      </td>
+                                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{labelFailures[label.id] || 0}</td>
+                                    </tr>
+                                    {openNoteFor === label.id && (
+                                      <tr className="note-row">
+                                        <td colSpan={3}>
+                                          <textarea
+                                            className="part-note-box"
+                                            placeholder="Add a note..."
+                                            autoFocus
+                                            value={partNotes[label.id] ?? label.note ?? ''}
+                                            onChange={(e) => setPartNotes(prev => ({ ...prev, [label.id]: e.target.value }))}
+                                            onBlur={() => saveLabelNote(label.id)}
+                                            onClick={(e) => e.stopPropagation()}
+                                          />
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </React.Fragment>
+                                );
+                              })}
                             </tbody>
                           </table>
                         )}

@@ -201,6 +201,8 @@ COLUMN_MIGRATIONS = [
     "ON line_model_mappings (layout_id, line_group_id, car_model_id) WHERE car_model_id IS NOT NULL",
     "CREATE UNIQUE INDEX IF NOT EXISTS idx_line_model_mappings_unique_nocar "
     "ON line_model_mappings (layout_id, line_group_id) WHERE car_model_id IS NULL",
+    # free-text note a user can attach to a mapped component in PartLabeler
+    "ALTER TABLE labels ADD COLUMN IF NOT EXISTS user_note TEXT NOT NULL DEFAULT ''",
 ]
 
 

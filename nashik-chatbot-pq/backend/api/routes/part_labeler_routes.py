@@ -39,6 +39,10 @@ class UpdateLabelDto(BaseModel):
     partName: str
     userId: int
 
+class UpdateLabelNoteDto(BaseModel):
+    note: str
+    userId: int
+
 class MappingRequest(BaseModel):
     tempFilePath: str
     mapping: Dict[str, str]
@@ -199,6 +203,15 @@ async def update_label(label_id: int, payload: UpdateLabelDto):
     except Exception as e:
         logger.error(f"Update label error: {e}")
         raise HTTPException(status_code=500, detail="Failed to update label")
+
+@router.put("/labels/{label_id}/note")
+async def update_label_note(label_id: int, payload: UpdateLabelNoteDto):
+    try:
+        get_service().update_label_note(label_id, payload.note, payload.userId)
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Update label note error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save note")
 
 @router.get("/labels/{image_id}")
 async def get_labels(image_id: int, userId: int = Query(...)):

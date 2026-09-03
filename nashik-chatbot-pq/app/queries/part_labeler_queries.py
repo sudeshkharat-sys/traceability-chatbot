@@ -39,8 +39,14 @@ class PartLabelerQueries:
         WHERE id = :id AND user_id = :user_id
     """
 
+    UPDATE_LABEL_NOTE = """
+        UPDATE labels
+        SET user_note = :note
+        WHERE id = :id AND user_id = :user_id
+    """
+
     GET_LABELS_FOR_IMAGE = """
-        SELECT id, image_id, part_name, description, part_number, failure_count, report_month, x_coord, y_coord
+        SELECT id, image_id, part_name, description, part_number, failure_count, report_month, x_coord, y_coord, user_note
         FROM labels
         WHERE image_id = :image_id AND user_id = :user_id
     """
