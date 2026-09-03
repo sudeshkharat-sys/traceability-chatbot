@@ -522,37 +522,55 @@
   font-weight: 600;
 }
 
-.note-icon-btn {
+/* Active-part summary card + note panel, side by side */
+.active-part-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.active-part-row .active-part-details {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.part-note-panel {
+  flex: 0 0 auto;
+  width: 44px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 4px;
+  transition: width 0.15s ease;
+}
+
+.active-part-row.note-open .part-note-panel {
+  flex: 1 1 0;
+  width: auto;
+  align-items: stretch;
+}
+
+.note-icon-btn-panel {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-left: 6px;
-  padding: 2px;
-  border: none;
+  width: 30px;
+  height: 30px;
+  border: 1px dashed #d1d5db;
+  border-radius: 8px;
   background: transparent;
   color: #9ca3af;
   cursor: pointer;
-  vertical-align: middle;
 }
 
-.note-icon-btn:hover {
+.note-icon-btn-panel:hover {
   color: var(--mahindra-red);
-}
-
-.integrated-table tr.active-row td .note-icon-btn,
-.integrated-table tr.active-row-all td .note-icon-btn {
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.note-row td {
-  cursor: default;
-  padding: 6px 12px 10px;
-  background: #fafbfc;
+  border-color: var(--mahindra-red);
 }
 
 .part-note-box {
   width: 100%;
-  min-height: 54px;
+  min-height: 100%;
   padding: 8px 10px;
   font-size: 0.75rem;
   font-family: inherit;
@@ -571,6 +589,23 @@
 .part-note-box:focus {
   outline: none;
   border-color: var(--mahindra-red);
+}
+
+/* Small badge on a CAD image marker showing it has a note */
+.marker-note-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #166534;
+  border: 1.5px solid #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  pointer-events: none;
 }
 
 /* All-sources columnar table */
