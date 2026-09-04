@@ -470,7 +470,9 @@
 }
 
 .side-data-left {
-  flex: 1 1 55%;
+  /* Narrower than before (was 55%) - Action Notes needs more width than
+     the mapped table + summary, which are mostly short fixed-length text. */
+  flex: 1 1 38%;
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -487,7 +489,10 @@
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 0;
+  /* Enough for the header row + ~3 component rows to stay visible even
+     when the summary card below grows - the table scrolls internally
+     (panel-table-scroll) for the rest. */
+  min-height: 160px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.02);
 }
 
@@ -561,7 +566,7 @@
    height), and active-part-details sits below the mapped table in the
    left column - see .side-data-left above. */
 .part-note-panel {
-  flex: 1 1 45%;
+  flex: 1 1 62%;
   min-width: 0;
   height: 100%;
   display: flex;
@@ -607,6 +612,12 @@
   border-radius: 6px;
   resize: vertical;
   box-sizing: border-box;
+  /* A run of typed spaces (or one long unbroken word) wasn't wrapping,
+     so it pushed past the box's right edge instead of dropping to the
+     next line. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .part-note-box::placeholder {
@@ -706,7 +717,11 @@
   flex-direction: column;
   gap: 8px;
   box-shadow: 0 4px 20px rgba(220, 20, 60, 0.08);
+  /* Kept compact so the mapped table above it keeps priority for height -
+     it holds a handful of short fixed fields, it doesn't need to grow. */
   flex: 0 0 auto;
+  max-height: 35%;
+  overflow: hidden;
 }
 
 .details-header {

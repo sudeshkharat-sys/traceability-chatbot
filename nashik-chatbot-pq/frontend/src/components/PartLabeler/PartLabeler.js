@@ -934,11 +934,15 @@ function PartLabeler() {
     // the whole line unreadably small rather than just trimming the text.
     const concernText = componentDescription || '-';
     const concernTrimmed = concernText.length > 90 ? concernText.slice(0, 90).trim() + '...' : concernText;
+    // Keys were a dull gray next to neon-red values - too much contrast
+    // in one direction, not enough in the other, so neither read as
+    // important. Keys are now a darker slate (still clearly secondary,
+    // but legible) and both keys/values are a size up.
     slide.addText([
-      { text: 'CONCERN: ', options: { fontSize: 10, bold: true, color: '7f8c8d' } },
-      { text: `${concernTrimmed}    `, options: { fontSize: 11, color: '2d3748' } },
-      { text: `${filterLabel.toUpperCase()} FAILURES: `, options: { fontSize: 10, bold: true, color: '7f8c8d' } },
-      { text: String(componentMonthFailures ?? 0), options: { fontSize: 13, bold: true, color: 'DC0028' } }
+      { text: 'CONCERN: ', options: { fontSize: 11, bold: true, color: '475569' } },
+      { text: `${concernTrimmed}    `, options: { fontSize: 12, bold: true, color: '1e293b' } },
+      { text: `${filterLabel.toUpperCase()} FAILURES: `, options: { fontSize: 11, bold: true, color: '475569' } },
+      { text: String(componentMonthFailures ?? 0), options: { fontSize: 14, bold: true, color: 'B01030' } }
     ], { x: leftAreaX, y: topY + imgH + sectionGap, w: leftAreaW, h: summaryH - sectionGap, valign: 'top', wrap: true, fit: 'shrink' });
 
     // Right side: Action Notes fills the full height, own light-gray
@@ -1028,6 +1032,11 @@ function PartLabeler() {
     try {
       const pptx = new PptxGenJS();
       pptx.layout = 'LAYOUT_WIDE'; // 13.33" x 7.5"
+      // No font was set before, so every text box fell back to pptxgenjs's
+      // default (Arial). Calibri reads as the more modern/corporate choice
+      // for a deck like this - swap this for an actual Mahindra brand font
+      // name if there's a specific one to use.
+      pptx.theme = { headFontFace: 'Calibri', bodyFontFace: 'Calibri' };
 
       for (const label of labels) {
         setActivePopup(label);
