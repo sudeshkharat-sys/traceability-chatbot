@@ -541,13 +541,33 @@
   font-weight: 600;
 }
 
+/* Summary card + note panel, side by side, fixed 30/70 split - notes is
+   free-typed and can run long (ICA/PCA bullets etc.), the summary card's
+   fields (name/concern/failures) are short and fixed. */
+.active-part-row {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.active-part-row .active-part-details {
+  flex: 0 0 30%;
+  min-width: 0;
+}
+
+.part-note-panel {
+  flex: 0 0 70%;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+}
+
 .part-note-box-wrap {
   display: flex;
   flex-direction: column;
   width: 100%;
+  height: 100%;
   gap: 3px;
-  flex: 1 1 auto;
-  min-height: 0;
 }
 
 /* Dark, same as the component name text, so the header is actually
@@ -562,7 +582,7 @@
 
 .part-note-box {
   width: 100%;
-  min-height: 160px;
+  min-height: 90px;
   flex: 1 1 auto;
   padding: 8px 10px;
   font-size: 0.75rem;
@@ -673,8 +693,6 @@
   gap: 8px;
   box-shadow: 0 4px 20px rgba(220, 20, 60, 0.08);
   flex: 0 0 auto;
-  max-height: 60%;
-  min-height: 0;
 }
 
 .details-header {
@@ -720,48 +738,25 @@
   font-size: 0.6rem;
   color: #94a3b8;
   text-transform: uppercase;
-  white-space: nowrap;
 }
 
 .primary-concern-row p {
-  margin: 0 0 0 4px;
+  margin: 2px 0 0 0;
   font-size: 0.75rem;
   color: #334155;
   font-weight: 600;
   line-height: 1.2;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-/* Single line: primary concern (truncates), failure count, download - so
-   the note box above keeps the height, this row just needs to fit. */
 .details-summary-stats {
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 14px;
-  flex-shrink: 0;
-  padding-top: 6px;
-  border-top: 1px solid #f1f3f5;
 }
 
-.details-summary-stats .primary-concern-row {
+.mini-stat {
   display: flex;
-  align-items: baseline;
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.details-summary-stats .mini-stat {
-  display: flex;
-  align-items: baseline;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.details-summary-stats .mini-stat .value {
-  font-size: 0.9rem;
-  margin: 0;
+  flex-direction: column;
 }
 
 .mini-stat .label {

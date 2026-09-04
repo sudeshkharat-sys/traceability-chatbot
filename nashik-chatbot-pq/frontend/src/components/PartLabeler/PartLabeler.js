@@ -894,9 +894,14 @@ function PartLabeler() {
   const addComponentSlide = async (pptx, label, viewConfig, componentData, componentDescription, componentMonthFailures, componentNote) => {
     const slide = pptx.addSlide();
 
+    // Component name stays left; a fixed report title sits top-middle.
     slide.addText(label.partName, {
-      x: 0.3, y: 0.05, w: 12.73, h: 0.42,
+      x: 0.3, y: 0.05, w: 4.5, h: 0.42,
       fontSize: 24, bold: true, color: 'DC0028'
+    });
+    slide.addText('Component Traceability Report', {
+      x: 4.8, y: 0.05, w: 3.73, h: 0.42,
+      fontSize: 14, bold: true, color: '2d3748', align: 'center', valign: 'middle'
     });
 
     // Top row: image on the left, detail panel (incl. Action Notes) on the right
@@ -923,10 +928,10 @@ function PartLabeler() {
     slide.addText([{ text: 'ACTION NOTES\n', options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: componentNote?.trim() || '-', options: { fontSize: 10, color: '2d3748' } }],
       { x: panelX, y: topY + 2.05, w: panelW, h: 0.75, valign: 'top', wrap: true, fit: 'shrink' });
 
-    // 4 uniform charts, same size/shape, in a row below - back to the
-    // pre-styling-pass sizing (chartH 3.2, title 0.3 above each chart),
-    // keeping the card/shadow/gridline polish from the styling pass.
-    const chartY = 3.95, chartH = 3.2, gap = 0.15, chartW = (12.73 - 3 * gap) / 4;
+    // 4 uniform charts, same size/shape, in a row below. Shrunk from the
+    // original 3.2" - at that height they were crowding the rest of the
+    // slide, so this leaves more breathing room above/below.
+    const chartY = 3.95, chartH = 2.6, gap = 0.15, chartW = (12.73 - 3 * gap) / 4;
     // Use the data fetched specifically for THIS component, not the shared
     // `dashboardData` React state - inside the export loop that state is
     // always one step behind (setState doesn't apply until the next render,
@@ -2390,12 +2395,13 @@ function PartLabeler() {
                     </div>
                                         <AnimatePresence>
                                           {activePopup && (
-                                          <motion.div
-                                            ref={detailCardRef}
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            className="active-part-details note-open"
-                                          >
+                                          <div className="active-part-row note-open">
+                                            <motion.div
+                                              ref={detailCardRef}
+                                              initial={{ opacity: 0, y: 10 }}
+                                              animate={{ opacity: 1, y: 0 }}
+                                              className="active-part-details"
+                                            >
                                               <div className="details-header">
                                                 {isEditingLabel ? (
                                                   <div className="edit-mode-compact">
@@ -2412,31 +2418,23 @@ function PartLabeler() {
                                                     </div>
                                                   </div>
                                                 ) : (
-                                                  <div className="title-row">
-                                                    <h3 className="mahindra-red-text">{activePopup.partName}</h3>
-                                                    <div className="actions">
-                                                      <button onClick={() => setIsEditingLabel(true)} title="Edit name"><Edit2 size={14} /></button>
-                                                      <button onClick={() => requestDeleteLabel(activePopup.id)} title="Delete"><Trash2 size={14} /></button>
-                                                      <button onClick={() => setActivePopup(null)} title="Close"><X size={14} /></button>
+                                                  <>
+                                                    <div className="title-row">
+                                                      <h3 className="mahindra-red-text">{activePopup.partName}</h3>
+                                                      <div className="actions">
+                                                        <button onClick={() => setIsEditingLabel(true)} title="Edit name"><Edit2 size={14} /></button>
+                                                        <button onClick={() => requestDeleteLabel(activePopup.id)} title="Delete"><Trash2 size={14} /></button>
+                                                        <button onClick={() => setActivePopup(null)} title="Close"><X size={14} /></button>
+                                                      </div>
                                                     </div>
-                                                  </div>
+                                                    <div className="primary-concern-row">
+                                                      <strong>Primary Concern:</strong>
+                                                      <p>{currentDescription}</p>
+                                                    </div>
+                                                  </>
                                                 )}
                                               </div>
-                                              <div className="part-note-box-wrap">
-                                                <span className="part-note-label">ACTION NOTES</span>
-                                                <textarea
-                                                  className="part-note-box"
-                                                  placeholder="Add action notes..."
-                                                  value={partNotes[activePopup.id] ?? activePopup.note ?? ''}
-                                                  onChange={(e) => setPartNotes(prev => ({ ...prev, [activePopup.id]: e.target.value }))}
-                                                  onBlur={() => saveLabelNote(activePopup.id)}
-                                                />
-                                              </div>
                                               <div className="details-summary-stats">
-                                                <div className="primary-concern-row">
-                                                  <strong>Primary Concern:</strong>
-                                                  <p>{currentDescription}</p>
-                                                </div>
                                                 <div className="mini-stat">
                                                   <span className="label">
                                                     {filterMonth.includes('All') ? 'ANNUAL' : (filterMonth.length === 1 ? filterMonth[0] : 'Multiple')}
@@ -2457,7 +2455,20 @@ function PartLabeler() {
                                                   }}><Download size={14} /><span>CSV</span></button>
                                                 </div>
                                               </div>
-                                          </motion.div>
+                                            </motion.div>
+                                            <div className="part-note-panel">
+                                              <div className="part-note-box-wrap">
+                                                <span className="part-note-label">ACTION NOTES</span>
+                                                <textarea
+                                                  className="part-note-box"
+                                                  placeholder="Add action notes..."
+                                                  value={partNotes[activePopup.id] ?? activePopup.note ?? ''}
+                                                  onChange={(e) => setPartNotes(prev => ({ ...prev, [activePopup.id]: e.target.value }))}
+                                                  onBlur={() => saveLabelNote(activePopup.id)}
+                                                />
+                                              </div>
+                                            </div>
+                                          </div>
                       )}
                     </AnimatePresence>
                   </div>
