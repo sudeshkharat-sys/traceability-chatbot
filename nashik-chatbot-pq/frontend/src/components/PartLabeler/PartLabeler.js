@@ -2174,13 +2174,10 @@ function PartLabeler() {
         </aside>
 
         <main className="part-labeler-workspace">
-          {selectedImage && (
-            <div className="workspace-page-title">
-              <h2>{selectedImage.displayName || selectedImage.filename}</h2>
-              <p>Failure trend & traceability</p>
-            </div>
-          )}
           <div className="workspace-header-bar">
+            {selectedImage && (
+              <h2 className="workspace-page-title">{selectedImage.displayName || selectedImage.filename}</h2>
+            )}
             {isPlantMode ? (
               <DataSourceSelector current={dataSource} onChange={handleDataSourceChange} />
             ) : !isEvMode && prefix ? (

@@ -239,23 +239,21 @@
   overflow: hidden;
 }
 
-.workspace-page-title {
-  padding: 10px 1.5rem 0;
-  flex-shrink: 0;
-}
-
-.workspace-page-title h2 {
+/* Was its own row above the filter bar (h2 + subtitle) - that extra row
+   ate into the vertical room the side panel needed below, which is what
+   was pushing the summary card into clipping. Folded inline into the
+   filter bar itself instead of freeing up that whole row. */
+h2.workspace-page-title {
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 0.9rem;
   font-weight: 800;
   color: var(--text-dark);
   text-transform: capitalize;
-}
-
-.workspace-page-title p {
-  margin: 1px 0 0 0;
-  font-size: 0.72rem;
-  color: var(--text-gray);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+  flex-shrink: 0;
 }
 
 .workspace-header-bar {
