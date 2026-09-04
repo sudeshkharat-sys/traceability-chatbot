@@ -894,44 +894,58 @@ function PartLabeler() {
   const addComponentSlide = async (pptx, label, viewConfig, componentData, componentDescription, componentMonthFailures, componentNote) => {
     const slide = pptx.addSlide();
 
-    // Component name stays left; a fixed report title sits top-middle.
-    slide.addText(label.partName, {
-      x: 0.3, y: 0.05, w: 4.5, h: 0.42,
-      fontSize: 24, bold: true, color: 'DC0028'
-    });
-    slide.addText('Component Traceability Report', {
-      x: 4.8, y: 0.05, w: 3.73, h: 0.42,
-      fontSize: 14, bold: true, color: '2d3748', align: 'center', valign: 'middle'
+    slide.addText(`Component Part: ${label.partName}`, {
+      x: 0.3, y: 0.05, w: 12.73, h: 0.42,
+      fontSize: 22, bold: true, color: 'DC0028'
     });
 
-    // Top row: image on the left, detail panel (incl. Action Notes) on the right
-    const topY = 0.5, topH = 2.85;
-    const imgAreaW = 7.6, panelX = 0.3 + imgAreaW + 0.2, panelW = 12.73 - imgAreaW - 0.2;
+    // Column geometry shared with the chart row below, so the top section
+    // lines up with it: first two chart columns' width = image area,
+    // other two chart columns' width = notes/summary area.
+    const gap = 0.15, chartW = (12.73 - 3 * gap) / 4;
+    const leftAreaX = 0.3, leftAreaW = chartW * 2 + gap;
+    const rightAreaX = leftAreaX + leftAreaW + gap, rightAreaW = chartW * 2 + gap;
+
+    // Charts are bottom-anchored so shrinking their height frees up room
+    // for the top section to grow, instead of leaving unused space below
+    // the charts (which is what a fixed chartY did).
+    const chartH = 2.6;
+    const chartY = 7.5 - 0.25 - chartH;
+    const topY = 0.55, topH = (chartY - 0.32) - 0.15 - topY;
 
     const top = await captureElement(pptTopSectionRef.current, { scale: 2.5, enhance: true });
     if (top) {
       const ratio = top.width / top.height;
-      let w = imgAreaW, h = w / ratio;
+      let w = leftAreaW, h = w / ratio;
       if (h > topH) { h = topH; w = h * ratio; }
-      slide.addImage({ data: top.data, x: 0.3 + (imgAreaW - w) / 2, y: topY, w, h });
+      slide.addImage({ data: top.data, x: leftAreaX + (leftAreaW - w) / 2, y: topY, w, h });
     }
 
-    const filterLabel = filterMonth.includes('All') ? 'Annual' : (filterMonth.length === 1 ? filterMonth[0] : 'Multiple');
-    slide.addText([{ text: 'COMPONENT\n', options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: label.partName, options: { fontSize: 18, bold: true, color: 'DC0028' } }],
-      { x: panelX, y: topY, w: panelW, h: 0.65, valign: 'top' });
-    slide.addText([{ text: 'PRIMARY CONCERN\n', options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: componentDescription || '-', options: { fontSize: 12, color: '2d3748' } }],
-      { x: panelX, y: topY + 0.75, w: panelW, h: 0.55, valign: 'top', wrap: true, fit: 'shrink' });
-    slide.addText([{ text: `${filterLabel.toUpperCase()} FAILURES\n`, options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: String(componentMonthFailures ?? 0), options: { fontSize: 26, bold: true, color: 'DC0028' } }],
-      { x: panelX, y: topY + 1.4, w: panelW, h: 0.65, valign: 'top' });
+    // Right side: Action Notes gets most of the height - it's free-typed
+    // and can run long (ICA/PCA bullets etc.) - with Primary Concern and
+    // Failures condensed into one strip below it, separated by a divider.
+    const summaryH = 0.6, sectionGap = 0.12;
+    const notesH = topH - summaryH - sectionGap;
+
     // Reserved on every slide, note-having or not, so the panel layout stays
     // identical across the whole deck rather than resizing per component.
     slide.addText([{ text: 'ACTION NOTES\n', options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: componentNote?.trim() || '-', options: { fontSize: 10, color: '2d3748' } }],
-      { x: panelX, y: topY + 2.05, w: panelW, h: 0.75, valign: 'top', wrap: true, fit: 'shrink' });
+      { x: rightAreaX, y: topY, w: rightAreaW, h: notesH, valign: 'top', wrap: true, fit: 'shrink' });
 
-    // 4 uniform charts, same size/shape, in a row below. Shrunk from the
-    // original 3.2" - at that height they were crowding the rest of the
-    // slide, so this leaves more breathing room above/below.
-    const chartY = 3.95, chartH = 2.6, gap = 0.15, chartW = (12.73 - 3 * gap) / 4;
+    slide.addShape(pptx.ShapeType.line, {
+      x: rightAreaX, y: topY + notesH + sectionGap / 2, w: rightAreaW, h: 0,
+      line: { color: 'e2e8f0', width: 1, dashType: 'dash' }
+    });
+
+    const filterLabel = filterMonth.includes('All') ? 'Annual' : (filterMonth.length === 1 ? filterMonth[0] : 'Multiple');
+    slide.addText([
+      { text: 'CONCERN: ', options: { fontSize: 8, bold: true, color: '7f8c8d' } },
+      { text: `${componentDescription || '-'}    `, options: { fontSize: 9, color: '2d3748' } },
+      { text: `${filterLabel.toUpperCase()} FAILURES: `, options: { fontSize: 8, bold: true, color: '7f8c8d' } },
+      { text: String(componentMonthFailures ?? 0), options: { fontSize: 11, bold: true, color: 'DC0028' } }
+    ], { x: rightAreaX, y: topY + notesH + sectionGap, w: rightAreaW, h: summaryH - sectionGap, valign: 'top', wrap: true, fit: 'shrink' });
+
+    // 4 uniform charts, same size/shape, in a row below.
     // Use the data fetched specifically for THIS component, not the shared
     // `dashboardData` React state - inside the export loop that state is
     // always one step behind (setState doesn't apply until the next render,
@@ -2422,9 +2436,9 @@ function PartLabeler() {
                                                     <div className="title-row">
                                                       <h3 className="mahindra-red-text">{activePopup.partName}</h3>
                                                       <div className="actions">
-                                                        <button onClick={() => setIsEditingLabel(true)} title="Edit name"><Edit2 size={14} /></button>
-                                                        <button onClick={() => requestDeleteLabel(activePopup.id)} title="Delete"><Trash2 size={14} /></button>
-                                                        <button onClick={() => setActivePopup(null)} title="Close"><X size={14} /></button>
+                                                        <button onClick={() => setIsEditingLabel(true)} title="Edit name"><Edit2 size={12} /></button>
+                                                        <button onClick={() => requestDeleteLabel(activePopup.id)} title="Delete"><Trash2 size={12} /></button>
+                                                        <button onClick={() => setActivePopup(null)} title="Close"><X size={12} /></button>
                                                       </div>
                                                     </div>
                                                     <div className="primary-concern-row">

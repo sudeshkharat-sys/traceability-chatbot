@@ -700,32 +700,44 @@
   padding-bottom: 6px;
 }
 
+/* The card is a narrow 30% column, so name + 3 icon buttons on one line
+   left them cramped/overlapping - name gets its own full-width row
+   (truncated, not squeezed), icons sit right-aligned below it. */
 .title-row {
   display: flex;
-  justify-content: space-between;
+  flex-wrap: wrap;
   align-items: center;
   margin-bottom: 4px;
+  row-gap: 4px;
 }
 
 .title-row h3 {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   text-transform: capitalize;
+  flex: 1 1 100%;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .actions {
   display: flex;
-  gap: 4px;
+  gap: 3px;
+  flex: 1 1 100%;
+  justify-content: flex-end;
 }
 
 .actions button {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
-  padding: 4px;
+  padding: 3px;
   border-radius: 4px;
   cursor: pointer;
   color: #64748b;
   transition: all 0.2s;
+  display: flex;
 }
 
 .actions button:hover {
@@ -750,8 +762,10 @@
 
 .details-summary-stats {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  row-gap: 6px;
 }
 
 .mini-stat {
@@ -766,7 +780,7 @@
 }
 
 .mini-stat .value {
-  font-size: 1.15rem;
+  font-size: 1rem;
   font-weight: 800;
   color: #1e293b;
   line-height: 1;
