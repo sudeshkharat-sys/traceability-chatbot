@@ -2066,6 +2066,12 @@ function PartLabeler() {
         </aside>
 
         <main className="part-labeler-workspace">
+          {selectedImage && (
+            <div className="workspace-page-title">
+              <h2>{selectedImage.displayName || selectedImage.filename}</h2>
+              <p>Failure trend & traceability</p>
+            </div>
+          )}
           <div className="workspace-header-bar">
             {isPlantMode ? (
               <DataSourceSelector current={dataSource} onChange={handleDataSourceChange} />
@@ -2384,19 +2390,18 @@ function PartLabeler() {
                     </div>
                                         <AnimatePresence>
                                           {activePopup && (
-                                          <div className="active-part-row note-open">
-                                            <motion.div
-                                              ref={detailCardRef}
-                                              initial={{ opacity: 0, y: 10 }}
-                                              animate={{ opacity: 1, y: 0 }}
-                                              className="active-part-details"
-                                            >
+                                          <motion.div
+                                            ref={detailCardRef}
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className="active-part-details note-open"
+                                          >
                                               <div className="details-header">
                                                 {isEditingLabel ? (
                                                   <div className="edit-mode-compact">
-                                                    <input 
-                                                      type="text" 
-                                                      value={editLabelName} 
+                                                    <input
+                                                      type="text"
+                                                      value={editLabelName}
                                                       onChange={(e) => setEditLabelName(e.target.value)}
                                                       autoFocus
                                                       onKeyDown={(e) => e.key === 'Enter' && handleUpdateLabel()}
@@ -2407,57 +2412,52 @@ function PartLabeler() {
                                                     </div>
                                                   </div>
                                                 ) : (
-                                                  <>
-                                                    <div className="title-row">
-                                                      <h3 className="mahindra-red-text">{activePopup.partName}</h3>
-                                                      <div className="actions">
-                                                        <button onClick={() => setIsEditingLabel(true)} title="Edit name"><Edit2 size={14} /></button>
-                                                        <button onClick={() => requestDeleteLabel(activePopup.id)} title="Delete"><Trash2 size={14} /></button>
-                                                        <button onClick={() => setActivePopup(null)} title="Close"><X size={14} /></button>
-                                                      </div>
+                                                  <div className="title-row">
+                                                    <h3 className="mahindra-red-text">{activePopup.partName}</h3>
+                                                    <div className="actions">
+                                                      <button onClick={() => setIsEditingLabel(true)} title="Edit name"><Edit2 size={14} /></button>
+                                                      <button onClick={() => requestDeleteLabel(activePopup.id)} title="Delete"><Trash2 size={14} /></button>
+                                                      <button onClick={() => setActivePopup(null)} title="Close"><X size={14} /></button>
                                                     </div>
-                                                    <div className="primary-concern-row">
-                                                      <strong>Primary Concern:</strong>
-                                                      <p>{currentDescription}</p>
-                                                    </div>
-                                                  </>
+                                                  </div>
                                                 )}
                                               </div>
-                          <div className="details-summary-stats">
-                            <div className="mini-stat">
-                              <span className="label">
-                                {filterMonth.includes('All') ? 'ANNUAL' : (filterMonth.length === 1 ? filterMonth[0] : 'Multiple')}
-                              </span>
-                              <span className="value">{currentMonthFailures}</span><span className="sub">Failures</span>
-                            </div>
-                            <div className="download-btn-group">
-                              <button className="download-csv-btn-integrated" onClick={() => {
-                                const params = new URLSearchParams();
-                                params.append('userId', userId);
-                                params.append('partName', activePopup.partName);
-                                filterMonth.forEach(m => params.append('month', m));
-                                filterModel.forEach(m => params.append('baseModel', m));
-                                filterMIS.forEach(m => params.append('misBucket', m));
-                                filterMfgQtr.forEach(m => params.append('mfgQtr', m));
-                                params.append('format', 'csv');
-                                window.open(`${API_BASE}/download-warranty?${params.toString()}`, '_blank');
-                              }}><Download size={14} /><span>CSV</span></button>
-                            </div>
-                          </div>
-                        </motion.div>
-                        <div className="part-note-panel">
-                          <div className="part-note-box-wrap">
-                            <span className="part-note-label">ACTION NOTES</span>
-                            <textarea
-                              className="part-note-box"
-                              placeholder="Add action notes..."
-                              value={partNotes[activePopup.id] ?? activePopup.note ?? ''}
-                              onChange={(e) => setPartNotes(prev => ({ ...prev, [activePopup.id]: e.target.value }))}
-                              onBlur={() => saveLabelNote(activePopup.id)}
-                            />
-                          </div>
-                        </div>
-                      </div>
+                                              <div className="part-note-box-wrap">
+                                                <span className="part-note-label">ACTION NOTES</span>
+                                                <textarea
+                                                  className="part-note-box"
+                                                  placeholder="Add action notes..."
+                                                  value={partNotes[activePopup.id] ?? activePopup.note ?? ''}
+                                                  onChange={(e) => setPartNotes(prev => ({ ...prev, [activePopup.id]: e.target.value }))}
+                                                  onBlur={() => saveLabelNote(activePopup.id)}
+                                                />
+                                              </div>
+                                              <div className="details-summary-stats">
+                                                <div className="primary-concern-row">
+                                                  <strong>Primary Concern:</strong>
+                                                  <p>{currentDescription}</p>
+                                                </div>
+                                                <div className="mini-stat">
+                                                  <span className="label">
+                                                    {filterMonth.includes('All') ? 'ANNUAL' : (filterMonth.length === 1 ? filterMonth[0] : 'Multiple')}
+                                                  </span>
+                                                  <span className="value">{currentMonthFailures}</span><span className="sub">Failures</span>
+                                                </div>
+                                                <div className="download-btn-group">
+                                                  <button className="download-csv-btn-integrated" onClick={() => {
+                                                    const params = new URLSearchParams();
+                                                    params.append('userId', userId);
+                                                    params.append('partName', activePopup.partName);
+                                                    filterMonth.forEach(m => params.append('month', m));
+                                                    filterModel.forEach(m => params.append('baseModel', m));
+                                                    filterMIS.forEach(m => params.append('misBucket', m));
+                                                    filterMfgQtr.forEach(m => params.append('mfgQtr', m));
+                                                    params.append('format', 'csv');
+                                                    window.open(`${API_BASE}/download-warranty?${params.toString()}`, '_blank');
+                                                  }}><Download size={14} /><span>CSV</span></button>
+                                                </div>
+                                              </div>
+                                          </motion.div>
                       )}
                     </AnimatePresence>
                   </div>
