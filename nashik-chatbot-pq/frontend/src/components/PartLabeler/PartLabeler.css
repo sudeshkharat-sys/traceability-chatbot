@@ -399,7 +399,10 @@
 }
 
 .workspace-scroll-container:not(.empty-state) .top-visual-section {
-  flex: 0 0 40%;
+  /* A bit more than before (was 40%) - the side panel's summary card was
+     getting clipped on shorter windows because there wasn't enough
+     vertical room for it plus the mapped table's floor height. */
+  flex: 0 0 46%;
 }
 
 .workspace-scroll-container.empty-state .top-visual-section {
@@ -476,9 +479,13 @@
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   height: 100%;
-  overflow: hidden;
+  /* overflow:hidden here was silently clipping the summary card's bottom
+     whenever the table's min-height + the card's natural height didn't
+     both fit the available column height. auto is the backstop - worst
+     case a small scrollbar appears, but nothing gets cut off invisibly. */
+  overflow-y: auto;
 }
 
 .mapped-parts-integrated {
@@ -489,10 +496,10 @@
   display: flex;
   flex-direction: column;
   flex: 1;
-  /* Enough for the header row + ~3 component rows to stay visible even
-     when the summary card below grows - the table scrolls internally
-     (panel-table-scroll) for the rest. */
-  min-height: 160px;
+  /* Lowered from 160px - that plus the summary card's height was what
+     didn't fit in a shorter browser window and got clipped. Table still
+     scrolls internally (panel-table-scroll) below this floor. */
+  min-height: 110px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.02);
 }
 

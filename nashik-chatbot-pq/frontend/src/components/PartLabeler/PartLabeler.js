@@ -1373,6 +1373,46 @@ function PartLabeler() {
     }
   };
 
+  // Word/PPT bullet text carries a real newline at every visual line of
+  // the *source* box, not just at paragraph ends - pasted verbatim, those
+  // force a break here too regardless of how much room is left on the
+  // line, and break up mid-sentence at odd points. This re-flows pasted
+  // text: a line only stays on its own line if it's blank or looks like
+  // the start of a new item (numbered/bulleted/checked/a "LABEL:" header)
+  // - everything else is joined onto the previous line with a single
+  // space, so the box's own word-wrap decides where lines actually break.
+  const normalizePastedNotes = (text) => {
+    const lines = text.replace(/\r\n?/g, '\n').split('\n');
+    const startsNewItem = (line) => /^(\d+[.)]|[-•✓]|[A-Za-z][A-Za-z /]{1,24}:)\s*/.test(line.trim());
+    const out = [];
+    lines.forEach((raw) => {
+      const trimmed = raw.trim();
+      if (!trimmed) { out.push(''); return; }
+      if (out.length === 0 || startsNewItem(raw)) {
+        out.push(trimmed);
+      } else {
+        out[out.length - 1] = out[out.length - 1] ? `${out[out.length - 1]} ${trimmed}` : trimmed;
+      }
+    });
+    return out.join('\n');
+  };
+
+  const handleNotePaste = (e) => {
+    const text = e.clipboardData?.getData('text/plain');
+    if (!text) return;
+    e.preventDefault();
+    const normalized = normalizePastedNotes(text);
+    const el = e.target;
+    const start = el.selectionStart, end = el.selectionEnd;
+    const current = partNotes[activePopup?.id] ?? activePopup?.note ?? '';
+    const next = current.slice(0, start) + normalized + current.slice(end);
+    setPartNotes(prev => ({ ...prev, [activePopup.id]: next }));
+    requestAnimationFrame(() => {
+      const pos = start + normalized.length;
+      el.selectionStart = el.selectionEnd = pos;
+    });
+  };
+
   const saveLabelNote = async (labelId) => {
     const note = partNotes[labelId] ?? '';
     try {
@@ -2505,6 +2545,7 @@ function PartLabeler() {
                             placeholder="Add action notes..."
                             value={partNotes[activePopup.id] ?? activePopup.note ?? ''}
                             onChange={(e) => setPartNotes(prev => ({ ...prev, [activePopup.id]: e.target.value }))}
+                            onPaste={handleNotePaste}
                             onBlur={() => saveLabelNote(activePopup.id)}
                           />
                         </div>
