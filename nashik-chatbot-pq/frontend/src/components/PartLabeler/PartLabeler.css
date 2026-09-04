@@ -496,10 +496,9 @@
   display: flex;
   flex-direction: column;
   flex: 1;
-  /* Lowered from 160px - that plus the summary card's height was what
-     didn't fit in a shorter browser window and got clipped. Table still
-     scrolls internally (panel-table-scroll) below this floor. */
-  min-height: 110px;
+  /* Back to keeping ~3 rows visible - the summary card below is the one
+     that got shrunk this time instead (fonts/padding), not this table. */
+  min-height: 150px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.02);
 }
 
@@ -724,21 +723,22 @@
   background: white;
   border: 1.5px solid var(--mahindra-red);
   border-radius: 12px;
-  padding: 8px 10px;
+  padding: 6px 8px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
   box-shadow: 0 4px 20px rgba(220, 20, 60, 0.08);
   /* A hard max-height + overflow:hidden here was clipping the lower part
-     of the card instead of just keeping it compact - removed. It stays
-     small on its own now: content is tightened (below) and Primary
-     Concern is capped to 2 lines instead of growing unbounded. */
+     of the card instead of just keeping it compact - removed. Instead
+     the card's own content is tightened throughout (padding/gaps/fonts
+     below) so it fits on its own, without needing to shrink the mapped
+     table's height to make room for it. */
   flex: 0 0 auto;
 }
 
 .details-header {
   border-bottom: 1px solid #f1f3f5;
-  padding-bottom: 6px;
+  padding-bottom: 3px;
 }
 
 /* Narrow 30% column - name truncates so it never fights the icons for
@@ -747,13 +747,13 @@
 .title-row {
   display: flex;
   align-items: center;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
   gap: 6px;
 }
 
 .title-row h3 {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: 0.78rem;
   text-transform: capitalize;
   flex: 1 1 auto;
   min-width: 0;
@@ -786,23 +786,23 @@
 }
 
 .primary-concern-row strong {
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   color: #94a3b8;
   text-transform: uppercase;
 }
 
 .primary-concern-row p {
-  margin: 2px 0 0 0;
-  font-size: 0.72rem;
+  margin: 1px 0 0 0;
+  font-size: 0.68rem;
   color: #334155;
   font-weight: 600;
-  line-height: 1.25;
-  /* Capped instead of left to grow unbounded - a long concern was what
-     pushed the card past its available height. */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  line-height: 1.2;
+  /* Single line, truncated - was capped to 2 lines, but even that was
+     enough to push the card past its available height in a shorter
+     window. The full text is still there, just not fully shown here. */
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .details-summary-stats {
@@ -810,7 +810,7 @@
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
-  row-gap: 6px;
+  row-gap: 3px;
 }
 
 .mini-stat {
@@ -819,21 +819,21 @@
 }
 
 .mini-stat .label {
-  font-size: 0.55rem;
+  font-size: 0.52rem;
   color: #94a3b8;
   font-weight: 700;
 }
 
 .mini-stat .value {
-  font-size: 1rem;
+  font-size: 0.85rem;
   font-weight: 800;
   color: #1e293b;
   line-height: 1;
-  margin: 2px 0;
+  margin: 1px 0;
 }
 
 .mini-stat .sub {
-  font-size: 0.6rem;
+  font-size: 0.55rem;
   color: #64748b;
 }
 
@@ -845,12 +845,12 @@
 .download-csv-btn-integrated {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   background: white;
   border: 1.5px solid #e2e8f0;
-  padding: 5px 8px;
+  padding: 3px 6px;
   border-radius: 6px;
-  font-size: 0.65rem;
+  font-size: 0.6rem;
   font-weight: 700;
   color: #475569;
   cursor: pointer;

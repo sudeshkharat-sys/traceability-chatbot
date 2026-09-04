@@ -957,7 +957,24 @@ function PartLabeler() {
       x: rightAreaX + 0.12, y: topY + 0.08, w: rightAreaW - 0.24, h: 0.25,
       fontSize: 11, bold: true, color: 'DC0028'
     });
-    slide.addText(componentNote?.trim() || '-', {
+    // Indentation is baked in here rather than left for manual editing in
+    // PowerPoint - typing leading spaces into an already-open text box
+    // there fights autocorrect/autofit and doesn't reliably hold, but
+    // spaces already present in the generated text render fine on open.
+    // A line only stays un-indented if it's blank or starts a new item
+    // (numbered/bulleted/checked/a "LABEL:" header); everything else
+    // gets indented as a continuation line.
+    const formatNoteForSlide = (note) => {
+      const trimmed = note?.trim();
+      if (!trimmed) return '-';
+      const startsNewItem = (line) => /^(\d+[.)]|[-•✓]|[A-Za-z][A-Za-z /]{1,24}:)\s*/.test(line.trim());
+      return trimmed.replace(/\r\n?/g, '\n').split('\n').map((line) => {
+        const t = line.trim();
+        if (!t) return '';
+        return startsNewItem(line) ? t : `    ${t}`;
+      }).join('\n');
+    };
+    slide.addText(formatNoteForSlide(componentNote), {
       x: rightAreaX + 0.12, y: topY + 0.38, w: rightAreaW - 0.24, h: topH - 0.5,
       fontSize: 10, color: '2d3748', valign: 'top', wrap: true, fit: 'shrink'
     });
