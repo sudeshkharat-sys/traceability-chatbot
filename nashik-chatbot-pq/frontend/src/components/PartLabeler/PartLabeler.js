@@ -913,37 +913,44 @@ function PartLabeler() {
     const chartY = 7.5 - 0.25 - chartH;
     const topY = 0.55, topH = (chartY - 0.32) - 0.15 - topY;
 
+    // Left side: PNG on top, one summary line below it (bigger text, more
+    // readable than the old cramped stacked labels). Moved off the right
+    // column entirely so it can never overlap Action Notes when the note
+    // text runs long.
+    const summaryH = 0.55, sectionGap = 0.12;
+    const imgH = topH - summaryH - sectionGap;
+
     const top = await captureElement(pptTopSectionRef.current, { scale: 2.5, enhance: true });
     if (top) {
       const ratio = top.width / top.height;
       let w = leftAreaW, h = w / ratio;
-      if (h > topH) { h = topH; w = h * ratio; }
+      if (h > imgH) { h = imgH; w = h * ratio; }
       slide.addImage({ data: top.data, x: leftAreaX + (leftAreaW - w) / 2, y: topY, w, h });
     }
 
-    // Right side: Action Notes gets most of the height - it's free-typed
-    // and can run long (ICA/PCA bullets etc.) - with Primary Concern and
-    // Failures condensed into one strip below it, separated by a divider.
-    const summaryH = 0.6, sectionGap = 0.12;
-    const notesH = topH - summaryH - sectionGap;
-
-    // Reserved on every slide, note-having or not, so the panel layout stays
-    // identical across the whole deck rather than resizing per component.
-    slide.addText([{ text: 'ACTION NOTES\n', options: { fontSize: 9, bold: true, color: '7f8c8d' } }, { text: componentNote?.trim() || '-', options: { fontSize: 10, color: '2d3748' } }],
-      { x: rightAreaX, y: topY, w: rightAreaW, h: notesH, valign: 'top', wrap: true, fit: 'shrink' });
-
-    slide.addShape(pptx.ShapeType.line, {
-      x: rightAreaX, y: topY + notesH + sectionGap / 2, w: rightAreaW, h: 0,
-      line: { color: 'e2e8f0', width: 1, dashType: 'dash' }
-    });
-
     const filterLabel = filterMonth.includes('All') ? 'Annual' : (filterMonth.length === 1 ? filterMonth[0] : 'Multiple');
     slide.addText([
-      { text: 'CONCERN: ', options: { fontSize: 8, bold: true, color: '7f8c8d' } },
-      { text: `${componentDescription || '-'}    `, options: { fontSize: 9, color: '2d3748' } },
-      { text: `${filterLabel.toUpperCase()} FAILURES: `, options: { fontSize: 8, bold: true, color: '7f8c8d' } },
-      { text: String(componentMonthFailures ?? 0), options: { fontSize: 11, bold: true, color: 'DC0028' } }
-    ], { x: rightAreaX, y: topY + notesH + sectionGap, w: rightAreaW, h: summaryH - sectionGap, valign: 'top', wrap: true, fit: 'shrink' });
+      { text: 'CONCERN: ', options: { fontSize: 10, bold: true, color: '7f8c8d' } },
+      { text: `${componentDescription || '-'}    `, options: { fontSize: 11, color: '2d3748' } },
+      { text: `${filterLabel.toUpperCase()} FAILURES: `, options: { fontSize: 10, bold: true, color: '7f8c8d' } },
+      { text: String(componentMonthFailures ?? 0), options: { fontSize: 13, bold: true, color: 'DC0028' } }
+    ], { x: leftAreaX, y: topY + imgH + sectionGap, w: leftAreaW, h: summaryH - sectionGap, valign: 'top', wrap: true, fit: 'shrink' });
+
+    // Right side: Action Notes fills the full height, own light-gray
+    // dotted box so it reads as a distinct card, with a red heading so
+    // it's actually noticeable instead of blending into the gray labels.
+    slide.addShape(pptx.ShapeType.rect, {
+      x: rightAreaX, y: topY, w: rightAreaW, h: topH,
+      fill: { type: 'none' }, line: { color: 'c7ccd1', width: 1, dashType: 'sysDot' }
+    });
+    slide.addText('ACTION NOTES', {
+      x: rightAreaX + 0.12, y: topY + 0.08, w: rightAreaW - 0.24, h: 0.25,
+      fontSize: 11, bold: true, color: 'DC0028'
+    });
+    slide.addText(componentNote?.trim() || '-', {
+      x: rightAreaX + 0.12, y: topY + 0.38, w: rightAreaW - 0.24, h: topH - 0.5,
+      fontSize: 10, color: '2d3748', valign: 'top', wrap: true, fit: 'shrink'
+    });
 
     // 4 uniform charts, same size/shape, in a row below.
     // Use the data fetched specifically for THIS component, not the shared

@@ -471,7 +471,10 @@
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: 0;
+  /* Rows were getting clipped to near-nothing when the summary/notes row
+     below grew (resized textarea, wrapped icons) - this guarantees the
+     table always keeps enough room to show a few rows. */
+  min-height: 140px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.02);
 }
 
@@ -548,6 +551,8 @@
   display: flex;
   align-items: stretch;
   gap: 10px;
+  flex-shrink: 0;
+  max-height: 45%;
 }
 
 .active-part-row .active-part-details {
@@ -560,6 +565,14 @@
   min-width: 0;
   display: flex;
   align-items: stretch;
+  /* Card frame to match the summary card beside it - it had none before,
+     so it read as unfinished/flat next to the bordered summary card. */
+  background: white;
+  border: 1.5px solid var(--mahindra-red);
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 0 4px 20px rgba(220, 20, 60, 0.08);
+  box-sizing: border-box;
 }
 
 .part-note-box-wrap {
@@ -567,22 +580,23 @@
   flex-direction: column;
   width: 100%;
   height: 100%;
-  gap: 3px;
+  gap: 4px;
 }
 
-/* Dark, same as the component name text, so the header is actually
-   legible - the lighter gray used by the other small labels was too
-   faint here. */
+/* Red + bold like the other card headers, so it actually stands out -
+   the plain dark-gray label read as just another field, not a heading. */
 .part-note-label {
-  font-size: 0.65rem;
-  color: var(--text-dark);
-  font-weight: 700;
+  font-size: 0.7rem;
+  color: var(--mahindra-red);
+  font-weight: 800;
   text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
 .part-note-box {
   width: 100%;
   min-height: 90px;
+  max-height: 180px;
   flex: 1 1 auto;
   padding: 8px 10px;
   font-size: 0.75rem;
@@ -700,22 +714,21 @@
   padding-bottom: 6px;
 }
 
-/* The card is a narrow 30% column, so name + 3 icon buttons on one line
-   left them cramped/overlapping - name gets its own full-width row
-   (truncated, not squeezed), icons sit right-aligned below it. */
+/* Narrow 30% column - name truncates so it never fights the icons for
+   room, icons stay fixed-size on the same line (not wrapped below,
+   which read as detached/floating). */
 .title-row {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
   margin-bottom: 4px;
-  row-gap: 4px;
+  gap: 6px;
 }
 
 .title-row h3 {
   margin: 0;
   font-size: 0.85rem;
   text-transform: capitalize;
-  flex: 1 1 100%;
+  flex: 1 1 auto;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -724,15 +737,14 @@
 
 .actions {
   display: flex;
-  gap: 3px;
-  flex: 1 1 100%;
-  justify-content: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
 .actions button {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
-  padding: 3px;
+  padding: 2px;
   border-radius: 4px;
   cursor: pointer;
   color: #64748b;
