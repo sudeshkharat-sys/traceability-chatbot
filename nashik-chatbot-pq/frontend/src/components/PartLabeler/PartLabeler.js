@@ -929,9 +929,14 @@ function PartLabeler() {
     }
 
     const filterLabel = filterMonth.includes('All') ? 'Annual' : (filterMonth.length === 1 ? filterMonth[0] : 'Multiple');
+    // Cut off with "..." past ~90 chars instead of letting `fit: shrink`
+    // keep shrinking the font on a long concern - past a point that made
+    // the whole line unreadably small rather than just trimming the text.
+    const concernText = componentDescription || '-';
+    const concernTrimmed = concernText.length > 90 ? concernText.slice(0, 90).trim() + '...' : concernText;
     slide.addText([
       { text: 'CONCERN: ', options: { fontSize: 10, bold: true, color: '7f8c8d' } },
-      { text: `${componentDescription || '-'}    `, options: { fontSize: 11, color: '2d3748' } },
+      { text: `${concernTrimmed}    `, options: { fontSize: 11, color: '2d3748' } },
       { text: `${filterLabel.toUpperCase()} FAILURES: `, options: { fontSize: 10, bold: true, color: '7f8c8d' } },
       { text: String(componentMonthFailures ?? 0), options: { fontSize: 13, bold: true, color: 'DC0028' } }
     ], { x: leftAreaX, y: topY + imgH + sectionGap, w: leftAreaW, h: summaryH - sectionGap, valign: 'top', wrap: true, fit: 'shrink' });
@@ -2357,6 +2362,7 @@ function PartLabeler() {
                     </div>
                   </div>
                   <div className="side-data-panel">
+                  <div className="side-data-left">
                     <div className="mapped-parts-integrated">
                       <div className="panel-header"><Layers size={16} /><span>Mapped Components</span></div>
                       <div className="panel-table-scroll">
@@ -2416,12 +2422,11 @@ function PartLabeler() {
                     </div>
                                         <AnimatePresence>
                                           {activePopup && (
-                                          <div className="active-part-row note-open">
                                             <motion.div
                                               ref={detailCardRef}
                                               initial={{ opacity: 0, y: 10 }}
                                               animate={{ opacity: 1, y: 0 }}
-                                              className="active-part-details"
+                                              className="active-part-details note-open"
                                             >
                                               <div className="details-header">
                                                 {isEditingLabel ? (
@@ -2477,21 +2482,25 @@ function PartLabeler() {
                                                 </div>
                                               </div>
                                             </motion.div>
-                                            <div className="part-note-panel">
-                                              <div className="part-note-box-wrap">
-                                                <span className="part-note-label">ACTION NOTES</span>
-                                                <textarea
-                                                  className="part-note-box"
-                                                  placeholder="Add action notes..."
-                                                  value={partNotes[activePopup.id] ?? activePopup.note ?? ''}
-                                                  onChange={(e) => setPartNotes(prev => ({ ...prev, [activePopup.id]: e.target.value }))}
-                                                  onBlur={() => saveLabelNote(activePopup.id)}
-                                                />
-                                              </div>
-                                            </div>
-                                          </div>
                       )}
                     </AnimatePresence>
+                  </div>
+                  <AnimatePresence>
+                    {activePopup && (
+                      <div className="part-note-panel note-open">
+                        <div className="part-note-box-wrap">
+                          <span className="part-note-label">ACTION NOTES</span>
+                          <textarea
+                            className="part-note-box"
+                            placeholder="Add action notes..."
+                            value={partNotes[activePopup.id] ?? activePopup.note ?? ''}
+                            onChange={(e) => setPartNotes(prev => ({ ...prev, [activePopup.id]: e.target.value }))}
+                            onBlur={() => saveLabelNote(activePopup.id)}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </AnimatePresence>
                   </div>
                 </div>
               )}

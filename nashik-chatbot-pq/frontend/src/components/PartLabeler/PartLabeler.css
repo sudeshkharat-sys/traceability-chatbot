@@ -411,7 +411,10 @@
 
 .layout-grid-top {
   display: grid;
-  grid-template-columns: 1fr 450px;
+  /* Widened from 450px - the side panel now holds a 2-column layout
+     (mapped table + summary on the left, Action Notes full-height on the
+     right) and needed more room, so the CAD image gives up some width. */
+  grid-template-columns: 1fr 560px;
   gap: 15px;
   height: 100%;
 }
@@ -455,7 +458,20 @@
   object-fit: contain;
 }
 
+/* Two columns: left is Mapped Components (scrollable) stacked over the
+   summary card; right is Action Notes, stretching the full column height
+   so it's never squeezed/clipped by the other two boxes. */
 .side-data-panel {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.side-data-left {
+  flex: 1 1 55%;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -471,10 +487,7 @@
   display: flex;
   flex-direction: column;
   flex: 1;
-  /* Rows were getting clipped to near-nothing when the summary/notes row
-     below grew (resized textarea, wrapped icons) - this guarantees the
-     table always keeps enough room to show a few rows. */
-  min-height: 140px;
+  min-height: 0;
   box-shadow: 0 2px 8px rgba(0,0,0,0.02);
 }
 
@@ -544,25 +557,13 @@
   font-weight: 600;
 }
 
-/* Summary card + note panel, side by side, fixed 30/70 split - notes is
-   free-typed and can run long (ICA/PCA bullets etc.), the summary card's
-   fields (name/concern/failures) are short and fixed. */
-.active-part-row {
-  display: flex;
-  align-items: stretch;
-  gap: 10px;
-  flex-shrink: 0;
-  max-height: 45%;
-}
-
-.active-part-row .active-part-details {
-  flex: 0 0 30%;
-  min-width: 0;
-}
-
+/* Part-note-panel is now the whole right column of side-data-panel (full
+   height), and active-part-details sits below the mapped table in the
+   left column - see .side-data-left above. */
 .part-note-panel {
-  flex: 0 0 70%;
+  flex: 1 1 45%;
   min-width: 0;
+  height: 100%;
   display: flex;
   align-items: stretch;
   /* Card frame to match the summary card beside it - it had none before,
@@ -596,7 +597,6 @@
 .part-note-box {
   width: 100%;
   min-height: 90px;
-  max-height: 180px;
   flex: 1 1 auto;
   padding: 8px 10px;
   font-size: 0.75rem;
