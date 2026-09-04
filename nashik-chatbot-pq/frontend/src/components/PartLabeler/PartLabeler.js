@@ -1414,6 +1414,16 @@ function PartLabeler() {
     return out.join('\n');
   };
 
+  // A single space between two words is a normal, collapsible break point
+  // - browsers are free to swallow it right at a line-wrap boundary, which
+  // is why pressing space to nudge a wrapped word rightward did nothing:
+  // that space just got collapsed away at the exact point it was added.
+  // Runs of 2+ spaces (what typing space repeatedly to indent produces)
+  // are converted to non-breaking spaces, which can't be collapsed or
+  // broken across - the gap actually shows and travels with the word it's
+  // attached to when that word wraps.
+  const preserveIndentSpaces = (text) => text.replace(/ {2,}/g, (run) => '\u00A0'.repeat(run.length));
+
   const handleNotePaste = (e) => {
     const text = e.clipboardData?.getData('text/plain');
     if (!text) return;
@@ -2561,7 +2571,7 @@ function PartLabeler() {
                             className="part-note-box"
                             placeholder="Add action notes..."
                             value={partNotes[activePopup.id] ?? activePopup.note ?? ''}
-                            onChange={(e) => setPartNotes(prev => ({ ...prev, [activePopup.id]: e.target.value }))}
+                            onChange={(e) => setPartNotes(prev => ({ ...prev, [activePopup.id]: preserveIndentSpaces(e.target.value) }))}
                             onPaste={handleNotePaste}
                             onBlur={() => saveLabelNote(activePopup.id)}
                           />
