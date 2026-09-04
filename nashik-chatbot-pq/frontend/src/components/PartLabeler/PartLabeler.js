@@ -934,15 +934,16 @@ function PartLabeler() {
     // the whole line unreadably small rather than just trimming the text.
     const concernText = componentDescription || '-';
     const concernTrimmed = concernText.length > 90 ? concernText.slice(0, 90).trim() + '...' : concernText;
-    // Keys were a dull gray next to neon-red values - too much contrast
-    // in one direction, not enough in the other, so neither read as
-    // important. Keys are now a darker slate (still clearly secondary,
-    // but legible) and both keys/values are a size up.
+    // Key and value were the same weight/near-same color, so nothing
+    // stood out as "the answer" - only Failures (red) read correctly.
+    // Keys are now small/muted/not bold (clearly secondary), values are
+    // bold and a size up (clearly the point), matching how Failures
+    // already worked.
     slide.addText([
-      { text: 'CONCERN: ', options: { fontSize: 11, bold: true, color: '475569' } },
+      { text: 'CONCERN: ', options: { fontSize: 9, bold: false, color: '94a3b8' } },
       { text: `${concernTrimmed}    `, options: { fontSize: 12, bold: true, color: '1e293b' } },
-      { text: `${filterLabel.toUpperCase()} FAILURES: `, options: { fontSize: 11, bold: true, color: '475569' } },
-      { text: String(componentMonthFailures ?? 0), options: { fontSize: 14, bold: true, color: 'B01030' } }
+      { text: `${filterLabel.toUpperCase()} FAILURES: `, options: { fontSize: 9, bold: false, color: '94a3b8' } },
+      { text: String(componentMonthFailures ?? 0), options: { fontSize: 15, bold: true, color: 'B01030' } }
     ], { x: leftAreaX, y: topY + imgH + sectionGap, w: leftAreaW, h: summaryH - sectionGap, valign: 'top', wrap: true, fit: 'shrink' });
 
     // Right side: Action Notes fills the full height, own light-gray
