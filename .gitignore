@@ -75,6 +75,9 @@ Thumbs.db
 # Allow QLense data folder Excel files
 !data_qlense/**/*.xlsx
 !data_qlense/*.xlsx
+# Allow PFMEA sample/test Excel files
+!pfmea_ai/**/*.xlsx
+!pfmea_ai/*.xlsx
 csv_output/
 excel_part_labeler_csv/
 thar_csv/
