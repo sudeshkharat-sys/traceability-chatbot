@@ -1,0 +1,100 @@
+{
+  "Head lamp": [
+    {
+      "process_step": "COLLECTION OF HEAD LAMP",
+      "failure_cause": "OPERATOR SELECTS WRONG PART\nPARTS MIX-UP IN STORAGE TROLLEY.",
+      "prevention_control": "OPERATOR TRAINING, PART TRACEABILITY, Sequencing part",
+      "modes_covered": [
+        {
+          "failure_mode": "SCRATCH / DAMAGE ON HEAD LAMP",
+          "source_excel_rows": [
+            18,
+            19
+          ],
+          "plant_recorded_occurrence": 4,
+          "plant_recorded_occurrence_meaning": "Moderate (1 in 10,000)"
+        },
+        {
+          "failure_mode": "FITMENT IS NOT FIRM\n WRONG SELECTION OF HEAD LAMP\n( NOT AS PER MODEL)",
+          "source_excel_rows": [
+            20,
+            21
+          ],
+          "plant_recorded_occurrence": 4,
+          "plant_recorded_occurrence_meaning": "Moderate (1 in 10,000)"
+        }
+      ]
+    },
+    {
+      "process_step": "ENSURE LOCKING OF CONNECTORS",
+      "failure_cause": "OPERATOR FORGETS TO DO SOCKET \nCONNECTION\nOPERATOR DOES IMPROPER CONNECTION",
+      "prevention_control": "PROPER CONNECTION IS ENSURED ON STAGE AND MARKING ON CONNECTION",
+      "modes_covered": [
+        {
+          "failure_mode": "IMPROPER LOCKING /\nPOOR LOCKING",
+          "source_excel_rows": [
+            22,
+            23
+          ],
+          "plant_recorded_occurrence": 3,
+          "plant_recorded_occurrence_meaning": "Low - relatively few failures (1 in 100,000)"
+        }
+      ]
+    },
+    {
+      "process_step": "PREFITMENT OF ALL\n H / L BOLTS",
+      "failure_cause": "SOS NOT FOLLOWED BY OPERATOR, \nREWORK",
+      "prevention_control": "OPERATOR TRAINING,\nWORK INSTRUCTIONS",
+      "modes_covered": [
+        {
+          "failure_mode": "OPERATOR FAILED TO PREFIT BOLTS",
+          "source_excel_rows": [
+            24,
+            25
+          ],
+          "plant_recorded_occurrence": 3,
+          "plant_recorded_occurrence_meaning": "Low - relatively few failures (1 in 100,000)"
+        }
+      ]
+    },
+    {
+      "process_step": "FLUSHNESS & GAPS MAINTAINED BETWEEN HEAD LAMP & FENDER EDGE",
+      "failure_cause": "OPERATOR DOESN'T MAINTAIN THE UNIFORM GAPS BETWEEN HEAD LAMP EDGE & FENDER",
+      "prevention_control": "OPERATOR TRAINING,\nWORK INSTRUCTIONS",
+      "modes_covered": [
+        {
+          "failure_mode": "OPERATOR FAILED TO FIT SCREWS AND NOT MAINTAINED GAP",
+          "source_excel_rows": [
+            26,
+            27
+          ],
+          "plant_recorded_occurrence": 3,
+          "plant_recorded_occurrence_meaning": "Low - relatively few failures (1 in 100,000)"
+        }
+      ]
+    },
+    {
+      "process_step": "PROPER TIGHTENING OF JOINT",
+      "failure_cause": "1.OPERATOR MISTAKE\n2. USE OF WRONG POWER TOOL\n3.  IMPROPER POWER TOOL CALIBRATION",
+      "prevention_control": "PROVISION OF DEDICATED  POWER TOOL FOR THIS APPLICATION, VISUAL / IDENTIFICATION ON POWER TOOL",
+      "modes_covered": [
+        {
+          "failure_mode": "TORQUE NOT ACHIEVED-UNDER TORQUE",
+          "source_excel_rows": [
+            28
+          ],
+          "plant_recorded_occurrence": 3,
+          "plant_recorded_occurrence_meaning": "Low - relatively few failures (1 in 100,000)"
+        },
+        {
+          "failure_mode": "TORQUE NOT ACHIEVED - OVER TORQUE",
+          "source_excel_rows": [
+            29
+          ],
+          "plant_recorded_occurrence": 3,
+          "plant_recorded_occurrence_meaning": "Low - relatively few failures (1 in 100,000)"
+        }
+      ]
+    }
+  ]
+}

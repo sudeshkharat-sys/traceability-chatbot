@@ -17,7 +17,10 @@ on a real file.
 | 3c | Export normalized rows as nested JSON (failure.mode, risk.severity, ...) instead of flat CSV - this is what Step 5's LLM prompt will actually consume | `step3c_to_json.py` | DONE |
 | 4a | Group normalized entries by (Function of Step, Failure Effect) and build the actual Severity input packet the LLM will see - one call per group, not per row | `step4_severity_input.py` | DONE |
 | 4b | Embed the AIAG-VDA handbook PDF into a local vector store (RAG source) | `step4_embed_handbook.py` | TODO (blocked - no PDF yet) |
-| 5 | Call the LLM for a Severity suggestion - simple embedded-table prompt first (no RAG), reusing nashik-chatbot-pq's existing Azure OpenAI setup | `step5_severity_llm.py` | DONE (Severity only; Occurrence/Detection not yet built) |
+| 4c | Same grouping as 4a but for Occurrence, driven by (Function of Step, Failure Cause, Prevention Control) | `step4b_occurrence_input.py` | DONE |
+| 5 | Call the LLM for a Severity suggestion - simple embedded-table prompt first (no RAG), reusing nashik-chatbot-pq's existing Azure OpenAI setup | `step5_severity_llm.py` | DONE (Severity only; Detection not yet built) |
+| 5b | Same as Step 5 but for Occurrence | `step5b_occurrence_llm.py` | DONE |
+| 6 | Write the final output Excel: plant's original columns/header style untouched, new "Suggestion" group (Severity + Occurrence only, for now) added on the right | `step6_write_output.py` | DONE (structure verified; live AI values pending real API run) |
 | 6 | Compare the AI draft against the plant's real recorded value, produce agree/disagree + reason | `step6_compare.py` | TODO |
 | 7 | Write the final output Excel: plant's original columns untouched on the left, AI Suggestion columns added on the right | `step7_write_output.py` | TODO |
 
@@ -243,6 +246,59 @@ with a clear message instead of a stack trace. Have not yet run it against
 the live API (no key available in this session) - that verification is
 still pending real credentials from you.
 
-**Not yet built:** the same treatment for Occurrence (driven by Failure
-Cause + Prevention Control) and Detection (driven by Detection Control) -
-each needs its own grouping/prompt design the way Severity got one.
+**Not yet built:** the same treatment for Detection (driven by Detection
+Control) - it needs its own grouping/prompt design, and per the last
+request the output only needs Severity + Occurrence suggestions for now
+(Prevention Control / Detection suggestions explicitly deferred).
+
+## Step 4c / 5b — Occurrence, same pattern as Severity
+
+`step4b_occurrence_input.py` groups entries by `(function.of_step,
+failure.cause, risk.prevention_control)` instead of `(function.of_step,
+failure.effect)` - Occurrence rates how likely the Cause is to happen
+given the current Prevention Control, not the Effect. Bug caught and
+fixed before pushing: the first version used `entry["process"]["step"]`
+(the sheet-wide stage banner, e.g. "Operation No: ... RH/LH HEAD LAMP
+FITMENT" - constant across the whole sheet) for context instead of the
+actually-specific `entry["function"]["of_step"]` (e.g. "COLLECTION OF HEAD
+LAMP") that Severity used - fixed to match. Verified: 7 entries -> 5
+groups for "Head lamp", same count as Severity (expected, since Cause and
+Effect happen to align 1:1 in this sheet), with the correct specific step
+name now showing in the prompt.
+
+`step5b_occurrence_llm.py` mirrors `step5_severity_llm.py` exactly, scored
+against the AIAG-VDA Occurrence Table instead of Severity's. Same
+`--dry-run` verification: all 5 "Head lamp" groups build a clean prompt,
+exit code 0.
+
+## Step 6 — the final output Excel
+
+Requested: the output should look like the plant's own sheet - a merged
+Group header row, then a Field header row - with a new "Suggestion" group
+added on the right, containing only Severity Suggestion and Occurrence
+Suggestion columns (Prevention Control / Detection suggestions explicitly
+not needed yet). `step6_write_output.py <path-to-excel> <sheet_name>`:
+
+- Rebuilds the same 2-level header style as the source sheet (row 1 =
+  merged group banner, row 2 = field name) for all 5 original groups,
+  then adds one more merged "Suggestion" group banner covering the 2 new
+  columns.
+- Data rows are the normalized, one-row-per-failure-entry rows from
+  step2_normalize.py - not the raw merged Excel layout - since that's the
+  only form where "one row = one failure" holds, which a Suggestion
+  column needs.
+- Matches each row to its AI result by `source_excel_rows` against
+  step5's `__severity_suggestions.json` / step5b's
+  `__occurrence_suggestions.json`. If those files don't exist yet (no
+  live API run happened), the cell is filled with an explicit "(AI
+  suggestion pending - run step5..._llm.py against the live API)"
+  placeholder rather than being silently blank, so it's never ambiguous
+  whether a blank means "no suggestion" or "hasn't been generated yet."
+
+Verified structurally against "Head lamp": correct 5 original group
+banners plus one "Suggestion" banner spanning exactly 2 columns, 7 data
+rows, placeholder text shown correctly (and its script-name reference
+fixed after being caught wrong on the first pass - said
+`step5_occurrence_llm.py`, the real file is `step5b_occurrence_llm.py`).
+Once Step 5/5b are run against the live API, re-running this step will
+pick up the real suggestions automatically - no code change needed.
