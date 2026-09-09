@@ -16,8 +16,8 @@ on a real file.
 | 3b | Decode the plant's own recorded S/O/D numbers into what they officially mean, per the AIAG-VDA reference tables (pure lookup, no AI) | `step3b_explain_scores.py` | DONE |
 | 3c | Export normalized rows as nested JSON (failure.mode, risk.severity, ...) instead of flat CSV - this is what Step 5's LLM prompt will actually consume | `step3c_to_json.py` | DONE |
 | 4a | Group normalized entries by (Function of Step, Failure Effect) and build the actual Severity input packet the LLM will see - one call per group, not per row | `step4_severity_input.py` | DONE |
-| 4b | Embed the AIAG-VDA handbook PDF into a local vector store (RAG source) | `step4_embed_handbook.py` | TODO |
-| 5 | For each process step, retrieve relevant handbook chunks + call the LLM to draft Failure Mode/Effect/Cause/S/D/Prevention | `step5_generate.py` | TODO |
+| 4b | Embed the AIAG-VDA handbook PDF into a local vector store (RAG source) | `step4_embed_handbook.py` | TODO (blocked - no PDF yet) |
+| 5 | Call the LLM for a Severity suggestion - simple embedded-table prompt first (no RAG), reusing nashik-chatbot-pq's existing Azure OpenAI setup | `step5_severity_llm.py` | DONE (Severity only; Occurrence/Detection not yet built) |
 | 6 | Compare the AI draft against the plant's real recorded value, produce agree/disagree + reason | `step6_compare.py` | TODO |
 | 7 | Write the final output Excel: plant's original columns untouched on the left, AI Suggestion columns added on the right | `step7_write_output.py` | TODO |
 
@@ -212,3 +212,37 @@ data-prep step before Step 5 actually calls the LLM.
 Run across all 4 sheets: Head lamp 7->5 groups, Grill fitment-High 7->5,
 Grill fitment-Low 6->4, Side seal 6->3 - real, meaningful collapsing in
 every sheet, not just the one already checked by hand.
+
+## Step 5 — what it does (Severity only, simple prompt first)
+
+Requested: use the GPT models already configured for this repo instead of
+waiting on the AIAG-VDA handbook PDF, and start with a plain prompt (no
+RAG) rather than blocking Step 5 on Step 4b. `step5_severity_llm.py`
+reuses nashik-chatbot-pq's own Azure OpenAI setup exactly -
+`app/models/azure_openai_handler.py`'s `get_reasoning_model()` and
+`app/config/config.py`'s field names - so it reads credentials from the
+SAME env var names (`AZURE_API_KEY`, `AZURE_GPT5_ENDPOINT` falling back to
+`AZURE_CHAT_ENDPOINT`, `AZURE_GPT_5_DEPLOYMENT` default `gpt-5`,
+`AZURE_API_VERSION_GPT5` default `2025-01-01-preview`, `REASONING_EFFORT`
+default `medium`) instead of inventing a new config scheme.
+
+Since the AIAG-VDA Severity Table is only 10 rows, it's embedded directly
+as text in the prompt rather than needing a vector store for something
+this small - RAG (Step 4b) only changes how the reference material is
+gathered once the real handbook PDF arrives, not this script's structure.
+For each Step 4a group (Function context + Failure Effect + the Mode(s) it
+covers, for grounding only), the LLM is asked to return its own
+independent Severity (1-10) + which table definition it matched + why, in
+strict JSON, which is then compared against the plant's recorded value per
+Mode.
+
+`--dry-run` prints the exact prompt for every group with no API call and
+no credentials needed - verified all 5 "Head lamp" groups build a clean,
+complete prompt (exit code 0), and confirmed the no-credentials case fails
+with a clear message instead of a stack trace. Have not yet run it against
+the live API (no key available in this session) - that verification is
+still pending real credentials from you.
+
+**Not yet built:** the same treatment for Occurrence (driven by Failure
+Cause + Prevention Control) and Detection (driven by Detection Control) -
+each needs its own grouping/prompt design the way Severity got one.
