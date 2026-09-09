@@ -122,14 +122,18 @@ def normalize_sheet(ws):
     def cause_of(record):
         return next((v for k, v in record.items() if isinstance(k, tuple) and k[1] == FAILURE_CAUSE_FIELD), None)
 
-    # The plant sheet sometimes records a Failure Mode's Severity on one
-    # physical row and its matching Failure Cause on the next physical row
-    # (Mode's merge is narrower than Severity's merge), which produces one
-    # row with the cause blank and a sibling row with the same mode and the
-    # real cause. Group consecutive rows that share the same forward-filled
-    # Mode value, and within each group drop the blank-cause rows whenever
-    # at least one row in that same group actually has a cause - otherwise
-    # they are just duplicate shells of the row that really has the cause.
+    # The plant sheet often records different fields of the *same* failure
+    # entry on different physical rows - e.g. Mode+Severity on one row and
+    # the matching Cause on the next, because their merges span a different
+    # number of rows. Group consecutive rows that share the same
+    # forward-filled Mode value (a Mode-block = one or more failure
+    # entries), then split each block into entries at every row that has
+    # its own non-blank Cause: that row closes out the entry started right
+    # after the previous entry's Cause row (or the start of the block).
+    # Within one entry, resolve each field independently by scanning the
+    # entry's own rows for the first non-blank value - rather than reading
+    # every field off a single "representative" row - so a field is never
+    # lost just because it happens to live on a different row than Cause.
     blocks = []
     for record in raw_rows:
         if blocks and mode_of(blocks[-1][0]) == mode_of(record):
@@ -139,19 +143,35 @@ def normalize_sheet(ws):
 
     rows = []
     for block in blocks:
-        block_rows = [r["_source_rows"][0] for r in block]
-        non_blank_cause_rows = [r for r in block if cause_of(r) not in (None, "")]
-        keep = non_blank_cause_rows if non_blank_cause_rows else block
-        for record in keep:
-            mode_val = mode_of(record)
-            cause_val = cause_of(record)
+        entries = []
+        current = []
+        for record in block:
+            current.append(record)
+            if cause_of(record) not in (None, ""):
+                entries.append(current)
+                current = []
+        if current:
+            # trailing rows with no cause of their own - fall back to the
+            # whole block as a single entry if nothing else claimed a cause
+            if entries:
+                entries[-1].extend(current)
+            else:
+                entries.append(current)
+
+        for entry in entries:
+            merged = {}
+            for group, field, _col, _ftype in columns:
+                key = (group, field)
+                merged[key] = next(
+                    (r[key] for r in entry if r[key] not in (None, "")), None
+                )
+            merged["_source_rows"] = [r["_source_rows"][0] for r in entry]
+
+            mode_val = mode_of(merged)
+            cause_val = cause_of(merged)
             if mode_val in (None, "") and cause_val in (None, ""):
                 continue
-            # Note the whole block's Excel rows, not just this record's own
-            # row, so the CSV shows exactly which source rows this entry
-            # was assembled from - needed to audit merge handling by hand.
-            record["_source_rows"] = block_rows
-            rows.append(record)
+            rows.append(merged)
 
     return columns, rows
 

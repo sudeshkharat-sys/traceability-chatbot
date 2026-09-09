@@ -1,0 +1,395 @@
+Source Excel Rows,"Structure Analysis (Step2) :: 1. Process Item System, Subsystem, Part Element or Name of Process",Structure Analysis (Step2) :: 2. Process Step Station No. and Name of Focus Element,Structure Analysis (Step2) :: 3. Process Work Element,"Function Analysis (Step3) :: 1. Function of the Process Item Function of System, Subsystem, Part Element or Process",Function Analysis (Step3) :: 2. Function of the Process Step and Product Characteristic (Quantitative value is optional),Function Analysis (Step3) :: 3. Function of the Process Work Element and Process Characteristic,Failure Analysis (Step4) :: 1. Failure Effects (FE) to the Next Higher Level Element and/or End User,Failure Analysis (Step4) :: Severity (S) of FE,Failure Analysis (Step4) :: 2. Failure Mode (FM) of the Focus Element,Failure Analysis (Step4) :: 3. Failure Cause (FC) of the Work Element,Risk Analysis (Step5) :: Current Prevention Control (PC) of FC,Risk Analysis (Step5) :: Occurrence (O) of FC,Risk Analysis (Step5) :: Current Detection Controls (DC) of FC or FM,Risk Analysis (Step5) :: Detection (D) of FC/FM,Risk Analysis (Step5) :: Action Prirorty,Risk Analysis (Step5) :: Special Characteristics,Optimization (Step6) :: Prevention Action,Optimization (Step6) :: Detection Action,Optimization (Step6) :: Responsible Persons Name,Optimization (Step6) :: Target Completion Date,Optimization (Step6) :: Status,Optimization (Step6) :: Action Taken with Pointer to Evidence,Optimization (Step6) :: Completion Date,Optimization (Step6) :: Severity (S),Optimization (Step6) :: Occurrence (O),Optimization (Step6) :: Detection (D),Optimization (Step6) :: Action Prirorty
+audit,other,other,work_element,other,other,work_element,other,risk_score,other,work_element,risk_score,risk_score,risk_score,risk_score,risk_score,other,other,other,other,other,other,other,other,risk_score,risk_score,risk_score,risk_score
+18+19,HEAD LAMP STAGE,"Operation No: 
+
+
+Stage: 
+FRONT GRILL FITMENT- HIGH VARIANT","1 Man - Operator
+
+
+2.Machine-  
+Battery tool, Traceability scanner
+
+3.Material (Indirect) - PPE's
+
+4.Method-
+Connections, 
+Bolts & pushpin   fitment
+
+
+5.Mother Nature
+(Environment)-NA
+
+6.Measurement- NA","Your Plant :
+To correctly install front grill fitment as per BIW design specifications.
+
+Ship to Plant : 
+
+End User : 
+1. Allow airflow to the radiator, condenser, and engine compartment
+2. Protect cooling components from debris, stones, insects
+3. Provide vehicle styling and brand identity",SELECTION OF PART AS PER MODEL,"1. Man: 
+1. TAKE THE FRONT GRILL FROM THE STORAGE AREA AND SCAN THE PART
+2. CONNECT THE CONNECTORS WITH GRILL
+3. INSERT & 
+ALIGN THE FRONT GRILL WITH BIW AND THEN TIGHT WITH BOLTS AND PUSHPINS
+
+2. Machine:
+Proper torquing with 4NM
+
+3. Material (Indirect) :
+Hand Gloves, Apron
+
+4. Method:
+1. Install Front grill from sequencing trolley and scan
+2. Then do the connections with wiring harness with grill and align with BIW and tight with bolts & pushpins","Your Plant:
+1. Wrong front grill variant installed
+2. FURTHER OPERATION NOT POSSIBLE
+3. Gaps or scratches on grill 
+
+Ship to Plant : Nil
+
+End User:
+1. Incorrect distance / object detection
+2. Water/dust ingress affecting sensor
+3. Customer dissatisfaction",6,WRONG PART SELECTION,"Sequence not followed by operator,
+SEQUENCING WRONG","OPERATOR TRAINING, PART TRACEABILITY, Sequencing part",4,"1. SELF CHECK, 
+2. CHECKMAN CHECKING,
+3. VMS scanning system",6,L,,,,,,,,,,,,
+20+21,HEAD LAMP STAGE,"Operation No: 
+
+
+Stage: 
+FRONT GRILL FITMENT- HIGH VARIANT","1 Man - Operator
+
+
+2.Machine-  
+Battery tool, Traceability scanner
+
+3.Material (Indirect) - PPE's
+
+4.Method-
+Connections, 
+Bolts & pushpin   fitment
+
+
+5.Mother Nature
+(Environment)-NA
+
+6.Measurement- NA","Your Plant :
+To correctly install front grill fitment as per BIW design specifications.
+
+Ship to Plant : 
+
+End User : 
+1. Allow airflow to the radiator, condenser, and engine compartment
+2. Protect cooling components from debris, stones, insects
+3. Provide vehicle styling and brand identity",ENSURE PUSHPIN FITMENT,"1. Man: 
+1. TAKE THE FRONT GRILL FROM THE STORAGE AREA AND SCAN THE PART
+2. CONNECT THE CONNECTORS WITH GRILL
+3. INSERT & 
+ALIGN THE FRONT GRILL WITH BIW AND THEN TIGHT WITH BOLTS AND PUSHPINS
+
+2. Machine:
+Proper torquing with 4NM
+
+3. Material (Indirect) :
+Hand Gloves, Apron
+
+4. Method:
+1. Install Front grill from sequencing trolley and scan
+2. Then do the connections with wiring harness with grill and align with BIW and tight with bolts & pushpins","Your Plant:
+1. Wrong front grill variant installed
+2. FURTHER OPERATION NOT POSSIBLE
+3. Gaps or scratches on grill 
+
+Ship to Plant : Nil
+
+End User:
+1. Incorrect distance / object detection
+2. Water/dust ingress affecting sensor
+3. Customer dissatisfaction",6,PUSHPIN MISSING,"Sequence not followed by operator,
+SEQUENCING WRONG","OPERATOR TRAINING, PART TRACEABILITY, Sequencing part",4,"1. SELF CHECK, 
+2. CHECKMAN CHECKING,
+3. VMS scanning system",6,L,,,,,,,,,,,,
+22+23,HEAD LAMP STAGE,"Operation No: 
+
+
+Stage: 
+FRONT GRILL FITMENT- HIGH VARIANT","1 Man - Operator
+
+
+2.Machine-  
+Battery tool, Traceability scanner
+
+3.Material (Indirect) - PPE's
+
+4.Method-
+Connections, 
+Bolts & pushpin   fitment
+
+
+5.Mother Nature
+(Environment)-NA
+
+6.Measurement- NA","Your Plant :
+To correctly install front grill fitment as per BIW design specifications.
+
+Ship to Plant : 
+
+End User : 
+1. Allow airflow to the radiator, condenser, and engine compartment
+2. Protect cooling components from debris, stones, insects
+3. Provide vehicle styling and brand identity",ENSURE LOCKING OF CONNECTORS,"1. Man: 
+1. TAKE THE FRONT GRILL FROM THE STORAGE AREA AND SCAN THE PART
+2. CONNECT THE CONNECTORS WITH GRILL
+3. INSERT & 
+ALIGN THE FRONT GRILL WITH BIW AND THEN TIGHT WITH BOLTS AND PUSHPINS
+
+2. Machine:
+Proper torquing with 4NM
+
+3. Material (Indirect) :
+Hand Gloves, Apron
+
+4. Method:
+1. Install Front grill from sequencing trolley and scan
+2. Then do the connections with wiring harness with grill and align with BIW and tight with bolts & pushpins","Your Plant:
+1. Wiring harness partially connected (loose fitment)
+2. Wiring harness pinched or damaged
+3. Rework time required high and further fitment not possible 
+
+Ship to Plant : Nil
+
+End User:
+1. False ADAS warnings or alerts
+2. Incorrect object detection
+3. Lane assist / collision warning inoperative
+4. Increased risk of accident",6,"IMPROPER LOCKING /
+POOR LOCKING","SOS not followed by operator, Connector not fully seated by operator","OPERATOR TRAINING, 
+WORK INSTRUCTIONS",3,"SELF CHECK ,
+CHECKMAN CHECKING",5,L,,,,,,,,,,,,
+24+25,HEAD LAMP STAGE,"Operation No: 
+
+
+Stage: 
+FRONT GRILL FITMENT- HIGH VARIANT","1 Man - Operator
+
+
+2.Machine-  
+Battery tool, Traceability scanner
+
+3.Material (Indirect) - PPE's
+
+4.Method-
+Connections, 
+Bolts & pushpin   fitment
+
+
+5.Mother Nature
+(Environment)-NA
+
+6.Measurement- NA","Your Plant :
+To correctly install front grill fitment as per BIW design specifications.
+
+Ship to Plant : 
+
+End User : 
+1. Allow airflow to the radiator, condenser, and engine compartment
+2. Protect cooling components from debris, stones, insects
+3. Provide vehicle styling and brand identity",ALIGNMENT OF FRONT GRILL WITH BIW,"1. Man: 
+1. TAKE THE FRONT GRILL FROM THE STORAGE AREA AND SCAN THE PART
+2. CONNECT THE CONNECTORS WITH GRILL
+3. INSERT & 
+ALIGN THE FRONT GRILL WITH BIW AND THEN TIGHT WITH BOLTS AND PUSHPINS
+
+2. Machine:
+Proper torquing with 4NM
+
+3. Material (Indirect) :
+Hand Gloves, Apron
+
+4. Method:
+1. Install Front grill from sequencing trolley and scan
+2. Then do the connections with wiring harness with grill and align with BIW and tight with bolts & pushpins","Your Plant:
+1. Wiring harness partially connected (loose fitment)
+2. Wiring harness pinched or damaged
+3. Rework time required high and further fitment not possible 
+
+Ship to Plant : Nil
+
+End User:
+1. False ADAS warnings or alerts
+2. Incorrect object detection
+3. Lane assist / collision warning inoperative
+4. Increased risk of accident",6,WRONG POSITIONING,"SOS not followed by operator, Connector not fully seated by operator","OPERATOR TRAINING, 
+WORK INSTRUCTIONS",3,"SELF CHECK ,
+CHECKMAN CHECKING",5,L,,,,,,,,,,,,
+26+27,HEAD LAMP STAGE,"Operation No: 
+
+
+Stage: 
+FRONT GRILL FITMENT- HIGH VARIANT","1 Man - Operator
+
+
+2.Machine-  
+Battery tool, Traceability scanner
+
+3.Material (Indirect) - PPE's
+
+4.Method-
+Connections, 
+Bolts & pushpin   fitment
+
+
+5.Mother Nature
+(Environment)-NA
+
+6.Measurement- NA","Your Plant :
+To correctly install front grill fitment as per BIW design specifications.
+
+Ship to Plant : 
+
+End User : 
+1. Allow airflow to the radiator, condenser, and engine compartment
+2. Protect cooling components from debris, stones, insects
+3. Provide vehicle styling and brand identity",PROPER TIGHTENING OF JOINT,"1. Man: 
+1. TAKE THE FRONT GRILL FROM THE STORAGE AREA AND SCAN THE PART
+2. CONNECT THE CONNECTORS WITH GRILL
+3. INSERT & 
+ALIGN THE FRONT GRILL WITH BIW AND THEN TIGHT WITH BOLTS AND PUSHPINS
+
+2. Machine:
+Proper torquing with 4NM
+
+3. Material (Indirect) :
+Hand Gloves, Apron
+
+4. Method:
+1. Install Front grill from sequencing trolley and scan
+2. Then do the connections with wiring harness with grill and align with BIW and tight with bolts & pushpins","Your Plant:
+1. DAMAGE OF THREADS / RATTLING DUE TO JOINT LOOSE
+2. Mounting bolts under-torqued or over-torqued
+3. Broken clips
+
+Ship to Plant : Nil
+
+End User:
+1. Customer loss of confidence in vehicle safety
+2. False collision warnings provided to driver
+3. Water/dust ingress affecting sensor
+4. Rattling or vibration noise during driving",4,OPERATOR FAILED TO FIT BOLTS,"SOS not followed by operator, Connector not fully seated by operator","OPERATOR TRAINING, 
+WORK INSTRUCTIONS",3,"SELF CHECK ,
+CHECKMAN CHECKING",5,L,,,,,,,,,,,,
+28,HEAD LAMP STAGE,"Operation No: 
+
+
+Stage: 
+FRONT GRILL FITMENT- HIGH VARIANT","1 Man - Operator
+
+
+2.Machine-  
+Battery tool, Traceability scanner
+
+3.Material (Indirect) - PPE's
+
+4.Method-
+Connections, 
+Bolts & pushpin   fitment
+
+
+5.Mother Nature
+(Environment)-NA
+
+6.Measurement- NA","Your Plant :
+To correctly install front grill fitment as per BIW design specifications.
+
+Ship to Plant : 
+
+End User : 
+1. Allow airflow to the radiator, condenser, and engine compartment
+2. Protect cooling components from debris, stones, insects
+3. Provide vehicle styling and brand identity",PROPER TIGHTENING OF JOINT,"1. Man: 
+1. TAKE THE FRONT GRILL FROM THE STORAGE AREA AND SCAN THE PART
+2. CONNECT THE CONNECTORS WITH GRILL
+3. INSERT & 
+ALIGN THE FRONT GRILL WITH BIW AND THEN TIGHT WITH BOLTS AND PUSHPINS
+
+2. Machine:
+Proper torquing with 4NM
+
+3. Material (Indirect) :
+Hand Gloves, Apron
+
+4. Method:
+1. Install Front grill from sequencing trolley and scan
+2. Then do the connections with wiring harness with grill and align with BIW and tight with bolts & pushpins","Your Plant:
+1. DAMAGE OF THREADS / RATTLING DUE TO JOINT LOOSE
+2. Mounting bolts under-torqued or over-torqued
+3. Broken clips
+
+Ship to Plant : Nil
+
+End User:
+1. Customer loss of confidence in vehicle safety
+2. False collision warnings provided to driver
+3. Water/dust ingress affecting sensor
+4. Rattling or vibration noise during driving",4,TORQUE NOT ACHIEVED-UNDER TORQUE,SOS not followed by operator or CALIBRATION SET VALUE IS WRONG,DEDICATED TOOLS FOR SPECIFIED TORQUE AND LABELS ON THE TOOL,3,"SELF CHECK,
+CHECKMAN CHECKING,
+CALIBRATION RECORD",5,L,,,,,,,,,,,,
+29,HEAD LAMP STAGE,"Operation No: 
+
+
+Stage: 
+FRONT GRILL FITMENT- HIGH VARIANT","1 Man - Operator
+
+
+2.Machine-  
+Battery tool, Traceability scanner
+
+3.Material (Indirect) - PPE's
+
+4.Method-
+Connections, 
+Bolts & pushpin   fitment
+
+
+5.Mother Nature
+(Environment)-NA
+
+6.Measurement- NA","Your Plant :
+To correctly install front grill fitment as per BIW design specifications.
+
+Ship to Plant : 
+
+End User : 
+1. Allow airflow to the radiator, condenser, and engine compartment
+2. Protect cooling components from debris, stones, insects
+3. Provide vehicle styling and brand identity",PROPER TIGHTENING OF JOINT,"1. Man: 
+1. TAKE THE FRONT GRILL FROM THE STORAGE AREA AND SCAN THE PART
+2. CONNECT THE CONNECTORS WITH GRILL
+3. INSERT & 
+ALIGN THE FRONT GRILL WITH BIW AND THEN TIGHT WITH BOLTS AND PUSHPINS
+
+2. Machine:
+Proper torquing with 4NM
+
+3. Material (Indirect) :
+Hand Gloves, Apron
+
+4. Method:
+1. Install Front grill from sequencing trolley and scan
+2. Then do the connections with wiring harness with grill and align with BIW and tight with bolts & pushpins","Your Plant:
+1. DAMAGE OF THREADS / RATTLING DUE TO JOINT LOOSE
+2. Mounting bolts under-torqued or over-torqued
+3. Broken clips
+
+Ship to Plant : Nil
+
+End User:
+1. Customer loss of confidence in vehicle safety
+2. False collision warnings provided to driver
+3. Water/dust ingress affecting sensor
+4. Rattling or vibration noise during driving",4,TORQUE NOT ACHIEVED - OVER TORQUE,SOS not followed by operator or CALIBRATION SET VALUE IS WRONG,DEDICATED TOOLS FOR SPECIFIED TORQUE AND LABELS ON THE TOOL,3,"SELF CHECK,
+CHECKMAN CHECKING,
+CALIBRATION RECORD",5,L,,,,,,,,,,,,

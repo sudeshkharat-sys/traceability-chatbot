@@ -11,7 +11,7 @@ on a real file.
 | # | Step | Script | Status |
 |---|------|--------|--------|
 | 1 | Read the uploaded plant Excel and report its structure (sheets, columns, row count, sample rows) — nothing else | `step1_read_excel.py` | DONE |
-| 2 | Normalize the real AIAG-VDA PFMEA form (2-level merged header at rows 13/15, hierarchical merged data from row 18) into one clean row per failure entry | `step2_normalize.py` | DONE |
+| 2 | Normalize the real AIAG-VDA PFMEA form (2-level merged header at rows 13/15, hierarchical merged data from row 18) into one clean row per failure entry | `step2_normalize.py` / `step2_verify.py` | DONE |
 | 3 | Compute RPN + Risk Level from Severity/Occurrence/Detection already present in the normalized rows (pure math, no AI) | `step3_rpn.py` | DONE |
 | 4 | Embed the AIAG-VDA handbook PDF into a local vector store (RAG source) | `step4_embed_handbook.py` | TODO |
 | 5 | For each process step, retrieve relevant handbook chunks + call the LLM to draft Failure Mode/Effect/Cause/S/D/Prevention | `step5_generate.py` | TODO |
@@ -87,6 +87,38 @@ Flushness + 2 Torque = 7).
   Priority), everything else = `other`. Useful downstream since the
   risk-score fields are exactly what the AI generation/comparison step
   will draft and compare against the plant's real numbers.
+
+**Hardened per-field resolution (requested: "build it so the compare step
+doesn't rot").** The original version picked one "representative" row per
+failure entry (whichever row had the Cause) and read every field off that
+single row - correct in every case tested, but only because Cause happened
+to line up with the other fields on the same row. Rewrote it to resolve
+each field independently: within an entry's row-group, scan for the first
+non-blank value per field, rather than trusting one row for everything.
+This matters specifically because Step 6 will compare the plant's
+Severity/Occurrence/Detection/Prevention Control/Detection Control against
+an AI draft - if any of those fields had silently come from the wrong row,
+every downstream "AI vs plant" suggestion built on it would be wrong too.
+
+**`step2_verify.py`** - an exhaustive, independent cross-check, not a
+reuse of step2_normalize.py's own grouping logic: for every output row, on
+every sheet, it re-derives every field straight from the raw Excel merges
+using just that row's audited Source Excel Rows, and diffs it against the
+CSV. Also prints a completeness report on the 8 "core comparison fields"
+(Failure Mode, Effect, Cause, Severity, Prevention Control, Occurrence,
+Detection Control, Detection) so gaps in the plant's own data are visible
+now, not discovered mid-AI-generation.
+
+Run across all 4 sheets (26 rows, 27 fields each): **0 mismatches** on
+every field of every row. It also surfaced a real data-quality finding:
+"Side seal" is missing Detection on 1 of 6 rows - genuine plant data gap,
+not a parsing bug, and useful context for Step 6 later.
+
+Note on independence: the verifier reuses `resolve()` (the low-level
+"is this cell inside a merge, if so use the merge's top-left value"
+primitive) since re-implementing that from scratch would just duplicate
+it - but it does NOT reuse step2_normalize.py's block/entry-splitting
+logic, which is where the actual risk of a bug lives.
 
 ## Step 3 — what it does
 
