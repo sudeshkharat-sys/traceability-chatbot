@@ -13,6 +13,7 @@ on a real file.
 | 1 | Read the uploaded plant Excel and report its structure (sheets, columns, row count, sample rows) — nothing else | `step1_read_excel.py` | DONE |
 | 2 | Normalize the real AIAG-VDA PFMEA form (2-level merged header at rows 13/15, hierarchical merged data from row 18) into one clean row per failure entry | `step2_normalize.py` / `step2_verify.py` | DONE |
 | 3 | Compute RPN + Risk Level from Severity/Occurrence/Detection already present in the normalized rows (pure math, no AI) | `step3_rpn.py` | DONE |
+| 3b | Decode the plant's own recorded S/O/D numbers into what they officially mean, per the AIAG-VDA reference tables (pure lookup, no AI) | `step3b_explain_scores.py` | DONE |
 | 4 | Embed the AIAG-VDA handbook PDF into a local vector store (RAG source) | `step4_embed_handbook.py` | TODO |
 | 5 | For each process step, retrieve relevant handbook chunks + call the LLM to draft Failure Mode/Effect/Cause/S/D/Prevention | `step5_generate.py` | TODO |
 | 6 | Compare the AI draft against the plant's real recorded value, produce agree/disagree + reason | `step6_compare.py` | TODO |
@@ -130,3 +131,21 @@ Re-verified against the corrected (7-row) Step 2 output for "Head lamp":
 all 7 rows got a real RPN (Low x5, Medium x2) - the "Missing S/O/D" rows
 seen before Step 2's fix were the same duplicate shell rows, not genuinely
 missing data.
+
+## Step 3b — what it does
+
+Requested: "when I see Severity=5, what does that actually mean?" - the
+plant's own recorded S/O/D numbers are just digits with no context in the
+sheet itself. `step3b_explain_scores.py <rpn-csv> [reference-xlsx]` looks
+each row's Severity/Occurrence/Detection value up against
+`AIAG_VDA_Scoring_Reference.xlsx` (a copy of the Severity/Occurrence/
+Detection Table sheets from the reference `FMEA_Template.xlsx` on the
+`claude/fmea-car-manufacturing-4pthaq` branch) and adds a "<Score> Meaning"
+column per field - pure lookup, no AI, and this is about explaining the
+plant's EXISTING numbers, not suggesting new ones. That comes in Step 6,
+once Step 4/5 give us an independent AI-drafted assessment (via the
+AIAG-VDA handbook PDF + RAG) to compare the plant's numbers against.
+
+Run against all 4 sheets: e.g. "Head lamp" row 1 (Severity=5) now reads
+"Degradation of secondary function (Comfort feature reduced, not gone)"
+instead of a bare 5.

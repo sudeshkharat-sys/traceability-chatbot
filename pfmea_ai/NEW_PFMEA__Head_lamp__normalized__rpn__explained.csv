@@ -1,0 +1,395 @@
+Source Excel Rows,"Structure Analysis (Step2) :: 1. Process Item System, Subsystem, Part Element or Name of Process",Structure Analysis (Step2) :: 2. Process Step Station No. and Name of Focus Element,Structure Analysis (Step2) :: 3. Process Work Element,"Function Analysis (Step3) :: 1. Function of the Process Item Function of System, Subsystem, Part Element or Process",Function Analysis (Step3) :: 2. Function of the Process Step and Product Characteristic (Quantitative value is optional),Function Analysis (Step3) :: 3. Function of the Process Work Element and Process Characteristic,Failure Analysis (Step4) :: 1. Failure Effects (FE) to the Next Higher Level Element and/or End User,Failure Analysis (Step4) :: Severity (S) of FE,Failure Analysis (Step4) :: 2. Failure Mode (FM) of the Focus Element,Failure Analysis (Step4) :: 3. Failure Cause (FC) of the Work Element,Risk Analysis (Step5) :: Current Prevention Control (PC) of FC,Risk Analysis (Step5) :: Occurrence (O) of FC,Risk Analysis (Step5) :: Current Detection Controls (DC) of FC or FM,Risk Analysis (Step5) :: Detection (D) of FC/FM,Risk Analysis (Step5) :: Action Prirorty,Risk Analysis (Step5) :: Special Characteristics,Optimization (Step6) :: Prevention Action,Optimization (Step6) :: Detection Action,Optimization (Step6) :: Responsible Persons Name,Optimization (Step6) :: Target Completion Date,Optimization (Step6) :: Status,Optimization (Step6) :: Action Taken with Pointer to Evidence,Optimization (Step6) :: Completion Date,Optimization (Step6) :: Severity (S),Optimization (Step6) :: Occurrence (O),Optimization (Step6) :: Detection (D),Optimization (Step6) :: Action Prirorty,RPN,Risk Level,Severity (S) of FE Meaning,Occurrence (O) of FC Meaning,Detection (D) of FC/FM Meaning
+audit,other,other,work_element,other,other,work_element,other,risk_score,other,work_element,risk_score,risk_score,risk_score,risk_score,risk_score,other,other,other,other,other,other,other,other,risk_score,risk_score,risk_score,risk_score,,,meaning_lookup,meaning_lookup,meaning_lookup
+18+19,HEAD LAMP STAGE,"Operation No: 
+
+
+Stage: 
+RH / LH HEAD LAMP FITMENT","1 Man - Operator
+
+
+2.Machine-  
+Battery tool, Traceability scanner
+
+3.Material (Indirect) - PPE's
+
+4.Method-
+Connections, Bolt fitment
+
+
+5.Mother Nature
+(Environment)-NA
+
+6.Measurement- NA","Your Plant :
+Headlamp assembly in specific design (bulb/LED assembly, lens fitting, aiming, electrical connection)
+
+Ship to Plant : 
+
+End User : 
+1. Provide adequate illumination of the road ahead during low-light or night conditions
+2. Ensure visibility of the vehicle to other road users
+3. Meet legal/regulatory lighting requirements (beam pattern, intensity, color)",COLLECTION OF HEAD LAMP,"1. Man: 
+1. COLLECT THE HEAD LAMP LH / RH SIDE FROM STORAGE AREA AND SCAN THE PART
+2. CONNECT THE 2 CONNECTORS WITH HEAD LAMP
+3. ALIGN THE HEAD LAMP WITH THE BIW AND THEN TIGHT WITH BOLTS
+
+2. Machine:
+Proper torquing with 6NM
+
+3. Material (Indirect) :
+Hand Gloves, Apron
+
+4. Method:
+1. Install Head lamp from sequencing trolley and scan
+2. Align H/L with BIW, then do the connections with wiring harness with head lamp and tight with bolts","Your Plant:
+1. Wrong Head lamp variant installed
+2. FURTHER OPERATION NOT POSSIBLE
+3. Lens cracked or broken
+
+Ship to Plant : Nil
+
+End User:
+1. Headlamp does not turn ON
+2. Insufficient brightness / dim light
+3. Customer dissatisfaction",5,SCRATCH / DAMAGE ON HEAD LAMP,"OPERATOR SELECTS WRONG PART
+PARTS MIX-UP IN STORAGE TROLLEY.","OPERATOR TRAINING, PART TRACEABILITY, Sequencing part",4,"1. SELF CHECK, 
+2. CHECKMAN CHECKING,
+3. ECOS SYSTEM",5,L,,,,,,,,,,,,,100,Medium,"Degradation of secondary function (Comfort feature reduced, not gone)","Moderate (1 in 10,000)","Moderate chance (Manual check using gauge/fixture, done consistently)"
+20+21,HEAD LAMP STAGE,"Operation No: 
+
+
+Stage: 
+RH / LH HEAD LAMP FITMENT","1 Man - Operator
+
+
+2.Machine-  
+Battery tool, Traceability scanner
+
+3.Material (Indirect) - PPE's
+
+4.Method-
+Connections, Bolt fitment
+
+
+5.Mother Nature
+(Environment)-NA
+
+6.Measurement- NA","Your Plant :
+Headlamp assembly in specific design (bulb/LED assembly, lens fitting, aiming, electrical connection)
+
+Ship to Plant : 
+
+End User : 
+1. Provide adequate illumination of the road ahead during low-light or night conditions
+2. Ensure visibility of the vehicle to other road users
+3. Meet legal/regulatory lighting requirements (beam pattern, intensity, color)",COLLECTION OF HEAD LAMP,"1. Man: 
+1. COLLECT THE HEAD LAMP LH / RH SIDE FROM STORAGE AREA AND SCAN THE PART
+2. CONNECT THE 2 CONNECTORS WITH HEAD LAMP
+3. ALIGN THE HEAD LAMP WITH THE BIW AND THEN TIGHT WITH BOLTS
+
+2. Machine:
+Proper torquing with 6NM
+
+3. Material (Indirect) :
+Hand Gloves, Apron
+
+4. Method:
+1. Install Head lamp from sequencing trolley and scan
+2. Align H/L with BIW, then do the connections with wiring harness with head lamp and tight with bolts","Your Plant:
+1. Wrong Head lamp variant installed
+2. FURTHER OPERATION NOT POSSIBLE
+3. Lens cracked or broken
+
+Ship to Plant : Nil
+
+End User:
+1. Headlamp does not turn ON
+2. Insufficient brightness / dim light
+3. Customer dissatisfaction",5,"FITMENT IS NOT FIRM
+ WRONG SELECTION OF HEAD LAMP
+( NOT AS PER MODEL)","OPERATOR SELECTS WRONG PART
+PARTS MIX-UP IN STORAGE TROLLEY.","OPERATOR TRAINING, PART TRACEABILITY, Sequencing part",4,"1. SELF CHECK, 
+2. CHECKMAN CHECKING,
+3. ECOS SYSTEM",5,L,,,,,,,,,,,,,100,Medium,"Degradation of secondary function (Comfort feature reduced, not gone)","Moderate (1 in 10,000)","Moderate chance (Manual check using gauge/fixture, done consistently)"
+22+23,HEAD LAMP STAGE,"Operation No: 
+
+
+Stage: 
+RH / LH HEAD LAMP FITMENT","1 Man - Operator
+
+
+2.Machine-  
+Battery tool, Traceability scanner
+
+3.Material (Indirect) - PPE's
+
+4.Method-
+Connections, Bolt fitment
+
+
+5.Mother Nature
+(Environment)-NA
+
+6.Measurement- NA","Your Plant :
+Headlamp assembly in specific design (bulb/LED assembly, lens fitting, aiming, electrical connection)
+
+Ship to Plant : 
+
+End User : 
+1. Provide adequate illumination of the road ahead during low-light or night conditions
+2. Ensure visibility of the vehicle to other road users
+3. Meet legal/regulatory lighting requirements (beam pattern, intensity, color)",ENSURE LOCKING OF CONNECTORS,"1. Man: 
+1. COLLECT THE HEAD LAMP LH / RH SIDE FROM STORAGE AREA AND SCAN THE PART
+2. CONNECT THE 2 CONNECTORS WITH HEAD LAMP
+3. ALIGN THE HEAD LAMP WITH THE BIW AND THEN TIGHT WITH BOLTS
+
+2. Machine:
+Proper torquing with 6NM
+
+3. Material (Indirect) :
+Hand Gloves, Apron
+
+4. Method:
+1. Install Head lamp from sequencing trolley and scan
+2. Align H/L with BIW, then do the connections with wiring harness with head lamp and tight with bolts","Your Plant:
+1. Wiring harness partially connected (loose fitment)
+2. Electrical connector loose or damaged
+3. Rework time required high and further fitment not possible 
+
+
+Ship to Plant : Nil
+
+End User:
+1. Incorrect beam alignment
+2. Headlamp does not turn ON
+3. Reduced road visibility
+4. Increased risk of accident",5,"IMPROPER LOCKING /
+POOR LOCKING","OPERATOR FORGETS TO DO SOCKET 
+CONNECTION
+OPERATOR DOES IMPROPER CONNECTION",PROPER CONNECTION IS ENSURED ON STAGE AND MARKING ON CONNECTION,3,"SELF CHECK WITH MARKING,
+CHECKMAN CHECKING,
+ECOS SYSTEM",5,L,,,,,,,,,,,,,75,Low,"Degradation of secondary function (Comfort feature reduced, not gone)","Low - relatively few failures (1 in 100,000)","Moderate chance (Manual check using gauge/fixture, done consistently)"
+24+25,HEAD LAMP STAGE,"Operation No: 
+
+
+Stage: 
+RH / LH HEAD LAMP FITMENT","1 Man - Operator
+
+
+2.Machine-  
+Battery tool, Traceability scanner
+
+3.Material (Indirect) - PPE's
+
+4.Method-
+Connections, Bolt fitment
+
+
+5.Mother Nature
+(Environment)-NA
+
+6.Measurement- NA","Your Plant :
+Headlamp assembly in specific design (bulb/LED assembly, lens fitting, aiming, electrical connection)
+
+Ship to Plant : 
+
+End User : 
+1. Provide adequate illumination of the road ahead during low-light or night conditions
+2. Ensure visibility of the vehicle to other road users
+3. Meet legal/regulatory lighting requirements (beam pattern, intensity, color)","PREFITMENT OF ALL
+ H / L BOLTS","1. Man: 
+1. COLLECT THE HEAD LAMP LH / RH SIDE FROM STORAGE AREA AND SCAN THE PART
+2. CONNECT THE 2 CONNECTORS WITH HEAD LAMP
+3. ALIGN THE HEAD LAMP WITH THE BIW AND THEN TIGHT WITH BOLTS
+
+2. Machine:
+Proper torquing with 6NM
+
+3. Material (Indirect) :
+Hand Gloves, Apron
+
+4. Method:
+1. Install Head lamp from sequencing trolley and scan
+2. Align H/L with BIW, then do the connections with wiring harness with head lamp and tight with bolts","Your Plant:
+1. Wiring harness partially connected (loose fitment)
+2. Electrical connector loose or damaged
+3. Rework time required high and further fitment not possible 
+
+
+Ship to Plant : Nil
+
+End User:
+1. Incorrect beam alignment
+2. Headlamp does not turn ON
+3. Reduced road visibility
+4. Increased risk of accident",5,OPERATOR FAILED TO PREFIT BOLTS,"SOS NOT FOLLOWED BY OPERATOR, 
+REWORK","OPERATOR TRAINING,
+WORK INSTRUCTIONS",3,"SELF CHECK WITH MARKING,
+CHECKMAN CHECKING,
+ECOS SYSTEM",5,L,,,,,,,,,,,,,75,Low,"Degradation of secondary function (Comfort feature reduced, not gone)","Low - relatively few failures (1 in 100,000)","Moderate chance (Manual check using gauge/fixture, done consistently)"
+26+27,HEAD LAMP STAGE,"Operation No: 
+
+
+Stage: 
+RH / LH HEAD LAMP FITMENT","1 Man - Operator
+
+
+2.Machine-  
+Battery tool, Traceability scanner
+
+3.Material (Indirect) - PPE's
+
+4.Method-
+Connections, Bolt fitment
+
+
+5.Mother Nature
+(Environment)-NA
+
+6.Measurement- NA","Your Plant :
+Headlamp assembly in specific design (bulb/LED assembly, lens fitting, aiming, electrical connection)
+
+Ship to Plant : 
+
+End User : 
+1. Provide adequate illumination of the road ahead during low-light or night conditions
+2. Ensure visibility of the vehicle to other road users
+3. Meet legal/regulatory lighting requirements (beam pattern, intensity, color)",FLUSHNESS & GAPS MAINTAINED BETWEEN HEAD LAMP & FENDER EDGE,"1. Man: 
+1. COLLECT THE HEAD LAMP LH / RH SIDE FROM STORAGE AREA AND SCAN THE PART
+2. CONNECT THE 2 CONNECTORS WITH HEAD LAMP
+3. ALIGN THE HEAD LAMP WITH THE BIW AND THEN TIGHT WITH BOLTS
+
+2. Machine:
+Proper torquing with 6NM
+
+3. Material (Indirect) :
+Hand Gloves, Apron
+
+4. Method:
+1. Install Head lamp from sequencing trolley and scan
+2. Align H/L with BIW, then do the connections with wiring harness with head lamp and tight with bolts","Your Plant:
+1. DAMAGE OF THREADS / RATTLING DUE TO JOINT LOOSE
+2. Mounting screws under-torqued or over-torqued
+
+Ship to Plant : Nil
+
+End User:
+1. Lens cracked or broken
+2. LED / BULB burnout
+3. Water ingress inside lamp
+4. Rattling or vibration noise during driving
+5. Driver discomfort or eye strain",4,OPERATOR FAILED TO FIT SCREWS AND NOT MAINTAINED GAP,OPERATOR DOESN'T MAINTAIN THE UNIFORM GAPS BETWEEN HEAD LAMP EDGE & FENDER,"OPERATOR TRAINING,
+WORK INSTRUCTIONS",3,"SELF CHECK WITH MARKING,
+CHECKMAN CHECKING,
+ECOS SYSTEM",5,L,,,,,,,,,,,,,60,Low,"Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)","Low - relatively few failures (1 in 100,000)","Moderate chance (Manual check using gauge/fixture, done consistently)"
+28,HEAD LAMP STAGE,"Operation No: 
+
+
+Stage: 
+RH / LH HEAD LAMP FITMENT","1 Man - Operator
+
+
+2.Machine-  
+Battery tool, Traceability scanner
+
+3.Material (Indirect) - PPE's
+
+4.Method-
+Connections, Bolt fitment
+
+
+5.Mother Nature
+(Environment)-NA
+
+6.Measurement- NA","Your Plant :
+Headlamp assembly in specific design (bulb/LED assembly, lens fitting, aiming, electrical connection)
+
+Ship to Plant : 
+
+End User : 
+1. Provide adequate illumination of the road ahead during low-light or night conditions
+2. Ensure visibility of the vehicle to other road users
+3. Meet legal/regulatory lighting requirements (beam pattern, intensity, color)",PROPER TIGHTENING OF JOINT,"1. Man: 
+1. COLLECT THE HEAD LAMP LH / RH SIDE FROM STORAGE AREA AND SCAN THE PART
+2. CONNECT THE 2 CONNECTORS WITH HEAD LAMP
+3. ALIGN THE HEAD LAMP WITH THE BIW AND THEN TIGHT WITH BOLTS
+
+2. Machine:
+Proper torquing with 6NM
+
+3. Material (Indirect) :
+Hand Gloves, Apron
+
+4. Method:
+1. Install Head lamp from sequencing trolley and scan
+2. Align H/L with BIW, then do the connections with wiring harness with head lamp and tight with bolts","Your Plant:
+1. DAMAGE OF THREADS / RATTLING DUE TO JOINT LOOSE
+2. Mounting screws under-torqued or over-torqued
+
+Ship to Plant : Nil
+
+End User:
+1. Lens cracked or broken
+2. LED / BULB burnout
+3. Water ingress inside lamp
+4. Rattling or vibration noise during driving
+5. Driver discomfort or eye strain",4,TORQUE NOT ACHIEVED-UNDER TORQUE,"1.OPERATOR MISTAKE
+2. USE OF WRONG POWER TOOL
+3.  IMPROPER POWER TOOL CALIBRATION","PROVISION OF DEDICATED  POWER TOOL FOR THIS APPLICATION, VISUAL / IDENTIFICATION ON POWER TOOL",3,"1. SELF CHECK WITH MARKING,
+2. CHECKMAN CHECKING,
+3. CALIBRATION RECORD",5,L,,,,,,,,,,,,,60,Low,"Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)","Low - relatively few failures (1 in 100,000)","Moderate chance (Manual check using gauge/fixture, done consistently)"
+29,HEAD LAMP STAGE,"Operation No: 
+
+
+Stage: 
+RH / LH HEAD LAMP FITMENT","1 Man - Operator
+
+
+2.Machine-  
+Battery tool, Traceability scanner
+
+3.Material (Indirect) - PPE's
+
+4.Method-
+Connections, Bolt fitment
+
+
+5.Mother Nature
+(Environment)-NA
+
+6.Measurement- NA","Your Plant :
+Headlamp assembly in specific design (bulb/LED assembly, lens fitting, aiming, electrical connection)
+
+Ship to Plant : 
+
+End User : 
+1. Provide adequate illumination of the road ahead during low-light or night conditions
+2. Ensure visibility of the vehicle to other road users
+3. Meet legal/regulatory lighting requirements (beam pattern, intensity, color)",PROPER TIGHTENING OF JOINT,"1. Man: 
+1. COLLECT THE HEAD LAMP LH / RH SIDE FROM STORAGE AREA AND SCAN THE PART
+2. CONNECT THE 2 CONNECTORS WITH HEAD LAMP
+3. ALIGN THE HEAD LAMP WITH THE BIW AND THEN TIGHT WITH BOLTS
+
+2. Machine:
+Proper torquing with 6NM
+
+3. Material (Indirect) :
+Hand Gloves, Apron
+
+4. Method:
+1. Install Head lamp from sequencing trolley and scan
+2. Align H/L with BIW, then do the connections with wiring harness with head lamp and tight with bolts","Your Plant:
+1. DAMAGE OF THREADS / RATTLING DUE TO JOINT LOOSE
+2. Mounting screws under-torqued or over-torqued
+
+Ship to Plant : Nil
+
+End User:
+1. Lens cracked or broken
+2. LED / BULB burnout
+3. Water ingress inside lamp
+4. Rattling or vibration noise during driving
+5. Driver discomfort or eye strain",4,TORQUE NOT ACHIEVED - OVER TORQUE,"1.OPERATOR MISTAKE
+2. USE OF WRONG POWER TOOL
+3.  IMPROPER POWER TOOL CALIBRATION","PROVISION OF DEDICATED  POWER TOOL FOR THIS APPLICATION, VISUAL / IDENTIFICATION ON POWER TOOL",3,"1. SELF CHECK WITH MARKING,
+2. CHECKMAN CHECKING,
+3. CALIBRATION RECORD",5,L,,,,,,,,,,,,,60,Low,"Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)","Low - relatively few failures (1 in 100,000)","Moderate chance (Manual check using gauge/fixture, done consistently)"
