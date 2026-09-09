@@ -15,7 +15,8 @@ on a real file.
 | 3 | Compute RPN + Risk Level from Severity/Occurrence/Detection already present in the normalized rows (pure math, no AI) | `step3_rpn.py` | DONE |
 | 3b | Decode the plant's own recorded S/O/D numbers into what they officially mean, per the AIAG-VDA reference tables (pure lookup, no AI) | `step3b_explain_scores.py` | DONE |
 | 3c | Export normalized rows as nested JSON (failure.mode, risk.severity, ...) instead of flat CSV - this is what Step 5's LLM prompt will actually consume | `step3c_to_json.py` | DONE |
-| 4 | Embed the AIAG-VDA handbook PDF into a local vector store (RAG source) | `step4_embed_handbook.py` | TODO |
+| 4a | Group normalized entries by (Function of Step, Failure Effect) and build the actual Severity input packet the LLM will see - one call per group, not per row | `step4_severity_input.py` | DONE |
+| 4b | Embed the AIAG-VDA handbook PDF into a local vector store (RAG source) | `step4_embed_handbook.py` | TODO |
 | 5 | For each process step, retrieve relevant handbook chunks + call the LLM to draft Failure Mode/Effect/Cause/S/D/Prevention | `step5_generate.py` | TODO |
 | 6 | Compare the AI draft against the plant's real recorded value, produce agree/disagree + reason | `step6_compare.py` | TODO |
 | 7 | Write the final output Excel: plant's original columns untouched on the left, AI Suggestion columns added on the right | `step7_write_output.py` | TODO |
@@ -185,3 +186,29 @@ already-verified CSV output (7/7/6/6 entries, same S/O/D/RPN per row) - the
 JSON export is a different shape of the same verified data, not a new
 parsing path that could disagree with it. This is the actual shape Step
 5's LLM prompt will be built from.
+
+## Step 4a — what it does
+
+Question raised: "how do we get the first input for the LLM" - for
+Severity specifically, and the concern that "many modes get merged" so we
+need to select the correct one rather than duplicating. Both points are
+right: per the Severity Table, Severity is rated on the Failure EFFECT
+(Function gives context to interpret it, Mode just identifies which
+failure it is) - so several different Modes commonly share the exact same
+(Function, Effect) pair, e.g. Head lamp's "Scratch/Damage" and "Fitment
+Not Firm" both come from "Collection of Head Lamp" with identical recorded
+Effect text. Sending one LLM call per row would waste calls on Modes whose
+Severity question is identical, and risks the AI answering the same
+question two different ways.
+
+`step4_severity_input.py <path-to-excel> [sheet_name ...]` groups the
+Step 3c entries by `(function.of_step, failure.effect)` and builds one
+input packet per group - function context (item/step/work element),
+effect text, and a `modes_covered` list naming every Mode (with its plant-
+recorded Severity, for the eventual comparison) that group's one AI answer
+will apply to. Still pure Python, no AI call yet - this is the last
+data-prep step before Step 5 actually calls the LLM.
+
+Run across all 4 sheets: Head lamp 7->5 groups, Grill fitment-High 7->5,
+Grill fitment-Low 6->4, Side seal 6->3 - real, meaningful collapsing in
+every sheet, not just the one already checked by hand.

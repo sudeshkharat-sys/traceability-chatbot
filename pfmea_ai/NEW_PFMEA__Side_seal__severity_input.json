@@ -1,0 +1,84 @@
+[
+  {
+    "function_of_step": "SELECTION OF SIDE SEAL",
+    "function_of_item": "Your Plant :\n1. Correct installation and positioning of the side seal during radiator assembly.\n2. Maintain seal integrity (no cuts, twists or misalignment)\n\nShip to Plant : \n\nEnd User : \n1. Maintain system pressure under operating temperature and vibration\n2. Accommodate thermal expansion between radiator components\n3. Seal the joint between the radiator core and side tank to prevent coolant leakage",
+    "function_of_work_element": "1. Man: \n1. GET THE SIDE SEAL FROM STORAGE BIN\n2. ALIGN THE SIDE SEAL WITH THE BIW AND THEN TIGHT WITH BOLT AND PUSHPIN\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Take side seal from storage bin\n2. Align side seal with BIW and tight with bolt and pushpin",
+    "failure_effect": "Your Plant:\n1. Wrong part installed or mixed material\n2. FURTHER OPERATION NOT POSSIBLE\n\nShip to Plant : Nil\n\nEnd User:\n1. Vehicle overheating\n2. Coolant seepage or visible leak\n3. Customer dissatisfaction",
+    "modes_covered": [
+      {
+        "failure_mode": "WRONG PART SELECTION",
+        "failure_cause": "Sequence not followed by operator",
+        "source_excel_rows": [
+          18,
+          19
+        ],
+        "plant_recorded_severity": 5,
+        "plant_recorded_severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)"
+      }
+    ]
+  },
+  {
+    "function_of_step": "ALIGNMENT OF SIDE SEAL WITH BIW",
+    "function_of_item": "Your Plant :\n1. Correct installation and positioning of the side seal during radiator assembly.\n2. Maintain seal integrity (no cuts, twists or misalignment)\n\nShip to Plant : \n\nEnd User : \n1. Maintain system pressure under operating temperature and vibration\n2. Accommodate thermal expansion between radiator components\n3. Seal the joint between the radiator core and side tank to prevent coolant leakage",
+    "function_of_work_element": "1. Man: \n1. GET THE SIDE SEAL FROM STORAGE BIN\n2. ALIGN THE SIDE SEAL WITH THE BIW AND THEN TIGHT WITH BOLT AND PUSHPIN\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Take side seal from storage bin\n2. Align side seal with BIW and tight with bolt and pushpin",
+    "failure_effect": "Your Plant:\n1. Cut, torn, pinched, or cracked seal\n2. Seal under-compressed or over-compressed\n3. Rework time required high and further fitment not possible \n\nShip to Plant : Nil\n\nEnd User:\n1. Reduced cooling efficiency\n2. Engine overheating\n3. Safety risk if overheating occurs during driving",
+    "modes_covered": [
+      {
+        "failure_mode": "IMPROPER LOCKING",
+        "failure_cause": "SOS not followed by operator",
+        "source_excel_rows": [
+          20,
+          21
+        ],
+        "plant_recorded_severity": 4,
+        "plant_recorded_severity_meaning": "Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)"
+      },
+      {
+        "failure_mode": "WRONG POSITIONING",
+        "failure_cause": "SOS not followed by operator",
+        "source_excel_rows": [
+          22,
+          23
+        ],
+        "plant_recorded_severity": 4,
+        "plant_recorded_severity_meaning": "Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)"
+      }
+    ]
+  },
+  {
+    "function_of_step": "PROPER TIGHTENING OF JOINT",
+    "function_of_item": "Your Plant :\n1. Correct installation and positioning of the side seal during radiator assembly.\n2. Maintain seal integrity (no cuts, twists or misalignment)\n\nShip to Plant : \n\nEnd User : \n1. Maintain system pressure under operating temperature and vibration\n2. Accommodate thermal expansion between radiator components\n3. Seal the joint between the radiator core and side tank to prevent coolant leakage",
+    "function_of_work_element": "1. Man: \n1. GET THE SIDE SEAL FROM STORAGE BIN\n2. ALIGN THE SIDE SEAL WITH THE BIW AND THEN TIGHT WITH BOLT AND PUSHPIN\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Take side seal from storage bin\n2. Align side seal with BIW and tight with bolt and pushpin",
+    "failure_effect": "Your Plant:\n1. DAMAGE OF THREADS / RATTLING DUE TO JOINT LOOSE\n2. Mounting Bolt under-torqued or over-torqued\n\nShip to Plant : Nil\n\nEnd User:\n1. Customer dissatisfaction due to coolant leak\n2. Coolant dripping under vehicle\n3. Rattling or vibration noise during driving",
+    "modes_covered": [
+      {
+        "failure_mode": "OPERATOR FAILED TO FIT BOLTS",
+        "failure_cause": "SOS not followed by operator",
+        "source_excel_rows": [
+          24,
+          25
+        ],
+        "plant_recorded_severity": 5,
+        "plant_recorded_severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)"
+      },
+      {
+        "failure_mode": "TORQUE NOT ACHIEVED-UNDER TORQUE",
+        "failure_cause": "SOS not followed by operator or tool calibration not done in intervals",
+        "source_excel_rows": [
+          26
+        ],
+        "plant_recorded_severity": 5,
+        "plant_recorded_severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)"
+      },
+      {
+        "failure_mode": "TORQUE NOT ACHIEVED - OVER TORQUE",
+        "failure_cause": "SOS not followed by operator or tool calibration not done in intervals",
+        "source_excel_rows": [
+          27
+        ],
+        "plant_recorded_severity": 5,
+        "plant_recorded_severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)"
+      }
+    ]
+  }
+]

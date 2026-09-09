@@ -1,0 +1,398 @@
+{
+  "Head lamp": [
+    {
+      "function_of_step": "COLLECTION OF HEAD LAMP",
+      "function_of_item": "Your Plant :\nHeadlamp assembly in specific design (bulb/LED assembly, lens fitting, aiming, electrical connection)\n\nShip to Plant : \n\nEnd User : \n1. Provide adequate illumination of the road ahead during low-light or night conditions\n2. Ensure visibility of the vehicle to other road users\n3. Meet legal/regulatory lighting requirements (beam pattern, intensity, color)",
+      "function_of_work_element": "1. Man: \n1. COLLECT THE HEAD LAMP LH / RH SIDE FROM STORAGE AREA AND SCAN THE PART\n2. CONNECT THE 2 CONNECTORS WITH HEAD LAMP\n3. ALIGN THE HEAD LAMP WITH THE BIW AND THEN TIGHT WITH BOLTS\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Install Head lamp from sequencing trolley and scan\n2. Align H/L with BIW, then do the connections with wiring harness with head lamp and tight with bolts",
+      "failure_effect": "Your Plant:\n1. Wrong Head lamp variant installed\n2. FURTHER OPERATION NOT POSSIBLE\n3. Lens cracked or broken\n\nShip to Plant : Nil\n\nEnd User:\n1. Headlamp does not turn ON\n2. Insufficient brightness / dim light\n3. Customer dissatisfaction",
+      "modes_covered": [
+        {
+          "failure_mode": "SCRATCH / DAMAGE ON HEAD LAMP",
+          "failure_cause": "OPERATOR SELECTS WRONG PART\nPARTS MIX-UP IN STORAGE TROLLEY.",
+          "source_excel_rows": [
+            18,
+            19
+          ],
+          "plant_recorded_severity": 5,
+          "plant_recorded_severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)"
+        },
+        {
+          "failure_mode": "FITMENT IS NOT FIRM\n WRONG SELECTION OF HEAD LAMP\n( NOT AS PER MODEL)",
+          "failure_cause": "OPERATOR SELECTS WRONG PART\nPARTS MIX-UP IN STORAGE TROLLEY.",
+          "source_excel_rows": [
+            20,
+            21
+          ],
+          "plant_recorded_severity": 5,
+          "plant_recorded_severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)"
+        }
+      ]
+    },
+    {
+      "function_of_step": "ENSURE LOCKING OF CONNECTORS",
+      "function_of_item": "Your Plant :\nHeadlamp assembly in specific design (bulb/LED assembly, lens fitting, aiming, electrical connection)\n\nShip to Plant : \n\nEnd User : \n1. Provide adequate illumination of the road ahead during low-light or night conditions\n2. Ensure visibility of the vehicle to other road users\n3. Meet legal/regulatory lighting requirements (beam pattern, intensity, color)",
+      "function_of_work_element": "1. Man: \n1. COLLECT THE HEAD LAMP LH / RH SIDE FROM STORAGE AREA AND SCAN THE PART\n2. CONNECT THE 2 CONNECTORS WITH HEAD LAMP\n3. ALIGN THE HEAD LAMP WITH THE BIW AND THEN TIGHT WITH BOLTS\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Install Head lamp from sequencing trolley and scan\n2. Align H/L with BIW, then do the connections with wiring harness with head lamp and tight with bolts",
+      "failure_effect": "Your Plant:\n1. Wiring harness partially connected (loose fitment)\n2. Electrical connector loose or damaged\n3. Rework time required high and further fitment not possible \n\n\nShip to Plant : Nil\n\nEnd User:\n1. Incorrect beam alignment\n2. Headlamp does not turn ON\n3. Reduced road visibility\n4. Increased risk of accident",
+      "modes_covered": [
+        {
+          "failure_mode": "IMPROPER LOCKING /\nPOOR LOCKING",
+          "failure_cause": "OPERATOR FORGETS TO DO SOCKET \nCONNECTION\nOPERATOR DOES IMPROPER CONNECTION",
+          "source_excel_rows": [
+            22,
+            23
+          ],
+          "plant_recorded_severity": 5,
+          "plant_recorded_severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)"
+        }
+      ]
+    },
+    {
+      "function_of_step": "PREFITMENT OF ALL\n H / L BOLTS",
+      "function_of_item": "Your Plant :\nHeadlamp assembly in specific design (bulb/LED assembly, lens fitting, aiming, electrical connection)\n\nShip to Plant : \n\nEnd User : \n1. Provide adequate illumination of the road ahead during low-light or night conditions\n2. Ensure visibility of the vehicle to other road users\n3. Meet legal/regulatory lighting requirements (beam pattern, intensity, color)",
+      "function_of_work_element": "1. Man: \n1. COLLECT THE HEAD LAMP LH / RH SIDE FROM STORAGE AREA AND SCAN THE PART\n2. CONNECT THE 2 CONNECTORS WITH HEAD LAMP\n3. ALIGN THE HEAD LAMP WITH THE BIW AND THEN TIGHT WITH BOLTS\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Install Head lamp from sequencing trolley and scan\n2. Align H/L with BIW, then do the connections with wiring harness with head lamp and tight with bolts",
+      "failure_effect": "Your Plant:\n1. Wiring harness partially connected (loose fitment)\n2. Electrical connector loose or damaged\n3. Rework time required high and further fitment not possible \n\n\nShip to Plant : Nil\n\nEnd User:\n1. Incorrect beam alignment\n2. Headlamp does not turn ON\n3. Reduced road visibility\n4. Increased risk of accident",
+      "modes_covered": [
+        {
+          "failure_mode": "OPERATOR FAILED TO PREFIT BOLTS",
+          "failure_cause": "SOS NOT FOLLOWED BY OPERATOR, \nREWORK",
+          "source_excel_rows": [
+            24,
+            25
+          ],
+          "plant_recorded_severity": 5,
+          "plant_recorded_severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)"
+        }
+      ]
+    },
+    {
+      "function_of_step": "FLUSHNESS & GAPS MAINTAINED BETWEEN HEAD LAMP & FENDER EDGE",
+      "function_of_item": "Your Plant :\nHeadlamp assembly in specific design (bulb/LED assembly, lens fitting, aiming, electrical connection)\n\nShip to Plant : \n\nEnd User : \n1. Provide adequate illumination of the road ahead during low-light or night conditions\n2. Ensure visibility of the vehicle to other road users\n3. Meet legal/regulatory lighting requirements (beam pattern, intensity, color)",
+      "function_of_work_element": "1. Man: \n1. COLLECT THE HEAD LAMP LH / RH SIDE FROM STORAGE AREA AND SCAN THE PART\n2. CONNECT THE 2 CONNECTORS WITH HEAD LAMP\n3. ALIGN THE HEAD LAMP WITH THE BIW AND THEN TIGHT WITH BOLTS\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Install Head lamp from sequencing trolley and scan\n2. Align H/L with BIW, then do the connections with wiring harness with head lamp and tight with bolts",
+      "failure_effect": "Your Plant:\n1. DAMAGE OF THREADS / RATTLING DUE TO JOINT LOOSE\n2. Mounting screws under-torqued or over-torqued\n\nShip to Plant : Nil\n\nEnd User:\n1. Lens cracked or broken\n2. LED / BULB burnout\n3. Water ingress inside lamp\n4. Rattling or vibration noise during driving\n5. Driver discomfort or eye strain",
+      "modes_covered": [
+        {
+          "failure_mode": "OPERATOR FAILED TO FIT SCREWS AND NOT MAINTAINED GAP",
+          "failure_cause": "OPERATOR DOESN'T MAINTAIN THE UNIFORM GAPS BETWEEN HEAD LAMP EDGE & FENDER",
+          "source_excel_rows": [
+            26,
+            27
+          ],
+          "plant_recorded_severity": 4,
+          "plant_recorded_severity_meaning": "Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)"
+        }
+      ]
+    },
+    {
+      "function_of_step": "PROPER TIGHTENING OF JOINT",
+      "function_of_item": "Your Plant :\nHeadlamp assembly in specific design (bulb/LED assembly, lens fitting, aiming, electrical connection)\n\nShip to Plant : \n\nEnd User : \n1. Provide adequate illumination of the road ahead during low-light or night conditions\n2. Ensure visibility of the vehicle to other road users\n3. Meet legal/regulatory lighting requirements (beam pattern, intensity, color)",
+      "function_of_work_element": "1. Man: \n1. COLLECT THE HEAD LAMP LH / RH SIDE FROM STORAGE AREA AND SCAN THE PART\n2. CONNECT THE 2 CONNECTORS WITH HEAD LAMP\n3. ALIGN THE HEAD LAMP WITH THE BIW AND THEN TIGHT WITH BOLTS\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Install Head lamp from sequencing trolley and scan\n2. Align H/L with BIW, then do the connections with wiring harness with head lamp and tight with bolts",
+      "failure_effect": "Your Plant:\n1. DAMAGE OF THREADS / RATTLING DUE TO JOINT LOOSE\n2. Mounting screws under-torqued or over-torqued\n\nShip to Plant : Nil\n\nEnd User:\n1. Lens cracked or broken\n2. LED / BULB burnout\n3. Water ingress inside lamp\n4. Rattling or vibration noise during driving\n5. Driver discomfort or eye strain",
+      "modes_covered": [
+        {
+          "failure_mode": "TORQUE NOT ACHIEVED-UNDER TORQUE",
+          "failure_cause": "1.OPERATOR MISTAKE\n2. USE OF WRONG POWER TOOL\n3.  IMPROPER POWER TOOL CALIBRATION",
+          "source_excel_rows": [
+            28
+          ],
+          "plant_recorded_severity": 4,
+          "plant_recorded_severity_meaning": "Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)"
+        },
+        {
+          "failure_mode": "TORQUE NOT ACHIEVED - OVER TORQUE",
+          "failure_cause": "1.OPERATOR MISTAKE\n2. USE OF WRONG POWER TOOL\n3.  IMPROPER POWER TOOL CALIBRATION",
+          "source_excel_rows": [
+            29
+          ],
+          "plant_recorded_severity": 4,
+          "plant_recorded_severity_meaning": "Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)"
+        }
+      ]
+    }
+  ],
+  "Grill fitment-High": [
+    {
+      "function_of_step": "SELECTION OF PART AS PER MODEL",
+      "function_of_item": "Your Plant :\nTo correctly install front grill fitment as per BIW design specifications.\n\nShip to Plant : \n\nEnd User : \n1. Allow airflow to the radiator, condenser, and engine compartment\n2. Protect cooling components from debris, stones, insects\n3. Provide vehicle styling and brand identity",
+      "function_of_work_element": "1. Man: \n1. TAKE THE FRONT GRILL FROM THE STORAGE AREA AND SCAN THE PART\n2. CONNECT THE CONNECTORS WITH GRILL\n3. INSERT & \nALIGN THE FRONT GRILL WITH BIW AND THEN TIGHT WITH BOLTS AND PUSHPINS\n\n2. Machine:\nProper torquing with 4NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Install Front grill from sequencing trolley and scan\n2. Then do the connections with wiring harness with grill and align with BIW and tight with bolts & pushpins",
+      "failure_effect": "Your Plant:\n1. Wrong front grill variant installed\n2. FURTHER OPERATION NOT POSSIBLE\n3. Gaps or scratches on grill \n\nShip to Plant : Nil\n\nEnd User:\n1. Incorrect distance / object detection\n2. Water/dust ingress affecting sensor\n3. Customer dissatisfaction",
+      "modes_covered": [
+        {
+          "failure_mode": "WRONG PART SELECTION",
+          "failure_cause": "Sequence not followed by operator,\nSEQUENCING WRONG",
+          "source_excel_rows": [
+            18,
+            19
+          ],
+          "plant_recorded_severity": 6,
+          "plant_recorded_severity_meaning": "Loss of secondary function (comfort/convenience feature stops working) (e.g. AC, infotainment fails)"
+        }
+      ]
+    },
+    {
+      "function_of_step": "ENSURE PUSHPIN FITMENT",
+      "function_of_item": "Your Plant :\nTo correctly install front grill fitment as per BIW design specifications.\n\nShip to Plant : \n\nEnd User : \n1. Allow airflow to the radiator, condenser, and engine compartment\n2. Protect cooling components from debris, stones, insects\n3. Provide vehicle styling and brand identity",
+      "function_of_work_element": "1. Man: \n1. TAKE THE FRONT GRILL FROM THE STORAGE AREA AND SCAN THE PART\n2. CONNECT THE CONNECTORS WITH GRILL\n3. INSERT & \nALIGN THE FRONT GRILL WITH BIW AND THEN TIGHT WITH BOLTS AND PUSHPINS\n\n2. Machine:\nProper torquing with 4NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Install Front grill from sequencing trolley and scan\n2. Then do the connections with wiring harness with grill and align with BIW and tight with bolts & pushpins",
+      "failure_effect": "Your Plant:\n1. Wrong front grill variant installed\n2. FURTHER OPERATION NOT POSSIBLE\n3. Gaps or scratches on grill \n\nShip to Plant : Nil\n\nEnd User:\n1. Incorrect distance / object detection\n2. Water/dust ingress affecting sensor\n3. Customer dissatisfaction",
+      "modes_covered": [
+        {
+          "failure_mode": "PUSHPIN MISSING",
+          "failure_cause": "Sequence not followed by operator,\nSEQUENCING WRONG",
+          "source_excel_rows": [
+            20,
+            21
+          ],
+          "plant_recorded_severity": 6,
+          "plant_recorded_severity_meaning": "Loss of secondary function (comfort/convenience feature stops working) (e.g. AC, infotainment fails)"
+        }
+      ]
+    },
+    {
+      "function_of_step": "ENSURE LOCKING OF CONNECTORS",
+      "function_of_item": "Your Plant :\nTo correctly install front grill fitment as per BIW design specifications.\n\nShip to Plant : \n\nEnd User : \n1. Allow airflow to the radiator, condenser, and engine compartment\n2. Protect cooling components from debris, stones, insects\n3. Provide vehicle styling and brand identity",
+      "function_of_work_element": "1. Man: \n1. TAKE THE FRONT GRILL FROM THE STORAGE AREA AND SCAN THE PART\n2. CONNECT THE CONNECTORS WITH GRILL\n3. INSERT & \nALIGN THE FRONT GRILL WITH BIW AND THEN TIGHT WITH BOLTS AND PUSHPINS\n\n2. Machine:\nProper torquing with 4NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Install Front grill from sequencing trolley and scan\n2. Then do the connections with wiring harness with grill and align with BIW and tight with bolts & pushpins",
+      "failure_effect": "Your Plant:\n1. Wiring harness partially connected (loose fitment)\n2. Wiring harness pinched or damaged\n3. Rework time required high and further fitment not possible \n\nShip to Plant : Nil\n\nEnd User:\n1. False ADAS warnings or alerts\n2. Incorrect object detection\n3. Lane assist / collision warning inoperative\n4. Increased risk of accident",
+      "modes_covered": [
+        {
+          "failure_mode": "IMPROPER LOCKING /\nPOOR LOCKING",
+          "failure_cause": "SOS not followed by operator, Connector not fully seated by operator",
+          "source_excel_rows": [
+            22,
+            23
+          ],
+          "plant_recorded_severity": 6,
+          "plant_recorded_severity_meaning": "Loss of secondary function (comfort/convenience feature stops working) (e.g. AC, infotainment fails)"
+        }
+      ]
+    },
+    {
+      "function_of_step": "ALIGNMENT OF FRONT GRILL WITH BIW",
+      "function_of_item": "Your Plant :\nTo correctly install front grill fitment as per BIW design specifications.\n\nShip to Plant : \n\nEnd User : \n1. Allow airflow to the radiator, condenser, and engine compartment\n2. Protect cooling components from debris, stones, insects\n3. Provide vehicle styling and brand identity",
+      "function_of_work_element": "1. Man: \n1. TAKE THE FRONT GRILL FROM THE STORAGE AREA AND SCAN THE PART\n2. CONNECT THE CONNECTORS WITH GRILL\n3. INSERT & \nALIGN THE FRONT GRILL WITH BIW AND THEN TIGHT WITH BOLTS AND PUSHPINS\n\n2. Machine:\nProper torquing with 4NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Install Front grill from sequencing trolley and scan\n2. Then do the connections with wiring harness with grill and align with BIW and tight with bolts & pushpins",
+      "failure_effect": "Your Plant:\n1. Wiring harness partially connected (loose fitment)\n2. Wiring harness pinched or damaged\n3. Rework time required high and further fitment not possible \n\nShip to Plant : Nil\n\nEnd User:\n1. False ADAS warnings or alerts\n2. Incorrect object detection\n3. Lane assist / collision warning inoperative\n4. Increased risk of accident",
+      "modes_covered": [
+        {
+          "failure_mode": "WRONG POSITIONING",
+          "failure_cause": "SOS not followed by operator, Connector not fully seated by operator",
+          "source_excel_rows": [
+            24,
+            25
+          ],
+          "plant_recorded_severity": 6,
+          "plant_recorded_severity_meaning": "Loss of secondary function (comfort/convenience feature stops working) (e.g. AC, infotainment fails)"
+        }
+      ]
+    },
+    {
+      "function_of_step": "PROPER TIGHTENING OF JOINT",
+      "function_of_item": "Your Plant :\nTo correctly install front grill fitment as per BIW design specifications.\n\nShip to Plant : \n\nEnd User : \n1. Allow airflow to the radiator, condenser, and engine compartment\n2. Protect cooling components from debris, stones, insects\n3. Provide vehicle styling and brand identity",
+      "function_of_work_element": "1. Man: \n1. TAKE THE FRONT GRILL FROM THE STORAGE AREA AND SCAN THE PART\n2. CONNECT THE CONNECTORS WITH GRILL\n3. INSERT & \nALIGN THE FRONT GRILL WITH BIW AND THEN TIGHT WITH BOLTS AND PUSHPINS\n\n2. Machine:\nProper torquing with 4NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Install Front grill from sequencing trolley and scan\n2. Then do the connections with wiring harness with grill and align with BIW and tight with bolts & pushpins",
+      "failure_effect": "Your Plant:\n1. DAMAGE OF THREADS / RATTLING DUE TO JOINT LOOSE\n2. Mounting bolts under-torqued or over-torqued\n3. Broken clips\n\nShip to Plant : Nil\n\nEnd User:\n1. Customer loss of confidence in vehicle safety\n2. False collision warnings provided to driver\n3. Water/dust ingress affecting sensor\n4. Rattling or vibration noise during driving",
+      "modes_covered": [
+        {
+          "failure_mode": "OPERATOR FAILED TO FIT BOLTS",
+          "failure_cause": "SOS not followed by operator, Connector not fully seated by operator",
+          "source_excel_rows": [
+            26,
+            27
+          ],
+          "plant_recorded_severity": 4,
+          "plant_recorded_severity_meaning": "Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)"
+        },
+        {
+          "failure_mode": "TORQUE NOT ACHIEVED-UNDER TORQUE",
+          "failure_cause": "SOS not followed by operator or CALIBRATION SET VALUE IS WRONG",
+          "source_excel_rows": [
+            28
+          ],
+          "plant_recorded_severity": 4,
+          "plant_recorded_severity_meaning": "Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)"
+        },
+        {
+          "failure_mode": "TORQUE NOT ACHIEVED - OVER TORQUE",
+          "failure_cause": "SOS not followed by operator or CALIBRATION SET VALUE IS WRONG",
+          "source_excel_rows": [
+            29
+          ],
+          "plant_recorded_severity": 4,
+          "plant_recorded_severity_meaning": "Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)"
+        }
+      ]
+    }
+  ],
+  "Grill fitment-Low": [
+    {
+      "function_of_step": "SELECTION OF PART AS PER MODEL",
+      "function_of_item": "Your Plant :\nTo correctly install front grill fitment as per BIW design specifications.\n\nShip to Plant : \n\nEnd User : \n1. Allow airflow to the radiator, condenser, and engine compartment\n2. Protect cooling components from debris, stones, insects\n3. Provide vehicle styling and brand identity",
+      "function_of_work_element": "1. Man: \n1. TAKE THE FRONT GRILL FROM THE STORAGE AREA AND SCAN THE PART\n2. INSERT & \nALIGN THE FRONT GRILL WITH BIW AND THEN TIGHT WITH BOLTS AND PUSHPINS\n\n2. Machine:\nProper torquing with 4NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Install Front grill from sequencing trolley and scan\n2. Align with BIW and tight with bolts & pushpins",
+      "failure_effect": "Your Plant:\n1. Wrong front grill variant installed\n2. FURTHER OPERATION NOT POSSIBLE\n3. Gaps or scratches on grill \n\nShip to Plant : Nil\n\nEnd User:\n1. Water/dust ingress affecting sensor\n2. Customer dissatisfaction\n3. Bad appereance of vehicle",
+      "modes_covered": [
+        {
+          "failure_mode": "WRONG PART SELECTION",
+          "failure_cause": "Sequence not followed by operator,\nSEQUENCING WRONG",
+          "source_excel_rows": [
+            18,
+            19
+          ],
+          "plant_recorded_severity": 6,
+          "plant_recorded_severity_meaning": "Loss of secondary function (comfort/convenience feature stops working) (e.g. AC, infotainment fails)"
+        }
+      ]
+    },
+    {
+      "function_of_step": "ENSURE PUSHPIN FITMENT",
+      "function_of_item": "Your Plant :\nTo correctly install front grill fitment as per BIW design specifications.\n\nShip to Plant : \n\nEnd User : \n1. Allow airflow to the radiator, condenser, and engine compartment\n2. Protect cooling components from debris, stones, insects\n3. Provide vehicle styling and brand identity",
+      "function_of_work_element": "1. Man: \n1. TAKE THE FRONT GRILL FROM THE STORAGE AREA AND SCAN THE PART\n2. INSERT & \nALIGN THE FRONT GRILL WITH BIW AND THEN TIGHT WITH BOLTS AND PUSHPINS\n\n2. Machine:\nProper torquing with 4NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Install Front grill from sequencing trolley and scan\n2. Align with BIW and tight with bolts & pushpins",
+      "failure_effect": "Your Plant:\n1. Wrong front grill variant installed\n2. FURTHER OPERATION NOT POSSIBLE\n3. Gaps or scratches on grill \n\nShip to Plant : Nil\n\nEnd User:\n1. Water/dust ingress affecting sensor\n2. Customer dissatisfaction\n3. Bad appereance of vehicle",
+      "modes_covered": [
+        {
+          "failure_mode": "PUSHPIN MISSING",
+          "failure_cause": "SOS not followed by operator",
+          "source_excel_rows": [
+            20,
+            21
+          ],
+          "plant_recorded_severity": 6,
+          "plant_recorded_severity_meaning": "Loss of secondary function (comfort/convenience feature stops working) (e.g. AC, infotainment fails)"
+        }
+      ]
+    },
+    {
+      "function_of_step": "ALIGNMENT OF FRONT GRILL WITH BIW",
+      "function_of_item": "Your Plant :\nTo correctly install front grill fitment as per BIW design specifications.\n\nShip to Plant : \n\nEnd User : \n1. Allow airflow to the radiator, condenser, and engine compartment\n2. Protect cooling components from debris, stones, insects\n3. Provide vehicle styling and brand identity",
+      "function_of_work_element": "1. Man: \n1. TAKE THE FRONT GRILL FROM THE STORAGE AREA AND SCAN THE PART\n2. INSERT & \nALIGN THE FRONT GRILL WITH BIW AND THEN TIGHT WITH BOLTS AND PUSHPINS\n\n2. Machine:\nProper torquing with 4NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Install Front grill from sequencing trolley and scan\n2. Align with BIW and tight with bolts & pushpins",
+      "failure_effect": "Your Plant:\n1. Rework time required high and further fitment not possible \n\nShip to Plant : Nil\n\nEnd User:\n1. Water/dust ingress affecting part warrenty",
+      "modes_covered": [
+        {
+          "failure_mode": "WRONG POSITIONING",
+          "failure_cause": "SOS not followed by operator",
+          "source_excel_rows": [
+            22,
+            23
+          ],
+          "plant_recorded_severity": 6,
+          "plant_recorded_severity_meaning": "Loss of secondary function (comfort/convenience feature stops working) (e.g. AC, infotainment fails)"
+        }
+      ]
+    },
+    {
+      "function_of_step": "PROPER TIGHTENING OF JOINT",
+      "function_of_item": "Your Plant :\nTo correctly install front grill fitment as per BIW design specifications.\n\nShip to Plant : \n\nEnd User : \n1. Allow airflow to the radiator, condenser, and engine compartment\n2. Protect cooling components from debris, stones, insects\n3. Provide vehicle styling and brand identity",
+      "function_of_work_element": "1. Man: \n1. TAKE THE FRONT GRILL FROM THE STORAGE AREA AND SCAN THE PART\n2. INSERT & \nALIGN THE FRONT GRILL WITH BIW AND THEN TIGHT WITH BOLTS AND PUSHPINS\n\n2. Machine:\nProper torquing with 4NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Install Front grill from sequencing trolley and scan\n2. Align with BIW and tight with bolts & pushpins",
+      "failure_effect": "Your Plant:\n1. DAMAGE OF THREADS / RATTLING DUE TO JOINT LOOSE\n2. Mounting bolts under-torqued or over-torqued\n3. Broken clips\n\nShip to Plant : Nil\n\nEnd User:\n1. Water/dust ingress affecting sensor\n2. Rattling or vibration noise during driving",
+      "modes_covered": [
+        {
+          "failure_mode": "OPERATOR FAILED TO FIT BOLTS",
+          "failure_cause": "SOS not followed by operator",
+          "source_excel_rows": [
+            24,
+            25
+          ],
+          "plant_recorded_severity": 4,
+          "plant_recorded_severity_meaning": "Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)"
+        },
+        {
+          "failure_mode": "TORQUE NOT ACHIEVED-UNDER TORQUE",
+          "failure_cause": "SOS not followed by operator or CALIBRATION SET VALUE IS WRONG",
+          "source_excel_rows": [
+            26
+          ],
+          "plant_recorded_severity": 4,
+          "plant_recorded_severity_meaning": "Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)"
+        },
+        {
+          "failure_mode": "TORQUE NOT ACHIEVED - OVER TORQUE",
+          "failure_cause": "SOS not followed by operator or CALIBRATION SET VALUE IS WRONG",
+          "source_excel_rows": [
+            27
+          ],
+          "plant_recorded_severity": 4,
+          "plant_recorded_severity_meaning": "Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)"
+        }
+      ]
+    }
+  ],
+  "Side seal": [
+    {
+      "function_of_step": "SELECTION OF SIDE SEAL",
+      "function_of_item": "Your Plant :\n1. Correct installation and positioning of the side seal during radiator assembly.\n2. Maintain seal integrity (no cuts, twists or misalignment)\n\nShip to Plant : \n\nEnd User : \n1. Maintain system pressure under operating temperature and vibration\n2. Accommodate thermal expansion between radiator components\n3. Seal the joint between the radiator core and side tank to prevent coolant leakage",
+      "function_of_work_element": "1. Man: \n1. GET THE SIDE SEAL FROM STORAGE BIN\n2. ALIGN THE SIDE SEAL WITH THE BIW AND THEN TIGHT WITH BOLT AND PUSHPIN\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Take side seal from storage bin\n2. Align side seal with BIW and tight with bolt and pushpin",
+      "failure_effect": "Your Plant:\n1. Wrong part installed or mixed material\n2. FURTHER OPERATION NOT POSSIBLE\n\nShip to Plant : Nil\n\nEnd User:\n1. Vehicle overheating\n2. Coolant seepage or visible leak\n3. Customer dissatisfaction",
+      "modes_covered": [
+        {
+          "failure_mode": "WRONG PART SELECTION",
+          "failure_cause": "Sequence not followed by operator",
+          "source_excel_rows": [
+            18,
+            19
+          ],
+          "plant_recorded_severity": 5,
+          "plant_recorded_severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)"
+        }
+      ]
+    },
+    {
+      "function_of_step": "ALIGNMENT OF SIDE SEAL WITH BIW",
+      "function_of_item": "Your Plant :\n1. Correct installation and positioning of the side seal during radiator assembly.\n2. Maintain seal integrity (no cuts, twists or misalignment)\n\nShip to Plant : \n\nEnd User : \n1. Maintain system pressure under operating temperature and vibration\n2. Accommodate thermal expansion between radiator components\n3. Seal the joint between the radiator core and side tank to prevent coolant leakage",
+      "function_of_work_element": "1. Man: \n1. GET THE SIDE SEAL FROM STORAGE BIN\n2. ALIGN THE SIDE SEAL WITH THE BIW AND THEN TIGHT WITH BOLT AND PUSHPIN\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Take side seal from storage bin\n2. Align side seal with BIW and tight with bolt and pushpin",
+      "failure_effect": "Your Plant:\n1. Cut, torn, pinched, or cracked seal\n2. Seal under-compressed or over-compressed\n3. Rework time required high and further fitment not possible \n\nShip to Plant : Nil\n\nEnd User:\n1. Reduced cooling efficiency\n2. Engine overheating\n3. Safety risk if overheating occurs during driving",
+      "modes_covered": [
+        {
+          "failure_mode": "IMPROPER LOCKING",
+          "failure_cause": "SOS not followed by operator",
+          "source_excel_rows": [
+            20,
+            21
+          ],
+          "plant_recorded_severity": 4,
+          "plant_recorded_severity_meaning": "Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)"
+        },
+        {
+          "failure_mode": "WRONG POSITIONING",
+          "failure_cause": "SOS not followed by operator",
+          "source_excel_rows": [
+            22,
+            23
+          ],
+          "plant_recorded_severity": 4,
+          "plant_recorded_severity_meaning": "Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)"
+        }
+      ]
+    },
+    {
+      "function_of_step": "PROPER TIGHTENING OF JOINT",
+      "function_of_item": "Your Plant :\n1. Correct installation and positioning of the side seal during radiator assembly.\n2. Maintain seal integrity (no cuts, twists or misalignment)\n\nShip to Plant : \n\nEnd User : \n1. Maintain system pressure under operating temperature and vibration\n2. Accommodate thermal expansion between radiator components\n3. Seal the joint between the radiator core and side tank to prevent coolant leakage",
+      "function_of_work_element": "1. Man: \n1. GET THE SIDE SEAL FROM STORAGE BIN\n2. ALIGN THE SIDE SEAL WITH THE BIW AND THEN TIGHT WITH BOLT AND PUSHPIN\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Take side seal from storage bin\n2. Align side seal with BIW and tight with bolt and pushpin",
+      "failure_effect": "Your Plant:\n1. DAMAGE OF THREADS / RATTLING DUE TO JOINT LOOSE\n2. Mounting Bolt under-torqued or over-torqued\n\nShip to Plant : Nil\n\nEnd User:\n1. Customer dissatisfaction due to coolant leak\n2. Coolant dripping under vehicle\n3. Rattling or vibration noise during driving",
+      "modes_covered": [
+        {
+          "failure_mode": "OPERATOR FAILED TO FIT BOLTS",
+          "failure_cause": "SOS not followed by operator",
+          "source_excel_rows": [
+            24,
+            25
+          ],
+          "plant_recorded_severity": 5,
+          "plant_recorded_severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)"
+        },
+        {
+          "failure_mode": "TORQUE NOT ACHIEVED-UNDER TORQUE",
+          "failure_cause": "SOS not followed by operator or tool calibration not done in intervals",
+          "source_excel_rows": [
+            26
+          ],
+          "plant_recorded_severity": 5,
+          "plant_recorded_severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)"
+        },
+        {
+          "failure_mode": "TORQUE NOT ACHIEVED - OVER TORQUE",
+          "failure_cause": "SOS not followed by operator or tool calibration not done in intervals",
+          "source_excel_rows": [
+            27
+          ],
+          "plant_recorded_severity": 5,
+          "plant_recorded_severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)"
+        }
+      ]
+    }
+  ]
+}

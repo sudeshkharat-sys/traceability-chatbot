@@ -1,0 +1,110 @@
+[
+  {
+    "function_of_step": "COLLECTION OF HEAD LAMP",
+    "function_of_item": "Your Plant :\nHeadlamp assembly in specific design (bulb/LED assembly, lens fitting, aiming, electrical connection)\n\nShip to Plant : \n\nEnd User : \n1. Provide adequate illumination of the road ahead during low-light or night conditions\n2. Ensure visibility of the vehicle to other road users\n3. Meet legal/regulatory lighting requirements (beam pattern, intensity, color)",
+    "function_of_work_element": "1. Man: \n1. COLLECT THE HEAD LAMP LH / RH SIDE FROM STORAGE AREA AND SCAN THE PART\n2. CONNECT THE 2 CONNECTORS WITH HEAD LAMP\n3. ALIGN THE HEAD LAMP WITH THE BIW AND THEN TIGHT WITH BOLTS\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Install Head lamp from sequencing trolley and scan\n2. Align H/L with BIW, then do the connections with wiring harness with head lamp and tight with bolts",
+    "failure_effect": "Your Plant:\n1. Wrong Head lamp variant installed\n2. FURTHER OPERATION NOT POSSIBLE\n3. Lens cracked or broken\n\nShip to Plant : Nil\n\nEnd User:\n1. Headlamp does not turn ON\n2. Insufficient brightness / dim light\n3. Customer dissatisfaction",
+    "modes_covered": [
+      {
+        "failure_mode": "SCRATCH / DAMAGE ON HEAD LAMP",
+        "failure_cause": "OPERATOR SELECTS WRONG PART\nPARTS MIX-UP IN STORAGE TROLLEY.",
+        "source_excel_rows": [
+          18,
+          19
+        ],
+        "plant_recorded_severity": 5,
+        "plant_recorded_severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)"
+      },
+      {
+        "failure_mode": "FITMENT IS NOT FIRM\n WRONG SELECTION OF HEAD LAMP\n( NOT AS PER MODEL)",
+        "failure_cause": "OPERATOR SELECTS WRONG PART\nPARTS MIX-UP IN STORAGE TROLLEY.",
+        "source_excel_rows": [
+          20,
+          21
+        ],
+        "plant_recorded_severity": 5,
+        "plant_recorded_severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)"
+      }
+    ]
+  },
+  {
+    "function_of_step": "ENSURE LOCKING OF CONNECTORS",
+    "function_of_item": "Your Plant :\nHeadlamp assembly in specific design (bulb/LED assembly, lens fitting, aiming, electrical connection)\n\nShip to Plant : \n\nEnd User : \n1. Provide adequate illumination of the road ahead during low-light or night conditions\n2. Ensure visibility of the vehicle to other road users\n3. Meet legal/regulatory lighting requirements (beam pattern, intensity, color)",
+    "function_of_work_element": "1. Man: \n1. COLLECT THE HEAD LAMP LH / RH SIDE FROM STORAGE AREA AND SCAN THE PART\n2. CONNECT THE 2 CONNECTORS WITH HEAD LAMP\n3. ALIGN THE HEAD LAMP WITH THE BIW AND THEN TIGHT WITH BOLTS\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Install Head lamp from sequencing trolley and scan\n2. Align H/L with BIW, then do the connections with wiring harness with head lamp and tight with bolts",
+    "failure_effect": "Your Plant:\n1. Wiring harness partially connected (loose fitment)\n2. Electrical connector loose or damaged\n3. Rework time required high and further fitment not possible \n\n\nShip to Plant : Nil\n\nEnd User:\n1. Incorrect beam alignment\n2. Headlamp does not turn ON\n3. Reduced road visibility\n4. Increased risk of accident",
+    "modes_covered": [
+      {
+        "failure_mode": "IMPROPER LOCKING /\nPOOR LOCKING",
+        "failure_cause": "OPERATOR FORGETS TO DO SOCKET \nCONNECTION\nOPERATOR DOES IMPROPER CONNECTION",
+        "source_excel_rows": [
+          22,
+          23
+        ],
+        "plant_recorded_severity": 5,
+        "plant_recorded_severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)"
+      }
+    ]
+  },
+  {
+    "function_of_step": "PREFITMENT OF ALL\n H / L BOLTS",
+    "function_of_item": "Your Plant :\nHeadlamp assembly in specific design (bulb/LED assembly, lens fitting, aiming, electrical connection)\n\nShip to Plant : \n\nEnd User : \n1. Provide adequate illumination of the road ahead during low-light or night conditions\n2. Ensure visibility of the vehicle to other road users\n3. Meet legal/regulatory lighting requirements (beam pattern, intensity, color)",
+    "function_of_work_element": "1. Man: \n1. COLLECT THE HEAD LAMP LH / RH SIDE FROM STORAGE AREA AND SCAN THE PART\n2. CONNECT THE 2 CONNECTORS WITH HEAD LAMP\n3. ALIGN THE HEAD LAMP WITH THE BIW AND THEN TIGHT WITH BOLTS\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Install Head lamp from sequencing trolley and scan\n2. Align H/L with BIW, then do the connections with wiring harness with head lamp and tight with bolts",
+    "failure_effect": "Your Plant:\n1. Wiring harness partially connected (loose fitment)\n2. Electrical connector loose or damaged\n3. Rework time required high and further fitment not possible \n\n\nShip to Plant : Nil\n\nEnd User:\n1. Incorrect beam alignment\n2. Headlamp does not turn ON\n3. Reduced road visibility\n4. Increased risk of accident",
+    "modes_covered": [
+      {
+        "failure_mode": "OPERATOR FAILED TO PREFIT BOLTS",
+        "failure_cause": "SOS NOT FOLLOWED BY OPERATOR, \nREWORK",
+        "source_excel_rows": [
+          24,
+          25
+        ],
+        "plant_recorded_severity": 5,
+        "plant_recorded_severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)"
+      }
+    ]
+  },
+  {
+    "function_of_step": "FLUSHNESS & GAPS MAINTAINED BETWEEN HEAD LAMP & FENDER EDGE",
+    "function_of_item": "Your Plant :\nHeadlamp assembly in specific design (bulb/LED assembly, lens fitting, aiming, electrical connection)\n\nShip to Plant : \n\nEnd User : \n1. Provide adequate illumination of the road ahead during low-light or night conditions\n2. Ensure visibility of the vehicle to other road users\n3. Meet legal/regulatory lighting requirements (beam pattern, intensity, color)",
+    "function_of_work_element": "1. Man: \n1. COLLECT THE HEAD LAMP LH / RH SIDE FROM STORAGE AREA AND SCAN THE PART\n2. CONNECT THE 2 CONNECTORS WITH HEAD LAMP\n3. ALIGN THE HEAD LAMP WITH THE BIW AND THEN TIGHT WITH BOLTS\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Install Head lamp from sequencing trolley and scan\n2. Align H/L with BIW, then do the connections with wiring harness with head lamp and tight with bolts",
+    "failure_effect": "Your Plant:\n1. DAMAGE OF THREADS / RATTLING DUE TO JOINT LOOSE\n2. Mounting screws under-torqued or over-torqued\n\nShip to Plant : Nil\n\nEnd User:\n1. Lens cracked or broken\n2. LED / BULB burnout\n3. Water ingress inside lamp\n4. Rattling or vibration noise during driving\n5. Driver discomfort or eye strain",
+    "modes_covered": [
+      {
+        "failure_mode": "OPERATOR FAILED TO FIT SCREWS AND NOT MAINTAINED GAP",
+        "failure_cause": "OPERATOR DOESN'T MAINTAIN THE UNIFORM GAPS BETWEEN HEAD LAMP EDGE & FENDER",
+        "source_excel_rows": [
+          26,
+          27
+        ],
+        "plant_recorded_severity": 4,
+        "plant_recorded_severity_meaning": "Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)"
+      }
+    ]
+  },
+  {
+    "function_of_step": "PROPER TIGHTENING OF JOINT",
+    "function_of_item": "Your Plant :\nHeadlamp assembly in specific design (bulb/LED assembly, lens fitting, aiming, electrical connection)\n\nShip to Plant : \n\nEnd User : \n1. Provide adequate illumination of the road ahead during low-light or night conditions\n2. Ensure visibility of the vehicle to other road users\n3. Meet legal/regulatory lighting requirements (beam pattern, intensity, color)",
+    "function_of_work_element": "1. Man: \n1. COLLECT THE HEAD LAMP LH / RH SIDE FROM STORAGE AREA AND SCAN THE PART\n2. CONNECT THE 2 CONNECTORS WITH HEAD LAMP\n3. ALIGN THE HEAD LAMP WITH THE BIW AND THEN TIGHT WITH BOLTS\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Install Head lamp from sequencing trolley and scan\n2. Align H/L with BIW, then do the connections with wiring harness with head lamp and tight with bolts",
+    "failure_effect": "Your Plant:\n1. DAMAGE OF THREADS / RATTLING DUE TO JOINT LOOSE\n2. Mounting screws under-torqued or over-torqued\n\nShip to Plant : Nil\n\nEnd User:\n1. Lens cracked or broken\n2. LED / BULB burnout\n3. Water ingress inside lamp\n4. Rattling or vibration noise during driving\n5. Driver discomfort or eye strain",
+    "modes_covered": [
+      {
+        "failure_mode": "TORQUE NOT ACHIEVED-UNDER TORQUE",
+        "failure_cause": "1.OPERATOR MISTAKE\n2. USE OF WRONG POWER TOOL\n3.  IMPROPER POWER TOOL CALIBRATION",
+        "source_excel_rows": [
+          28
+        ],
+        "plant_recorded_severity": 4,
+        "plant_recorded_severity_meaning": "Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)"
+      },
+      {
+        "failure_mode": "TORQUE NOT ACHIEVED - OVER TORQUE",
+        "failure_cause": "1.OPERATOR MISTAKE\n2. USE OF WRONG POWER TOOL\n3.  IMPROPER POWER TOOL CALIBRATION",
+        "source_excel_rows": [
+          29
+        ],
+        "plant_recorded_severity": 4,
+        "plant_recorded_severity_meaning": "Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)"
+      }
+    ]
+  }
+]
