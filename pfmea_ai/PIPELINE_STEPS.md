@@ -62,12 +62,26 @@ inconsistency where a couple of rows have cause-like text typed into the
 Failure Mode column rather than the Failure Cause column. That's a plant
 data-quality note, not something this step should silently correct.
 
+**Correction (caught in real testing):** the first version of this script
+emitted 12 rows for "Head lamp", not 7. Root cause: the plant sheet
+sometimes records a Failure Mode + Severity on one physical Excel row and
+the matching Failure Cause on the very next physical row (Mode's merge
+only spans 2 rows, Severity's merge spans 4), so the same logical failure
+entry produced two output rows - one with the cause blank, one with the
+same mode and the real cause. Fixed by grouping consecutive rows that
+share the same forward-filled Mode value and, within each group, dropping
+the blank-cause rows whenever a sibling row in that same group actually
+has a cause. Re-verified against "Head lamp": now 7 rows, matching a
+manual recount of the sheet exactly (2 Collection + 2 Connectors + 1
+Flushness + 2 Torque = 7).
+
 ## Step 3 — what it does
 
 `step3_rpn.py <normalized-csv-from-step2>` adds RPN (Severity x Occurrence
 x Detection) and Risk Level (Low/Medium/High/Critical, same banding as
 `pfmea_outputs/FMEA_Template.xlsx`'s "RPN Guide" sheet) to each row. Rows
 missing any of S/O/D are marked "Missing S/O/D" rather than guessed.
-Verified against the Step 2 output for "Head lamp": 10 of 12 rows got a
-real RPN (Low x6, Medium x4), 2 rows correctly flagged as missing scores -
-matching what the raw sheet actually has.
+Re-verified against the corrected (7-row) Step 2 output for "Head lamp":
+all 7 rows got a real RPN (Low x5, Medium x2) - the "Missing S/O/D" rows
+seen before Step 2's fix were the same duplicate shell rows, not genuinely
+missing data.

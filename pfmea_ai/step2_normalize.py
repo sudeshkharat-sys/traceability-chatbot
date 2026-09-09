@@ -86,18 +86,44 @@ def normalize_sheet(ws):
     merge_lookup = build_merge_lookup(ws)
     columns = build_columns(ws, merge_lookup)
 
-    rows = []
+    raw_rows = []
     for row in range(DATA_START_ROW, ws.max_row + 1):
         record = {}
         for group, field, col in columns:
             record[(group, field)] = resolve(ws, merge_lookup, row, col)
+        raw_rows.append(record)
 
-        mode_val = next((v for (g, f), v in record.items() if f == FAILURE_MODE_FIELD), None)
-        cause_val = next((v for (g, f), v in record.items() if f == FAILURE_CAUSE_FIELD), None)
-        if mode_val in (None, "") and cause_val in (None, ""):
-            continue
+    def mode_of(record):
+        return next((v for (g, f), v in record.items() if f == FAILURE_MODE_FIELD), None)
 
-        rows.append(record)
+    def cause_of(record):
+        return next((v for (g, f), v in record.items() if f == FAILURE_CAUSE_FIELD), None)
+
+    # The plant sheet sometimes records a Failure Mode's Severity on one
+    # physical row and its matching Failure Cause on the next physical row
+    # (Mode's merge is narrower than Severity's merge), which produces one
+    # row with the cause blank and a sibling row with the same mode and the
+    # real cause. Group consecutive rows that share the same forward-filled
+    # Mode value, and within each group drop the blank-cause rows whenever
+    # at least one row in that same group actually has a cause - otherwise
+    # they are just duplicate shells of the row that really has the cause.
+    blocks = []
+    for record in raw_rows:
+        if blocks and mode_of(blocks[-1][0]) == mode_of(record):
+            blocks[-1].append(record)
+        else:
+            blocks.append([record])
+
+    rows = []
+    for block in blocks:
+        non_blank_cause_rows = [r for r in block if cause_of(r) not in (None, "")]
+        keep = non_blank_cause_rows if non_blank_cause_rows else block
+        for record in keep:
+            mode_val = mode_of(record)
+            cause_val = cause_of(record)
+            if mode_val in (None, "") and cause_val in (None, ""):
+                continue
+            rows.append(record)
 
     return columns, rows
 
