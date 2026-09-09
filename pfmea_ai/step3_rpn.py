@@ -79,6 +79,15 @@ def main():
         print(f"Found columns: {fieldnames}")
         sys.exit(1)
 
+    # step2_normalize.py writes a field-type legend row right after the
+    # header (marked "audit" in the Source Excel Rows column) - keep it out
+    # of the RPN math and pass it through untouched.
+    legend_row = None
+    if rows and rows[0].get("Source Excel Rows") == "audit":
+        legend_row = rows.pop(0)
+        legend_row["RPN"] = ""
+        legend_row["Risk Level"] = ""
+
     rows = add_rpn(rows)
     out_fieldnames = fieldnames + ["RPN", "Risk Level"]
 
@@ -86,6 +95,8 @@ def main():
     with open(out_path, "w", newline="", encoding="utf-8") as fh:
         writer = csv.DictWriter(fh, fieldnames=out_fieldnames)
         writer.writeheader()
+        if legend_row is not None:
+            writer.writerow(legend_row)
         writer.writerows(rows)
 
     print(f"Wrote {out_path}")

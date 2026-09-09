@@ -75,6 +75,19 @@ has a cause. Re-verified against "Head lamp": now 7 rows, matching a
 manual recount of the sheet exactly (2 Collection + 2 Connectors + 1
 Flushness + 2 Torque = 7).
 
+**Audit trail + color legend added on request.** The output CSV now has:
+- A `Source Excel Rows` column on every data row, showing exactly which
+  physical Excel row(s) that entry was assembled from (e.g. `18+19`) - so
+  any row can be checked against the source sheet by hand.
+- A second header row (right after the column names) tagging each field's
+  type from the plant template's own color legend: pink header fill
+  (`F769BE`) = `work_element` (Process Work Element, Function of Work
+  Element, Failure Cause), green header fill (`009900`) = `risk_score`
+  (Severity, Prevention/Detection Control, Occurrence, Detection, Action
+  Priority), everything else = `other`. Useful downstream since the
+  risk-score fields are exactly what the AI generation/comparison step
+  will draft and compare against the plant's real numbers.
+
 ## Step 3 — what it does
 
 `step3_rpn.py <normalized-csv-from-step2>` adds RPN (Severity x Occurrence
