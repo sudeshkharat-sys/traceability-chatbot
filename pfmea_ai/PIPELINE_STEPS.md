@@ -12,7 +12,7 @@ on a real file.
 |---|------|--------|--------|
 | 1 | Read the uploaded plant Excel and report its structure (sheets, columns, row count, sample rows) — nothing else | `step1_read_excel.py` | DONE |
 | 2 | Normalize the real AIAG-VDA PFMEA form (2-level merged header at rows 13/15, hierarchical merged data from row 18) into one clean row per failure entry | `step2_normalize.py` | DONE |
-| 3 | Compute RPN + Risk Level from Severity/Occurrence/Detection already present in the normalized rows (pure math, no AI) | `step3_rpn.py` | TODO |
+| 3 | Compute RPN + Risk Level from Severity/Occurrence/Detection already present in the normalized rows (pure math, no AI) | `step3_rpn.py` | DONE |
 | 4 | Embed the AIAG-VDA handbook PDF into a local vector store (RAG source) | `step4_embed_handbook.py` | TODO |
 | 5 | For each process step, retrieve relevant handbook chunks + call the LLM to draft Failure Mode/Effect/Cause/S/D/Prevention | `step5_generate.py` | TODO |
 | 6 | Compare the AI draft against the plant's real recorded value, produce agree/disagree + reason | `step6_compare.py` | TODO |
@@ -61,3 +61,13 @@ swapped - it faithfully reproduces the sheet, including a plant data-entry
 inconsistency where a couple of rows have cause-like text typed into the
 Failure Mode column rather than the Failure Cause column. That's a plant
 data-quality note, not something this step should silently correct.
+
+## Step 3 — what it does
+
+`step3_rpn.py <normalized-csv-from-step2>` adds RPN (Severity x Occurrence
+x Detection) and Risk Level (Low/Medium/High/Critical, same banding as
+`pfmea_outputs/FMEA_Template.xlsx`'s "RPN Guide" sheet) to each row. Rows
+missing any of S/O/D are marked "Missing S/O/D" rather than guessed.
+Verified against the Step 2 output for "Head lamp": 10 of 12 rows got a
+real RPN (Low x6, Medium x4), 2 rows correctly flagged as missing scores -
+matching what the raw sheet actually has.
