@@ -1,0 +1,264 @@
+[
+  {
+    "source_excel_rows": [
+      18,
+      19
+    ],
+    "process": {
+      "item": "HEAD LAMP STAGE",
+      "step": "Operation No: \n\n\nStage: \nLH / RH RADIATOR SIDE SEAL FITMENT",
+      "work_element": "1 Man - Operator\n\n\n2.Machine-  \nBattery tool\n\n3.Material (Indirect) - PPE's\n\n4.Method-\nScrew & pushpin fitment\n\n\n5.Mother Nature\n(Environment)-NA\n\n6.Measurement- NA"
+    },
+    "function": {
+      "of_item": "Your Plant :\n1. Correct installation and positioning of the side seal during radiator assembly.\n2. Maintain seal integrity (no cuts, twists or misalignment)\n\nShip to Plant : \n\nEnd User : \n1. Maintain system pressure under operating temperature and vibration\n2. Accommodate thermal expansion between radiator components\n3. Seal the joint between the radiator core and side tank to prevent coolant leakage",
+      "of_step": "SELECTION OF SIDE SEAL",
+      "of_work_element": "1. Man: \n1. GET THE SIDE SEAL FROM STORAGE BIN\n2. ALIGN THE SIDE SEAL WITH THE BIW AND THEN TIGHT WITH BOLT AND PUSHPIN\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Take side seal from storage bin\n2. Align side seal with BIW and tight with bolt and pushpin"
+    },
+    "failure": {
+      "effect": "Your Plant:\n1. Wrong part installed or mixed material\n2. FURTHER OPERATION NOT POSSIBLE\n\nShip to Plant : Nil\n\nEnd User:\n1. Vehicle overheating\n2. Coolant seepage or visible leak\n3. Customer dissatisfaction",
+      "mode": "WRONG PART SELECTION",
+      "cause": "Sequence not followed by operator"
+    },
+    "risk": {
+      "severity": 5,
+      "prevention_control": "OPERATOR TRAINING,\nWORK INSTRUCTIONS",
+      "occurrence": 3,
+      "detection_control": "1. SELF CHECK, \n2. CHECKMAN CHECKING",
+      "detection": 5,
+      "action_priority": null,
+      "special_characteristics": null,
+      "severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)",
+      "occurrence_meaning": "Low - relatively few failures (1 in 100,000)",
+      "detection_meaning": "Moderate chance (Manual check using gauge/fixture, done consistently)",
+      "rpn": 75,
+      "risk_level": "Low"
+    },
+    "optimization": {
+      "prevention_action": null,
+      "detection_action": null,
+      "responsible": null,
+      "target_date": null,
+      "status": null,
+      "action_taken": null,
+      "completion_date": null
+    }
+  },
+  {
+    "source_excel_rows": [
+      20,
+      21
+    ],
+    "process": {
+      "item": "HEAD LAMP STAGE",
+      "step": "Operation No: \n\n\nStage: \nLH / RH RADIATOR SIDE SEAL FITMENT",
+      "work_element": "1 Man - Operator\n\n\n2.Machine-  \nBattery tool\n\n3.Material (Indirect) - PPE's\n\n4.Method-\nScrew & pushpin fitment\n\n\n5.Mother Nature\n(Environment)-NA\n\n6.Measurement- NA"
+    },
+    "function": {
+      "of_item": "Your Plant :\n1. Correct installation and positioning of the side seal during radiator assembly.\n2. Maintain seal integrity (no cuts, twists or misalignment)\n\nShip to Plant : \n\nEnd User : \n1. Maintain system pressure under operating temperature and vibration\n2. Accommodate thermal expansion between radiator components\n3. Seal the joint between the radiator core and side tank to prevent coolant leakage",
+      "of_step": "ALIGNMENT OF SIDE SEAL WITH BIW",
+      "of_work_element": "1. Man: \n1. GET THE SIDE SEAL FROM STORAGE BIN\n2. ALIGN THE SIDE SEAL WITH THE BIW AND THEN TIGHT WITH BOLT AND PUSHPIN\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Take side seal from storage bin\n2. Align side seal with BIW and tight with bolt and pushpin"
+    },
+    "failure": {
+      "effect": "Your Plant:\n1. Cut, torn, pinched, or cracked seal\n2. Seal under-compressed or over-compressed\n3. Rework time required high and further fitment not possible \n\nShip to Plant : Nil\n\nEnd User:\n1. Reduced cooling efficiency\n2. Engine overheating\n3. Safety risk if overheating occurs during driving",
+      "mode": "IMPROPER LOCKING",
+      "cause": "SOS not followed by operator"
+    },
+    "risk": {
+      "severity": 4,
+      "prevention_control": "OPERATOR TRAINING,\nWORK INSTRUCTIONS",
+      "occurrence": 2,
+      "detection_control": "1. SELF CHECK, \n2. CHECKMAN CHECKING",
+      "detection": 5,
+      "action_priority": null,
+      "special_characteristics": null,
+      "severity_meaning": "Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)",
+      "occurrence_meaning": "Low (1 in 1,000,000)",
+      "detection_meaning": "Moderate chance (Manual check using gauge/fixture, done consistently)",
+      "rpn": 40,
+      "risk_level": "Low"
+    },
+    "optimization": {
+      "prevention_action": null,
+      "detection_action": null,
+      "responsible": null,
+      "target_date": null,
+      "status": null,
+      "action_taken": null,
+      "completion_date": null
+    }
+  },
+  {
+    "source_excel_rows": [
+      22,
+      23
+    ],
+    "process": {
+      "item": "HEAD LAMP STAGE",
+      "step": "Operation No: \n\n\nStage: \nLH / RH RADIATOR SIDE SEAL FITMENT",
+      "work_element": "1 Man - Operator\n\n\n2.Machine-  \nBattery tool\n\n3.Material (Indirect) - PPE's\n\n4.Method-\nScrew & pushpin fitment\n\n\n5.Mother Nature\n(Environment)-NA\n\n6.Measurement- NA"
+    },
+    "function": {
+      "of_item": "Your Plant :\n1. Correct installation and positioning of the side seal during radiator assembly.\n2. Maintain seal integrity (no cuts, twists or misalignment)\n\nShip to Plant : \n\nEnd User : \n1. Maintain system pressure under operating temperature and vibration\n2. Accommodate thermal expansion between radiator components\n3. Seal the joint between the radiator core and side tank to prevent coolant leakage",
+      "of_step": "ALIGNMENT OF SIDE SEAL WITH BIW",
+      "of_work_element": "1. Man: \n1. GET THE SIDE SEAL FROM STORAGE BIN\n2. ALIGN THE SIDE SEAL WITH THE BIW AND THEN TIGHT WITH BOLT AND PUSHPIN\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Take side seal from storage bin\n2. Align side seal with BIW and tight with bolt and pushpin"
+    },
+    "failure": {
+      "effect": "Your Plant:\n1. Cut, torn, pinched, or cracked seal\n2. Seal under-compressed or over-compressed\n3. Rework time required high and further fitment not possible \n\nShip to Plant : Nil\n\nEnd User:\n1. Reduced cooling efficiency\n2. Engine overheating\n3. Safety risk if overheating occurs during driving",
+      "mode": "WRONG POSITIONING",
+      "cause": "SOS not followed by operator"
+    },
+    "risk": {
+      "severity": 4,
+      "prevention_control": "OPERATOR TRAINING,\nWORK INSTRUCTIONS",
+      "occurrence": 2,
+      "detection_control": "SELF CHECK WITH MARKING,\nCHECKMAN CHECKING",
+      "detection": 5,
+      "action_priority": null,
+      "special_characteristics": null,
+      "severity_meaning": "Defect noticed by most customers (appearance, noise) - high annoyance (Very noticeable cosmetic/noise issue)",
+      "occurrence_meaning": "Low (1 in 1,000,000)",
+      "detection_meaning": "Moderate chance (Manual check using gauge/fixture, done consistently)",
+      "rpn": 40,
+      "risk_level": "Low"
+    },
+    "optimization": {
+      "prevention_action": null,
+      "detection_action": null,
+      "responsible": null,
+      "target_date": null,
+      "status": null,
+      "action_taken": null,
+      "completion_date": null
+    }
+  },
+  {
+    "source_excel_rows": [
+      24,
+      25
+    ],
+    "process": {
+      "item": "HEAD LAMP STAGE",
+      "step": "Operation No: \n\n\nStage: \nLH / RH RADIATOR SIDE SEAL FITMENT",
+      "work_element": "1 Man - Operator\n\n\n2.Machine-  \nBattery tool\n\n3.Material (Indirect) - PPE's\n\n4.Method-\nScrew & pushpin fitment\n\n\n5.Mother Nature\n(Environment)-NA\n\n6.Measurement- NA"
+    },
+    "function": {
+      "of_item": "Your Plant :\n1. Correct installation and positioning of the side seal during radiator assembly.\n2. Maintain seal integrity (no cuts, twists or misalignment)\n\nShip to Plant : \n\nEnd User : \n1. Maintain system pressure under operating temperature and vibration\n2. Accommodate thermal expansion between radiator components\n3. Seal the joint between the radiator core and side tank to prevent coolant leakage",
+      "of_step": "PROPER TIGHTENING OF JOINT",
+      "of_work_element": "1. Man: \n1. GET THE SIDE SEAL FROM STORAGE BIN\n2. ALIGN THE SIDE SEAL WITH THE BIW AND THEN TIGHT WITH BOLT AND PUSHPIN\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Take side seal from storage bin\n2. Align side seal with BIW and tight with bolt and pushpin"
+    },
+    "failure": {
+      "effect": "Your Plant:\n1. DAMAGE OF THREADS / RATTLING DUE TO JOINT LOOSE\n2. Mounting Bolt under-torqued or over-torqued\n\nShip to Plant : Nil\n\nEnd User:\n1. Customer dissatisfaction due to coolant leak\n2. Coolant dripping under vehicle\n3. Rattling or vibration noise during driving",
+      "mode": "OPERATOR FAILED TO FIT BOLTS",
+      "cause": "SOS not followed by operator"
+    },
+    "risk": {
+      "severity": 5,
+      "prevention_control": "OPERATOR TRAINING,\nWORK INSTRUCTIONS",
+      "occurrence": 3,
+      "detection_control": "SELF CHECK WITH MARKING,\nCHECKMAN CHECKING",
+      "detection": 5,
+      "action_priority": null,
+      "special_characteristics": null,
+      "severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)",
+      "occurrence_meaning": "Low - relatively few failures (1 in 100,000)",
+      "detection_meaning": "Moderate chance (Manual check using gauge/fixture, done consistently)",
+      "rpn": 75,
+      "risk_level": "Low"
+    },
+    "optimization": {
+      "prevention_action": null,
+      "detection_action": null,
+      "responsible": null,
+      "target_date": null,
+      "status": null,
+      "action_taken": null,
+      "completion_date": null
+    }
+  },
+  {
+    "source_excel_rows": [
+      26
+    ],
+    "process": {
+      "item": "HEAD LAMP STAGE",
+      "step": "Operation No: \n\n\nStage: \nLH / RH RADIATOR SIDE SEAL FITMENT",
+      "work_element": "1 Man - Operator\n\n\n2.Machine-  \nBattery tool\n\n3.Material (Indirect) - PPE's\n\n4.Method-\nScrew & pushpin fitment\n\n\n5.Mother Nature\n(Environment)-NA\n\n6.Measurement- NA"
+    },
+    "function": {
+      "of_item": "Your Plant :\n1. Correct installation and positioning of the side seal during radiator assembly.\n2. Maintain seal integrity (no cuts, twists or misalignment)\n\nShip to Plant : \n\nEnd User : \n1. Maintain system pressure under operating temperature and vibration\n2. Accommodate thermal expansion between radiator components\n3. Seal the joint between the radiator core and side tank to prevent coolant leakage",
+      "of_step": "PROPER TIGHTENING OF JOINT",
+      "of_work_element": "1. Man: \n1. GET THE SIDE SEAL FROM STORAGE BIN\n2. ALIGN THE SIDE SEAL WITH THE BIW AND THEN TIGHT WITH BOLT AND PUSHPIN\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Take side seal from storage bin\n2. Align side seal with BIW and tight with bolt and pushpin"
+    },
+    "failure": {
+      "effect": "Your Plant:\n1. DAMAGE OF THREADS / RATTLING DUE TO JOINT LOOSE\n2. Mounting Bolt under-torqued or over-torqued\n\nShip to Plant : Nil\n\nEnd User:\n1. Customer dissatisfaction due to coolant leak\n2. Coolant dripping under vehicle\n3. Rattling or vibration noise during driving",
+      "mode": "TORQUE NOT ACHIEVED-UNDER TORQUE",
+      "cause": "SOS not followed by operator or tool calibration not done in intervals"
+    },
+    "risk": {
+      "severity": 5,
+      "prevention_control": "TORQUE CALIBRATION FREQUENCY TO BE DECIDE",
+      "occurrence": 3,
+      "detection_control": "SELF CHECK WITH MARKING,\nCHECKMAN CHECKING,\nCALIBRATION RECORD",
+      "detection": 5,
+      "action_priority": null,
+      "special_characteristics": null,
+      "severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)",
+      "occurrence_meaning": "Low - relatively few failures (1 in 100,000)",
+      "detection_meaning": "Moderate chance (Manual check using gauge/fixture, done consistently)",
+      "rpn": 75,
+      "risk_level": "Low"
+    },
+    "optimization": {
+      "prevention_action": null,
+      "detection_action": null,
+      "responsible": null,
+      "target_date": null,
+      "status": null,
+      "action_taken": null,
+      "completion_date": null
+    }
+  },
+  {
+    "source_excel_rows": [
+      27
+    ],
+    "process": {
+      "item": "HEAD LAMP STAGE",
+      "step": "Operation No: \n\n\nStage: \nLH / RH RADIATOR SIDE SEAL FITMENT",
+      "work_element": "1 Man - Operator\n\n\n2.Machine-  \nBattery tool\n\n3.Material (Indirect) - PPE's\n\n4.Method-\nScrew & pushpin fitment\n\n\n5.Mother Nature\n(Environment)-NA\n\n6.Measurement- NA"
+    },
+    "function": {
+      "of_item": "Your Plant :\n1. Correct installation and positioning of the side seal during radiator assembly.\n2. Maintain seal integrity (no cuts, twists or misalignment)\n\nShip to Plant : \n\nEnd User : \n1. Maintain system pressure under operating temperature and vibration\n2. Accommodate thermal expansion between radiator components\n3. Seal the joint between the radiator core and side tank to prevent coolant leakage",
+      "of_step": "PROPER TIGHTENING OF JOINT",
+      "of_work_element": "1. Man: \n1. GET THE SIDE SEAL FROM STORAGE BIN\n2. ALIGN THE SIDE SEAL WITH THE BIW AND THEN TIGHT WITH BOLT AND PUSHPIN\n\n2. Machine:\nProper torquing with 6NM\n\n3. Material (Indirect) :\nHand Gloves, Apron\n\n4. Method:\n1. Take side seal from storage bin\n2. Align side seal with BIW and tight with bolt and pushpin"
+    },
+    "failure": {
+      "effect": "Your Plant:\n1. DAMAGE OF THREADS / RATTLING DUE TO JOINT LOOSE\n2. Mounting Bolt under-torqued or over-torqued\n\nShip to Plant : Nil\n\nEnd User:\n1. Customer dissatisfaction due to coolant leak\n2. Coolant dripping under vehicle\n3. Rattling or vibration noise during driving",
+      "mode": "TORQUE NOT ACHIEVED - OVER TORQUE",
+      "cause": "SOS not followed by operator or tool calibration not done in intervals"
+    },
+    "risk": {
+      "severity": 5,
+      "prevention_control": "TORQUE CALIBRATION FREQUENCY TO BE DECIDE",
+      "occurrence": 3,
+      "detection_control": "SELF CHECK WITH MARKING,\nCHECKMAN CHECKING,\nCALIBRATION RECORD",
+      "detection": null,
+      "action_priority": null,
+      "special_characteristics": null,
+      "severity_meaning": "Degradation of secondary function (Comfort feature reduced, not gone)",
+      "occurrence_meaning": "Low - relatively few failures (1 in 100,000)",
+      "detection_meaning": null,
+      "rpn": null,
+      "risk_level": "Missing S/O/D"
+    },
+    "optimization": {
+      "prevention_action": null,
+      "detection_action": null,
+      "responsible": null,
+      "target_date": null,
+      "status": null,
+      "action_taken": null,
+      "completion_date": null
+    }
+  }
+]

@@ -14,6 +14,7 @@ on a real file.
 | 2 | Normalize the real AIAG-VDA PFMEA form (2-level merged header at rows 13/15, hierarchical merged data from row 18) into one clean row per failure entry | `step2_normalize.py` / `step2_verify.py` | DONE |
 | 3 | Compute RPN + Risk Level from Severity/Occurrence/Detection already present in the normalized rows (pure math, no AI) | `step3_rpn.py` | DONE |
 | 3b | Decode the plant's own recorded S/O/D numbers into what they officially mean, per the AIAG-VDA reference tables (pure lookup, no AI) | `step3b_explain_scores.py` | DONE |
+| 3c | Export normalized rows as nested JSON (failure.mode, risk.severity, ...) instead of flat CSV - this is what Step 5's LLM prompt will actually consume | `step3c_to_json.py` | DONE |
 | 4 | Embed the AIAG-VDA handbook PDF into a local vector store (RAG source) | `step4_embed_handbook.py` | TODO |
 | 5 | For each process step, retrieve relevant handbook chunks + call the LLM to draft Failure Mode/Effect/Cause/S/D/Prevention | `step5_generate.py` | TODO |
 | 6 | Compare the AI draft against the plant's real recorded value, produce agree/disagree + reason | `step6_compare.py` | TODO |
@@ -149,3 +150,38 @@ AIAG-VDA handbook PDF + RAG) to compare the plant's numbers against.
 Run against all 4 sheets: e.g. "Head lamp" row 1 (Severity=5) now reads
 "Degradation of secondary function (Comfort feature reduced, not gone)"
 instead of a bare 5.
+
+## Step 3c — what it does
+
+Requested: a JSON export instead of flat CSV, since the sheet has so many
+merged columns/cells - a flat CSV has to flatten hierarchy into strings
+like `"Failure Analysis (Step4) :: 2. Failure Mode ..."`, which is awkward
+to build an LLM prompt from and easy to mis-key. `step3c_to_json.py
+<path-to-excel> [sheet_name ...]` builds one clean, nested JSON object per
+failure entry directly from step2/step3/step3b's own Python functions (not
+by re-parsing their CSV, so there's no legend-row/audit-column quirk to
+route around):
+
+```json
+{
+  "source_excel_rows": [18, 19],
+  "process": {"item": ..., "step": ..., "work_element": ...},
+  "function": {"of_item": ..., "of_step": ..., "of_work_element": ...},
+  "failure": {"effect": ..., "mode": ..., "cause": ...},
+  "risk": {
+    "severity": 5, "severity_meaning": "...",
+    "occurrence": 4, "occurrence_meaning": "...",
+    "detection": 5, "detection_meaning": "...",
+    "prevention_control": ..., "detection_control": ...,
+    "rpn": 100, "risk_level": "Medium"
+  },
+  "optimization": {"prevention_action": ..., "responsible": ..., "status": ...}
+}
+```
+
+Writes one `<sheet>.json` per sheet plus a combined `__all_sheets.json`.
+Cross-checked against all 4 sheets: same row counts and RPN values as the
+already-verified CSV output (7/7/6/6 entries, same S/O/D/RPN per row) - the
+JSON export is a different shape of the same verified data, not a new
+parsing path that could disagree with it. This is the actual shape Step
+5's LLM prompt will be built from.
