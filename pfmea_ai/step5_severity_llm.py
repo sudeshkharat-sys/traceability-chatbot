@@ -158,15 +158,17 @@ FAILURE MODE(S) THIS EFFECT APPLIES TO (for context/grounding only - Severity is
 
 TASK:
 Determine the correct Severity score (1-10) per the AIAG-VDA table.
+This ONE score will be applied to every Failure Mode listed above - they all share the same Function+Effect, so they get one shared Severity answer, not one each.
 - Rate primarily on the "End User effect" section, since that is the customer-facing outcome the Severity table describes ("affects safe vehicle operation", "loss of function", etc.).
 - Use "Your Plant effect" and "Ship to Plant effect" only as supporting context (e.g. confirming this is a real, recurring failure), not as the basis for the score itself.
-- The End User effect text may list several distinct symptoms. Score the single most representative, typically-occurring outcome for THIS specific failure mode - do not automatically jump to the worst-sounding phrase in the list if it describes a rare/extreme case rather than the normal consequence of this failure.
-- If the same End User effect text is reused verbatim across multiple different failure modes in this sheet, treat it as generic/boilerplate and lean on the specific Failure Mode/Cause above to judge how severe THIS particular failure realistically is, rather than always matching the boilerplate's worst phrase.
+- The End User effect text may list several distinct symptoms. Score the single most representative, typically-occurring outcome for this Effect as a whole - do not automatically jump to the worst-sounding phrase in the list if it describes a rare/extreme case rather than the normal consequence of this failure.
+- If this End User effect text is reused verbatim across other, unrelated groups elsewhere in this sheet, treat it as generic/boilerplate and judge severity from what the Effect text itself actually describes, rather than always matching the boilerplate's worst phrase.
+- In your reasoning, write about the shared Effect in general - do NOT single out or name just one of the Failure Modes listed above, since your answer covers all of them equally.
 Return ONLY valid JSON, no other text, in this exact shape:
 {{
   "suggested_severity": <integer 1-10>,
   "matched_table_definition": "<the exact AIAG-VDA definition text this effect matches>",
-  "reasoning": "<1-3 sentences explaining why this effect matches this score, referencing specific details from the End User effect text>"
+  "reasoning": "<1-3 sentences explaining why this Effect matches this score, referencing specific details from the End User effect text - phrased generally, not naming one specific Failure Mode>"
 }}"""
 
 
