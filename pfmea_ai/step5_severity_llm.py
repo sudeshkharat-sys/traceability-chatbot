@@ -76,11 +76,69 @@ SEVERITY_TABLE_TEXT = """Score | AIAG-VDA Definition (Effect on Customer) | Plai
 Note: Severity is rated on the EFFECT, not the cause, and rarely changes unless the product/design itself changes."""
 
 
+EFFECT_SECTION_HEADERS = ["Your Plant", "Ship to Plant", "End User"]
+
+
+def split_effect_sections(effect_text):
+    """The plant types Failure Effect as one free-text cell with its own
+    'Your Plant:' / 'Ship to Plant:' / 'End User:' sub-headers rather than
+    separate columns. Split those out so the prompt can present - and the
+    LLM can be told to weight - each audience separately, instead of
+    handing over one undifferentiated blob. Severity in AIAG-VDA is judged
+    from the end user's/next-higher-level's actual experience, not from
+    whichever single phrase anywhere in the cell sounds worst; without this
+    split, GPT was fixating on outlier phrases like "increased risk of
+    accident" that appear in reused/boilerplate End User text shared across
+    several unrelated failure modes, and scoring every group 9-10.
+    """
+    sections = {header: [] for header in EFFECT_SECTION_HEADERS}
+    current = None
+    for line in (effect_text or "").splitlines():
+        stripped = line.strip()
+        # A header can be alone on its line ("End User :") or share the line
+        # with its value ("Ship to Plant : Nil") - match either form.
+        header_match = None
+        inline_value = None
+        for h in EFFECT_SECTION_HEADERS:
+            if stripped.lower() == h.lower() or stripped.lower().rstrip(":").strip() == h.lower():
+                header_match = h
+                break
+            prefix = h.lower() + " "
+            if stripped.lower().startswith(prefix) or stripped.lower().startswith(h.lower() + ":"):
+                rest = stripped[len(h):].lstrip()
+                if rest.startswith(":"):
+                    header_match = h
+                    inline_value = rest[1:].strip()
+                    break
+        if header_match:
+            current = header_match
+            if inline_value:
+                sections[current].append(inline_value)
+            continue
+        if current and stripped:
+            sections[current].append(stripped)
+    result = {}
+    for header, lines in sections.items():
+        text = "\n".join(lines).strip()
+        result[header] = "" if text.lower() in ("", "nil", "none", "n/a", "na") else text
+    return result
+
+
 def build_prompt(group):
     modes_text = "\n".join(
         f"  - Mode: {m['failure_mode'].strip()}\n    Cause: {m['failure_cause'].strip() if m['failure_cause'] else '(not recorded)'}\n    Plant's recorded Severity: {m['plant_recorded_severity']}"
         for m in group["modes_covered"]
     )
+
+    effect_sections = split_effect_sections(group["failure_effect"])
+    effect_text = "\n\n".join(
+        f"{header} effect:\n{effect_sections[header] if effect_sections[header] else '(none recorded)'}"
+        for header in EFFECT_SECTION_HEADERS
+    )
+    if not any(effect_sections.values()):
+        # Effect text didn't use the plant's usual sub-headers - fall back to
+        # the raw text rather than showing three empty sections.
+        effect_text = group["failure_effect"].strip()
 
     return f"""You are a process/manufacturing engineer performing a PFMEA (Process Failure Mode and Effects Analysis) review per the AIAG-VDA standard.
 
@@ -92,19 +150,23 @@ Function of Process Item: {group['function_of_item'].strip()}
 Function of Process Step: {group['function_of_step'].strip()}
 Function of Process Work Element: {group['function_of_work_element'].strip()}
 
-FAILURE EFFECT (what actually happens as a result of this failure):
-{group['failure_effect'].strip()}
+FAILURE EFFECT, split by whose perspective it's recorded from:
+{effect_text}
 
 FAILURE MODE(S) THIS EFFECT APPLIES TO (for context/grounding only - Severity is rated on the Effect above, not the Mode):
 {modes_text}
 
 TASK:
-Based ONLY on the Failure Effect above and the AIAG-VDA Severity Table, determine the correct Severity score (1-10).
+Determine the correct Severity score (1-10) per the AIAG-VDA table.
+- Rate primarily on the "End User effect" section, since that is the customer-facing outcome the Severity table describes ("affects safe vehicle operation", "loss of function", etc.).
+- Use "Your Plant effect" and "Ship to Plant effect" only as supporting context (e.g. confirming this is a real, recurring failure), not as the basis for the score itself.
+- The End User effect text may list several distinct symptoms. Score the single most representative, typically-occurring outcome for THIS specific failure mode - do not automatically jump to the worst-sounding phrase in the list if it describes a rare/extreme case rather than the normal consequence of this failure.
+- If the same End User effect text is reused verbatim across multiple different failure modes in this sheet, treat it as generic/boilerplate and lean on the specific Failure Mode/Cause above to judge how severe THIS particular failure realistically is, rather than always matching the boilerplate's worst phrase.
 Return ONLY valid JSON, no other text, in this exact shape:
 {{
   "suggested_severity": <integer 1-10>,
   "matched_table_definition": "<the exact AIAG-VDA definition text this effect matches>",
-  "reasoning": "<1-3 sentences explaining why this effect matches this score, referencing specific details from the Failure Effect text>"
+  "reasoning": "<1-3 sentences explaining why this effect matches this score, referencing specific details from the End User effect text>"
 }}"""
 
 
