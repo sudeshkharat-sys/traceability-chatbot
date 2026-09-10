@@ -46,6 +46,7 @@ import logging
 import os
 import sys
 import warnings
+from collections import Counter
 from pathlib import Path
 
 # nashik-chatbot-pq's app.config/azure_openai_handler modules set up a root
@@ -199,6 +200,7 @@ Determine the correct Severity score (1-10) per the AIAG-VDA table, specifically
 - Use "Your Plant effect" and "Ship to Plant effect" only as supporting context, not as the basis for the score itself.
 - The End User effect text may list several distinct symptoms. Pick the outcome that is actually representative of THIS Failure Mode/Cause specifically - do not automatically jump to the worst-sounding phrase in the list if it describes a rare/extreme case rather than what this particular failure typically causes.
 - If this End User effect text is reused verbatim across unrelated failure modes elsewhere in the sheet, treat it as generic/boilerplate and judge severity primarily from the Failure Mode/Cause above, not from matching the boilerplate's worst phrase.
+- FIRST explicitly decide: could this effect plausibly affect SAFE vehicle operation or involve regulatory noncompliance (Scores 9-10), given the component involved (e.g. exterior lighting is safety/legally-relevant equipment, not just a comfort feature)? Only fall back to "loss/degradation of function" (Scores 6-8) if you can justify why safe operation is NOT plausibly affected - don't default to the function-loss bucket just because it sounds like the calmer, more moderate answer. State this safety-vs-function-loss decision explicitly in your reasoning.
 Return ONLY valid JSON, no other text, in this exact shape:
 {{
   "suggested_severity": <integer 1-10>,
@@ -278,9 +280,14 @@ def main():
         idx = args.index("--handbook-index")
         handbook_index_path = args[idx + 1]
         args = args[:idx] + args[idx + 2 :]
+    repeat = 1
+    if "--repeat" in args:
+        idx = args.index("--repeat")
+        repeat = int(args[idx + 1])
+        args = args[:idx] + args[idx + 2 :]
 
     if len(args) < 1:
-        print("Usage: python step5_severity_llm.py <path-to-excel> [sheet_name] [--dry-run] [--handbook-index <path>]")
+        print("Usage: python step5_severity_llm.py <path-to-excel> [sheet_name] [--dry-run] [--handbook-index <path>] [--repeat N]")
         sys.exit(1)
 
     path = args[0]
@@ -319,9 +326,16 @@ def main():
                 print(prompt)
                 continue
 
-            suggestion = call_llm(llm, prompt)
             plant_sev = (entry.get("risk") or {}).get("severity")
-            ai_sev = suggestion["suggested_severity"]
+            runs = [call_llm(llm, prompt) for _ in range(repeat)]
+            severities = [r["suggested_severity"] for r in runs]
+            consistent = len(set(severities)) == 1
+            # Majority vote (ties broken by the highest score, since understating
+            # a safety-relevant severity is the costlier mistake to make silently).
+            counts = Counter(severities)
+            best_count = max(counts.values())
+            ai_sev = max(s for s, c in counts.items() if c == best_count)
+
             sheet_results.append(
                 {
                     "failure_mode": failure_mode,
@@ -329,12 +343,18 @@ def main():
                     "plant_recorded_severity": plant_sev,
                     "ai_suggested_severity": ai_sev,
                     "agree": plant_sev == ai_sev,
-                    "ai_matched_table_definition": suggestion["matched_table_definition"],
-                    "ai_reasoning": suggestion["reasoning"],
+                    "ai_matched_table_definition": runs[0]["matched_table_definition"],
+                    "ai_reasoning": runs[0]["reasoning"],
+                    "ai_consistent_across_runs": consistent,
+                    "ai_runs": [
+                        {"suggested_severity": r["suggested_severity"], "matched_table_definition": r["matched_table_definition"], "reasoning": r["reasoning"]}
+                        for r in runs
+                    ] if repeat > 1 else None,
                 }
             )
             agreement = "MATCH" if plant_sev == ai_sev else f"DIFFERS (plant={plant_sev}, AI={ai_sev})"
-            print(f"[{sn}] {(failure_mode or '')[:40]!r:42} {agreement}")
+            stability = "" if repeat == 1 else (" [STABLE]" if consistent else f" [UNSTABLE: {severities}]")
+            print(f"[{sn}] {(failure_mode or '')[:40]!r:42} {agreement}{stability}")
 
         results[sn] = sheet_results
 
