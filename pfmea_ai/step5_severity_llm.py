@@ -108,8 +108,34 @@ Return ONLY valid JSON, no other text, in this exact shape:
 }}"""
 
 
+def _load_dotenv_into_environ():
+    """Load KEY=VALUE lines from a .env file into os.environ, without adding
+    a python-dotenv dependency. Never overrides a variable already set in
+    the real shell environment. Looks first for pfmea_ai/.env (in case you
+    keep a dedicated one here), then falls back to nashik-chatbot-pq/.env
+    (the repo's existing Azure OpenAI credentials) since these scripts are
+    documented to reuse that same config."""
+    candidates = [
+        Path(__file__).resolve().parent / ".env",
+        Path(__file__).resolve().parent.parent / "nashik-chatbot-pq" / ".env",
+    ]
+    for env_path in candidates:
+        if not env_path.is_file():
+            continue
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip('"').strip("'")
+            os.environ.setdefault(key, value)
+
+
 def get_llm():
     from langchain_openai import AzureChatOpenAI
+
+    _load_dotenv_into_environ()
 
     api_key = os.environ.get("AZURE_API_KEY")
     endpoint = os.environ.get("AZURE_GPT5_ENDPOINT") or os.environ.get("AZURE_CHAT_ENDPOINT")
