@@ -178,6 +178,8 @@ def build_prompt_for_entry(entry, severity_table_text=SEVERITY_TABLE_TEXT):
 
     return f"""You are a process/manufacturing engineer performing a PFMEA (Process Failure Mode and Effects Analysis) review per the AIAG-VDA standard.
 
+GROUNDING RULE: The Severity table below is the ONLY source of truth for scoring definitions - it may be an excerpt retrieved directly from the real AIAG-VDA handbook PDF, which can word things slightly differently from what you may recall from general training knowledge. Use ONLY the definition text given below, quoted or paraphrased faithfully - do NOT substitute a definition you remember from elsewhere, and do NOT invent table rows/wording that are not present below. If a needed row/score genuinely is not present in the table below, say so in your reasoning rather than guessing its content.
+
 AIAG-VDA SEVERITY SCORING TABLE (1-10):
 {severity_table_text}
 
