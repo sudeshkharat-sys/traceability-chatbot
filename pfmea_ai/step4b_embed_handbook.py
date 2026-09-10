@@ -191,21 +191,44 @@ def cosine_similarity(a, b):
     return dot / (norm_a * norm_b)
 
 
-def retrieve(index_path, query, top_k=5):
+PREFER_BOOST = 0.05
+AVOID_PENALTY = 0.05
+
+
+def retrieve(index_path, query, top_k=5, prefer_terms=None, avoid_terms=None):
     """Return the top_k most relevant chunks (dicts with text/page/type,
     highest similarity first) for query, embedding the query fresh each
     call. Reads the index built by build_index() - no server, no external
-    DB, just the JSON file on disk."""
+    DB, just the JSON file on disk.
+
+    prefer_terms/avoid_terms (case-insensitive substrings) nudge the
+    ranking without hard-filtering anything out. Needed because the
+    AIAG-VDA handbook keeps separate "for the Product" (DFMEA) and "for
+    the Process" (PFMEA) Occurrence/Detection tables that are textually
+    very similar - a raw embedding search on "Occurrence prevention
+    control" scored the DFMEA table above the correct PFMEA one in
+    testing. A soft boost/penalty (not a hard filter) is used because a
+    hard filter on a keyword the model happens to phrase differently
+    would silently return zero results instead of degrading gracefully."""
     with open(index_path, encoding="utf-8") as fh:
         index = json.load(fh)
 
     embedder = get_embedding_model()
     query_vector = embedder.embed_query(query)
 
-    scored = [
-        (cosine_similarity(query_vector, chunk["embedding"]), chunk)
-        for chunk in index["chunks"]
-    ]
+    prefer_terms = [t.lower() for t in (prefer_terms or [])]
+    avoid_terms = [t.lower() for t in (avoid_terms or [])]
+
+    scored = []
+    for chunk in index["chunks"]:
+        score = cosine_similarity(query_vector, chunk["embedding"])
+        text_lower = chunk["text"].lower()
+        if any(t in text_lower for t in prefer_terms):
+            score += PREFER_BOOST
+        if any(t in text_lower for t in avoid_terms):
+            score -= AVOID_PENALTY
+        scored.append((score, chunk))
+
     scored.sort(key=lambda pair: pair[0], reverse=True)
     return [{"score": score, **{k: v for k, v in chunk.items() if k != "embedding"}} for score, chunk in scored[:top_k]]
 
@@ -215,7 +238,7 @@ def main():
     if len(args) < 1:
         print("Usage:")
         print("  python step4b_embed_handbook.py <path-to-handbook.pdf>")
-        print("  python step4b_embed_handbook.py <path-to-handbook.pdf> --query \"...\" [--top-k N]")
+        print("  python step4b_embed_handbook.py <path-to-handbook.pdf> --query \"...\" [--top-k N] [--prefer \"term,term\"] [--avoid \"term,term\"]")
         sys.exit(1)
 
     pdf_path = Path(args[0])
@@ -224,10 +247,12 @@ def main():
     if "--query" in args:
         query = args[args.index("--query") + 1]
         top_k = int(args[args.index("--top-k") + 1]) if "--top-k" in args else 5
+        prefer_terms = args[args.index("--prefer") + 1].split(",") if "--prefer" in args else None
+        avoid_terms = args[args.index("--avoid") + 1].split(",") if "--avoid" in args else None
         if not out_path.is_file():
             print(f"ERROR: {out_path} not found. Run without --query first to build the index.")
             sys.exit(1)
-        results = retrieve(out_path, query, top_k=top_k)
+        results = retrieve(out_path, query, top_k=top_k, prefer_terms=prefer_terms, avoid_terms=avoid_terms)
         for i, r in enumerate(results, start=1):
             print(f"\n--- Result {i} (score={r['score']:.3f}, page={r['page']}, type={r['type']}) ---")
             print(r["text"][:800])

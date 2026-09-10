@@ -123,7 +123,41 @@ def split_effect_sections(effect_text):
     return result
 
 
-def build_prompt_for_entry(entry):
+def dedupe_reference_chunks(chunks):
+    """The handbook repeats some tables (e.g. Severity) near-verbatim across
+    multiple pages/appendices. Keep only the first occurrence of each
+    normalized text so the prompt doesn't pay for 3 copies of the same
+    table."""
+    seen = set()
+    unique = []
+    for chunk in chunks:
+        key = " ".join(chunk["text"].split()).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(chunk)
+    return unique
+
+
+def get_reference_text(handbook_index_path, query, fallback_text, prefer_terms=None, avoid_terms=None, top_k=3):
+    """Return grounded reference text retrieved from the embedded AIAG-VDA
+    handbook (step4b_embed_handbook.py) if a handbook index was provided,
+    otherwise fall back to the hardcoded table text embedded directly in
+    this script. Keeping the fallback means step5/step5b still work
+    exactly as before when no PDF has been embedded yet."""
+    if not handbook_index_path:
+        return fallback_text
+
+    from step4b_embed_handbook import retrieve
+
+    results = retrieve(handbook_index_path, query, top_k=top_k, prefer_terms=prefer_terms, avoid_terms=avoid_terms)
+    results = dedupe_reference_chunks(results)
+    if not results:
+        return fallback_text
+    return "\n\n---\n\n".join(f"(From handbook page {r['page']})\n{r['text']}" for r in results)
+
+
+def build_prompt_for_entry(entry, severity_table_text=SEVERITY_TABLE_TEXT):
     """Per-Failure-Mode prompt (not grouped) - requested so every row gets
     its own independent AI call and reasoning that names ITS OWN Mode/Cause,
     instead of one shared answer copy-pasted across every Mode that happens
@@ -144,7 +178,7 @@ def build_prompt_for_entry(entry):
     return f"""You are a process/manufacturing engineer performing a PFMEA (Process Failure Mode and Effects Analysis) review per the AIAG-VDA standard.
 
 AIAG-VDA SEVERITY SCORING TABLE (1-10):
-{SEVERITY_TABLE_TEXT}
+{severity_table_text}
 
 CONTEXT FOR THIS PROCESS STEP:
 Function of Process Item: {(function.get('of_item') or '').strip()}
@@ -239,9 +273,14 @@ def main():
     dry_run = "--dry-run" in args
     if dry_run:
         args.remove("--dry-run")
+    handbook_index_path = None
+    if "--handbook-index" in args:
+        idx = args.index("--handbook-index")
+        handbook_index_path = args[idx + 1]
+        args = args[:idx] + args[idx + 2 :]
 
     if len(args) < 1:
-        print("Usage: python step5_severity_llm.py <path-to-excel> [sheet_name] [--dry-run]")
+        print("Usage: python step5_severity_llm.py <path-to-excel> [sheet_name] [--dry-run] [--handbook-index <path>]")
         sys.exit(1)
 
     path = args[0]
@@ -249,6 +288,14 @@ def main():
 
     reference_path = str(Path(__file__).with_name("AIAG_VDA_Scoring_Reference.xlsx"))
     reference_lookup = load_reference_lookup(reference_path)
+
+    severity_table_text = get_reference_text(
+        handbook_index_path,
+        query="Severity rating table effect on customer safe vehicle operation loss of function",
+        fallback_text=SEVERITY_TABLE_TEXT,
+    )
+    if handbook_index_path:
+        print(f"Using handbook-grounded Severity reference from {handbook_index_path}\n")
 
     wb = load_workbook(path, data_only=True)
     sheet_names = [sheet_name] if sheet_name else wb.sheetnames
@@ -263,7 +310,7 @@ def main():
 
         sheet_results = []
         for i, entry in enumerate(entries, start=1):
-            prompt = build_prompt_for_entry(entry)
+            prompt = build_prompt_for_entry(entry, severity_table_text=severity_table_text)
             failure_mode = (entry.get("failure") or {}).get("mode")
 
             if dry_run:

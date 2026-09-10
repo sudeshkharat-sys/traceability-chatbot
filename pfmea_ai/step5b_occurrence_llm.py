@@ -26,7 +26,7 @@ from step3b_explain_scores import load_reference_lookup
 from step4b_occurrence_input import build_groups
 from step2_normalize import normalize_sheet
 from step3c_to_json import build_entry
-from step5_severity_llm import call_llm, get_llm
+from step5_severity_llm import call_llm, get_llm, get_reference_text
 
 OCCURRENCE_TABLE_TEXT = """Score | Meaning | Approx. Failure Rate
 10 | Very high - failure almost certain | >= 1 in 10
@@ -43,7 +43,7 @@ OCCURRENCE_TABLE_TEXT = """Score | Meaning | Approx. Failure Rate
 Note: use REAL production/defect data when available; this table is for estimation when historical data doesn't exist."""
 
 
-def build_prompt(group):
+def build_prompt(group, occurrence_table_text=OCCURRENCE_TABLE_TEXT):
     modes_text = "\n".join(
         f"  - Mode: {m['failure_mode'].strip()}\n    Plant's recorded Occurrence: {m['plant_recorded_occurrence']}"
         for m in group["modes_covered"]
@@ -52,7 +52,7 @@ def build_prompt(group):
     return f"""You are a process/manufacturing engineer performing a PFMEA (Process Failure Mode and Effects Analysis) review per the AIAG-VDA standard.
 
 AIAG-VDA OCCURRENCE SCORING TABLE (1-10):
-{OCCURRENCE_TABLE_TEXT}
+{occurrence_table_text}
 
 PROCESS STEP: {group['process_step'].strip()}
 
@@ -79,9 +79,14 @@ def main():
     dry_run = "--dry-run" in args
     if dry_run:
         args.remove("--dry-run")
+    handbook_index_path = None
+    if "--handbook-index" in args:
+        idx = args.index("--handbook-index")
+        handbook_index_path = args[idx + 1]
+        args = args[:idx] + args[idx + 2 :]
 
     if len(args) < 1:
-        print("Usage: python step5b_occurrence_llm.py <path-to-excel> [sheet_name] [--dry-run]")
+        print("Usage: python step5b_occurrence_llm.py <path-to-excel> [sheet_name] [--dry-run] [--handbook-index <path>]")
         sys.exit(1)
 
     path = args[0]
@@ -89,6 +94,20 @@ def main():
 
     reference_path = str(Path(__file__).with_name("AIAG_VDA_Scoring_Reference.xlsx"))
     reference_lookup = load_reference_lookup(reference_path)
+
+    # The handbook has separate "for the Product" (DFMEA) and "for the
+    # Process" (PFMEA) Occurrence tables that read very similarly - without
+    # the prefer/avoid nudge, a raw embedding search scored the wrong
+    # (Product/DFMEA) table above the correct PFMEA one in testing.
+    occurrence_table_text = get_reference_text(
+        handbook_index_path,
+        query="Occurrence Potential for the Process PFMEA prevention controls likelihood of failure cause",
+        fallback_text=OCCURRENCE_TABLE_TEXT,
+        prefer_terms=["for the Process"],
+        avoid_terms=["for the Product"],
+    )
+    if handbook_index_path:
+        print(f"Using handbook-grounded Occurrence reference from {handbook_index_path}\n")
 
     wb = load_workbook(path, data_only=True)
     sheet_names = [sheet_name] if sheet_name else wb.sheetnames
@@ -104,7 +123,7 @@ def main():
 
         sheet_results = []
         for i, group in enumerate(groups, start=1):
-            prompt = build_prompt(group)
+            prompt = build_prompt(group, occurrence_table_text=occurrence_table_text)
 
             if dry_run:
                 print("=" * 80)
