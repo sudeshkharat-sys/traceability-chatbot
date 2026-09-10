@@ -57,7 +57,6 @@ warnings.filterwarnings("ignore")
 from openpyxl import load_workbook
 
 from step3b_explain_scores import load_reference_lookup
-from step4_severity_input import build_groups
 from step2_normalize import normalize_sheet
 from step3c_to_json import build_entry
 
@@ -124,21 +123,23 @@ def split_effect_sections(effect_text):
     return result
 
 
-def build_prompt(group):
-    modes_text = "\n".join(
-        f"  - Mode: {m['failure_mode'].strip()}\n    Cause: {m['failure_cause'].strip() if m['failure_cause'] else '(not recorded)'}\n    Plant's recorded Severity: {m['plant_recorded_severity']}"
-        for m in group["modes_covered"]
-    )
+def build_prompt_for_entry(entry):
+    """Per-Failure-Mode prompt (not grouped) - requested so every row gets
+    its own independent AI call and reasoning that names ITS OWN Mode/Cause,
+    instead of one shared answer copy-pasted across every Mode that happens
+    to share the same recorded Effect text. Trades away the Step 4a
+    call-count optimization for row-level independence and clarity."""
+    failure = entry.get("failure") or {}
+    function = entry.get("function") or {}
+    risk = entry.get("risk") or {}
 
-    effect_sections = split_effect_sections(group["failure_effect"])
+    effect_sections = split_effect_sections(failure.get("effect"))
     effect_text = "\n\n".join(
         f"{header} effect:\n{effect_sections[header] if effect_sections[header] else '(none recorded)'}"
         for header in EFFECT_SECTION_HEADERS
     )
     if not any(effect_sections.values()):
-        # Effect text didn't use the plant's usual sub-headers - fall back to
-        # the raw text rather than showing three empty sections.
-        effect_text = group["failure_effect"].strip()
+        effect_text = (failure.get("effect") or "").strip()
 
     return f"""You are a process/manufacturing engineer performing a PFMEA (Process Failure Mode and Effects Analysis) review per the AIAG-VDA standard.
 
@@ -146,29 +147,29 @@ AIAG-VDA SEVERITY SCORING TABLE (1-10):
 {SEVERITY_TABLE_TEXT}
 
 CONTEXT FOR THIS PROCESS STEP:
-Function of Process Item: {group['function_of_item'].strip()}
-Function of Process Step: {group['function_of_step'].strip()}
-Function of Process Work Element: {group['function_of_work_element'].strip()}
+Function of Process Item: {(function.get('of_item') or '').strip()}
+Function of Process Step: {(function.get('of_step') or '').strip()}
+Function of Process Work Element: {(function.get('of_work_element') or '').strip()}
+
+THIS SPECIFIC FAILURE:
+Failure Mode: {(failure.get('mode') or '').strip()}
+Failure Cause: {(failure.get('cause') or '(not recorded)').strip()}
+Plant's recorded Severity: {risk.get('severity')}
 
 FAILURE EFFECT, split by whose perspective it's recorded from:
 {effect_text}
 
-FAILURE MODE(S) THIS EFFECT APPLIES TO (for context/grounding only - Severity is rated on the Effect above, not the Mode):
-{modes_text}
-
 TASK:
-Determine the correct Severity score (1-10) per the AIAG-VDA table.
-This ONE score will be applied to every Failure Mode listed above - they all share the same Function+Effect, so they get one shared Severity answer, not one each.
+Determine the correct Severity score (1-10) per the AIAG-VDA table, specifically for THIS Failure Mode/Cause above (not for other modes that might share this Effect text elsewhere in the sheet).
 - Rate primarily on the "End User effect" section, since that is the customer-facing outcome the Severity table describes ("affects safe vehicle operation", "loss of function", etc.).
-- Use "Your Plant effect" and "Ship to Plant effect" only as supporting context (e.g. confirming this is a real, recurring failure), not as the basis for the score itself.
-- The End User effect text may list several distinct symptoms. Score the single most representative, typically-occurring outcome for this Effect as a whole - do not automatically jump to the worst-sounding phrase in the list if it describes a rare/extreme case rather than the normal consequence of this failure.
-- If this End User effect text is reused verbatim across other, unrelated groups elsewhere in this sheet, treat it as generic/boilerplate and judge severity from what the Effect text itself actually describes, rather than always matching the boilerplate's worst phrase.
-- In your reasoning, write about the shared Effect in general - do NOT single out or name just one of the Failure Modes listed above, since your answer covers all of them equally.
+- Use "Your Plant effect" and "Ship to Plant effect" only as supporting context, not as the basis for the score itself.
+- The End User effect text may list several distinct symptoms. Pick the outcome that is actually representative of THIS Failure Mode/Cause specifically - do not automatically jump to the worst-sounding phrase in the list if it describes a rare/extreme case rather than what this particular failure typically causes.
+- If this End User effect text is reused verbatim across unrelated failure modes elsewhere in the sheet, treat it as generic/boilerplate and judge severity primarily from the Failure Mode/Cause above, not from matching the boilerplate's worst phrase.
 Return ONLY valid JSON, no other text, in this exact shape:
 {{
   "suggested_severity": <integer 1-10>,
   "matched_table_definition": "<the exact AIAG-VDA definition text this effect matches>",
-  "reasoning": "<1-3 sentences explaining why this Effect matches this score, referencing specific details from the End User effect text - phrased generally, not naming one specific Failure Mode>"
+  "reasoning": "<1-3 sentences explaining why THIS Failure Mode/Cause matches this score, referencing specific details from the End User effect text>"
 }}"""
 
 
@@ -259,35 +260,34 @@ def main():
         ws = wb[sn]
         _columns, rows = normalize_sheet(ws)
         entries = [build_entry(record, reference_lookup) for record in rows]
-        groups = build_groups(entries)
 
         sheet_results = []
-        for i, group in enumerate(groups, start=1):
-            prompt = build_prompt(group)
+        for i, entry in enumerate(entries, start=1):
+            prompt = build_prompt_for_entry(entry)
+            failure_mode = (entry.get("failure") or {}).get("mode")
 
             if dry_run:
                 print("=" * 80)
-                print(f"[{sn}] Group {i}/{len(groups)}: {group['function_of_step'][:50]!r}")
+                print(f"[{sn}] Entry {i}/{len(entries)}: {(failure_mode or '')[:50]!r}")
                 print(prompt)
                 continue
 
             suggestion = call_llm(llm, prompt)
-            for mode in group["modes_covered"]:
-                plant_sev = mode["plant_recorded_severity"]
-                ai_sev = suggestion["suggested_severity"]
-                sheet_results.append(
-                    {
-                        "failure_mode": mode["failure_mode"],
-                        "source_excel_rows": mode["source_excel_rows"],
-                        "plant_recorded_severity": plant_sev,
-                        "ai_suggested_severity": ai_sev,
-                        "agree": plant_sev == ai_sev,
-                        "ai_matched_table_definition": suggestion["matched_table_definition"],
-                        "ai_reasoning": suggestion["reasoning"],
-                    }
-                )
-                agreement = "MATCH" if plant_sev == ai_sev else f"DIFFERS (plant={plant_sev}, AI={ai_sev})"
-                print(f"[{sn}] {mode['failure_mode'][:40]!r:42} {agreement}")
+            plant_sev = (entry.get("risk") or {}).get("severity")
+            ai_sev = suggestion["suggested_severity"]
+            sheet_results.append(
+                {
+                    "failure_mode": failure_mode,
+                    "source_excel_rows": entry["source_excel_rows"],
+                    "plant_recorded_severity": plant_sev,
+                    "ai_suggested_severity": ai_sev,
+                    "agree": plant_sev == ai_sev,
+                    "ai_matched_table_definition": suggestion["matched_table_definition"],
+                    "ai_reasoning": suggestion["reasoning"],
+                }
+            )
+            agreement = "MATCH" if plant_sev == ai_sev else f"DIFFERS (plant={plant_sev}, AI={ai_sev})"
+            print(f"[{sn}] {(failure_mode or '')[:40]!r:42} {agreement}")
 
         results[sn] = sheet_results
 
