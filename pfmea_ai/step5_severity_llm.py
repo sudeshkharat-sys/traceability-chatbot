@@ -42,9 +42,17 @@ nashik-chatbot-pq/.env):
 """
 
 import json
+import logging
 import os
 import sys
+import warnings
 from pathlib import Path
+
+# nashik-chatbot-pq's app.config/azure_openai_handler modules set up a root
+# logger at INFO/DEBUG (for the FastAPI server); silence that here so this
+# standalone script's terminal output isn't flooded with server-style logs.
+logging.getLogger().setLevel(logging.WARNING)
+warnings.filterwarnings("ignore")
 
 from openpyxl import load_workbook
 

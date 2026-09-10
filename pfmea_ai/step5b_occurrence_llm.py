@@ -9,9 +9,16 @@ Same credentials/env vars as step5_severity_llm.py.
 """
 
 import json
+import logging
 import os
 import sys
+import warnings
 from pathlib import Path
+
+# Same rationale as step5_severity_llm.py: silence the FastAPI-style root
+# logger config pulled in transitively via app.config/azure_openai_handler.
+logging.getLogger().setLevel(logging.WARNING)
+warnings.filterwarnings("ignore")
 
 from openpyxl import load_workbook
 
