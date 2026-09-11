@@ -181,6 +181,12 @@ def build_prompt_for_entry(entry, severity_table_text=SEVERITY_TABLE_TEXT):
 
     return f"""You are a process/manufacturing engineer performing a PFMEA (Process Failure Mode and Effects Analysis) review per the AIAG-VDA standard.
 
+DO NOT HALLUCINATE - HARD RULE: The Severity table below, and the Failure Mode/Cause/Effect text given further down, are the ONLY facts you are allowed to use. Treat them as ground truth and nothing else:
+- Do NOT use any Severity definition, score band, or "9 vs 10" rule from your training knowledge (e.g. any "with/without warning" concept from older FMEA standards) - if it is not written in the table below, it does not exist for this task.
+- Do NOT invent, assume, or infer any fact about the failure (an injury, an accident, a regulation, a warning system, a component behavior) that is not explicitly present in the Failure Mode/Cause/Effect text given below. If the text is silent on something, treat it as unknown/not applicable - never fill the gap with a plausible-sounding guess.
+- Do NOT invent table rows, reword definitions to sound more familiar, or "correct" the table text below even if it looks incomplete or unusual - quote/paraphrase only what is actually there.
+- If you are not sure which step of the decision tree applies, say so explicitly in your reasoning rather than picking confidently. A stated uncertainty is correct behavior here; a confident wrong answer is not.
+
 GROUNDING RULE: The Severity table below is the ONLY source of truth for scoring definitions - it may be an excerpt retrieved directly from the real AIAG-VDA handbook PDF, which can word things slightly differently from what you may recall from general training knowledge. Use ONLY the definition text given below, quoted or paraphrased faithfully - do NOT substitute a definition you remember from elsewhere, and do NOT invent table rows/wording that are not present below. If a needed row/score genuinely is not present in the table below, say so in your reasoning rather than guessing its content.
 
 AIAG-VDA SEVERITY SCORING TABLE (1-10):
