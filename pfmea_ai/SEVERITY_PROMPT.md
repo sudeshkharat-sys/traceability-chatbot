@@ -33,6 +33,8 @@ Failure Mode: {failure.mode}
 Failure Cause: {failure.cause}
 Plant's recorded Severity: {risk.severity}
 
+MERGED-MODE CHECK: The "Failure Mode" text above is exactly one Excel cell as the plant recorded it - it may describe ONE failure mode, or it may actually contain SEVERAL distinct failure mode phrases the plant wrote into the same cell (e.g. separated by line breaks, "AND", or listed one after another) that arguably deserve separate PFMEA rows with potentially different severities. You are NOT being asked to split them or score them separately here - you must still give ONE score for the row as given, using the worst-case-severity distinct mode among them (since a single row-level severity has to represent the row). But you MUST flag this for the human reviewer if it applies.
+
 FAILURE EFFECT, split by whose perspective it's recorded from:
 {effect_text}   <- split into "Your Plant effect" / "Ship to Plant effect" / "End User effect"
 
@@ -70,7 +72,8 @@ Return ONLY valid JSON, no other text, in this exact shape:
   "applicable_effect": "<the 4-part audit above, as 1-4 short numbered clauses>",
   "decision_path": "<one short clause per decision-tree step you passed through, e.g. 'Step1: no safety/health risk -> Step2: no regulatory noncompliance -> Step3: not total loss of primary function -> Step4: stopped here, total loss of secondary function'>",
   "reasoning": "<1-3 sentences explaining why THIS Failure Mode/Cause matches this score, referencing specific details from the End User effect text>",
-  "recommended_action": "<one specific, implementable action - usually a targeted prevention/error-proofing action for this exact Failure Cause, occasionally a proportionate severity-reducing design change for high-severity effects; never a generic full-component redesign>"
+  "recommended_action": "<one specific, implementable action - usually a targeted prevention/error-proofing action for this exact Failure Cause, occasionally a proportionate severity-reducing design change for high-severity effects; never a generic full-component redesign>",
+  "merged_modes_detected": "<null if the Failure Mode text is a single failure mode; otherwise a short list of the distinct failure mode phrases you found merged into this one cell, e.g. ['Fitment not firm', 'Wrong selection of headlamp (not per model)'], so a reviewer knows this row should probably be split into separate PFMEA rows>"
 }
 ```
 
