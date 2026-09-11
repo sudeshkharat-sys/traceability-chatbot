@@ -213,7 +213,9 @@ Work through this decision tree, in order, and stop at the first step whose cond
 
 For each step you pass through before stopping, state in one short clause why that step's condition was NOT met, before giving the reasoning for the step where you stopped. This makes the elimination process explicit rather than jumping straight to a score.
 
-Also propose ONE recommended action a design/process engineer could take to reduce this failure's severity. Per AIAG-VDA, Severity is a property of the failure's effect and is normally only reduced through a PRODUCT OR PROCESS DESIGN change (e.g. adding a fail-safe, redundancy, or a physical interlock that changes the actual consequence of the failure) - NOT through a Prevention/Detection control (which reduces Occurrence/Detection instead, not Severity) and NOT a driver-warning/notification feature (per Table C2-1, warning to the driver is not part of how Severity is scored in this table, so it would not lower the score). If no realistic design change would lower this specific effect's severity, say so explicitly rather than inventing a generic action.
+Also propose ONE recommended action. Default assumption: for MOST failures, Severity does NOT realistically change - it is a property of the failure's effect on the vehicle/customer, fixed by the product's design, and this specific failure mode almost never justifies redesigning the component itself. So in most cases the honest, useful recommendation is a targeted PREVENTION action that stops THIS specific failure cause from happening in THIS process step (e.g. a poka-yoke/error-proofing fixture, a torque-controlled tool with lockout, a keyed/asymmetric connector so the wrong part physically cannot be installed, a sensor that stops the line if the step wasn't done) - these reduce Occurrence, not Severity, but they are what actually gets implemented on a real production line, and that is what "recommended_action" should mean here in practice.
+Only propose an actual SEVERITY-reducing design change (a fail-safe, redundancy, or a physical/functional change to what happens when the failure occurs) in the rare case where such a change is genuinely proportionate to this failure - not as your default answer, and never a full component/system redesign ("redesign the headlamp", "add a redundant lighting path") unless the failure mode itself is severe enough (Step 1/2 score) to warrant it. Do NOT propose a driver-warning/notification feature (per Table C2-1, warning is not part of how Severity is scored, so it wouldn't lower the score anyway).
+Keep the recommendation to ONE sentence, specific enough that someone on the line could actually implement it this quarter - name the specific part/step/mechanism from the Failure Cause above, not a generic engineering platitude.
 
 Return ONLY valid JSON, no other text, in this exact shape:
 {{
@@ -221,7 +223,7 @@ Return ONLY valid JSON, no other text, in this exact shape:
   "matched_table_definition": "<the exact AIAG-VDA definition text this effect matches>",
   "decision_path": "<one short clause per decision-tree step you passed through, e.g. 'Step1: no safety/health risk -> Step2: no regulatory noncompliance -> Step3: not total loss of primary function -> Step4: stopped here, total loss of secondary function'>",
   "reasoning": "<1-3 sentences explaining why THIS Failure Mode/Cause matches this score, referencing specific details from the End User effect text>",
-  "recommended_action": "<one concrete design/process change that would reduce this effect's severity, or a brief explicit statement that no realistic severity-reducing design change exists for this effect>"
+  "recommended_action": "<one specific, implementable action - usually a targeted prevention/error-proofing action for this exact Failure Cause, occasionally a proportionate severity-reducing design change for high-severity effects; never a generic full-component redesign>"
 }}"""
 
 
