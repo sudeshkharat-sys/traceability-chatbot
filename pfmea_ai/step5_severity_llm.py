@@ -61,19 +61,22 @@ from step3b_explain_scores import load_reference_lookup
 from step2_normalize import normalize_sheet
 from step3c_to_json import build_entry
 
-SEVERITY_TABLE_TEXT = """Score | AIAG-VDA Definition (Effect on Customer) | Plain-Language Meaning
-10 | Failure affects safe vehicle operation and/or involves noncompliance with government regulation, WITHOUT warning | Sudden safety hazard, no warning sign
-9  | Failure affects safe vehicle operation and/or involves noncompliance with government regulation, WITH warning | Safety hazard, but some warning is given
-8  | Loss of primary function (vehicle/system inoperable, does not affect safe operation) | Car won't run / drive properly
-7  | Degradation of primary function | Car runs, but function badly reduced
-6  | Loss of secondary function (comfort/convenience feature stops working) | e.g. AC, infotainment fails
-5  | Degradation of secondary function | Comfort feature reduced, not gone
-4  | Defect noticed by most customers (appearance, noise) - high annoyance | Very noticeable cosmetic/noise issue
-3  | Defect noticed by many customers - moderate annoyance | Noticeable but less severe
-2  | Defect noticed by discriminating customers only - minor annoyance | Only a picky customer would notice
-1  | No discernible effect | Nobody notices anything
+SEVERITY_TABLE_TEXT = """Table C2-1 - PFMEA SEVERITY (S), from the AIAG-VDA FMEA Handbook (1st Edition, 2019), verbatim.
+IMPORTANT: This is the real handbook table. There is NO "with warning / without warning" distinction anywhere in it -
+that is a rule from an older, different FMEA standard and must NOT be applied here. The 9 vs 10 split is
+safety/health-risk (10) vs regulatory-noncompliance (9), full stop.
 
-Note: Severity is rated on the EFFECT, not the cause, and rarely changes unless the product/design itself changes."""
+S | Effect | Impact to Your Plant | Impact to Ship-to Plant (when known) | Impact to End User (when known)
+10 (High) | Failure may result in an acute health and/or safety risk for the manufacturing or assembly worker | Failure may result in an acute health and/or safety risk for the manufacturing or assembly worker | Affects safe operation of the vehicle and/or other vehicles, the health of driver or passenger(s) or road users or pedestrians.
+9 | Failure may result in in-plant regulatory noncompliance | Failure may result in in-plant regulatory noncompliance | Noncompliance with regulations.
+8 (Moderately high) | 100% of production run affected may have to be scrapped | Line shutdown greater than full production shift; stop shipment possible; field repair or replacement required (Assembly to End User) other than for regulatory noncompliance. Failure may result in in-plant regulatory noncompliance or may have a chronic health and/or safety risk for the manufacturing or assembly worker | Loss of primary vehicle function necessary for normal driving during expected service life.
+7 | Product may have to be sorted and a portion (less than 100%) scrapped; deviation from primary process; decreased line speed or added manpower | Line shutdown from 1 hour up to full production shift; stop shipment possible; field repair or replacement required (Assembly to End User) other than for regulatory noncompliance | Degradation of primary vehicle function necessary for normal driving during expected service life.
+6 (Moderately low) | 100% of production run may have to be reworked off line and accepted | Line shutdown up to one hour | Loss of secondary vehicle function.
+5 | A portion of the production run may have to be reworked off line and accepted | Less than 100% of product affected; strong possibility for additional defective product; sort required; no line shutdown | Degradation of secondary vehicle function.
+4 | 100% of production run may have to be reworked in station before it is processed | Defective product triggers significant reaction plan; additional defective products not likely; sort not required | Very objectionable appearance, sound, vibration, harshness, or haptics.
+3 (Low) | A portion of the production run may have to be reworked in-station before it is processed | Defective product triggers minor reaction plan; additional defective products not likely; sort not required | Moderately objectionable appearance, sound, vibration, harshness, or haptics.
+2 | Slight inconvenience to process, operation, or operator | Defective product triggers no reaction plan; additional defective products not likely; sort not required; requires feedback to supplier | Slightly objectionable appearance, sound, vibration, harshness, or haptics.
+1 (Very low) | No discernible effect | No discernible effect or no effect | No discernible effect."""
 
 
 EFFECT_SECTION_HEADERS = ["Your Plant", "Ship to Plant", "End User"]
@@ -201,22 +204,22 @@ SCORING RULES (apply in this fixed order - do not skip or reorder steps; this is
 - The End User effect text may list several distinct symptoms. Pick the outcome that is actually representative of THIS Failure Mode/Cause specifically - never pick the worst-sounding phrase in the list if it describes a rare/extreme case rather than what this particular failure typically causes.
 - If this End User effect text is reused verbatim across unrelated failure modes elsewhere in the sheet, treat it as generic/boilerplate and judge severity primarily from the Failure Mode/Cause above, not from matching the boilerplate's worst phrase.
 
-Work through this decision tree, in order, and stop at the first step whose condition is satisfied - that step's score band is your answer:
-1. SAFETY/REGULATORY CHECK: Score 9-10 ONLY if the End User effect text says (or unambiguously implies) one of: total/near-total LOSS of the function (component does not work at all - e.g. "does not turn on", "does not operate"), explicit mention of an accident/collision/injury already occurring or being caused, or explicit noncompliance with a named regulation/standard. A component merely being "dim", "reduced", "insufficient", "degraded", "intermittent", or "weak" is NOT enough on its own to qualify here, even for a safety-relevant component like lighting/brakes/steering - that is a Step 2 degradation case, not a Step 1 case. Do not infer an unstated accident risk from a safety-relevant component name alone.
-   - If Step 1 is satisfied, pick between 9 and 10 using this fixed rule, not judgment: score 10 ONLY if the effect text explicitly states the failure is silent/undetectable/no indication to the driver before it matters. In every other case - including when the text is simply silent on whether there's a warning - score 9. Never default to 10 by assuming the absence of a warning; absence of a statement about a warning means score 9.
-2. PRIMARY FUNCTION CHECK (only if step 1 is "no"): Does the effect stop the vehicle/system from performing its PRIMARY function (the core job of this component/system) entirely, or only degrade it? Total loss of a NON-safety-relevant primary function -> 8. Degraded but still working (e.g. "dim", "insufficient", "reduced", "intermittent") -> 7. Terms like "insufficient brightness / dim light" always belong here at 7, never at Step 1.
-3. SECONDARY FUNCTION CHECK (only if steps 1-2 are "no"): Is the affected function a secondary/comfort/convenience feature (not primary, not safety)? Total loss -> 6. Degraded -> 5.
-4. COSMETIC/NOISE CHECK (only if steps 1-3 are "no"): Rate 1-4 strictly by how widely customers would notice the defect, per the table (4 = most customers notice, 1 = no discernible effect). Do not default to the middle of this range without a stated reason tied to the effect text.
+Work through this decision tree, in order, and stop at the first step whose condition is satisfied - that step's score band is your answer. CRITICAL: per Table C2-1 above, the 9-vs-10 split is SAFETY/HEALTH RISK (10) vs. REGULATORY NONCOMPLIANCE (9) ONLY - there is no "with/without warning" concept in this table. Do not use warning-related reasoning anywhere below.
+1. SAFETY/HEALTH RISK CHECK (score 10): Score 10 ONLY if the effect text says (or unambiguously implies) one of: an acute health/safety risk to a manufacturing or assembly worker (Your Plant / Ship-to Plant columns), OR the vehicle/component being unsafe to operate, or an actual/plausible injury, accident, or risk to the driver, passengers, road users, or pedestrians (End User column). A component merely being "dim", "reduced", "insufficient", "degraded", "intermittent", or "weak" is NOT enough on its own to qualify here, even for a safety-relevant component like lighting/brakes/steering - that is a Step 3 degradation case, not this case. Do not infer an unstated injury/accident risk from a safety-relevant component name alone; the text must actually describe the unsafe condition or its consequence.
+2. REGULATORY CHECK (only if step 1 is "no"; score 9): Score 9 ONLY if the effect text says (or unambiguously implies) noncompliance with a named regulation/standard, in-plant or for the vehicle (e.g. an emissions, lighting, or safety-equipment regulation) - as distinct from the failure simply being unsafe (that's Step 1). If the text doesn't reference regulatory compliance at all, this step is "no".
+3. PRIMARY FUNCTION CHECK (only if steps 1-2 are "no"): Does the effect stop the vehicle/system from performing its PRIMARY function (the core job of this component/system) entirely, or only degrade it? Total loss of the primary function -> 8. Degraded but still working (e.g. "dim", "insufficient", "reduced", "intermittent") -> 7. Terms like "insufficient brightness / dim light" always belong here at 7, never at Step 1, unless Step 1's explicit unsafe-condition text applies instead.
+4. SECONDARY FUNCTION CHECK (only if steps 1-3 are "no"): Is the affected function a secondary/comfort/convenience feature (not primary, not safety)? Total loss -> 6. Degraded -> 5.
+5. COSMETIC/NOISE CHECK (only if steps 1-4 are "no"): Rate 2-4 strictly by how widely customers would notice the defect, per the table (4 = very objectionable, 3 = moderately objectionable, 2 = slightly objectionable). Score 1 only for "no discernible effect". Do not default to the middle of this range without a stated reason tied to the effect text.
 
 For each step you pass through before stopping, state in one short clause why that step's condition was NOT met, before giving the reasoning for the step where you stopped. This makes the elimination process explicit rather than jumping straight to a score.
 
-Also propose ONE recommended action a design/process engineer could take to reduce this failure's severity. Per AIAG-VDA, Severity is a property of the failure's effect and is normally only reduced through a PRODUCT OR PROCESS DESIGN change (e.g. adding a fail-safe, redundancy, a physical interlock, a warning system) - NOT through a Prevention/Detection control, which reduces Occurrence/Detection instead, not Severity. If no realistic design change would lower this specific effect's severity, say so explicitly rather than inventing a generic action.
+Also propose ONE recommended action a design/process engineer could take to reduce this failure's severity. Per AIAG-VDA, Severity is a property of the failure's effect and is normally only reduced through a PRODUCT OR PROCESS DESIGN change (e.g. adding a fail-safe, redundancy, or a physical interlock that changes the actual consequence of the failure) - NOT through a Prevention/Detection control (which reduces Occurrence/Detection instead, not Severity) and NOT a driver-warning/notification feature (per Table C2-1, warning to the driver is not part of how Severity is scored in this table, so it would not lower the score). If no realistic design change would lower this specific effect's severity, say so explicitly rather than inventing a generic action.
 
 Return ONLY valid JSON, no other text, in this exact shape:
 {{
   "suggested_severity": <integer 1-10>,
   "matched_table_definition": "<the exact AIAG-VDA definition text this effect matches>",
-  "decision_path": "<one short clause per decision-tree step you passed through, e.g. 'Step1: no safety/regulatory effect -> Step2: not total loss of primary function -> Step3: stopped here, total loss of secondary function'>",
+  "decision_path": "<one short clause per decision-tree step you passed through, e.g. 'Step1: no safety/health risk -> Step2: no regulatory noncompliance -> Step3: not total loss of primary function -> Step4: stopped here, total loss of secondary function'>",
   "reasoning": "<1-3 sentences explaining why THIS Failure Mode/Cause matches this score, referencing specific details from the End User effect text>",
   "recommended_action": "<one concrete design/process change that would reduce this effect's severity, or a brief explicit statement that no realistic severity-reducing design change exists for this effect>"
 }}"""
