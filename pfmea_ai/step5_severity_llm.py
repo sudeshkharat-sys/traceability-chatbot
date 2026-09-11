@@ -196,18 +196,28 @@ Plant's recorded Severity: {risk.get('severity')}
 FAILURE EFFECT, split by whose perspective it's recorded from:
 {effect_text}
 
-TASK:
-Determine the correct Severity score (1-10) per the AIAG-VDA table, specifically for THIS Failure Mode/Cause above (not for other modes that might share this Effect text elsewhere in the sheet).
-- Rate primarily on the "End User effect" section, since that is the customer-facing outcome the Severity table describes ("affects safe vehicle operation", "loss of function", etc.).
-- Use "Your Plant effect" and "Ship to Plant effect" only as supporting context, not as the basis for the score itself.
-- The End User effect text may list several distinct symptoms. Pick the outcome that is actually representative of THIS Failure Mode/Cause specifically - do not automatically jump to the worst-sounding phrase in the list if it describes a rare/extreme case rather than what this particular failure typically causes.
+SCORING RULES (apply in this fixed order - do not skip or reorder steps; this is what makes your answer repeatable):
+- Rate primarily on the "End User effect" section, since that is the customer-facing outcome the Severity table describes. Use "Your Plant effect" and "Ship to Plant effect" only as supporting context, never as the basis for the score itself.
+- The End User effect text may list several distinct symptoms. Pick the outcome that is actually representative of THIS Failure Mode/Cause specifically - never pick the worst-sounding phrase in the list if it describes a rare/extreme case rather than what this particular failure typically causes.
 - If this End User effect text is reused verbatim across unrelated failure modes elsewhere in the sheet, treat it as generic/boilerplate and judge severity primarily from the Failure Mode/Cause above, not from matching the boilerplate's worst phrase.
-- FIRST explicitly decide: could this effect plausibly affect SAFE vehicle operation or involve regulatory noncompliance (Scores 9-10), given the component involved (e.g. exterior lighting is safety/legally-relevant equipment, not just a comfort feature)? Only fall back to "loss/degradation of function" (Scores 6-8) if you can justify why safe operation is NOT plausibly affected - don't default to the function-loss bucket just because it sounds like the calmer, more moderate answer. State this safety-vs-function-loss decision explicitly in your reasoning.
+
+Work through this decision tree, in order, and stop at the first step whose condition is satisfied - that step's score band is your answer:
+1. SAFETY/REGULATORY CHECK: Does the representative End User effect plausibly stop the vehicle from being safely operated, or involve noncompliance with a government regulation, given the component involved (e.g. exterior lighting, brakes, steering are safety/legally-relevant even if the described symptom sounds minor)? If yes -> score 9-10 (10 = no warning is given before the hazard; 9 = some warning is given). Pick between 9 and 10 ONLY on whether a warning precedes the hazard - not on how severe the hazard feels.
+2. PRIMARY FUNCTION CHECK (only if step 1 is "no"): Does the effect stop the vehicle/system from performing its PRIMARY function (the core job of this component/system) entirely, or only degrade it? Total loss -> 8. Degraded but still working -> 7.
+3. SECONDARY FUNCTION CHECK (only if steps 1-2 are "no"): Is the affected function a secondary/comfort/convenience feature (not primary, not safety)? Total loss -> 6. Degraded -> 5.
+4. COSMETIC/NOISE CHECK (only if steps 1-3 are "no"): Rate 1-4 strictly by how widely customers would notice the defect, per the table (4 = most customers notice, 1 = no discernible effect). Do not default to the middle of this range without a stated reason tied to the effect text.
+
+For each step you pass through before stopping, state in one short clause why that step's condition was NOT met, before giving the reasoning for the step where you stopped. This makes the elimination process explicit rather than jumping straight to a score.
+
+Also propose ONE recommended action a design/process engineer could take to reduce this failure's severity. Per AIAG-VDA, Severity is a property of the failure's effect and is normally only reduced through a PRODUCT OR PROCESS DESIGN change (e.g. adding a fail-safe, redundancy, a physical interlock, a warning system) - NOT through a Prevention/Detection control, which reduces Occurrence/Detection instead, not Severity. If no realistic design change would lower this specific effect's severity, say so explicitly rather than inventing a generic action.
+
 Return ONLY valid JSON, no other text, in this exact shape:
 {{
   "suggested_severity": <integer 1-10>,
   "matched_table_definition": "<the exact AIAG-VDA definition text this effect matches>",
-  "reasoning": "<1-3 sentences explaining why THIS Failure Mode/Cause matches this score, referencing specific details from the End User effect text>"
+  "decision_path": "<one short clause per decision-tree step you passed through, e.g. 'Step1: no safety/regulatory effect -> Step2: not total loss of primary function -> Step3: stopped here, total loss of secondary function'>",
+  "reasoning": "<1-3 sentences explaining why THIS Failure Mode/Cause matches this score, referencing specific details from the End User effect text>",
+  "recommended_action": "<one concrete design/process change that would reduce this effect's severity, or a brief explicit statement that no realistic severity-reducing design change exists for this effect>"
 }}"""
 
 
@@ -346,10 +356,18 @@ def main():
                     "ai_suggested_severity": ai_sev,
                     "agree": plant_sev == ai_sev,
                     "ai_matched_table_definition": runs[0]["matched_table_definition"],
+                    "ai_decision_path": runs[0].get("decision_path"),
                     "ai_reasoning": runs[0]["reasoning"],
+                    "ai_recommended_action": runs[0].get("recommended_action"),
                     "ai_consistent_across_runs": consistent,
                     "ai_runs": [
-                        {"suggested_severity": r["suggested_severity"], "matched_table_definition": r["matched_table_definition"], "reasoning": r["reasoning"]}
+                        {
+                            "suggested_severity": r["suggested_severity"],
+                            "matched_table_definition": r["matched_table_definition"],
+                            "decision_path": r.get("decision_path"),
+                            "reasoning": r["reasoning"],
+                            "recommended_action": r.get("recommended_action"),
+                        }
                         for r in runs
                     ] if repeat > 1 else None,
                 }
