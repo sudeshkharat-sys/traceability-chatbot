@@ -267,19 +267,36 @@ def get_llm():
         azure_deployment=deployment,
         api_key=api_key,
         api_version=api_version,
-        max_tokens=4096,
+        # Reasoning models spend part of this budget on hidden reasoning
+        # tokens before emitting any visible output; the decision_path +
+        # recommended_action fields added to the prompt made that visible
+        # output longer, so 4096 could be exhausted by reasoning alone and
+        # leave an empty completion. Give it more headroom.
+        max_tokens=8192,
         reasoning_effort=reasoning_effort,
     )
 
 
 def call_llm(llm, prompt):
     response = llm.invoke(prompt)
-    text = response.content.strip()
+    text = (response.content or "").strip()
+    if not text:
+        finish_reason = (response.response_metadata or {}).get("finish_reason")
+        usage = getattr(response, "usage_metadata", None)
+        raise RuntimeError(
+            f"LLM returned an empty response (finish_reason={finish_reason!r}, usage={usage!r}). "
+            "This usually means max_tokens was exhausted by hidden reasoning tokens before any "
+            "output text was produced - try raising max_tokens in get_llm() or lowering REASONING_EFFORT."
+        )
     if text.startswith("```"):
         text = text.strip("`")
         if text.startswith("json"):
             text = text[4:]
-    return json.loads(text.strip())
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        raise RuntimeError(f"LLM response was not valid JSON: {e}\n---RAW RESPONSE---\n{text[:2000]}") from e
 
 
 def main():
