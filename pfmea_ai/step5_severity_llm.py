@@ -226,10 +226,17 @@ Also propose ONE recommended action. Default assumption: for MOST failures, Seve
 Only propose an actual SEVERITY-reducing design change (a fail-safe, redundancy, or a physical/functional change to what happens when the failure occurs) in the rare case where such a change is genuinely proportionate to this failure - not as your default answer, and never a full component/system redesign ("redesign the headlamp", "add a redundant lighting path") unless the failure mode itself is severe enough (Step 1/2 score) to warrant it. Do NOT propose a driver-warning/notification feature (per Table C2-1, warning is not part of how Severity is scored, so it wouldn't lower the score anyway).
 Keep the recommendation to ONE sentence, specific enough that someone on the line could actually implement it this quarter - name the specific part/step/mechanism from the Failure Cause above, not a generic engineering platitude.
 
+Before scoring, do this 4-part audit explicitly (this becomes the "applicable_effect" field below) - it exists so an engineer can check your work without re-deriving it themselves:
+1. State the ONE End User effect phrase you are treating as applicable to THIS Failure Mode/Cause (quote it).
+2. State why it is causally applicable to this specific Failure Mode/Cause (not just "it's in the list").
+3. State whether any OTHER effect phrase in the list was a candidate and, if so, why you did not use it instead (e.g. "less severe phrase 'dim light' was also present but the explicit safety phrase 'increased risk of accident' takes priority per the hard rule").
+4. Only if the supplied Failure Mode/Cause/Effect text is genuinely ambiguous between two plausible effects (not merely "there were multiple phrases"), say so explicitly instead of silently picking one.
+
 Return ONLY valid JSON, no other text, in this exact shape:
 {{
   "suggested_severity": <integer 1-10>,
   "matched_table_definition": "<the exact AIAG-VDA definition text this effect matches>",
+  "applicable_effect": "<the 4-part audit above, as 1-4 short numbered clauses>",
   "decision_path": "<one short clause per decision-tree step you passed through, e.g. 'Step1: no safety/health risk -> Step2: no regulatory noncompliance -> Step3: not total loss of primary function -> Step4: stopped here, total loss of secondary function'>",
   "reasoning": "<1-3 sentences explaining why THIS Failure Mode/Cause matches this score, referencing specific details from the End User effect text>",
   "recommended_action": "<one specific, implementable action - usually a targeted prevention/error-proofing action for this exact Failure Cause, occasionally a proportionate severity-reducing design change for high-severity effects; never a generic full-component redesign>"
@@ -388,6 +395,7 @@ def main():
                     "ai_suggested_severity": ai_sev,
                     "agree": plant_sev == ai_sev,
                     "ai_matched_table_definition": runs[0]["matched_table_definition"],
+                    "ai_applicable_effect": runs[0].get("applicable_effect"),
                     "ai_decision_path": runs[0].get("decision_path"),
                     "ai_reasoning": runs[0]["reasoning"],
                     "ai_recommended_action": runs[0].get("recommended_action"),
@@ -396,6 +404,7 @@ def main():
                         {
                             "suggested_severity": r["suggested_severity"],
                             "matched_table_definition": r["matched_table_definition"],
+                            "applicable_effect": r.get("applicable_effect"),
                             "decision_path": r.get("decision_path"),
                             "reasoning": r["reasoning"],
                             "recommended_action": r.get("recommended_action"),
