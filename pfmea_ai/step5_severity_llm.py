@@ -299,6 +299,12 @@ def get_llm():
         # leave an empty completion. Give it more headroom.
         max_tokens=8192,
         reasoning_effort=reasoning_effort,
+        # Without a timeout, a stalled/slow API call hangs the whole script
+        # forever with no error and no output - looks identical to the
+        # process just being "stuck". Fail loudly instead so a bad run is
+        # visibly a retry, not silence.
+        timeout=180,
+        max_retries=2,
     )
 
 
