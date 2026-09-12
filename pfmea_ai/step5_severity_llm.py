@@ -233,6 +233,8 @@ Also propose ONE recommended action. Default assumption: for MOST failures, Seve
 Only propose an actual SEVERITY-reducing design change (a fail-safe, redundancy, or a physical/functional change to what happens when the failure occurs) in the rare case where such a change is genuinely proportionate to this failure - not as your default answer, and never a full component/system redesign ("redesign the headlamp", "add a redundant lighting path") unless the failure mode itself is severe enough (Step 1/2 score) to warrant it. Do NOT propose a driver-warning/notification feature (per Table C2-1, warning is not part of how Severity is scored, so it wouldn't lower the score anyway).
 Keep the recommendation to ONE sentence, specific enough that someone on the line could actually implement it this quarter - name the specific part/step/mechanism from the Failure Cause above, not a generic engineering platitude.
 
+Also propose ONE detection recommendation - this is a DIFFERENT question from Prevention above. Prevention stops the Failure Cause from happening at all; Detection is about how this station (or the next one downstream) would CATCH this specific Failure Mode if it happened anyway, before the part ships further down the line or leaves the plant. Concretely: a sensor, gauge, vision/camera check, poka-yoke verification step, functional test (e.g. an electrical continuity/illumination test), or an inspection gate - specific to what would actually reveal THIS Failure Mode (e.g. a vision-inspection gate reveals a scratch; an illumination test reveals a non-functioning headlamp; a torque-verification readout reveals under/over-torque). Do NOT propose a control that would only catch a DIFFERENT failure mode than the one in this row. Keep it to ONE sentence, same implementability bar as the Prevention recommendation.
+
 EXISTING CONTROLS RULE (applies to both the Prevention recommendation above and any Detection recommendation you are asked for elsewhere): you are given the Current Prevention Control (PC) and Current Detection Controls (DC) already in place at this station. Your recommendation must NOT just restate or duplicate what is already there (e.g. if DC already lists "SELF CHECK, CHECKMAN CHECKING, ECOS SYSTEM", do not recommend "add a self-check" - that already exists and adds nothing). Instead:
 - If an existing control is manual/human-dependent (self-check, visual check, checksheet) and the failure is severe enough to warrant it, recommend the specific automated/poka-yoke upgrade that would close the gap a manual control leaves open (manual checks can be skipped or missed; a sensor/interlock cannot).
 - If an existing control already looks adequate for this specific failure cause, say so plainly instead of inventing an unnecessary addition - it is fine for the recommendation to be "the existing prevention control (PC) already addresses this; no change needed" when that is honestly true.
@@ -262,6 +264,7 @@ Return ONLY valid JSON, no other text, in this exact shape:
   "decision_path": "<one short clause per decision-tree step you passed through, e.g. 'Step1: no safety/health risk -> Step2: no regulatory noncompliance -> Step3: not total loss of primary function -> Step4: stopped here, total loss of secondary function'>",
   "reasoning": "<1-3 sentences explaining why THIS Failure Mode/Cause matches this score, referencing specific details from the End User effect text>",
   "recommended_action": "<one specific, implementable action - usually a targeted prevention/error-proofing action for this exact Failure Cause, occasionally a proportionate severity-reducing design change for high-severity effects; never a generic full-component redesign>",
+  "detection_recommendation": "<one specific, implementable way to CATCH this exact Failure Mode if it occurs - a sensor/gauge/vision check/functional test/inspection gate specific to this Mode, not a control that would only catch a different failure mode>",
   "merged_modes_detected": "<null if the Failure Mode text is a single failure mode; otherwise a short list of the distinct failure mode phrases you found merged into this one cell, e.g. ['Fitment not firm', 'Wrong selection of headlamp (not per model)'], so a reviewer knows this row should probably be split into separate PFMEA rows>",
   "cause_mode_mismatch": <true if the Failure Cause's physical mechanism does not logically produce the stated Failure Mode (per the CAUSE/MODE MISMATCH CHECK rule above), false otherwise>,
   "cause_mode_mismatch_note": "<null if cause_mode_mismatch is false; otherwise one sentence saying what the Cause text looks like it actually belongs to instead, e.g. 'This Cause (wrong part/mix-up) does not produce a scratch/damage Mode - it reads like the Cause for the adjacent Fitment/Wrong-selection row instead'>"
@@ -431,6 +434,7 @@ def main():
                     "ai_decision_path": runs[0].get("decision_path"),
                     "ai_reasoning": runs[0]["reasoning"],
                     "ai_recommended_action": runs[0].get("recommended_action"),
+                    "ai_detection_recommendation": runs[0].get("detection_recommendation"),
                     "ai_merged_modes_detected": runs[0].get("merged_modes_detected"),
                     "ai_cause_mode_mismatch": runs[0].get("cause_mode_mismatch"),
                     "ai_cause_mode_mismatch_note": runs[0].get("cause_mode_mismatch_note"),
@@ -444,6 +448,7 @@ def main():
                             "decision_path": r.get("decision_path"),
                             "reasoning": r["reasoning"],
                             "recommended_action": r.get("recommended_action"),
+                            "detection_recommendation": r.get("detection_recommendation"),
                             "merged_modes_detected": r.get("merged_modes_detected"),
                             "cause_mode_mismatch": r.get("cause_mode_mismatch"),
                             "cause_mode_mismatch_note": r.get("cause_mode_mismatch_note"),

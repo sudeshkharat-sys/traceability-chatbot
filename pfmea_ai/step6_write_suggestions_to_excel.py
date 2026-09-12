@@ -13,9 +13,9 @@ New columns added, in order:
   Severity Note  - short reason for that severity
   Occurrence (O) - left BLANK: requires real plant defect-frequency data,
                    never AI-generated
-  Detection (D)  - left BLANK for now: step5 does not yet generate a
-                   distinct Detection suggestion (see step5's
-                   recommended_action, which is Prevention-only)
+  Detection (D)  - AI suggested detection method (sensor/gauge/vision
+                   check/functional test/inspection gate) specific to
+                   catching THIS Failure Mode, distinct from Prevention
   Prevention     - AI suggested prevention/poka-yoke action
   Remark         - merged-mode info, cause/mode mismatch, ambiguity
                    breakdown, plant-vs-AI disagreement, AND (new) a
@@ -325,9 +325,7 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             severity_col: row["ai_suggested_severity"],
             severity_note_col: row.get("ai_reasoning") or "",
             # Occurrence intentionally left blank - requires real plant data.
-            # Detection intentionally left blank - step5 does not yet
-            # generate a real, distinct Detection suggestion (only
-            # Prevention).
+            detection_col: row.get("ai_detection_recommendation") or "",
             prevention_col: row.get("ai_recommended_action") or "",
             remark_col: build_remark(row, cause_to_modes, this_cause),
         }

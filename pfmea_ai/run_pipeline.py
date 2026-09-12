@@ -91,6 +91,7 @@ def score_entries(entries, llm, severity_table_text, repeat, log=print):
                 "agree": plant_sev == ai_sev,
                 "ai_reasoning": runs[0]["reasoning"],
                 "ai_recommended_action": runs[0].get("recommended_action"),
+                "ai_detection_recommendation": runs[0].get("detection_recommendation"),
                 "ai_merged_modes_detected": runs[0].get("merged_modes_detected"),
                 "ai_cause_mode_mismatch": runs[0].get("cause_mode_mismatch"),
                 "ai_cause_mode_mismatch_note": runs[0].get("cause_mode_mismatch_note"),
