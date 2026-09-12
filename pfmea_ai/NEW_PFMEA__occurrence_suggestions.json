@@ -1,0 +1,86 @@
+{
+  "Head lamp": [
+    {
+      "failure_mode": "SCRATCH / DAMAGE ON HEAD LAMP",
+      "source_excel_rows": [
+        18,
+        19
+      ],
+      "plant_recorded_occurrence": 4,
+      "ai_suggested_occurrence": 7,
+      "agree": false,
+      "ai_matched_table_definition": "Prevention controls somewhat effective in preventing failure cause.",
+      "ai_reasoning": "Controls are primarily behavioral (operator training) with best-practice elements (part traceability and sequencing), which reduce but do not robustly prevent wrong-part selection or trolley mix‑ups. Without a technical error-proofing interlock, the prevention is only somewhat effective, so a higher occurrence rating is warranted."
+    },
+    {
+      "failure_mode": "FITMENT IS NOT FIRM\n WRONG SELECTION OF HEAD LAMP\n( NOT AS PER MODEL)",
+      "source_excel_rows": [
+        20,
+        21
+      ],
+      "plant_recorded_occurrence": 4,
+      "ai_suggested_occurrence": 7,
+      "agree": false,
+      "ai_matched_table_definition": "Prevention controls somewhat effective in preventing failure cause.",
+      "ai_reasoning": "Controls are primarily behavioral (operator training) with best-practice elements (part traceability and sequencing), which reduce but do not robustly prevent wrong-part selection or trolley mix‑ups. Without a technical error-proofing interlock, the prevention is only somewhat effective, so a higher occurrence rating is warranted."
+    },
+    {
+      "failure_mode": "IMPROPER LOCKING /\nPOOR LOCKING",
+      "source_excel_rows": [
+        22,
+        23
+      ],
+      "plant_recorded_occurrence": 3,
+      "ai_suggested_occurrence": 7,
+      "agree": false,
+      "ai_matched_table_definition": "Prevention controls somewhat effective in preventing failure cause.",
+      "ai_reasoning": "The causes are operator-related (forgetting or making an improper connection) and the current prevention is mainly best-practice/behavioral (stage instruction and visual marking), not a technical/poka‑yoke interlock. Such controls are only somewhat effective at preventing human error, so a high occurrence rating is appropriate."
+    },
+    {
+      "failure_mode": "OPERATOR FAILED TO PREFIT BOLTS",
+      "source_excel_rows": [
+        24,
+        25
+      ],
+      "plant_recorded_occurrence": 3,
+      "ai_suggested_occurrence": 9,
+      "agree": false,
+      "ai_matched_table_definition": "9 Very high Behavioral Prevention controls will have little effect in preventing failure cause.",
+      "ai_reasoning": "The cause is the operator not following the SOS, and the current prevention controls (operator training and work instructions) are behavioral/best-practice measures that typically have limited effectiveness in preventing noncompliance. Without technical error-proofing, the likelihood of recurrence remains very high."
+    },
+    {
+      "failure_mode": "OPERATOR FAILED TO FIT SCREWS AND NOT MAINTAINED GAP",
+      "source_excel_rows": [
+        26,
+        27
+      ],
+      "plant_recorded_occurrence": 3,
+      "ai_suggested_occurrence": 9,
+      "agree": false,
+      "ai_matched_table_definition": "9 Prevention controls will have little\nVery high Behavioral\neffect in preventing failure cause.",
+      "ai_reasoning": "The cause depends on operator technique to maintain uniform gaps, and the only prevention controls are training and work instructions, which are behavioral. Per AIAG-VDA, such controls typically have little effect in preventing the cause, leading to a very high occurrence rating."
+    },
+    {
+      "failure_mode": "TORQUE NOT ACHIEVED-UNDER TORQUE",
+      "source_excel_rows": [
+        28
+      ],
+      "plant_recorded_occurrence": 3,
+      "ai_suggested_occurrence": 5,
+      "agree": false,
+      "ai_matched_table_definition": "Prevention controls are effective in preventing failure cause. Moderate",
+      "ai_reasoning": "Providing a dedicated, visually identified power tool helps prevent use of the wrong tool, but this relies on operator behavior and does not inherently prevent operator mistakes or improper calibration. Therefore, the prevention is effective but not highly robust."
+    },
+    {
+      "failure_mode": "TORQUE NOT ACHIEVED - OVER TORQUE",
+      "source_excel_rows": [
+        29
+      ],
+      "plant_recorded_occurrence": 3,
+      "ai_suggested_occurrence": 5,
+      "agree": false,
+      "ai_matched_table_definition": "Prevention controls are effective in preventing failure cause. Moderate",
+      "ai_reasoning": "Providing a dedicated, visually identified power tool helps prevent use of the wrong tool, but this relies on operator behavior and does not inherently prevent operator mistakes or improper calibration. Therefore, the prevention is effective but not highly robust."
+    }
+  ]
+}
