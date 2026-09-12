@@ -260,7 +260,10 @@ def main():
 
     ws.merge_cells(start_row=section_header_row_start, start_column=start_col, end_row=section_header_row_end, end_column=end_col)
     section_cell = ws.cell(row=section_header_row_start, column=start_col, value="Suggestion")
-    style_like(section_cell, section_ref_cell, fill_rgb=SUGGESTION_FILL_RGB)
+    # Top-level section header stays plain (no fill) like its siblings
+    # ("Risk Analysis (Step5)", "Optimization (Step6)") - only the
+    # sub-column headers below get the distinct purple fill.
+    style_like(section_cell, section_ref_cell)
 
     for i, header in enumerate(NEW_COLUMN_HEADERS):
         col = start_col + i
@@ -269,6 +272,21 @@ def main():
         style_like(sub_cell, sub_ref_cell, fill_rgb=SUGGESTION_FILL_RGB)
 
     severity_col, severity_note_col, occurrence_col, detection_col, prevention_col, remark_col = range(start_col, start_col + 6)
+
+    # Widen the new columns so wrapped text is actually readable instead of
+    # squeezing into the sheet's default column width - short numeric/blank
+    # columns (Severity, Occurrence) stay narrow, text-heavy columns get
+    # more room.
+    column_widths = {
+        severity_col: 10,
+        severity_note_col: 32,
+        occurrence_col: 12,
+        detection_col: 32,
+        prevention_col: 38,
+        remark_col: 55,
+    }
+    for col, width in column_widths.items():
+        ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = width
 
     print(f"Detected header row: {header_row}")
     print(f"Appended new 'Suggestion' block at columns {ws.cell(row=header_row, column=start_col).coordinate.rstrip('0123456789')}-{ws.cell(row=header_row, column=end_col).coordinate.rstrip('0123456789')} (rows {section_header_row_start}-{sub_header_row_end})")
