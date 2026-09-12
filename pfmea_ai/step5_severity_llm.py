@@ -238,11 +238,17 @@ Before scoring, do this 4-part audit explicitly (this becomes the "applicable_ef
 4. Only if the supplied Failure Mode/Cause/Effect text is genuinely ambiguous between two plausible effects (not merely "there were multiple phrases"), say so explicitly instead of silently picking one.
 5. State explicitly whether the CAUSE/MODE MISMATCH CHECK applies here (does the stated Failure Cause's mechanism actually produce the stated Failure Mode?) - if it doesn't, say so and confirm you based the representative-symptom choice on the Failure Mode text instead of the Cause.
 
+AMBIGUITY BREAKDOWN RULE (do NOT silently force a single number when the row is genuinely ambiguous): the source Excel data is kept exactly as the plant recorded it and is not being rewritten or split for this task. Some rows (merged failure modes like "Scratch/Damage", or a Mode word like "damage" that could mean either a cosmetic or a functional outcome) do NOT have one unambiguously correct severity - a human reviewer needs to see the real options and choose, rather than the model quietly guessing one and being wrong (or unstable) half the time. So:
+- If step 4 above found genuine ambiguity (two or more plausible End User effect readings that would lead to DIFFERENT severities, not just different wording of the same severity), you MUST populate "possible_severities" with one entry per distinct plausible reading, each with its own severity/definition/reasoning, sorted worst (highest severity) first.
+- If there is no genuine ambiguity (one reading is clearly the most representative per the rules above), set "possible_severities" to null - do not manufacture options that aren't real.
+- "suggested_severity" must always be set to the WORST (highest) severity among the "possible_severities" entries when that list is non-null (consistent with the existing worst-case-among-merged-modes rule), so the single-number field stays usable for the existing pass/fail comparison against the plant's recorded severity - the bullet list is the reviewer-facing detail, not a replacement for that field.
+
 Return ONLY valid JSON, no other text, in this exact shape:
 {{
   "suggested_severity": <integer 1-10>,
   "matched_table_definition": "<the exact AIAG-VDA definition text this effect matches>",
   "applicable_effect": "<the 4-part audit above, as 1-4 short numbered clauses>",
+  "possible_severities": "<null if not genuinely ambiguous; otherwise a list of objects, worst-first, each shaped {{'severity': <int>, 'effect_used': '<quoted End User effect phrase>', 'matched_table_definition': '<table text>', 'reasoning': '<1-2 sentences>'}}, one per distinct plausible reading - this is what a human reviewer picks between instead of the model silently guessing>",
   "decision_path": "<one short clause per decision-tree step you passed through, e.g. 'Step1: no safety/health risk -> Step2: no regulatory noncompliance -> Step3: not total loss of primary function -> Step4: stopped here, total loss of secondary function'>",
   "reasoning": "<1-3 sentences explaining why THIS Failure Mode/Cause matches this score, referencing specific details from the End User effect text>",
   "recommended_action": "<one specific, implementable action - usually a targeted prevention/error-proofing action for this exact Failure Cause, occasionally a proportionate severity-reducing design change for high-severity effects; never a generic full-component redesign>",
@@ -411,6 +417,7 @@ def main():
                     "agree": plant_sev == ai_sev,
                     "ai_matched_table_definition": runs[0]["matched_table_definition"],
                     "ai_applicable_effect": runs[0].get("applicable_effect"),
+                    "ai_possible_severities": runs[0].get("possible_severities"),
                     "ai_decision_path": runs[0].get("decision_path"),
                     "ai_reasoning": runs[0]["reasoning"],
                     "ai_recommended_action": runs[0].get("recommended_action"),
@@ -423,6 +430,7 @@ def main():
                             "suggested_severity": r["suggested_severity"],
                             "matched_table_definition": r["matched_table_definition"],
                             "applicable_effect": r.get("applicable_effect"),
+                            "possible_severities": r.get("possible_severities"),
                             "decision_path": r.get("decision_path"),
                             "reasoning": r["reasoning"],
                             "recommended_action": r.get("recommended_action"),
@@ -436,7 +444,8 @@ def main():
             )
             agreement = "MATCH" if plant_sev == ai_sev else f"DIFFERS (plant={plant_sev}, AI={ai_sev})"
             stability = "" if repeat == 1 else (" [STABLE]" if consistent else f" [UNSTABLE: {severities}]")
-            print(f"[{sn}] {(failure_mode or '')[:40]!r:42} {agreement}{stability}")
+            ambiguous = " [AMBIGUOUS - see possible_severities]" if runs[0].get("possible_severities") else ""
+            print(f"[{sn}] {(failure_mode or '')[:40]!r:42} {agreement}{stability}{ambiguous}")
 
         results[sn] = sheet_results
 
