@@ -215,52 +215,20 @@ def build_remark(row, cause_to_modes, this_cause):
     return " ".join(parts) if parts else "Single failure mode, no flags."
 
 
-def main():
-    if len(sys.argv) < 4:
-        print("Usage: python step6_write_suggestions_to_excel.py <source.xlsx> <sheet_name> <suggestions.json> [severity_input.json] [output.xlsx]")
-        sys.exit(1)
+def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None, log=print):
+    """Core of step6: given an already-open worksheet and this sheet's list
+    of suggestion rows (step5's per-sheet output shape), append the
+    Suggestion column block and write every row's values into it. Mutates
+    ws in place; does not save the workbook (caller decides when/where).
 
-    source_path = Path(sys.argv[1])
-    sheet_name = sys.argv[2]
-    suggestions_path = Path(sys.argv[3])
-
-    # 4th/5th args are both optional and positionally ambiguous (severity_input
-    # json vs. output xlsx) - disambiguate by file extension.
-    severity_input_path = None
-    output_path = None
-    for extra in sys.argv[4:]:
-        if extra.lower().endswith(".json"):
-            severity_input_path = Path(extra)
-        else:
-            output_path = Path(extra)
-    if output_path is None:
-        output_path = source_path.with_name(f"{source_path.stem}__with_suggestions.xlsx")
-
-    with open(suggestions_path, encoding="utf-8") as fh:
-        suggestions = json.load(fh)
-
-    if sheet_name not in suggestions:
-        print(f"ERROR: '{sheet_name}' not found in {suggestions_path}. Available: {list(suggestions.keys())}")
-        sys.exit(1)
-
-    rows = suggestions[sheet_name]
-    cause_to_modes = build_duplicate_cause_map(severity_input_path)
-
-    # Cause text per Failure Mode, for the duplicate-Cause check - only
-    # available if severity_input_path was given.
-    cause_by_mode = {}
-    if severity_input_path:
-        with open(severity_input_path, encoding="utf-8") as fh:
-            groups = json.load(fh)
-        for group in groups:
-            for mode_entry in group.get("modes_covered", []):
-                cause_by_mode[mode_entry["failure_mode"].strip()] = mode_entry.get("failure_cause")
-
-    wb = load_workbook(source_path)
-    if sheet_name not in wb.sheetnames:
-        print(f"ERROR: sheet '{sheet_name}' not found in {source_path}. Available: {wb.sheetnames}")
-        sys.exit(1)
-    ws = wb[sheet_name]
+    cause_to_modes/cause_by_mode are optional - when omitted, the
+    duplicate-Cause-across-Modes check in Remark is skipped for this sheet
+    (e.g. if no severity_input data was available). Returns the number of
+    rows written, or None if the sheet's header row couldn't be found (an
+    error is logged instead of raising, so a multi-sheet caller can skip
+    just this one sheet and continue with the rest)."""
+    cause_to_modes = cause_to_modes or {}
+    cause_by_mode = cause_by_mode or {}
 
     # Header row is wherever "Failure Mode (FM)" appears - detected instead
     # of hardcoded row 15 so this survives minor template edits. Matched on
@@ -273,8 +241,8 @@ def main():
             header_row = r
             break
     if header_row is None:
-        print("ERROR: could not find the header row (no cell containing 'Failure Mode (FM)').")
-        sys.exit(1)
+        log(f"ERROR: could not find the header row (no cell containing 'Failure Mode (FM)') in sheet '{ws.title}'.")
+        return None
 
     # Always append a brand new column block - never write into an existing
     # column, even an empty one, so it's unambiguous which cells are
@@ -327,10 +295,9 @@ def main():
     for col, width in column_widths.items():
         ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = width
 
-    print(f"Detected header row: {header_row}")
-    print(f"Appended new 'Suggestion' block at columns {ws.cell(row=header_row, column=start_col).coordinate.rstrip('0123456789')}-{ws.cell(row=header_row, column=end_col).coordinate.rstrip('0123456789')} (rows {section_header_row_start}-{sub_header_row_end})")
-    if not severity_input_path:
-        print("NOTE: no severity_input.json given - the duplicate-Cause-across-Modes check in Remark is skipped.")
+    log(f"  [{ws.title}] header row: {header_row}, Suggestion block: {ws.cell(row=header_row, column=start_col).coordinate.rstrip('0123456789')}-{ws.cell(row=header_row, column=end_col).coordinate.rstrip('0123456789')}")
+    if not cause_by_mode:
+        log(f"  [{ws.title}] NOTE: no Cause data given - the duplicate-Cause-across-Modes check in Remark is skipped for this sheet.")
 
     # Reference an existing DATA cell (not a header) for border/alignment/
     # font, so the new Suggestion cells look like the rest of the row
@@ -374,6 +341,60 @@ def main():
             # vertically centered for readability.
             style_merged_range(ws, row_start, row_end, col, col, data_ref_cell, center=True)
         written += 1
+
+    return written
+
+
+def main():
+    if len(sys.argv) < 4:
+        print("Usage: python step6_write_suggestions_to_excel.py <source.xlsx> <sheet_name> <suggestions.json> [severity_input.json] [output.xlsx]")
+        sys.exit(1)
+
+    source_path = Path(sys.argv[1])
+    sheet_name = sys.argv[2]
+    suggestions_path = Path(sys.argv[3])
+
+    # 4th/5th args are both optional and positionally ambiguous (severity_input
+    # json vs. output xlsx) - disambiguate by file extension.
+    severity_input_path = None
+    output_path = None
+    for extra in sys.argv[4:]:
+        if extra.lower().endswith(".json"):
+            severity_input_path = Path(extra)
+        else:
+            output_path = Path(extra)
+    if output_path is None:
+        output_path = source_path.with_name(f"{source_path.stem}__with_suggestions.xlsx")
+
+    with open(suggestions_path, encoding="utf-8") as fh:
+        suggestions = json.load(fh)
+
+    if sheet_name not in suggestions:
+        print(f"ERROR: '{sheet_name}' not found in {suggestions_path}. Available: {list(suggestions.keys())}")
+        sys.exit(1)
+
+    rows = suggestions[sheet_name]
+    cause_to_modes = build_duplicate_cause_map(severity_input_path)
+
+    # Cause text per Failure Mode, for the duplicate-Cause check - only
+    # available if severity_input_path was given.
+    cause_by_mode = {}
+    if severity_input_path:
+        with open(severity_input_path, encoding="utf-8") as fh:
+            groups = json.load(fh)
+        for group in groups:
+            for mode_entry in group.get("modes_covered", []):
+                cause_by_mode[mode_entry["failure_mode"].strip()] = mode_entry.get("failure_cause")
+
+    wb = load_workbook(source_path)
+    if sheet_name not in wb.sheetnames:
+        print(f"ERROR: sheet '{sheet_name}' not found in {source_path}. Available: {wb.sheetnames}")
+        sys.exit(1)
+    ws = wb[sheet_name]
+
+    written = apply_suggestions_to_sheet(ws, rows, cause_to_modes=cause_to_modes, cause_by_mode=cause_by_mode)
+    if written is None:
+        sys.exit(1)
 
     wb.save(output_path)
     print(f"\nWrote {written} row(s) of suggestions to {output_path}")
