@@ -1,0 +1,50 @@
+{
+  "_notes": "DRAFT for review only - not wired into the pipeline yet. Waiting on your actual target Excel column layout before implementing. Occurrence is intentionally left for you to fill from real plant defect-frequency data, not AI-generated.",
+
+  "example_row_single_mode": {
+    "source_excel_rows": [22, 23],
+    "failure_mode": "IMPROPER LOCKING / POOR LOCKING",
+    "Suggestion": {
+      "Severity": {
+        "value": 10,
+        "reason": "Loose/forgotten connector can leave headlamp non-functional, reducing visibility - explicit accident-risk effect stated."
+      },
+      "Occurrence": {
+        "value": null,
+        "reason": "Not AI-generated - requires actual defect frequency/PPM data from the plant."
+      },
+      "Detection": {
+        "value": "Add an in-station connector-latch sensor (vision or force-check) that confirms both headlamp connectors are fully seated before the operator can proceed."
+      },
+      "Prevention": {
+        "value": "Add a connector-latch verification interlock at this station that stops the line if either connector is not seated/locked."
+      }
+    },
+    "Remark": "Single failure mode - no merge."
+  },
+
+  "example_row_merged_mode": {
+    "source_excel_rows": [18, 19],
+    "failure_mode": "SCRATCH / DAMAGE ON HEAD LAMP",
+    "Suggestion": {
+      "Severity": {
+        "value": 8,
+        "reason": "Worst case of merged mode: 'damage' can disable the lamp entirely (S8); 'scratch' alone would only be cosmetic (S4). Ambiguous - see possible_severities in full output."
+      },
+      "Occurrence": {
+        "value": null,
+        "reason": "Not AI-generated - requires actual defect frequency/PPM data from the plant."
+      },
+      "Detection": {
+        "value_for_scratch": "Add a visual/vision-inspection gate before install to catch scratched or damaged headlamp units.",
+        "value_for_damage": "Add an in-line continuity/illumination test at the install station to catch a damaged unit that fails to light before it moves further down the line."
+      },
+      "Prevention": {
+        "value_for_scratch": "Use padded, individually segregated slots in the storage trolley to prevent contact damage between headlamp units.",
+        "value_for_damage": "Add a barcode/part-ID scan interlock at the pick point to block a mismatched/incompatible variant from being installed in the first place.",
+        "combined": "Segregate and pad storage trolley slots to prevent handling damage, and add a barcode/part-ID scan interlock at pick point to block incompatible-variant installation."
+      }
+    },
+    "Remark": "Merged failure mode cell: 'Scratch on headlamp' + 'Damage on headlamp' - two distinct sub-modes, so Detection/Prevention are given per sub-mode above (plus one combined option) rather than a single blended answer."
+  }
+}
