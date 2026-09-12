@@ -45,7 +45,7 @@ from copy import copy
 from pathlib import Path
 
 from openpyxl import load_workbook
-from openpyxl.styles import PatternFill
+from openpyxl.styles import Alignment, Border, PatternFill, Side
 
 NEW_COLUMN_HEADERS = [
     "Severity (S)",
@@ -61,6 +61,15 @@ NEW_COLUMN_HEADERS = [
 # AI-suggested area rather than blending into the existing green/blue
 # section headers.
 SUGGESTION_FILL_RGB = "FF7030A0"
+
+# One uniform thin border applied to every cell in the new block, instead
+# of copying whatever border the sheet's own template cells happen to use
+# (which vary - some are "medium", some "thin" - copying them made the new
+# block's grid look inconsistent, dark in some spots and light in others).
+UNIFORM_BORDER = Border(
+    left=Side(style="thin"), right=Side(style="thin"),
+    top=Side(style="thin"), bottom=Side(style="thin"),
+)
 
 
 def find_merge_containing(ws, row, col):
@@ -100,18 +109,42 @@ def find_section_header_rows(ws, header_row):
     return candidate_row, header_row - 1, ref
 
 
-def style_like(target_cell, reference_cell, fill_rgb=None):
-    """Copy font/alignment/border from an existing header cell so the new
-    Suggestion header reads as part of the same sheet, not a bolted-on
-    afterthought. Optionally override the fill color (e.g. to the
-    Suggestion block's own distinct purple)."""
+def style_like(target_cell, reference_cell, fill_rgb=None, center=False):
+    """Copy font from an existing header cell so the new Suggestion header
+    reads as part of the same sheet, not a bolted-on afterthought. Border
+    is NOT copied from the reference - the sheet's own template cells use
+    inconsistent border weights ("medium" on some headers, "thin" on data
+    cells), and copying them made the new block's grid look uneven, dark
+    in some spots and light in others; every new cell gets the same
+    UNIFORM_BORDER instead, guaranteeing a consistent look regardless of
+    what the rest of the template does. Optionally override the fill color
+    (e.g. to the Suggestion block's own distinct purple), and/or force
+    centered horizontal+vertical alignment with wrap text - reads better
+    for a wide merged header or a data cell than inheriting the
+    reference's plain left alignment."""
     target_cell.font = copy(reference_cell.font)
-    target_cell.alignment = copy(reference_cell.alignment)
-    target_cell.border = copy(reference_cell.border)
+    target_cell.border = UNIFORM_BORDER
+    if center:
+        target_cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    else:
+        target_cell.alignment = copy(reference_cell.alignment)
     if fill_rgb:
         target_cell.fill = PatternFill(fill_type="solid", fgColor=fill_rgb)
     else:
         target_cell.fill = copy(reference_cell.fill)
+
+
+def style_merged_range(ws, min_row, max_row, min_col, max_col, reference_cell, fill_rgb=None, center=False):
+    """Apply style_like to EVERY physical cell inside a merged range, not
+    just its top-left anchor. A merged cell only DISPLAYS the anchor's
+    value, but Excel/other viewers can still show each interior cell's own
+    border/fill at the seams if they're left at their default (unstyled)
+    state - this is what caused some borders to look dark/thin and others
+    to look missing/inconsistent. Styling every cell in the range makes
+    the whole merged block's border look uniform."""
+    for r in range(min_row, max_row + 1):
+        for c in range(min_col, max_col + 1):
+            style_like(ws.cell(row=r, column=c), reference_cell, fill_rgb=fill_rgb, center=center)
 
 
 def normalize_header(text):
@@ -259,31 +292,37 @@ def main():
     sub_header_row_start, sub_header_row_end, sub_ref_cell = find_sub_header_rows(ws, header_row)
 
     ws.merge_cells(start_row=section_header_row_start, start_column=start_col, end_row=section_header_row_end, end_column=end_col)
-    section_cell = ws.cell(row=section_header_row_start, column=start_col, value="Suggestion")
+    ws.cell(row=section_header_row_start, column=start_col, value="Suggestion")
     # Top-level section header stays plain (no fill) like its siblings
     # ("Risk Analysis (Step5)", "Optimization (Step6)") - only the
-    # sub-column headers below get the distinct purple fill.
-    style_like(section_cell, section_ref_cell)
+    # sub-column headers below get the distinct purple fill. Centered
+    # (not inheriting the sibling's left-alignment) since a 6-column-wide
+    # merged label reads oddly pinned to one edge - every cell in the
+    # merge is styled, not just the anchor, so the block's border/fill
+    # looks uniform instead of showing stray unstyled interior cells.
+    style_merged_range(ws, section_header_row_start, section_header_row_end, start_col, end_col, section_ref_cell, center=True)
 
     for i, header in enumerate(NEW_COLUMN_HEADERS):
         col = start_col + i
         ws.merge_cells(start_row=sub_header_row_start, start_column=col, end_row=sub_header_row_end, end_column=col)
-        sub_cell = ws.cell(row=sub_header_row_start, column=col, value=header)
-        style_like(sub_cell, sub_ref_cell, fill_rgb=SUGGESTION_FILL_RGB)
+        ws.cell(row=sub_header_row_start, column=col, value=header)
+        style_merged_range(ws, sub_header_row_start, sub_header_row_end, col, col, sub_ref_cell, fill_rgb=SUGGESTION_FILL_RGB, center=True)
 
     severity_col, severity_note_col, occurrence_col, detection_col, prevention_col, remark_col = range(start_col, start_col + 6)
 
     # Widen the new columns so wrapped text is actually readable instead of
-    # squeezing into the sheet's default column width - short numeric/blank
-    # columns (Severity, Occurrence) stay narrow, text-heavy columns get
-    # more room.
+    # squeezing into the sheet's default column width - Severity/Occurrence
+    # hold only a short number so they stay narrow (one normal cell width);
+    # Severity Note and the other text-heavy columns get roughly double
+    # that so a sentence of reasoning doesn't look cramped/odd in a
+    # single-number-width column.
     column_widths = {
-        severity_col: 10,
-        severity_note_col: 32,
-        occurrence_col: 12,
-        detection_col: 32,
-        prevention_col: 38,
-        remark_col: 55,
+        severity_col: 8,
+        severity_note_col: 45,
+        occurrence_col: 8,
+        detection_col: 40,
+        prevention_col: 45,
+        remark_col: 60,
     }
     for col, width in column_widths.items():
         ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = width
@@ -328,8 +367,12 @@ def main():
         for col, value in values.items():
             if row_end > row_start:
                 ws.merge_cells(start_row=row_start, start_column=col, end_row=row_end, end_column=col)
-            cell = ws.cell(row=row_start, column=col, value=value)
-            style_like(cell, data_ref_cell)
+            ws.cell(row=row_start, column=col, value=value)
+            # Style every cell in the merge, not just the anchor, and force
+            # centered+wrapped alignment - this is what keeps the border
+            # look consistent (no stray unstyled interior cells) and text
+            # vertically centered for readability.
+            style_merged_range(ws, row_start, row_end, col, col, data_ref_cell, center=True)
         written += 1
 
     wb.save(output_path)
