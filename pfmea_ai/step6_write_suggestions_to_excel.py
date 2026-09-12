@@ -129,19 +129,6 @@ def normalize_cause_text(text):
     return re.sub(r"\s+", " ", str(text or "")).strip().lower()
 
 
-def find_data_row_for_excel_row(ws, target_excel_row, search_col):
-    """Given one of the plant's original row numbers (from
-    source_excel_rows), find the actual row to write into - accounting for
-    vertically merged cells (a Failure Mode cell merged across rows 18-19
-    is one logical entry; writing into its top-left row is what actually
-    shows up)."""
-    for merged_range in ws.merged_cells.ranges:
-        if merged_range.min_col <= search_col <= merged_range.max_col:
-            if merged_range.min_row <= target_excel_row <= merged_range.max_row:
-                return merged_range.min_row
-    return target_excel_row
-
-
 def build_duplicate_cause_map(severity_input_path):
     """Return {normalized_cause_text: [failure_mode, ...]} across every
     mode in every group of the given severity_input JSON, so a Remark can
@@ -288,20 +275,44 @@ def main():
     if not severity_input_path:
         print("NOTE: no severity_input.json given - the duplicate-Cause-across-Modes check in Remark is skipped.")
 
+    # Reference an existing DATA cell (not a header) for border/alignment/
+    # font, so the new Suggestion cells look like the rest of the row
+    # instead of bare/unformatted - found from the first data row under
+    # the sub-header band.
+    data_ref_cell = ws.cell(row=sub_header_row_end + 1, column=1)
+    for r in range(sub_header_row_end + 1, ws.max_row + 1):
+        candidate = ws.cell(row=r, column=start_col - 1)
+        if candidate.border.top.style or candidate.border.left.style:
+            data_ref_cell = candidate
+            break
+
     written = 0
     for row in rows:
         this_cause = cause_by_mode.get(row["failure_mode"].strip())
-        for excel_row in row["source_excel_rows"]:
-            target_row = find_data_row_for_excel_row(ws, excel_row, severity_col)
-            ws.cell(row=target_row, column=severity_col, value=row["ai_suggested_severity"])
-            ws.cell(row=target_row, column=severity_note_col, value=row.get("ai_reasoning") or "")
+        excel_rows = row["source_excel_rows"]
+        # The plant's Failure Mode cell is merged across all rows in
+        # source_excel_rows (e.g. [18, 19]) - merge these new Suggestion
+        # cells across the SAME row span for each column, so this record's
+        # row height/borders match the rest of the row instead of leaving
+        # a bare, unmerged single-height cell next to a merged 2-row block.
+        row_start, row_end = min(excel_rows), max(excel_rows)
+
+        values = {
+            severity_col: row["ai_suggested_severity"],
+            severity_note_col: row.get("ai_reasoning") or "",
             # Occurrence intentionally left blank - requires real plant data.
-            # Detection intentionally left blank - step5 does not yet generate
-            # a real, distinct Detection suggestion (only Prevention).
-            ws.cell(row=target_row, column=prevention_col, value=row.get("ai_recommended_action") or "")
-            ws.cell(row=target_row, column=remark_col, value=build_remark(row, cause_to_modes, this_cause))
-            written += 1
-            break  # one write per logical row group is enough - merged cells share the same target_row anyway
+            # Detection intentionally left blank - step5 does not yet
+            # generate a real, distinct Detection suggestion (only
+            # Prevention).
+            prevention_col: row.get("ai_recommended_action") or "",
+            remark_col: build_remark(row, cause_to_modes, this_cause),
+        }
+        for col, value in values.items():
+            if row_end > row_start:
+                ws.merge_cells(start_row=row_start, start_column=col, end_row=row_end, end_column=col)
+            cell = ws.cell(row=row_start, column=col, value=value)
+            style_like(cell, data_ref_cell)
+        written += 1
 
     wb.save(output_path)
     print(f"\nWrote {written} row(s) of suggestions to {output_path}")
