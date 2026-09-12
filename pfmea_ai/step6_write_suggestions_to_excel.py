@@ -41,9 +41,11 @@ import json
 import re
 import sys
 from collections import defaultdict
+from copy import copy
 from pathlib import Path
 
 from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
 
 NEW_COLUMN_HEADERS = [
     "Severity (S)",
@@ -53,6 +55,63 @@ NEW_COLUMN_HEADERS = [
     "Prevention",
     "Remark",
 ]
+
+# Distinct purple fill for the new Suggestion block, matching the plant's
+# own screenshot of this block, so it visually reads as a clearly-new,
+# AI-suggested area rather than blending into the existing green/blue
+# section headers.
+SUGGESTION_FILL_RGB = "FF7030A0"
+
+
+def find_merge_containing(ws, row, col):
+    for merged_range in ws.merged_cells.ranges:
+        if merged_range.min_row <= row <= merged_range.max_row and merged_range.min_col <= col <= merged_range.max_col:
+            return merged_range
+    return None
+
+
+def find_sub_header_rows(ws, header_row):
+    """The sheet's own sub-headers (e.g. 'Severity (S)' at O15) are each
+    merged vertically across a 3-row band starting at header_row (O15:O17).
+    Find that band - and a real reference cell to copy styling from - from
+    an existing sub-header instead of hardcoding header_row+2, so this
+    survives a template row-height change. Returns (row_start, row_end,
+    reference_cell)."""
+    for col in range(1, ws.max_column + 1):
+        merged_range = find_merge_containing(ws, header_row, col)
+        if merged_range and merged_range.min_row == header_row and merged_range.max_row > header_row:
+            return merged_range.min_row, merged_range.max_row, ws.cell(row=merged_range.min_row, column=merged_range.min_col)
+    ref = ws.cell(row=header_row, column=1)
+    return header_row, header_row, ref
+
+
+def find_section_header_rows(ws, header_row):
+    """The sheet's own top-level section headers (e.g. 'Optimization
+    (Step6)') sit merged across 2 rows immediately above the sub-header
+    band (rows header_row-2 : header_row-1). Found from an existing
+    section header's own merge instead of hardcoding, for the same reason
+    as find_sub_header_rows. Returns (row_start, row_end, reference_cell)."""
+    candidate_row = header_row - 2
+    for col in range(1, ws.max_column + 1):
+        merged_range = find_merge_containing(ws, candidate_row, col)
+        if merged_range and merged_range.min_row == candidate_row and merged_range.max_row == header_row - 1:
+            return merged_range.min_row, merged_range.max_row, ws.cell(row=merged_range.min_row, column=merged_range.min_col)
+    ref = ws.cell(row=candidate_row, column=1)
+    return candidate_row, header_row - 1, ref
+
+
+def style_like(target_cell, reference_cell, fill_rgb=None):
+    """Copy font/alignment/border from an existing header cell so the new
+    Suggestion header reads as part of the same sheet, not a bolted-on
+    afterthought. Optionally override the fill color (e.g. to the
+    Suggestion block's own distinct purple)."""
+    target_cell.font = copy(reference_cell.font)
+    target_cell.alignment = copy(reference_cell.alignment)
+    target_cell.border = copy(reference_cell.border)
+    if fill_rgb:
+        target_cell.fill = PatternFill(fill_type="solid", fgColor=fill_rgb)
+    else:
+        target_cell.fill = copy(reference_cell.fill)
 
 
 def normalize_header(text):
@@ -199,15 +258,33 @@ def main():
 
     # Always append a brand new column block - never write into an existing
     # column, even an empty one, so it's unambiguous which cells are
-    # AI-suggested vs. the plant's own data.
+    # AI-suggested vs. the plant's own data. Mirrors the sheet's own
+    # convention: a merged top-level section header (like "Optimization
+    # (Step6)" at row 13-14) spanning the whole block, plus each
+    # sub-column's header merged vertically across the same 3-row band as
+    # its siblings (e.g. "Severity (S)" at row 15-17) - found by inspecting
+    # an existing sub-header's own merged range rather than hardcoding row
+    # numbers, so this keeps working if the template's row layout shifts.
     start_col = ws.max_column + 1
+    end_col = start_col + len(NEW_COLUMN_HEADERS) - 1
+
+    section_header_row_start, section_header_row_end, section_ref_cell = find_section_header_rows(ws, header_row)
+    sub_header_row_start, sub_header_row_end, sub_ref_cell = find_sub_header_rows(ws, header_row)
+
+    ws.merge_cells(start_row=section_header_row_start, start_column=start_col, end_row=section_header_row_end, end_column=end_col)
+    section_cell = ws.cell(row=section_header_row_start, column=start_col, value="Suggestion")
+    style_like(section_cell, section_ref_cell, fill_rgb=SUGGESTION_FILL_RGB)
+
     for i, header in enumerate(NEW_COLUMN_HEADERS):
-        ws.cell(row=header_row, column=start_col + i, value=header)
+        col = start_col + i
+        ws.merge_cells(start_row=sub_header_row_start, start_column=col, end_row=sub_header_row_end, end_column=col)
+        sub_cell = ws.cell(row=sub_header_row_start, column=col, value=header)
+        style_like(sub_cell, sub_ref_cell, fill_rgb=SUGGESTION_FILL_RGB)
 
     severity_col, severity_note_col, occurrence_col, detection_col, prevention_col, remark_col = range(start_col, start_col + 6)
 
     print(f"Detected header row: {header_row}")
-    print(f"Appended new Suggestion columns at: {ws.cell(row=header_row, column=start_col).coordinate} - {ws.cell(row=header_row, column=start_col + 5).coordinate}")
+    print(f"Appended new 'Suggestion' block at columns {ws.cell(row=header_row, column=start_col).coordinate.rstrip('0123456789')}-{ws.cell(row=header_row, column=end_col).coordinate.rstrip('0123456789')} (rows {section_header_row_start}-{sub_header_row_end})")
     if not severity_input_path:
         print("NOTE: no severity_input.json given - the duplicate-Cause-across-Modes check in Remark is skipped.")
 
