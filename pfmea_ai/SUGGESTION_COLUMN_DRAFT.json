@@ -1,50 +1,33 @@
 {
-  "_notes": "DRAFT for review only - not wired into the pipeline yet. Waiting on your actual target Excel column layout before implementing. Occurrence is intentionally left for you to fill from real plant defect-frequency data, not AI-generated.",
+  "_notes": "DRAFT v2 - matches the actual Excel 'Suggestion' block (columns S/O/D/Prevention, purple header, already present but empty) plus one new 'Remark' column to be added right after Prevention. Every value below is a FLAT SHORT STRING - these are single Excel cells, not nested JSON, so a merged/ambiguous row gets one combined sentence in Detection/Prevention with the split explained in Remark, not separate sub-fields. Occurrence is intentionally left blank - it needs real plant defect-frequency data, not an AI guess.",
 
   "example_row_single_mode": {
     "source_excel_rows": [22, 23],
     "failure_mode": "IMPROPER LOCKING / POOR LOCKING",
-    "Suggestion": {
-      "Severity": {
-        "value": 10,
-        "reason": "Loose/forgotten connector can leave headlamp non-functional, reducing visibility - explicit accident-risk effect stated."
-      },
-      "Occurrence": {
-        "value": null,
-        "reason": "Not AI-generated - requires actual defect frequency/PPM data from the plant."
-      },
-      "Detection": {
-        "value": "Add an in-station connector-latch sensor (vision or force-check) that confirms both headlamp connectors are fully seated before the operator can proceed."
-      },
-      "Prevention": {
-        "value": "Add a connector-latch verification interlock at this station that stops the line if either connector is not seated/locked."
-      }
-    },
-    "Remark": "Single failure mode - no merge."
+    "Severity_S": 10,
+    "Occurrence_O": "",
+    "Detection_D": "Add an in-station connector-latch sensor (vision or force-check) confirming both headlamp connectors are fully seated before the operator proceeds.",
+    "Prevention": "Add a connector-latch verification interlock at this station that stops the line if either connector is not seated/locked.",
+    "Remark": "Single failure mode, not merged. Severity 10 - explicit accident-risk effect stated (loose connector can leave headlamp non-functional, reducing visibility)."
   },
 
   "example_row_merged_mode": {
     "source_excel_rows": [18, 19],
     "failure_mode": "SCRATCH / DAMAGE ON HEAD LAMP",
-    "Suggestion": {
-      "Severity": {
-        "value": 8,
-        "reason": "Worst case of merged mode: 'damage' can disable the lamp entirely (S8); 'scratch' alone would only be cosmetic (S4). Ambiguous - see possible_severities in full output."
-      },
-      "Occurrence": {
-        "value": null,
-        "reason": "Not AI-generated - requires actual defect frequency/PPM data from the plant."
-      },
-      "Detection": {
-        "value_for_scratch": "Add a visual/vision-inspection gate before install to catch scratched or damaged headlamp units.",
-        "value_for_damage": "Add an in-line continuity/illumination test at the install station to catch a damaged unit that fails to light before it moves further down the line."
-      },
-      "Prevention": {
-        "value_for_scratch": "Use padded, individually segregated slots in the storage trolley to prevent contact damage between headlamp units.",
-        "value_for_damage": "Add a barcode/part-ID scan interlock at the pick point to block a mismatched/incompatible variant from being installed in the first place.",
-        "combined": "Segregate and pad storage trolley slots to prevent handling damage, and add a barcode/part-ID scan interlock at pick point to block incompatible-variant installation."
-      }
-    },
-    "Remark": "Merged failure mode cell: 'Scratch on headlamp' + 'Damage on headlamp' - two distinct sub-modes, so Detection/Prevention are given per sub-mode above (plus one combined option) rather than a single blended answer."
+    "Severity_S": 8,
+    "Occurrence_O": "",
+    "Detection_D": "For scratch: visual/vision-inspection gate before install. For damage: in-line continuity/illumination test at the install station to catch a unit that fails to light.",
+    "Prevention": "For scratch: padded, segregated storage-trolley slots to prevent handling damage. For damage: barcode/part-ID scan interlock at pick point to block an incompatible variant from being installed.",
+    "Remark": "Merged failure mode: 'Scratch on headlamp' (1st) + 'Damage on headlamp' (2nd). Severity 8 = worst case (damage -> total loss of function); scratch alone would only be S4 (cosmetic). See full JSON's possible_severities for the 7/8 ambiguity breakdown."
+  },
+
+  "example_row_merged_mode_torque": {
+    "source_excel_rows": [29],
+    "failure_mode": "TORQUE NOT ACHIEVED - OVER TORQUE",
+    "Severity_S": 4,
+    "Occurrence_O": "",
+    "Detection_D": "Use a torque-controlled tool with data logging/OK-NOK output at the fastening station to flag out-of-spec torque immediately, plus a periodic torque-check audit.",
+    "Prevention": "Use a torque-controlled DC tool with an upper-limit shutoff (not just lower-limit OK/NOK) to prevent over-torquing the housing/lens.",
+    "Remark": "Row covers both directions of torque error (under- and over-). For THIS row (over-torque specifically): direct effect is lens cracking, not rattling (rattling is the under-torque row's mechanism) - Detection/Prevention above are written for the over-torque mechanism specifically."
   }
 }
