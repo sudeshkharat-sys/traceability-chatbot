@@ -342,6 +342,9 @@ def score_split_modes(entry, merged_phrases, severity_table_text, call_fn):
                 "matched_table_definition": result["matched_table_definition"],
                 "reasoning": result["reasoning"],
                 "recommended_action": result.get("recommended_action"),
+                "detection_recommendation": result.get("detection_recommendation"),
+                "suggested_detection": result.get("suggested_detection"),
+                "detection_matched_table_definition": result.get("detection_matched_table_definition"),
             }
         )
     return splits
@@ -556,7 +559,7 @@ def main():
             if ai_split_suggestions:
                 print(f"    MERGED MODE CELL - scored {len(ai_split_suggestions)} modes separately:")
                 for s in ai_split_suggestions:
-                    print(f"      - {s['failure_mode'][:50]!r:52} suggested_severity={s['suggested_severity']}")
+                    print(f"      - {s['failure_mode'][:50]!r:52} severity={s['suggested_severity']} detection={s.get('suggested_detection')}")
 
         results[sn] = sheet_results
 

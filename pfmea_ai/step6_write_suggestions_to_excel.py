@@ -201,6 +201,17 @@ def build_remark(row, cause_to_modes, this_cause):
         if splits:
             scored = "; ".join(f"'{s['failure_mode']}'=S{s['suggested_severity']}" for s in splits)
             parts.append(f"Scored separately: {scored}. Row-level Severity above is the worst case; consider splitting this row in the plant sheet.")
+            detections = [s for s in splits if s.get("suggested_detection") is not None]
+            if detections:
+                det_scored = "; ".join(f"'{s['failure_mode']}'=D{s['suggested_detection']}" for s in detections)
+                parts.append(f"Detection per mode: {det_scored}.")
+            actions = [s for s in splits if s.get("recommended_action") or s.get("detection_recommendation")]
+            if actions:
+                action_text = " | ".join(
+                    f"'{s['failure_mode']}': prevention - {s.get('recommended_action') or 'n/a'}; detection - {s.get('detection_recommendation') or 'n/a'}"
+                    for s in actions
+                )
+                parts.append(f"Per-mode actions: {action_text}.")
 
     if row.get("ai_cause_mode_mismatch"):
         note = row.get("ai_cause_mode_mismatch_note") or "Stated Cause does not logically produce the stated Mode."

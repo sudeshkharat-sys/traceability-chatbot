@@ -120,7 +120,7 @@ def score_entries(entries, llm, severity_table_text, repeat, log=print):
         if ai_split_suggestions:
             log(f"      MERGED MODE CELL - scored {len(ai_split_suggestions)} modes separately:")
             for s in ai_split_suggestions:
-                log(f"        - {s['failure_mode'][:50]!r:52} suggested_severity={s['suggested_severity']}")
+                log(f"        - {s['failure_mode'][:50]!r:52} severity={s['suggested_severity']} detection={s.get('suggested_detection')}")
     return results
 
 
