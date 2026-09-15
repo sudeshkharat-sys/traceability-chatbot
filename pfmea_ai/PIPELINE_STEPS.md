@@ -251,6 +251,20 @@ Control) - it needs its own grouping/prompt design, and per the last
 request the output only needs Severity + Occurrence suggestions for now
 (Prevention Control / Detection suggestions explicitly deferred).
 
+**Merged-mode handling added.** Some plant Failure Mode cells genuinely
+contain more than one distinct failure mode typed into the same cell (e.g.
+Head lamp row 2: `"FITMENT IS NOT FIRM / WRONG SELECTION OF HEAD LAMP"`).
+The prompt's existing MERGED-MODE CHECK already asked the LLM to flag this
+via `merged_modes_detected`, but the row still only got one blended,
+worst-case score - exactly the "two modes merged into one, confuses the
+score" problem. Now, whenever `merged_modes_detected` comes back as more
+than one phrase, `score_split_modes()` re-scores each phrase independently
+with its own LLM call (skipping the merged-mode instructions, since each
+call is already a single mode) and records the results as
+`ai_split_suggestions` on that row, alongside the original blended score -
+so the reviewer gets both the row-level number the plant's form still
+needs AND a correct, independent severity per real failure mode.
+
 ## Step 4c / 5b — Occurrence, same pattern as Severity
 
 `step4b_occurrence_input.py` groups entries by `(function.of_step,
