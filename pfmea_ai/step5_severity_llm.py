@@ -79,6 +79,26 @@ S | Effect | Impact to Your Plant | Impact to Ship-to Plant (when known) | Impac
 1 (Very low) | No discernible effect | No discernible effect or no effect | No discernible effect."""
 
 
+DETECTION_TABLE_TEXT = """AIAG-VDA-style PFMEA DETECTION (D) SCORING TABLE (1-10). Detection rates how likely the CURRENT
+Detection Controls at (or downstream of) this station are to catch this specific Failure Mode/Cause BEFORE the part
+ships further down the line or leaves the plant - it is about the control's reliability, NOT about how bad the
+failure is (that is Severity) or how often it happens (that is Occurrence). Lower is better (harder to miss);
+higher is worse (easier to miss/no control).
+
+D | Detection Method Category | Meaning
+1 (Almost certain) | Error-proofing / poka-yoke that physically prevents the defective condition from occurring or from proceeding to the next station | The failure cannot physically happen or physically cannot pass this station undetected - no reliance on a human or a separate check step.
+2-3 (Very high / High) | Automated detection (sensor, vision system, gauge with automatic reading) with an automatic machine stop or lockout on failure | A machine/sensor catches it and physically stops the process - no human judgment call involved, but it is a separate control rather than built-in prevention.
+4-5 (Moderately high / Moderate) | Automated detection (sensor, vision system) with a warning/alarm to the operator, who must then act | The system catches it and flags it, but a human still has to notice/respond to the alarm - a small chance of the alarm being missed or overridden.
+6 (Low) | Manual gauging/measurement using a fixture or tool (e.g. torque readout, go/no-go gauge) at this station, performed on every part | Reliable if followed correctly, but depends on the operator actually performing the check on every unit.
+7 (Very low) | Manual visual/tactile inspection by the operator at this station, on every part (self-check) | Human-dependent; can be skipped, rushed, or missed, especially for subtle defects.
+8 (Remote) | Manual visual inspection at a LATER station (not this one) - e.g. a downstream QC checkpoint, not every unit necessarily checked | Detection is delayed and relies on a different person/step noticing a defect that already passed this station.
+9 (Very remote) | Indirect/inferred detection only (e.g. periodic sampling, statistical process control charts) - most individual defective units are NOT directly checked | Only a fraction of parts are actually inspected; an individual defect has a real chance of never being caught in-plant.
+10 (Absolute uncertainty) | No detection method currently exists at this station or downstream in the plant | The defect will not be caught until it reaches Ship-to Plant or the End User, if at all.
+
+Note: this is a standard-methodology fallback table, not a verbatim handbook excerpt - when --handbook-index is
+passed, real text retrieved from the plant's own AIAG-VDA handbook PDF replaces this."""
+
+
 EFFECT_SECTION_HEADERS = ["Your Plant", "Ship to Plant", "End User"]
 
 
@@ -161,7 +181,7 @@ def get_reference_text(handbook_index_path, query, fallback_text, prefer_terms=N
     return "\n\n---\n\n".join(f"(From handbook page {r['page']})\n{r['text']}" for r in results)
 
 
-def build_prompt_for_entry(entry, severity_table_text=SEVERITY_TABLE_TEXT, mode_override=None, skip_merged_check=False):
+def build_prompt_for_entry(entry, severity_table_text=SEVERITY_TABLE_TEXT, detection_table_text=DETECTION_TABLE_TEXT, mode_override=None, skip_merged_check=False):
     """Per-Failure-Mode prompt (not grouped) - requested so every row gets
     its own independent AI call and reasoning that names ITS OWN Mode/Cause,
     instead of one shared answer copy-pasted across every Mode that happens
@@ -208,6 +228,9 @@ GROUNDING RULE: The Severity table below is the ONLY source of truth for scoring
 AIAG-VDA SEVERITY SCORING TABLE (1-10):
 {severity_table_text}
 
+AIAG-VDA DETECTION SCORING TABLE (1-10) - used ONLY for the "suggested_detection" field below, a SEPARATE question from Severity:
+{detection_table_text}
+
 CONTEXT FOR THIS PROCESS STEP:
 Function of Process Item: {(function.get('of_item') or '').strip()}
 Function of Process Step: {(function.get('of_step') or '').strip()}
@@ -249,6 +272,8 @@ Keep the recommendation to ONE sentence, specific enough that someone on the lin
 
 Also propose ONE detection recommendation - this is a DIFFERENT question from Prevention above. Prevention stops the Failure Cause from happening at all; Detection is about how this station (or the next one downstream) would CATCH this specific Failure Mode if it happened anyway, before the part ships further down the line or leaves the plant. Concretely: a sensor, gauge, vision/camera check, poka-yoke verification step, functional test (e.g. an electrical continuity/illumination test), or an inspection gate - specific to what would actually reveal THIS Failure Mode (e.g. a vision-inspection gate reveals a scratch; an illumination test reveals a non-functioning headlamp; a torque-verification readout reveals under/over-torque). Do NOT propose a control that would only catch a DIFFERENT failure mode than the one in this row. Keep it to ONE sentence, same implementability bar as the Prevention recommendation.
 
+Also score Detection (1-10), a SEPARATE question from Severity/the recommendation above: using ONLY the AIAG-VDA DETECTION SCORING TABLE given earlier and the Current Detection Controls (DC) text given below, determine how reliably the EXISTING DC (as currently described, not any upgrade you might recommend) would catch THIS Failure Mode before the part ships further down the line or leaves the plant. Match the DC text's method type (poka-yoke/automated-with-stop/automated-with-alarm/manual-gauge/manual-visual-at-station/manual-visual-downstream/sampling-only/none) against the table's categories - do NOT infer the score from Severity or Occurrence, and do NOT invent a detection method that is not actually described in the DC text. If DC is "(not recorded - no prevention control currently exists)" or similarly empty/absent, score Detection at 10 (no current detection method) rather than guessing a method that was never stated.
+
 EXISTING CONTROLS RULE (applies to both the Prevention recommendation above and any Detection recommendation you are asked for elsewhere): you are given the Current Prevention Control (PC) and Current Detection Controls (DC) already in place at this station. Your recommendation must NOT just restate or duplicate what is already there (e.g. if DC already lists "SELF CHECK, CHECKMAN CHECKING, ECOS SYSTEM", do not recommend "add a self-check" - that already exists and adds nothing). Instead:
 - If an existing control is manual/human-dependent (self-check, visual check, checksheet) and the failure is severe enough to warrant it, recommend the specific automated/poka-yoke upgrade that would close the gap a manual control leaves open (manual checks can be skipped or missed; a sensor/interlock cannot).
 - If an existing control already looks adequate for this specific failure cause, say so plainly instead of inventing an unnecessary addition - it is fine for the recommendation to be "the existing prevention control (PC) already addresses this; no change needed" when that is honestly true.
@@ -279,6 +304,8 @@ Return ONLY valid JSON, no other text, in this exact shape:
   "reasoning": "<1-3 sentences explaining why THIS Failure Mode/Cause matches this score, referencing specific details from the End User effect text>",
   "recommended_action": "<one specific, implementable action - usually a targeted prevention/error-proofing action for this exact Failure Cause, occasionally a proportionate severity-reducing design change for high-severity effects; never a generic full-component redesign>",
   "detection_recommendation": "<one specific, implementable way to CATCH this exact Failure Mode if it occurs - a sensor/gauge/vision check/functional test/inspection gate specific to this Mode, not a control that would only catch a different failure mode>",
+  "suggested_detection": <integer 1-10, per the AIAG-VDA DETECTION SCORING TABLE and the CURRENT Detection Controls (DC) text as actually described - NOT based on your recommended upgrade above, and NOT inferred from the Severity score>,
+  "detection_matched_table_definition": "<the exact Detection table definition/category text this DC matches>",
   "merged_modes_detected": {merged_modes_field},
   "cause_mode_mismatch": <true if the Failure Cause's physical mechanism does not logically produce the stated Failure Mode (per the CAUSE/MODE MISMATCH CHECK rule above), false otherwise>,
   "cause_mode_mismatch_note": "<null if cause_mode_mismatch is false; otherwise one sentence saying what the Cause text looks like it actually belongs to instead, e.g. 'This Cause (wrong part/mix-up) does not produce a scratch/damage Mode - it reads like the Cause for the adjacent Fitment/Wrong-selection row instead'>"
@@ -494,6 +521,9 @@ def main():
                     "ai_reasoning": runs[0]["reasoning"],
                     "ai_recommended_action": runs[0].get("recommended_action"),
                     "ai_detection_recommendation": runs[0].get("detection_recommendation"),
+                    "plant_recorded_detection": (entry.get("risk") or {}).get("detection"),
+                    "ai_suggested_detection": runs[0].get("suggested_detection"),
+                    "ai_detection_matched_table_definition": runs[0].get("detection_matched_table_definition"),
                     "ai_merged_modes_detected": merged_modes_detected,
                     "ai_split_suggestions": ai_split_suggestions,
                     "ai_cause_mode_mismatch": runs[0].get("cause_mode_mismatch"),
@@ -509,6 +539,8 @@ def main():
                             "reasoning": r["reasoning"],
                             "recommended_action": r.get("recommended_action"),
                             "detection_recommendation": r.get("detection_recommendation"),
+                            "suggested_detection": r.get("suggested_detection"),
+                            "detection_matched_table_definition": r.get("detection_matched_table_definition"),
                             "merged_modes_detected": r.get("merged_modes_detected"),
                             "cause_mode_mismatch": r.get("cause_mode_mismatch"),
                             "cause_mode_mismatch_note": r.get("cause_mode_mismatch_note"),

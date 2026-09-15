@@ -13,7 +13,11 @@ New columns added, in order:
   Severity Note  - short reason for that severity
   Occurrence (O) - left BLANK: requires real plant defect-frequency data,
                    never AI-generated
-  Detection (D)  - AI suggested detection method (sensor/gauge/vision
+  Detection (D)  - AI suggested Detection score (1-10, AIAG-VDA table),
+                   scored from the CURRENT Detection Controls (DC) text
+                   as actually described - not from Severity, and not
+                   from the recommendation below
+  Detection Note - AI suggested detection method (sensor/gauge/vision
                    check/functional test/inspection gate) specific to
                    catching THIS Failure Mode, distinct from Prevention
   Prevention     - AI suggested prevention/poka-yoke action
@@ -52,6 +56,7 @@ NEW_COLUMN_HEADERS = [
     "Severity Note",
     "Occurrence (O)",
     "Detection (D)",
+    "Detection Note",
     "Prevention",
     "Remark",
 ]
@@ -280,19 +285,20 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
         ws.cell(row=sub_header_row_start, column=col, value=header)
         style_merged_range(ws, sub_header_row_start, sub_header_row_end, col, col, sub_ref_cell, fill_rgb=SUGGESTION_FILL_RGB, center=True)
 
-    severity_col, severity_note_col, occurrence_col, detection_col, prevention_col, remark_col = range(start_col, start_col + 6)
+    severity_col, severity_note_col, occurrence_col, detection_col, detection_note_col, prevention_col, remark_col = range(start_col, start_col + 7)
 
     # Widen the new columns so wrapped text is actually readable instead of
-    # squeezing into the sheet's default column width - Severity/Occurrence
-    # hold only a short number so they stay narrow (one normal cell width);
-    # Severity Note and the other text-heavy columns get roughly double
+    # squeezing into the sheet's default column width - Severity/Occurrence/
+    # Detection hold only a short number so they stay narrow (one normal
+    # cell width); the Note and other text-heavy columns get roughly double
     # that so a sentence of reasoning doesn't look cramped/odd in a
     # single-number-width column.
     column_widths = {
         severity_col: 8,
         severity_note_col: 45,
         occurrence_col: 8,
-        detection_col: 40,
+        detection_col: 8,
+        detection_note_col: 40,
         prevention_col: 45,
         remark_col: 60,
     }
@@ -329,7 +335,8 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             severity_col: row["ai_suggested_severity"],
             severity_note_col: row.get("ai_reasoning") or "",
             # Occurrence intentionally left blank - requires real plant data.
-            detection_col: row.get("ai_detection_recommendation") or "",
+            detection_col: row.get("ai_suggested_detection"),
+            detection_note_col: row.get("ai_detection_recommendation") or "",
             prevention_col: row.get("ai_recommended_action") or "",
             remark_col: build_remark(row, cause_to_modes, this_cause),
         }
