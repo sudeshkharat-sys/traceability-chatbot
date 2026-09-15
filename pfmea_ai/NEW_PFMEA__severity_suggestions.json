@@ -10,47 +10,56 @@
       "ai_suggested_severity": 8,
       "agree": false,
       "ai_matched_table_definition": "Loss of primary vehicle function necessary for normal driving during expected service life.",
-      "ai_applicable_effect": "1) 'Headlamp does not turn ON' — INDIRECT for the 'scratch' sub-mode; DIRECT for the 'damage' sub-mode (e.g., damage could impair the light source/connector); therefore DIRECT overall when considering the merged 'damage' sub-mode. 2) 'Insufficient brightness / dim light' — DIRECT for the 'scratch' sub-mode (scattering/reduced transmission) and also DIRECT for the 'damage' sub-mode (misalignment/cracked lens), thus DIRECT. 3) 'Customer dissatisfaction' — INDIRECT (a downstream reaction to functional issues). Ambiguity: effects (1) and (2) are both DIRECT and representative of different sub-modes within the merged failure mode; worst-case (1) selected for the single-number severity.",
+      "ai_applicable_effect": "1) Enumerated End User effects: (a) \"Headlamp does not turn ON\"; (b) \"Insufficient brightness / dim light\"; (c) \"Customer dissatisfaction\". 2) DIRECT/INDIRECT vs. Failure Mode SCRATCH / DAMAGE (using Mode due to cause/mode mismatch): (a) DIRECT for the DAMAGE sub-mode (a damaged lamp can fail to power/illuminate); INDIRECT for a mere scratch; after the merged-mode sub-cause check, treated as DIRECT overall because DAMAGE is included in the Mode. (b) DIRECT for SCRATCH (lens scratching can reduce output) and for DAMAGE (optical/functional degradation). (c) INDIRECT, as it is a downstream perception resulting from (a) or (b), not a distinct physical vehicle function effect. 3) Representative effect: \"Headlamp does not turn ON\" selected because the Mode explicitly includes DAMAGE and this outcome follows directly from damage, representing a total loss of the headlamp’s primary function. 4) Note: Genuine ambiguity exists between (a) total loss and (b) degraded output for the merged Mode; worst-case is used for suggested_severity.",
       "ai_possible_severities": [
         {
           "severity": 8,
           "effect_used": "Headlamp does not turn ON",
           "matched_table_definition": "Loss of primary vehicle function necessary for normal driving during expected service life.",
-          "reasoning": "For the 'damage' sub-mode, a damaged headlamp can directly fail to illuminate, which is a total loss of the headlamp’s primary function."
+          "reasoning": "With the Mode including DAMAGE, a damaged headlamp can fail to illuminate entirely, which is a total loss of the lamp’s primary function."
         },
         {
           "severity": 7,
           "effect_used": "Insufficient brightness / dim light",
           "matched_table_definition": "Degradation of primary vehicle function necessary for normal driving during expected service life.",
-          "reasoning": "For the 'scratch' sub-mode (and some 'damage' cases), optical degradation directly reduces output, degrading the headlamp’s primary function."
+          "reasoning": "A scratched lens or partial damage can degrade the beam/output, directly reducing the primary function without fully losing it."
         }
       ],
-      "ai_decision_path": "Step1: no explicit safety/health risk stated in End User effects -> Step2: no regulatory noncompliance stated -> Step3: stopped here, total loss of primary function ('Headlamp does not turn ON')",
-      "ai_reasoning": "The End User effects include 'Headlamp does not turn ON' (total loss) and 'Insufficient brightness / dim light' (degradation). With a merged mode 'SCRATCH / DAMAGE', the 'damage' sub-mode can directly yield a complete loss of headlamp function, mapping to Severity 8 per the table.",
-      "ai_recommended_action": "Add a pick-to-light bin-door interlock on the headlamp sequencing trolley tied to barcode scan and build manifest so the operator cannot access or select the wrong variant.",
-      "ai_detection_recommendation": "Install an in-station camera-based vision inspection to automatically detect and reject headlamp lens/housing scratches or cracks before final tightening.",
+      "ai_decision_path": "Step1: no safety/health risk phrase present in End User effects -> Step2: no regulatory noncompliance stated -> Step3: stopped here; total loss of primary function (per 'Headlamp does not turn ON').",
+      "ai_reasoning": "The End User effects list includes \"Headlamp does not turn ON\" (total loss of the headlamp’s primary function) and \"Insufficient brightness / dim light\" (degradation). Per the table, total loss of a primary vehicle function maps to Severity 8; degradation would be 7, so worst-case for the merged Mode is 8.",
+      "ai_recommended_action": "Implement a barcode-scan interlock at the sequencing trolley pick point that only releases the part if the scanned part number matches the build VIN/model, preventing wrong-part selection/mix-up.",
+      "ai_detection_recommendation": "Install an automated vision camera gate before bolt tightening to inspect the lens/housing for scratches or damage and automatically reject discrepant units.",
+      "plant_recorded_detection": 5,
+      "ai_suggested_detection": 8,
+      "ai_detection_matched_table_definition": "Low | Test or inspection method has not been proven to be effective and reliable (e.g. plant has little or no experience with method, gauge R&R results marginal on comparable process or this application, etc.). | Human inspection (visual, tactile, audible), or use of manual gauging (attribute or variable) that SHOULD detect the failure mode or failure cause.",
       "ai_merged_modes_detected": [
-        "Scratch on headlamp",
-        "Damage on headlamp"
+        "SCRATCH",
+        "DAMAGE ON HEAD LAMP"
       ],
       "ai_split_suggestions": [
         {
-          "failure_mode": "Scratch on headlamp",
-          "suggested_severity": 4,
-          "matched_table_definition": "100% of production run may have to be reworked in station before it is processed | Defective product triggers significant reaction plan; additional defective products not likely; sort not required | Very objectionable appearance, sound, vibration, harshness, or haptics.",
-          "reasoning": "The only direct End User effect of a scratch on the headlamp is customer dissatisfaction (appearance). Per the table, this maps to an appearance issue, which is very objectionable for an exterior lamp lens, corresponding to Severity 4.",
-          "recommended_action": "Add individual soft-lined (foam/felt) pockets or separators to the sequencing/storage trolley so headlamps cannot contact each other or hard surfaces during handling, preventing scratches."
+          "failure_mode": "SCRATCH",
+          "suggested_severity": 3,
+          "matched_table_definition": "Moderately objectionable appearance, sound, vibration, harshness, or haptics.",
+          "reasoning": "The End User list cites functional loss/dim light, but those are not direct outcomes of a cosmetic SCRATCH mode; no safety or regulatory language is stated. A scratch on the headlamp is a cosmetic appearance defect, so Severity maps to the appearance category; without specifics on visibility, a moderately objectionable appearance (S=3) is a representative choice.",
+          "recommended_action": "Add variant-specific keyed bins/slots on the sequencing trolley with a scanner-interlocked pick-to-light that only releases the correct headlamp variant for the build, preventing wrong-part selection.",
+          "detection_recommendation": "Install an in-station automated vision inspection to check the headlamp lens surfaces for scratches before bolt tightening, with automatic reject on fail.",
+          "suggested_detection": 8,
+          "detection_matched_table_definition": "Low | Test or inspection method has not been proven to be effective and reliable (e.g. plant has little or no experience with method, gauge R&R results marginal on comparable process or this application, etc.). | Human inspection (visual, tactile, audible), or use of manual gauging (attribute or variable) that SHOULD detect the failure mode or failure cause."
         },
         {
-          "failure_mode": "Damage on headlamp",
+          "failure_mode": "DAMAGE ON HEAD LAMP",
           "suggested_severity": 8,
           "matched_table_definition": "Loss of primary vehicle function necessary for normal driving during expected service life.",
-          "reasoning": "End User effects explicitly include both a total loss of function (\"does not turn ON\") and a degraded condition (\"dim light\"), with no safety or regulatory language. For the broad mode \"Damage on headlamp,\" both are plausible direct outcomes; applying the worst-case among direct effects yields Severity 8 per the table.",
-          "recommended_action": "Add a pick-to-light and barcode-scan PLC interlock that only enables the torque tool when the scanned headlamp variant matches the build manifest for that VIN, preventing wrong-part selection from the storage trolley."
+          "reasoning": "The End User effects list a total loss case (does not turn ON) and a degraded case (dim). Both are direct results of a damaged headlamp; applying the worst-case rule yields Severity 8.",
+          "recommended_action": "Add a pick-to-light with bin-lockout on the storage/sequence trolley tied to the build manifest so only the correct headlamp variant bin can be opened/picked, preventing wrong-part selection.",
+          "detection_recommendation": "Add an in-station automated functional light-on test with a photometric sensor that verifies each headlamp turns on and meets minimum intensity, interlocked to stop the process on fail.",
+          "suggested_detection": 8,
+          "detection_matched_table_definition": "Low | Test or inspection method has not been proven to be effective and reliable (e.g. plant has little or no experience with method, gauge R&R results marginal on comparable process or this application, etc.). | Human inspection (visual, tactile, audible), or use of manual gauging (attribute or variable) that SHOULD detect the failure mode or failure cause."
         }
       ],
       "ai_cause_mode_mismatch": true,
-      "ai_cause_mode_mismatch_note": "This Cause (wrong part/mix-up) does not physically produce a scratch/damage; it aligns with a 'wrong headlamp variant installed' failure mode instead.",
+      "ai_cause_mode_mismatch_note": "This Cause (wrong part/mix-up) does not produce a scratch/damage Mode; it aligns with a 'wrong headlamp variant installed' failure instead.",
       "ai_consistent_across_runs": true,
       "ai_runs": null
     },
@@ -64,43 +73,52 @@
       "ai_suggested_severity": 8,
       "agree": false,
       "ai_matched_table_definition": "Loss of primary vehicle function necessary for normal driving during expected service life.",
-      "ai_applicable_effect": "1) Enumerated End User effects: [1] \"Headlamp does not turn ON\"; [2] \"Insufficient brightness / dim light\"; [3] \"Customer dissatisfaction\". 2) Direct/Indirect classification against both sub-modes in the merged Failure Mode: - For sub-mode \"Wrong selection of head lamp (not as per model)\": [1] Direct (a wrong/incompatible variant can directly result in no illumination), [2] Direct (a wrong but functional variant can directly produce lower-than-required light output), [3] Indirect (generic outcome, not a functional mechanism). - For sub-mode \"Fitment is not firm\": [1] Indirect (would require an additional step such as loss of connection), [2] Indirect (would require an additional step such as mis-aim or optical change), [3] Indirect. After the sub-mode check, effects [1] and [2] remain DIRECT via the \"wrong selection\" sub-mode. 3) Representative effect(s): [1] \"Headlamp does not turn ON\" and [2] \"Insufficient brightness / dim light\" are equally representative of the stated Cause/Mode; per worst-case-at-row rule, use [1] for severity. 4) Therefore severity aligns to total loss of a primary vehicle function (S=8), with an alternate plausible reading as degraded primary function (S=7).",
+      "ai_applicable_effect": "1) Enumerated End User effects: (a) \"Headlamp does not turn ON\"; (b) \"Insufficient brightness / dim light\"; (c) \"Customer dissatisfaction\". 2) DIRECT/INDIRECT classification against the merged Failure Mode sub-modes: - For sub-mode \"Wrong selection of headlamp (not as per model)\": (a) DIRECT (wrong variant can result in non-function), (b) DIRECT (wrong variant can result in reduced output/brightness), (c) INDIRECT (a reaction, not a functional symptom). - For sub-mode \"Fitment is not firm\": (a) INDIRECT (would require an additional connection/open-circuit step), (b) INDIRECT (would require an additional mis-aim/voltage-drop step), (c) INDIRECT. Per the merged-mode rule, effects that are DIRECT for at least one sub-mode are treated as DIRECT overall. 3) Representative effect(s): (a) and (b) remain equally representative for the \"wrong selection\" sub-mode; without further specifics, both are plausible direct outcomes of the stated mode/cause. 4) Therefore, genuine ambiguity exists between (a) total loss and (b) degradation of the primary lighting function; worst-case (a) governs the single severity number.",
       "ai_possible_severities": [
         {
           "severity": 8,
           "effect_used": "Headlamp does not turn ON",
           "matched_table_definition": "Loss of primary vehicle function necessary for normal driving during expected service life.",
-          "reasoning": "Installing the wrong headlamp variant can directly result in no illumination, which is a total loss of the headlamp’s primary function."
+          "reasoning": "Installing the wrong headlamp variant can directly result in a non-functioning lamp, which is a total loss of the primary lighting function."
         },
         {
           "severity": 7,
           "effect_used": "Insufficient brightness / dim light",
           "matched_table_definition": "Degradation of primary vehicle function necessary for normal driving during expected service life.",
-          "reasoning": "A wrong but electrically compatible headlamp variant can illuminate with reduced output, which is a degradation of the primary lighting function."
+          "reasoning": "A wrong headlamp variant can directly result in reduced light output, which degrades the primary lighting function."
         }
       ],
-      "ai_decision_path": "Step1: no explicit unsafe operation/injury/collision text -> Step2: no regulatory noncompliance stated -> Step3: primary function affected; worst-case is total loss (headlamp does not turn ON) -> assign S=8",
-      "ai_reasoning": "The listed End User effects include both total loss of illumination and dim illumination. These map to loss or degradation of a primary vehicle function (headlighting). Without any explicit safety or regulatory wording, the worst-case direct outcome for the merged mode is \"does not turn ON,\" which corresponds to S=8.",
-      "ai_recommended_action": "Add a VIN-linked pick-to-light/locking-bin system on the sequencing trolley so only the correct LH/RH headlamp bin illuminates and unlocks for the model, preventing wrong-part selection.",
-      "ai_detection_recommendation": "Introduce an automated headlamp functional test at this station that commands ON and verifies illumination with a camera/lux sensor (or current sensor) before release.",
+      "ai_decision_path": "Step1: no safety/health risk phrasing in End User effects -> Step2: no explicit regulatory noncompliance stated -> Step3: applicable; worst-case is total loss of primary function (does not turn ON) -> Stop at S=8",
+      "ai_reasoning": "The End User effects list either a total loss of the headlamp’s primary function (does not turn ON) or a degradation (dim light); both are direct for the 'wrong selection of headlamp' sub-mode. Per the merged-mode worst-case rule, the total loss case maps to S=8.",
+      "ai_recommended_action": "Add a VIN/model-linked pick-to-light system with bin-locking on the sequencing trolley so only the correct headlamp variant bin illuminates/unlocks, preventing the operator from picking a wrong part.",
+      "ai_detection_recommendation": "Add an automated in-station power-on test with current/photometric verification and interlock that blocks release if the headlamp fails to turn on or is below the expected threshold.",
+      "plant_recorded_detection": 5,
+      "ai_suggested_detection": 8,
+      "ai_detection_matched_table_definition": "Low | Test or inspection method has not been proven to be effective and reliable (e.g. plant has little or no experience with method, gauge R&R results marginal on comparable process or this application, etc.). | Human inspection (visual, tactile, audible), or use of manual gauging (attribute or variable) that SHOULD detect the failure mode or failure cause.",
       "ai_merged_modes_detected": [
         "Fitment is not firm",
-        "Wrong selection of head lamp (not as per model)"
+        "Wrong selection of headlamp (not as per model)"
       ],
       "ai_split_suggestions": [
         {
           "failure_mode": "Fitment is not firm",
           "suggested_severity": 8,
           "matched_table_definition": "Loss of primary vehicle function necessary for normal driving during expected service life.",
-          "reasoning": "The End User effects explicitly include both a total loss of lighting function (does not turn ON) and a degraded function (dim), each directly plausible from installing the wrong headlamp variant; per the rules, the worst-case DIRECT reading is used, which maps to loss of the primary function (8).",
-          "recommended_action": "Add a VIN-linked pick-to-light/locked-bin system on the sequencing trolley that only illuminates and unlocks the correct headlamp variant slot and prevents removal of any other part."
+          "reasoning": "The End User effects list includes both “Headlamp does not turn ON” (total loss of the headlamp’s primary function) and “Insufficient brightness / dim light” (degradation). No explicit safety or regulatory wording is present, so Severity aligns with primary-function loss/degradation; the worst-case direct effect is total loss (8).",
+          "recommended_action": "Add a barcode/RFID variant verification interlock that only enables the 6 Nm torque tool (OK-to-bolt) when the scanned headlamp PN matches the vehicle build spec, preventing wrong-part installation from the sequencing trolley.",
+          "detection_recommendation": "Introduce an automated in-station headlamp functional/photometric test that powers the lamp and measures ON status and minimum brightness, with a hard stop if requirements are not met.",
+          "suggested_detection": 8,
+          "detection_matched_table_definition": "Test or inspection method has not been proven to be effective and reliable (e.g. plant has little or no experience with method, gauge R&R results marginal on comparable process or this application, etc.). | Human inspection (visual, tactile, audible), or use of manual gauging (attribute or variable) that SHOULD detect the failure mode or failure cause."
         },
         {
-          "failure_mode": "Wrong selection of head lamp (not as per model)",
+          "failure_mode": "Wrong selection of headlamp (not as per model)",
           "suggested_severity": 8,
           "matched_table_definition": "Loss of primary vehicle function necessary for normal driving during expected service life.",
-          "reasoning": "The End User effects list shows direct impacts to the headlamp’s primary function: either complete non-operation or dim output; with no safety or regulatory wording present, severity is determined by primary-function loss, and the worst equally representative case is total loss (8).",
-          "recommended_action": "Implement a pick-to-light bin system interlocked to the build record so only the correct headlamp variant bin illuminates/opens for each VIN, preventing wrong-part selection from the storage trolley."
+          "reasoning": "The End User effects list either a total loss of the headlamp function (does not turn ON) or a degraded output (dim), both of which directly follow from installing the wrong headlamp variant; by the table, total loss of a primary function maps to Severity 8.",
+          "recommended_action": "Add a pick-to-light with bin lockout at the sequencing trolley keyed to the vehicle VIN/model so only the correct headlamp part number can be released for the job and access to other bins is physically blocked.",
+          "detection_recommendation": "Install an in-station automated barcode/OCR verification of the installed headlamp part label against the build record with a hard line stop/torque-gun lockout on any mismatch.",
+          "suggested_detection": 7,
+          "detection_matched_table_definition": "Low | (same maturity as D=8: not proven to be effective and reliable) | Machine-based detection (automated or semi-automated with notification by light, buzzer, etc.), or use of inspection equipment such as a coordinate measuring machine, that SHOULD detect failure mode or failure cause."
         }
       ],
       "ai_cause_mode_mismatch": false,
@@ -118,14 +136,41 @@
       "ai_suggested_severity": 10,
       "agree": false,
       "ai_matched_table_definition": "Affects safe operation of the vehicle and/or other vehicles, the health of driver or passenger(s) or road users or pedestrians.",
-      "ai_applicable_effect": "1) Enumerated End User effects: [1] 'Incorrect beam alignment', [2] 'Headlamp does not turn ON', [3] 'Reduced road visibility', [4] 'Increased risk of accident'. 2) Classification vs. Mode/Cause (improper/poor locking; operator forgets/does improper socket connection): [1] INDIRECT (connector locking does not directly change mechanical aim; would require an additional mis-aiming step), [2] DIRECT (unlocked/forgotten connector can leave lamp unpowered), [3] DIRECT (a non-functioning/improperly connected lamp reduces road visibility), [4] DIRECT (reduced visibility from a non-functioning lamp creates accident risk; this is a direct safety consequence, not an extra failure step). 3) Representative effect used: 'Increased risk of accident' selected because it is explicitly stated, causally plausible for a non-functioning headlamp, and per the scoring rules it mandates the safety/health risk band.",
+      "ai_applicable_effect": "1) Incorrect beam alignment — INDIRECT relative to an electrical connector not locked/seated; misalignment would require an additional, different failure step unrelated to connector locking. 2) Headlamp does not turn ON — DIRECT: an unseated/forgotten connector can remove power to the headlamp. 3) Reduced road visibility — DIRECT: loss of illumination follows directly from a non‑functional headlamp due to the connector issue. 4) Increased risk of accident — DIRECT safety consequence of reduced visibility from a non‑functional headlamp; per the hard rule, this explicit safety phrase applies. Representative effect: \"Increased risk of accident\" is selected because it is explicitly stated, causally plausible for this headlamp/connector failure, and triggers the safety/health criterion.",
       "ai_possible_severities": null,
-      "ai_decision_path": "Step1: explicit safety consequence ('Increased risk of accident') present and causally plausible -> stopped here (score 10)",
-      "ai_reasoning": "Improper/forgotten connector locking can leave the headlamp inoperative, which reduces road visibility; the End User effects explicitly state 'Increased risk of accident'. This matches the Severity 10 definition affecting safe vehicle operation and road user safety.",
-      "ai_recommended_action": "Install a keyed connector insertion fixture with a mechanical interlock that only releases the part for bolt tightening when both headlamp connectors are fully seated and latched to the hard-stop.",
-      "ai_detection_recommendation": "Add an automated functional test at this station that powers the headlamp circuits and verifies current/illumination with a sensor, stopping the line if either connector is not making electrical contact.",
-      "ai_merged_modes_detected": null,
-      "ai_split_suggestions": null,
+      "ai_decision_path": "Step1: explicit safety/health risk stated and causally plausible (\"Increased risk of accident\") -> stopped here at S=10",
+      "ai_reasoning": "Improper/poor locking of the headlamp electrical connectors can leave the lamp non-functional, leading to reduced road visibility and the explicitly stated \"increased risk of accident\" for the end user. The AIAG‑VDA table assigns such safety/accident risk to Severity 10.",
+      "ai_recommended_action": "Add an interlocked connector-seating poka‑yoke with stroke/force sensing that only enables the bolt‑tightening tool after both headlamp connectors are fully latched (positive lock detected).",
+      "ai_detection_recommendation": "Add an automated end‑of‑station functional test that powers the headlamp and verifies illumination/current draw for required circuits, with automatic line stop on fail.",
+      "plant_recorded_detection": 5,
+      "ai_suggested_detection": 8,
+      "ai_detection_matched_table_definition": "Test or inspection method has not been proven to be effective and reliable (e.g. plant has little or no experience with method, gauge R&R results marginal on comparable process or this application, etc.). Human inspection (visual, tactile, audible), or use of manual gauging (attribute or variable) that SHOULD detect the failure mode or failure cause.",
+      "ai_merged_modes_detected": [
+        "IMPROPER LOCKING",
+        "POOR LOCKING"
+      ],
+      "ai_split_suggestions": [
+        {
+          "failure_mode": "IMPROPER LOCKING",
+          "suggested_severity": 10,
+          "matched_table_definition": "Affects safe operation of the vehicle and/or other vehicles, the health of driver or passenger(s) or road users or pedestrians.",
+          "reasoning": "The End User effects explicitly include \"Increased risk of accident,\" which is a plausible consequence of a headlamp not turning on or reduced visibility from an improperly locked/connected harness. Per the table, this constitutes a safety/health risk to road users, requiring Severity 10.",
+          "recommended_action": "Add a poka‑yoke latch-position/CPA presence sensor on each headlamp connector interlocked to enable the torque tool only when both connectors are fully seated and locked.",
+          "detection_recommendation": "Add an automated in-station headlamp functional test that powers the lamp and verifies current/illumination with a sensor, blocking release if either connector is not properly seated.",
+          "suggested_detection": 8,
+          "detection_matched_table_definition": "Low | Test or inspection method has not been proven to be effective and reliable (e.g. plant has little or no experience with method, gauge R&R results marginal on comparable process or this application, etc.). | Human inspection (visual, tactile, audible), or use of manual gauging (attribute or variable) that SHOULD detect the failure mode or failure cause."
+        },
+        {
+          "failure_mode": "POOR LOCKING",
+          "suggested_severity": 10,
+          "matched_table_definition": "Affects safe operation of the vehicle and/or other vehicles, the health of driver or passenger(s) or road users or pedestrians.",
+          "reasoning": "The End User effects explicitly state “Increased risk of accident,” which is a direct, plausible consequence of a headlamp not turning on due to a poorly locked/improper connector on a primary lighting function. Per Table C2-1, such an unsafe condition affecting vehicle operation and road users is Severity 10.",
+          "recommended_action": "Add a connector-latch poka‑yoke interlock (latch presence/seat sensor tied to the station) that prevents proceeding to bolt‑tightening until both headlamp connectors are fully seated and latched.",
+          "detection_recommendation": "Install an automated in‑station functional test that powers the headlamp and verifies illumination/continuity for each connector with an interlocked pass/fail gate that stops the part if either side fails.",
+          "suggested_detection": 8,
+          "detection_matched_table_definition": "Low | Test or inspection method has not been proven to be effective and reliable (e.g. plant has little or no experience with method, gauge R&R results marginal on comparable process or this application, etc.). | Human inspection (visual, tactile, audible), or use of manual gauging (attribute or variable) that SHOULD detect the failure mode or failure cause."
+        }
+      ],
       "ai_cause_mode_mismatch": false,
       "ai_cause_mode_mismatch_note": null,
       "ai_consistent_across_runs": true,
@@ -140,13 +185,16 @@
       "plant_recorded_severity": 5,
       "ai_suggested_severity": 10,
       "agree": false,
-      "ai_matched_table_definition": "Failure may result in an acute health and/or safety risk for the manufacturing or assembly worker | Failure may result in an acute health and/or safety risk for the manufacturing or assembly worker | Affects safe operation of the vehicle and/or other vehicles, the health of driver or passenger(s) or road users or pedestrians.",
-      "ai_applicable_effect": "1) Incorrect beam alignment — DIRECT: missing prefit bolts allow the headlamp to sit misaligned relative to the BIW. 2) Headlamp does not turn ON — INDIRECT: requires an additional electrical connection failure beyond the missing/untightened bolts. 3) Reduced road visibility — DIRECT: follows from mis-aimed headlamps due to lack of proper fastening. 4) Increased risk of accident — INDIRECT mechanistically (a consequence of reduced visibility), but explicitly stated and causally plausible for this failure; per the hard rule, this explicit safety effect governs severity. Representative for non-safety DIRECT symptoms would be 'Incorrect beam alignment' or 'Reduced road visibility', but severity is set by the explicit 'Increased risk of accident' statement.",
+      "ai_matched_table_definition": "Affects safe operation of the vehicle and/or other vehicles, the health of driver or passenger(s) or road users or pedestrians.",
+      "ai_applicable_effect": "1) Incorrect beam alignment — DIRECT: missing prefit bolts prevents proper alignment/retention of the headlamp to the BIW, leading directly to misalignment. 2) Headlamp does not turn ON — INDIRECT: electrical non-function would require an additional, unstated connection/wiring failure beyond merely not prefitting bolts. 3) Reduced road visibility — DIRECT: misalignment/looseness from missing bolts directly reduces effective illumination of the road. 4) Increased risk of accident — DIRECT as an end-user safety consequence of reduced visibility/misalignment; per the hard rule, this explicit safety phrase applies and is causally plausible for a headlamp. Representative effect used: \"Increased risk of accident\" because it is explicitly stated and directly follows from reduced visibility due to the headlamp not being properly secured/aligned.",
       "ai_possible_severities": null,
-      "ai_decision_path": "Step1: safety/health risk present via explicit 'Increased risk of accident' -> stopped here",
-      "ai_reasoning": "The End User effects explicitly state 'Increased risk of accident', which is a safety consequence plausibly resulting from mis-aimed or non-functioning headlamps when bolts are not prefitted. Per the scoring rules, an explicit, causally plausible safety phrase requires Severity = 10.",
-      "ai_recommended_action": "Install a DC electric fastening system with controller that requires the required number of 6 Nm OK tighten events (bolt count) and locks out completion until achieved, with bolt-present/socket-present sensors on the tool.",
-      "ai_detection_recommendation": "Add an end-of-station vision check that verifies both headlamp bolts are present and seated (and lamp is flush/aligned), with NOK line stop and image traceability.",
+      "ai_decision_path": "Step1: explicit safety/health risk present in End User effects (\"Increased risk of accident\") -> stopped here, S=10",
+      "ai_reasoning": "The End User effects explicitly include \"Increased risk of accident,\" which is a plausible consequence of missing prefit bolts causing misalignment or non-function leading to reduced road visibility. Per the scoring rules, an explicit safety consequence requires Severity 10.",
+      "ai_recommended_action": "Install an in-station bolt-present poka‑yoke (pick-to-light with count verification plus bolt-start presence sensors) that prevents advancing the job until all required headlamp prefit bolts are inserted.",
+      "ai_detection_recommendation": "Add a machine-based bolt presence and torque/angle verification (vision or prox sensors confirming both bolt heads plus DC tool signature) with station interlock that stops the line if any headlamp prefit bolt is missing.",
+      "plant_recorded_detection": 5,
+      "ai_suggested_detection": 8,
+      "ai_detection_matched_table_definition": "Test or inspection method has not been proven to be effective and reliable (e.g. plant has little or no experience with method, gauge R&R results marginal on comparable process or this application, etc.). Human inspection (visual, tactile, audible), or use of manual gauging (attribute or variable) that SHOULD detect the failure mode or failure cause.",
       "ai_merged_modes_detected": null,
       "ai_split_suggestions": null,
       "ai_cause_mode_mismatch": false,
@@ -164,34 +212,43 @@
       "ai_suggested_severity": 4,
       "agree": true,
       "ai_matched_table_definition": "Very objectionable appearance, sound, vibration, harshness, or haptics.",
-      "ai_applicable_effect": "End User effects enumerated and classified vs. the merged Mode ['failed to fit screws', 'not maintained gap'] after sub-mode check: (1) 'Lens cracked or broken' = INDIRECT for both sub-modes (would require additional stress/damage progression beyond a loose/misaligned lamp). (2) 'LED / BULB burnout' = INDIRECT for both sub-modes (would require an additional electrical/thermal failure mechanism not stated). (3) 'Water ingress inside lamp' = INDIRECT for both sub-modes (mounting gap to fender does not directly defeat the lamp housing seal; would need an added leak path/failure). (4) 'Rattling or vibration noise during driving' = DIRECT for the 'failed to fit screws' sub-mode (loose/missing fasteners cause immediate vibration/noise); for the 'gap not maintained' sub-mode it is not inherent, so treated as INDIRECT there; after the merged-mode worst-case check it remains DIRECT overall. (5) 'Driver discomfort or eye strain' = INDIRECT for both sub-modes (requires mis-aim/illumination degradation not explicitly stated as a direct outcome). Representative DIRECT effect chosen: 'Rattling or vibration noise during driving' because it follows immediately from a loose/missing-screw headlamp without additional unstated failure steps.",
+      "ai_applicable_effect": "1) Lens cracked or broken – INDIRECT (would require additional stress/interference beyond loose/misaligned mounting). 2) LED / BULB burnout – INDIRECT (would require an electrical failure mechanism not described by missing screws/poor gap). 3) Water ingress inside lamp – INDIRECT (would require a compromised seal; gap to fender or missing screws does not directly state a failed housing seal). 4) Rattling or vibration noise during driving – DIRECT (loose/missing screws and poor fit directly cause NVH). 5) Driver discomfort or eye strain – INDIRECT (would require beam mis-aim or glare/flicker not explicitly stated). Representative DIRECT effect: “Rattling or vibration noise during driving,” as this follows directly from loose/missing fasteners and improper fit.",
       "ai_possible_severities": null,
-      "ai_decision_path": "Step1: no safety/health risk stated in End User effects -> Step2: no regulatory noncompliance stated -> Step3: no explicit total loss or degradation of primary lighting function selected as the representative direct effect -> Step4: not a secondary function -> Step5: stopped here, very objectionable NVH (rattling/vibration noise) matches S=4",
-      "ai_reasoning": "Among the listed End User effects, the direct outcome of missing/loose screws is rattling or vibration noise during driving, which maps to very objectionable sound/vibration per the table. More severe items like bulb burnout or water ingress require additional unstated failure mechanisms and are not used for the representative severity.",
-      "ai_recommended_action": "Add a dedicated alignment/locator fixture with hard stops that sets the headlamp-to-fender gap uniformly and clamps the lamp in position during tightening so the operator cannot torque unless the gap is within spec.",
-      "ai_detection_recommendation": "Install an in-station vision system to automatically measure headlamp-to-fender gap/flushness and verify both mounting screws are present/seated, interlocked to stop the line on fail.",
+      "ai_decision_path": "Step1: no safety/health risk wording in End User effects -> Step2: no regulatory noncompliance stated -> Step3: no stated loss or degradation of primary lighting function -> Step4: no secondary function loss/degradation -> Step5: stopped here, very objectionable NVH (rattling/vibration noise)",
+      "ai_reasoning": "Among the listed End User effects, only rattling/vibration noise follows directly from missing/under-installed screws and improper gap; it is an NVH/cosmetic issue and aligns with the table’s “very objectionable … sound, vibration” definition.",
+      "ai_recommended_action": "Add a headlamp alignment/locating fixture with hard datum stops that set the lamp-to-fender gap before tightening, preventing fastening unless the lamp is seated to the locators (poka‑yoke for uniform gaps).",
+      "ai_detection_recommendation": "Install an in-station machine-vision check to measure headlamp-to-fender gaps at multiple points and confirm all mounting screws are present after torque, with automatic line stop on fail.",
+      "plant_recorded_detection": 5,
+      "ai_suggested_detection": 8,
+      "ai_detection_matched_table_definition": "Low | Test or inspection method has not been proven to be effective and reliable (e.g. plant has little or no experience with method, gauge R&R results marginal on comparable process or this application, etc.). | Human inspection (visual, tactile, audible), or use of manual gauging (attribute or variable) that SHOULD detect the failure mode or failure cause.",
       "ai_merged_modes_detected": [
-        "Failed to fit screws",
-        "Not maintained gap between headlamp and fender edge"
+        "FAILED TO FIT SCREWS",
+        "NOT MAINTAINED GAP"
       ],
       "ai_split_suggestions": [
         {
-          "failure_mode": "Failed to fit screws",
+          "failure_mode": "FAILED TO FIT SCREWS",
           "suggested_severity": 4,
           "matched_table_definition": "Very objectionable appearance, sound, vibration, harshness, or haptics.",
-          "reasoning": "The most direct End User effect of missing mounting screws is 'rattling or vibration noise during driving,' which matches the table’s NVH category; no explicit safety or regulatory consequence is stated for this row.",
-          "recommended_action": "Add a dedicated headlamp alignment/locator fixture with hard datums that sets the uniform gap to the fender and aligns the mounting holes so the screws can be installed without play or misposition."
+          "reasoning": "For the mode 'failed to fit screws', the direct customer experience is rattling/vibration during driving; the other listed effects require additional unstated mechanisms. NVH that customers would find very objectionable maps to Severity 4 per the table.",
+          "recommended_action": "Install a headlamp alignment/locating fixture with datum pins and hard gap shims that hold the lamp to the BIW at the specified uniform gaps so the screw holes are aligned before tightening.",
+          "detection_recommendation": "Add a DC electric screwdriver with torque–angle monitoring and screw-count interlock (or a vision screw-present check) that prevents station completion if any required mounting screw is missing.",
+          "suggested_detection": 8,
+          "detection_matched_table_definition": "Low | Test or inspection method has not been proven to be effective and reliable (e.g. plant has little or no experience with method, gauge R&R results marginal on comparable process or this application, etc.). | Human inspection (visual, tactile, audible), or use of manual gauging (attribute or variable) that SHOULD detect the failure mode or failure cause."
         },
         {
-          "failure_mode": "Not maintained gap between headlamp and fender edge",
+          "failure_mode": "NOT MAINTAINED GAP",
           "suggested_severity": 4,
-          "matched_table_definition": "100% of production run may have to be reworked in station before it is processed | Defective product triggers significant reaction plan; additional defective products not likely; sort not required | Very objectionable appearance, sound, vibration, harshness, or haptics.",
-          "reasoning": "The representative End User effect is 'Rattling or vibration noise during driving,' which maps to 'Very objectionable ... vibration' in the table. No explicit accident/injury or regulatory noncompliance is stated for this row, and the other listed effects require additional unstated mechanisms beyond a mis-gapped installation.",
-          "recommended_action": "Add a simple alignment fixture with fixed datums and hard-stops that locates the headlamp relative to the fender edge before torquing to prevent non-uniform gaps."
+          "matched_table_definition": "4 | 100% of production run may have to be reworked in station before it is processed | Defective product triggers significant reaction plan; additional defective products not likely; sort not required | Very objectionable appearance, sound, vibration, harshness, or haptics.",
+          "reasoning": "Among the listed end user effects, the DIRECT outcome of this fit/flushness defect is rattling/vibration noise while driving, which is a very objectionable NVH condition per the table. No explicit safety or regulatory consequence is stated for this specific failure, and the primary lighting function is not the DIRECTly affected symptom here.",
+          "recommended_action": "Add a simple alignment/locating fixture with hard stops that sets the headlamp-to-fender gap uniformly before torquing so the operator cannot tighten bolts unless the lamp is seated to the specified flushness.",
+          "detection_recommendation": "Install an in-station camera or laser gap/flush measurement system that automatically measures the headlamp–fender gap around the perimeter and stops the line or flags a reject if limits are exceeded.",
+          "suggested_detection": 8,
+          "detection_matched_table_definition": "8 | Low | Test or inspection method has not been proven to be effective and reliable (e.g. plant has little or no experience with method, gauge R&R results marginal on comparable process or this application, etc.). | Human inspection (visual, tactile, audible), or use of manual gauging (attribute or variable) that SHOULD detect the failure mode or failure cause."
         }
       ],
-      "ai_cause_mode_mismatch": true,
-      "ai_cause_mode_mismatch_note": "The stated cause addresses only non-uniform gaps, not missing/failed-to-fit screws; it appears to belong to the 'not maintained gap' sub-mode rather than the 'failed to fit screws' sub-mode.",
+      "ai_cause_mode_mismatch": false,
+      "ai_cause_mode_mismatch_note": null,
       "ai_consistent_across_runs": true,
       "ai_runs": null
     },
@@ -203,13 +260,16 @@
       "plant_recorded_severity": 4,
       "ai_suggested_severity": 4,
       "agree": true,
-      "ai_matched_table_definition": "100% of production run may have to be reworked in station before it is processed | Defective product triggers significant reaction plan; additional defective products not likely; sort not required | Very objectionable appearance, sound, vibration, harshness, or haptics.",
-      "ai_applicable_effect": "1) Lens cracked or broken — INDIRECT (would require additional stress/fatigue; under‑torqued mount does not crack the lens by itself). 2) LED / BULB burnout — INDIRECT (electrical burnout does not follow directly from a loose mounting joint). 3) Water ingress inside lamp — INDIRECT (would need a sealing breach beyond a loose fastener; not directly implied). 4) Rattling or vibration noise during driving — DIRECT (a loose/under‑torqued joint commonly causes NVH/rattle). 5) Driver discomfort or eye strain — INDIRECT (assumes beam misalignment/flicker; not a direct outcome of under‑torque). Representative DIRECT effect: \"Rattling or vibration noise during driving\" because it follows immediately from a loose headlamp mounting joint.",
+      "ai_matched_table_definition": "Very objectionable appearance, sound, vibration, harshness, or haptics.",
+      "ai_applicable_effect": "1) Lens cracked or broken - INDIRECT: an under-torqued headlamp mounting would require additional movement/impact or stress to crack the lens; not a direct, immediate result of loose bolts. 2) LED / BULB burnout - INDIRECT: would require added mechanisms (e.g., vibration-induced filament/LED failure); not a direct outcome of under-torque. 3) Water ingress inside lamp - INDIRECT: would require seal compromise due to misalignment or damage; under-torque of mounting bolts does not directly open the lamp housing seal. 4) Rattling or vibration noise during driving - DIRECT: a loose joint from under-torque directly produces rattling/vibration. 5) Driver discomfort or eye strain - INDIRECT: would require mis-aimed beam or altered output; under-torque does not directly create this without additional steps. Representative DIRECT effect: 'Rattling or vibration noise during driving' because it follows immediately from a loose headlamp mounting due to under-torque, without any additional failure mechanism.",
       "ai_possible_severities": null,
-      "ai_decision_path": "Step1: no explicit injury/accident/unsafe-operation text in End User effects -> Step2: no regulatory noncompliance stated -> Step3: no stated total loss or degradation of primary headlamp function -> Step4: not a secondary function issue -> Step5: stop here; very objectionable noise/vibration (NVH)",
-      "ai_reasoning": "Under‑torque leads to a loose headlamp mounting, which directly produces rattling/vibration noise during driving. This maps to \"Very objectionable ... vibration/harshness\" in the End User column. No explicit safety or regulatory effects are stated for this failure.",
-      "ai_recommended_action": "Implement a controller‑locked DC torque tool preset to 6 Nm with station interlock (tool/spindle ID or RFID) so a wrong tool cannot run and the correct torque program is always applied.",
-      "ai_detection_recommendation": "Add torque/angle monitoring with OK/NOK interlock on the tool so the station cannot release an OK until 6 Nm is achieved, with cycle‑by‑cycle traceable data logging.",
+      "ai_decision_path": "Step1: no explicit safety/health risk stated for end users -> Step2: no regulatory noncompliance stated -> Step3: primary lighting function not directly lost or degraded for the representative effect -> Step5: stopped here under cosmetic/noise; very objectionable NVH",
+      "ai_reasoning": "Under-torque of the headlamp mounting bolts most directly causes rattling/vibration noise during driving, which fits the 'very objectionable' NVH category. No explicit accident/injury or regulatory noncompliance effect is stated for this mode, and the primary lighting function loss effects listed are indirect.",
+      "ai_recommended_action": "Add RFID/tool-parameter lockout and socket/bit coding so only the correct, calibrated tool with the 6 Nm program can be used at this station, preventing operator error and wrong-tool use.",
+      "ai_detection_recommendation": "Implement a transducerized DC nutrunner (torque/angle logging) with bolt count and OK/NOK interlock that blocks station completion if 6 Nm is not achieved.",
+      "plant_recorded_detection": 5,
+      "ai_suggested_detection": 8,
+      "ai_detection_matched_table_definition": "Low | Test or inspection method has not been proven to be effective and reliable (e.g. plant has little or no experience with method, gauge R&R results marginal on comparable process or this application, etc.). | Human inspection (visual, tactile, audible), or use of manual gauging (attribute or variable) that SHOULD detect the failure mode or failure cause.",
       "ai_merged_modes_detected": null,
       "ai_split_suggestions": null,
       "ai_cause_mode_mismatch": false,
@@ -226,43 +286,52 @@
       "ai_suggested_severity": 4,
       "agree": true,
       "ai_matched_table_definition": "Very objectionable appearance, sound, vibration, harshness, or haptics.",
-      "ai_applicable_effect": "1) Lens cracked or broken — DIRECT for the over‑torque sub‑mode (excess torque can directly crack lamp components), INDIRECT for under‑torque; 2) LED / BULB burnout — INDIRECT (would require an additional unstated electrical/thermal failure); 3) Water ingress inside lamp — INDIRECT (requires a sealing breach as an additional step beyond torque error); 4) Rattling or vibration noise during driving — DIRECT for the under‑torque sub‑mode (loose joint leads to rattling); 5) Driver discomfort or eye strain — INDIRECT (would require mis‑aim/glare as an additional step). Among the DIRECT effects, two are equally representative for the merged mode (under‑ vs over‑torque): 'Rattling or vibration noise during driving' and 'Lens cracked or broken,' both mapping to cosmetic/NVH.",
+      "ai_applicable_effect": "1) Lens cracked or broken – DIRECT for the 'over torque' sub-mode (excess torque can crack lamp components); INDIRECT for the 'torque not achieved' sub-mode; treated as DIRECT overall due to merged-mode worst-case rule. 2) LED / BULB burnout – INDIRECT (would require additional steps such as prolonged vibration or electrical stress not stated). 3) Water ingress inside lamp – INDIRECT (requires a prior crack/seal breach, an additional unstated step). 4) Rattling or vibration noise during driving – DIRECT for the 'torque not achieved' (under-torque) sub-mode; treated as DIRECT overall. 5) Driver discomfort or eye strain – INDIRECT (secondary to vibration/beam shake; also explicitly not a safety phrase). Among the DIRECT effects, 'Lens cracked or broken' (over-torque) and 'Rattling or vibration noise during driving' (under-torque) are equally representative of the two sub-modes; both map to the same S4 definition; selecting 'Rattling or vibration noise during driving' as the representative symptom because it follows most directly from 'torque not achieved' wording, but severity is unchanged either way. Cause/mode mismatch: does not apply (causes plausibly produce the mode).",
       "ai_possible_severities": [
         {
           "severity": 4,
           "effect_used": "Lens cracked or broken",
           "matched_table_definition": "Very objectionable appearance, sound, vibration, harshness, or haptics.",
-          "reasoning": "Over‑torque can directly crack lamp components, yielding a very objectionable appearance defect perceived by most customers."
+          "reasoning": "Over-torque can directly crack visible lamp components, yielding a very objectionable appearance to the end user."
         },
         {
           "severity": 4,
           "effect_used": "Rattling or vibration noise during driving",
           "matched_table_definition": "Very objectionable appearance, sound, vibration, harshness, or haptics.",
-          "reasoning": "Under‑torque directly causes a loose joint, producing rattling/vibration noise that is very objectionable to the end user."
+          "reasoning": "Under-torque directly leads to a loose joint and NVH that is very objectionable to the end user."
         }
       ],
-      "ai_decision_path": "Step1: no safety/health risk stated in End User effects -> Step2: no regulatory noncompliance stated -> Step3: no stated total loss or degradation of the primary lighting function -> Step4: not a secondary function -> Step5: stopped at cosmetic/NVH; very objectionable appearance/sound/vibration",
-      "ai_reasoning": "The End User effects tied directly to improper torque are noise (rattling/vibration) and potentially a cracked lamp; both are cosmetic/NVH issues and would be very objectionable to customers, aligning with Severity 4 per the table.",
-      "ai_recommended_action": "Replace the current setup with a transducerized, programmable DC torque tool interlocked to the station (barcode/part ID selects the 6 Nm program and locks the tool if incorrect), eliminating wrong tool/setting use and operator over‑torque.",
-      "ai_detection_recommendation": "Add in‑station electronic torque/angle monitoring with OK/NOK and data logging for each fastener (line stop on NOK) to catch under‑ or over‑torque events immediately.",
+      "ai_decision_path": "Step1: no safety/health risk stated in End User effects (discomfort/eye strain is explicitly not a safety trigger) -> Step2: no regulatory noncompliance mentioned -> Step3: no stated total loss or degradation of primary lighting function -> Step4: not a secondary/convenience function -> Step5: stopped here, very objectionable NVH/appearance",
+      "ai_reasoning": "The End User effects directly tied to incorrect torque are rattling/vibration noise and visible cracking, both of which are very objectionable to customers and align with the S4 definition; no safety or regulatory language is present, and no explicit loss/degradation of the primary lighting function is stated.",
+      "ai_recommended_action": "Install a DC torque/angle-controlled nutrunner locked to the 6 Nm specification via part barcode scan with controller interlock to prevent completion if torque is out of spec, eliminating wrong-tool use and over/under-torque from operator error or mis-calibration.",
+      "ai_detection_recommendation": "Add in-station torque/angle monitoring with an OK/NOK controller that records achieved values per fastener and stops the line or flags NOK if the 6 Nm spec is not met.",
+      "plant_recorded_detection": 5,
+      "ai_suggested_detection": 9,
+      "ai_detection_matched_table_definition": "Very low | It is unlikely that the testing or inspection method will detect the failure mode. | The failure mode is not easily detected through random or sporadic audits.",
       "ai_merged_modes_detected": [
-        "TORQUE NOT ACHIEVED",
-        "OVER TORQUE"
+        "Torque not achieved (under-torque)",
+        "Over torque"
       ],
       "ai_split_suggestions": [
         {
-          "failure_mode": "TORQUE NOT ACHIEVED",
+          "failure_mode": "Torque not achieved (under-torque)",
           "suggested_severity": 4,
           "matched_table_definition": "4 | 100% of production run may have to be reworked in station before it is processed | Defective product triggers significant reaction plan; additional defective products not likely; sort not required | Very objectionable appearance, sound, vibration, harshness, or haptics.",
-          "reasoning": "The only direct end-user effect of an under/over-torqued headlamp mounting is rattling/vibration noise during driving, which aligns with the table’s \"Very objectionable ... sound, vibration\" description; other listed effects require additional unstated damage mechanisms.",
-          "recommended_action": "Replace the current tool with a transducerized shut-off DC nutrunner preset to 6 Nm and interlocked to the station PLC so only the correct, calibrated program/tool can run and the cycle cannot complete unless the target torque is reached."
+          "reasoning": "The only direct End User effect of an under‑torqued headlamp mounting is “Rattling or vibration noise during driving,” which aligns with a very objectionable sound/vibration complaint. Other listed effects (lens crack, bulb burnout, water ingress, eye strain) require additional unstated mechanisms and are indirect for this specific Mode/Cause.",
+          "recommended_action": "Replace the station’s driver with a controller‑based shutoff (transducerized) torque tool locked to 6 Nm for this joint to error‑proof operator technique and wrong‑tool use.",
+          "detection_recommendation": "Add 100% in‑station torque/angle verification with the tool’s OK/NOK interlock that prevents process completion/release if any fastener is below spec.",
+          "suggested_detection": 8,
+          "detection_matched_table_definition": "8 | Low | Test or inspection method has not been proven to be effective and reliable (e.g. plant has little or no experience with method, gauge R&R results marginal on comparable process or this application, etc.). | Human inspection (visual, tactile, audible), or use of manual gauging (attribute or variable) that SHOULD detect the failure mode or failure cause."
         },
         {
-          "failure_mode": "OVER TORQUE",
+          "failure_mode": "Over torque",
           "suggested_severity": 4,
           "matched_table_definition": "Very objectionable appearance, sound, vibration, harshness, or haptics.",
-          "reasoning": "The most direct End User outcome of an over-torqued headlamp mounting joint is rattling/vibration noise while driving, which is an NVH complaint. Per the table, such noise/vibration is a very objectionable condition to the user, corresponding to Severity 4.",
-          "recommended_action": "Replace the current tool with a DC torque-controlled nutrunner programmed to 6 Nm with an upper torque shut-off to prevent over-torque at this station."
+          "reasoning": "For over-torque, the only direct end-user effect listed is a cracked/broken lens, which maps to a very objectionable appearance issue; no direct loss/degradation of lighting function or explicit safety/regulatory consequence is stated for this mode. Therefore Severity aligns with the cosmetic/NVH tier at 4.",
+          "recommended_action": "Replace the current tool with a transducerized, torque-controlled driver locked to a 6 Nm window with an upper-limit shutoff and PLC interlock so over‑torque cannot be applied.",
+          "detection_recommendation": "Add in-station torque monitoring/trace capture with programmed upper/lower limits and automatic NOK line stop if torque exceeds the upper limit.",
+          "suggested_detection": 9,
+          "detection_matched_table_definition": "Very low | It is unlikely that the testing or inspection method will detect the failure mode. | The failure mode is not easily detected through random or sporadic audits."
         }
       ],
       "ai_cause_mode_mismatch": false,
