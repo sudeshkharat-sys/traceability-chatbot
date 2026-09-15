@@ -161,12 +161,18 @@ def get_reference_text(handbook_index_path, query, fallback_text, prefer_terms=N
     return "\n\n---\n\n".join(f"(From handbook page {r['page']})\n{r['text']}" for r in results)
 
 
-def build_prompt_for_entry(entry, severity_table_text=SEVERITY_TABLE_TEXT):
+def build_prompt_for_entry(entry, severity_table_text=SEVERITY_TABLE_TEXT, mode_override=None, skip_merged_check=False):
     """Per-Failure-Mode prompt (not grouped) - requested so every row gets
     its own independent AI call and reasoning that names ITS OWN Mode/Cause,
     instead of one shared answer copy-pasted across every Mode that happens
     to share the same recorded Effect text. Trades away the Step 4a
-    call-count optimization for row-level independence and clarity."""
+    call-count optimization for row-level independence and clarity.
+
+    mode_override/skip_merged_check: used when re-scoring ONE phrase that was
+    already pulled out of a merged Failure Mode cell (see
+    score_split_modes() below) - the phrase is already a single mode, so the
+    merged-mode instructions/field would be asking the LLM a question that no
+    longer applies."""
     failure = entry.get("failure") or {}
     function = entry.get("function") or {}
     risk = entry.get("risk") or {}
@@ -178,6 +184,16 @@ def build_prompt_for_entry(entry, severity_table_text=SEVERITY_TABLE_TEXT):
     )
     if not any(effect_sections.values()):
         effect_text = (failure.get("effect") or "").strip()
+
+    failure_mode_text = (mode_override if mode_override is not None else failure.get("mode")) or ""
+    merged_mode_check_section = "" if skip_merged_check else """
+
+MERGED-MODE CHECK: The "Failure Mode" text above is exactly one Excel cell as the plant recorded it - it may describe ONE failure mode, or it may actually contain SEVERAL distinct failure mode phrases the plant wrote into the same cell (e.g. separated by line breaks, "AND", or listed one after another) that arguably deserve separate PFMEA rows with potentially different severities. You are NOT being asked to split them or score them separately here - you must still give ONE score for the row as given, using the worst-case-severity distinct mode among them (since a single row-level severity has to represent the row). But you MUST flag this for the human reviewer if it applies."""
+    merged_modes_field = (
+        '"<null - this is already a single, already-split failure mode phrase, so this field is not applicable>"'
+        if skip_merged_check
+        else '"<null if the Failure Mode text is a single failure mode; otherwise a short list of the distinct failure mode phrases you found merged into this one cell, e.g. [\'Fitment not firm\', \'Wrong selection of headlamp (not per model)\'], so a reviewer knows this row should probably be split into separate PFMEA rows>"'
+    )
 
     return f"""You are a process/manufacturing engineer performing a PFMEA (Process Failure Mode and Effects Analysis) review per the AIAG-VDA standard.
 
@@ -198,11 +214,9 @@ Function of Process Step: {(function.get('of_step') or '').strip()}
 Function of Process Work Element: {(function.get('of_work_element') or '').strip()}
 
 THIS SPECIFIC FAILURE:
-Failure Mode: {(failure.get('mode') or '').strip()}
+Failure Mode: {failure_mode_text.strip()}
 Failure Cause: {(failure.get('cause') or '(not recorded)').strip()}
-Plant's recorded Severity: {risk.get('severity')}
-
-MERGED-MODE CHECK: The "Failure Mode" text above is exactly one Excel cell as the plant recorded it - it may describe ONE failure mode, or it may actually contain SEVERAL distinct failure mode phrases the plant wrote into the same cell (e.g. separated by line breaks, "AND", or listed one after another) that arguably deserve separate PFMEA rows with potentially different severities. You are NOT being asked to split them or score them separately here - you must still give ONE score for the row as given, using the worst-case-severity distinct mode among them (since a single row-level severity has to represent the row). But you MUST flag this for the human reviewer if it applies.
+Plant's recorded Severity: {risk.get('severity')}{merged_mode_check_section}
 
 FAILURE EFFECT, split by whose perspective it's recorded from:
 {effect_text}
@@ -243,8 +257,43 @@ Return ONLY valid JSON, no other text, in this exact shape:
   "decision_path": "<one short clause per decision-tree step you passed through, e.g. 'Step1: no safety/health risk -> Step2: no regulatory noncompliance -> Step3: not total loss of primary function -> Step4: stopped here, total loss of secondary function'>",
   "reasoning": "<1-3 sentences explaining why THIS Failure Mode/Cause matches this score, referencing specific details from the End User effect text>",
   "recommended_action": "<one specific, implementable action - usually a targeted prevention/error-proofing action for this exact Failure Cause, occasionally a proportionate severity-reducing design change for high-severity effects; never a generic full-component redesign>",
-  "merged_modes_detected": "<null if the Failure Mode text is a single failure mode; otherwise a short list of the distinct failure mode phrases you found merged into this one cell, e.g. ['Fitment not firm', 'Wrong selection of headlamp (not per model)'], so a reviewer knows this row should probably be split into separate PFMEA rows>"
+  "merged_modes_detected": {merged_modes_field}
 }}"""
+
+
+def score_split_modes(entry, merged_phrases, severity_table_text, call_fn):
+    """Re-score a row whose Failure Mode cell was flagged as containing
+    several distinct modes merged together (see MERGED-MODE CHECK above).
+    Rather than leaving the human reviewer with just one blended,
+    worst-case score and a flag, call the LLM once per detected phrase so
+    each real failure mode gets its own independent Severity + reasoning -
+    this is what actually resolves the "two modes merged into one, confuses
+    the score" problem instead of just flagging it.
+
+    call_fn(prompt) -> parsed JSON response, so this can be unit-tested /
+    dry-run without a live LLM."""
+    splits = []
+    for phrase in merged_phrases:
+        phrase = (phrase or "").strip()
+        if not phrase:
+            continue
+        prompt = build_prompt_for_entry(
+            entry,
+            severity_table_text=severity_table_text,
+            mode_override=phrase,
+            skip_merged_check=True,
+        )
+        result = call_fn(prompt)
+        splits.append(
+            {
+                "failure_mode": phrase,
+                "suggested_severity": result["suggested_severity"],
+                "matched_table_definition": result["matched_table_definition"],
+                "reasoning": result["reasoning"],
+                "recommended_action": result.get("recommended_action"),
+            }
+        )
+    return splits
 
 
 def _load_dotenv_into_environ():
@@ -397,6 +446,16 @@ def main():
             best_count = max(counts.values())
             ai_sev = max(s for s, c in counts.items() if c == best_count)
 
+            merged_modes_detected = runs[0].get("merged_modes_detected")
+            ai_split_suggestions = None
+            if isinstance(merged_modes_detected, list) and len(merged_modes_detected) > 1:
+                ai_split_suggestions = score_split_modes(
+                    entry,
+                    merged_modes_detected,
+                    severity_table_text,
+                    call_fn=lambda p: call_llm(llm, p),
+                )
+
             sheet_results.append(
                 {
                     "failure_mode": failure_mode,
@@ -409,7 +468,8 @@ def main():
                     "ai_decision_path": runs[0].get("decision_path"),
                     "ai_reasoning": runs[0]["reasoning"],
                     "ai_recommended_action": runs[0].get("recommended_action"),
-                    "ai_merged_modes_detected": runs[0].get("merged_modes_detected"),
+                    "ai_merged_modes_detected": merged_modes_detected,
+                    "ai_split_suggestions": ai_split_suggestions,
                     "ai_consistent_across_runs": consistent,
                     "ai_runs": [
                         {
@@ -428,6 +488,10 @@ def main():
             agreement = "MATCH" if plant_sev == ai_sev else f"DIFFERS (plant={plant_sev}, AI={ai_sev})"
             stability = "" if repeat == 1 else (" [STABLE]" if consistent else f" [UNSTABLE: {severities}]")
             print(f"[{sn}] {(failure_mode or '')[:40]!r:42} {agreement}{stability}")
+            if ai_split_suggestions:
+                print(f"    MERGED MODE CELL - scored {len(ai_split_suggestions)} modes separately:")
+                for s in ai_split_suggestions:
+                    print(f"      - {s['failure_mode'][:50]!r:52} suggested_severity={s['suggested_severity']}")
 
         results[sn] = sheet_results
 
