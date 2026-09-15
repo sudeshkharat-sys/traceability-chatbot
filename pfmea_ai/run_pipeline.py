@@ -43,6 +43,7 @@ from step5_severity_llm import (
     call_llm,
     get_llm,
     get_reference_text,
+    score_split_modes,
 )
 from step6_write_suggestions_to_excel import apply_suggestions_to_sheet, normalize_cause_text
 
@@ -82,6 +83,16 @@ def score_entries(entries, llm, severity_table_text, repeat, log=print):
         best_count = max(counts.values())
         ai_sev = max(s for s, c in counts.items() if c == best_count)
 
+        merged_modes_detected = runs[0].get("merged_modes_detected")
+        ai_split_suggestions = None
+        if isinstance(merged_modes_detected, list) and len(merged_modes_detected) > 1:
+            ai_split_suggestions = score_split_modes(
+                entry,
+                merged_modes_detected,
+                severity_table_text,
+                call_fn=lambda p: call_llm(llm, p),
+            )
+
         results.append(
             {
                 "failure_mode": failure_mode,
@@ -92,7 +103,8 @@ def score_entries(entries, llm, severity_table_text, repeat, log=print):
                 "ai_reasoning": runs[0]["reasoning"],
                 "ai_recommended_action": runs[0].get("recommended_action"),
                 "ai_detection_recommendation": runs[0].get("detection_recommendation"),
-                "ai_merged_modes_detected": runs[0].get("merged_modes_detected"),
+                "ai_merged_modes_detected": merged_modes_detected,
+                "ai_split_suggestions": ai_split_suggestions,
                 "ai_cause_mode_mismatch": runs[0].get("cause_mode_mismatch"),
                 "ai_cause_mode_mismatch_note": runs[0].get("cause_mode_mismatch_note"),
                 "ai_possible_severities": runs[0].get("possible_severities"),
@@ -102,6 +114,10 @@ def score_entries(entries, llm, severity_table_text, repeat, log=print):
         agreement = "MATCH" if plant_sev == ai_sev else f"DIFFERS (plant={plant_sev}, AI={ai_sev})"
         stability = "" if repeat == 1 else (" [STABLE]" if consistent else f" [UNSTABLE: {severities}]")
         log(f"    {(failure_mode or '')[:40]!r:42} {agreement}{stability}")
+        if ai_split_suggestions:
+            log(f"      MERGED MODE CELL - scored {len(ai_split_suggestions)} modes separately:")
+            for s in ai_split_suggestions:
+                log(f"        - {s['failure_mode'][:50]!r:52} suggested_severity={s['suggested_severity']}")
     return results
 
 

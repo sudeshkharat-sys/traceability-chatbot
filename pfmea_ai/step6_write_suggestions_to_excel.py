@@ -192,6 +192,10 @@ def build_remark(row, cause_to_modes, this_cause):
     if merged:
         numbered = "; ".join(f"{i + 1}. {m}" for i, m in enumerate(merged))
         parts.append(f"Merged failure mode: {numbered}.")
+        splits = row.get("ai_split_suggestions")
+        if splits:
+            scored = "; ".join(f"'{s['failure_mode']}'=S{s['suggested_severity']}" for s in splits)
+            parts.append(f"Scored separately: {scored}. Row-level Severity above is the worst case; consider splitting this row in the plant sheet.")
 
     if row.get("ai_cause_mode_mismatch"):
         note = row.get("ai_cause_mode_mismatch_note") or "Stated Cause does not logically produce the stated Mode."
