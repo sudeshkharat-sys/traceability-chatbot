@@ -21,35 +21,35 @@ New columns added, in order:
                    check/functional test/inspection gate) specific to
                    catching THIS Failure Mode, distinct from Prevention
   Prevention     - AI suggested prevention/poka-yoke action
-  Sub-mode A / Sub-mode A (S/D) / Sub-mode A Actions - when the Failure
-                   Mode cell was flagged as containing 2+ distinct modes
-                   merged into one cell, the FIRST detected sub-mode's own
-                   name, Severity/Detection pair, and Prevention+Detection
-                   actions - visible side-by-side in normal columns
-                   instead of only inside the Remark paragraph. Blank when
-                   the row's Mode wasn't a merged cell. Deliberately NOT
-                   physical row-splitting: this sheet has fields (Function
-                   of Step, Effect, Severity, Detection Control, ...)
-                   merged ACROSS two different failure entries at once,
-                   and openpyxl does not correctly shrink/shift those
-                   merges when rows are inserted mid-span (confirmed by
-                   testing - it leaves a stale, overlapping merged range
-                   instead), so physically splitting rows risks silently
-                   corrupting the sheet. Dedicated columns avoid that risk
-                   entirely while still surfacing both sub-modes clearly.
-  Sub-mode B / Sub-mode B (S/D) / Sub-mode B Actions - same, for the
-                   SECOND detected sub-mode. A cell with 3+ merged modes
-                   (not seen in practice so far) still lists every mode in
-                   Remark; only the first two get dedicated columns.
-  Remark         - merged-mode info, cause/mode mismatch, ambiguity
-                   breakdown, plant-vs-AI disagreement, AND (new) a
-                   cross-row check: flags when the exact same Failure
-                   Cause text is reused verbatim across two DIFFERENT
-                   Failure Modes elsewhere in the sheet - e.g. a
-                   copy-pasted Cause that doesn't actually belong to
-                   this row (see the "wrong part/mix-up" Cause shared
-                   between "Scratch/Damage" and "Fitment/Wrong
-                   Selection" in the Head lamp sheet).
+  Sub-modes      - when the Failure Mode cell was flagged as containing
+                   2+ distinct modes merged into one cell, one compact
+                   "A = <name> (S<x>/D<y>)" line per detected sub-mode
+                   (up to 2; a rare 3rd+ still only shows in Remark).
+                   Blank when the row's Mode wasn't a merged cell.
+                   Deliberately NOT physical row-splitting: this sheet has
+                   fields (Function of Step, Effect, Severity, Detection
+                   Control, ...) merged ACROSS two different failure
+                   entries at once, and openpyxl does not correctly
+                   shrink/shift those merges when rows are inserted
+                   mid-span (confirmed by testing - it leaves a stale,
+                   overlapping merged range instead), so physically
+                   splitting rows risks silently corrupting the sheet.
+  Sub-mode Prevention / Sub-mode Detection - one "A = ...\nB = ..." line
+                   per sub-mode's own Prevention action / Detection
+                   action, matching the labels used in the Sub-modes
+                   column above.
+  Remark         - cause/mode mismatch, ambiguity breakdown, plant-vs-AI
+                   disagreement, AND a cross-row check: flags when the
+                   exact same Failure Cause text is reused verbatim
+                   across two DIFFERENT Failure Modes elsewhere in the
+                   sheet - e.g. a copy-pasted Cause that doesn't actually
+                   belong to this row (see the "wrong part/mix-up" Cause
+                   shared between "Scratch/Damage" and "Fitment/Wrong
+                   Selection" in the Head lamp sheet). Deliberately does
+                   NOT repeat the per-sub-mode Severity/Detection/action
+                   detail already shown in the Sub-modes columns above -
+                   just a short pointer to look there, so this cell
+                   stays short instead of duplicating that data as text.
 
 The duplicate-Cause check needs the original Failure Cause text, which
 is not in step5's suggestions JSON (only Failure Mode is) - it's read
@@ -78,12 +78,9 @@ NEW_COLUMN_HEADERS = [
     "Detection (D)",
     "Detection Note",
     "Prevention",
-    "Sub-mode A",
-    "Sub-mode A (S/D)",
-    "Sub-mode A Actions",
-    "Sub-mode B",
-    "Sub-mode B (S/D)",
-    "Sub-mode B Actions",
+    "Sub-modes",
+    "Sub-mode Prevention",
+    "Sub-mode Detection",
     "Remark",
 ]
 
@@ -221,23 +218,11 @@ def build_remark(row, cause_to_modes, this_cause):
 
     merged = row.get("ai_merged_modes_detected")
     if merged:
-        numbered = "; ".join(f"{i + 1}. {m}" for i, m in enumerate(merged))
-        parts.append(f"Merged failure mode: {numbered}.")
-        splits = row.get("ai_split_suggestions")
-        if splits:
-            scored = "; ".join(f"'{s['failure_mode']}'=S{s['suggested_severity']}" for s in splits)
-            parts.append(f"Scored separately: {scored}. Row-level Severity above is the worst case; consider splitting this row in the plant sheet.")
-            detections = [s for s in splits if s.get("suggested_detection") is not None]
-            if detections:
-                det_scored = "; ".join(f"'{s['failure_mode']}'=D{s['suggested_detection']}" for s in detections)
-                parts.append(f"Detection per mode: {det_scored}.")
-            actions = [s for s in splits if s.get("recommended_action") or s.get("detection_recommendation")]
-            if actions:
-                action_text = " | ".join(
-                    f"'{s['failure_mode']}': prevention - {s.get('recommended_action') or 'n/a'}; detection - {s.get('detection_recommendation') or 'n/a'}"
-                    for s in actions
-                )
-                parts.append(f"Per-mode actions: {action_text}.")
+        # The per-sub-mode Severity/Detection/Prevention/Detection-action
+        # detail lives in the dedicated Sub-modes/Sub-mode Prevention/
+        # Sub-mode Detection columns now - keep this a short pointer
+        # instead of duplicating all of that as one long paragraph.
+        parts.append(f"Merged failure mode ({len(merged)} distinct modes detected) - see Sub-modes columns for per-mode Severity/Detection/actions. Row-level Severity/Detection above are the worst case; consider splitting this row in the plant sheet.")
 
     if row.get("ai_cause_mode_mismatch"):
         note = row.get("ai_cause_mode_mismatch_note") or "Stated Cause does not logically produce the stated Mode."
@@ -324,8 +309,7 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
 
     (
         severity_col, severity_note_col, occurrence_col, detection_col, detection_note_col, prevention_col,
-        submode_a_col, submode_a_sd_col, submode_a_actions_col,
-        submode_b_col, submode_b_sd_col, submode_b_actions_col,
+        submodes_col, submode_prevention_col, submode_detection_col,
         remark_col,
     ) = range(start_col, start_col + len(NEW_COLUMN_HEADERS))
 
@@ -342,13 +326,10 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
         detection_col: 8,
         detection_note_col: 40,
         prevention_col: 45,
-        submode_a_col: 30,
-        submode_a_sd_col: 10,
-        submode_a_actions_col: 45,
-        submode_b_col: 30,
-        submode_b_sd_col: 10,
-        submode_b_actions_col: 45,
-        remark_col: 60,
+        submodes_col: 35,
+        submode_prevention_col: 45,
+        submode_detection_col: 45,
+        remark_col: 50,
     }
     for col, width in column_widths.items():
         ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = width
@@ -379,19 +360,15 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
         # a bare, unmerged single-height cell next to a merged 2-row block.
         row_start, row_end = min(excel_rows), max(excel_rows)
 
-        splits = row.get("ai_split_suggestions") or []
+        splits = (row.get("ai_split_suggestions") or [])[:2]
+        labels = ["A", "B"]
 
-        def submode_actions(s):
-            prevention = s.get("recommended_action") or "n/a"
-            detection = s.get("detection_recommendation") or "n/a"
-            return f"Prevention: {prevention}\nDetection: {detection}"
-
-        def submode_severity_detection(s):
+        def submode_line(label, s):
             sev = s.get("suggested_severity")
             det = s.get("suggested_detection")
             sev_text = f"S{sev}" if sev is not None else "S?"
             det_text = f"D{det}" if det is not None else "D(not scored - re-run needed)"
-            return f"{sev_text} / {det_text}"
+            return f"{label} = {s['failure_mode']} ({sev_text}/{det_text})"
 
         values = {
             severity_col: row["ai_suggested_severity"],
@@ -400,16 +377,17 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             detection_col: row.get("ai_suggested_detection"),
             detection_note_col: row.get("ai_detection_recommendation") or "",
             prevention_col: row.get("ai_recommended_action") or "",
-            # First two split modes get their own visible columns so a
-            # reviewer sees both sets of values side-by-side without
-            # reading through the Remark paragraph - additional splits
-            # beyond 2 (rare) still show up in Remark only.
-            submode_a_col: splits[0]["failure_mode"] if len(splits) >= 1 else "",
-            submode_a_sd_col: submode_severity_detection(splits[0]) if len(splits) >= 1 else "",
-            submode_a_actions_col: submode_actions(splits[0]) if len(splits) >= 1 else "",
-            submode_b_col: splits[1]["failure_mode"] if len(splits) >= 2 else "",
-            submode_b_sd_col: submode_severity_detection(splits[1]) if len(splits) >= 2 else "",
-            submode_b_actions_col: submode_actions(splits[1]) if len(splits) >= 2 else "",
+            # First two split modes get compact "A = ..." / "B = ..." lines
+            # in dedicated columns, side-by-side with the row's own values,
+            # instead of only readable inside the Remark paragraph.
+            # Additional splits beyond 2 (rare) still show up in Remark only.
+            submodes_col: "\n".join(submode_line(labels[i], s) for i, s in enumerate(splits)),
+            submode_prevention_col: "\n".join(
+                f"{labels[i]} = {s.get('recommended_action') or 'n/a'}" for i, s in enumerate(splits)
+            ),
+            submode_detection_col: "\n".join(
+                f"{labels[i]} = {s.get('detection_recommendation') or 'n/a'}" for i, s in enumerate(splits)
+            ),
             remark_col: build_remark(row, cause_to_modes, this_cause),
         }
         for col, value in values.items():
