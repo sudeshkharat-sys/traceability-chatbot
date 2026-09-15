@@ -28,17 +28,22 @@ from step2_normalize import normalize_sheet
 from step3c_to_json import build_entry
 from step5_severity_llm import call_llm, get_llm, get_reference_text
 
-OCCURRENCE_TABLE_TEXT = """Score | Meaning | Approx. Failure Rate
-10 | Very high - failure almost certain | >= 1 in 10
-9  | Very high | 1 in 20
-8  | High - repeated failures | 1 in 50
-7  | High | 1 in 100
-6  | Moderate - occasional failures | 1 in 500
-5  | Moderate | 1 in 2,000
-4  | Moderate | 1 in 10,000
-3  | Low - relatively few failures | 1 in 100,000
-2  | Low | 1 in 1,000,000
-1  | Very low - failure unlikely / error-proofed by design | < 1 in 1,500,000
+OCCURRENCE_TABLE_TEXT = """Table C2.3.1 - Alternate PFMEA OCCURRENCE (O) with Incidents per Thousand Values, from the
+AIAG-VDA FMEA Handbook (1st Edition, 2019), page 198, verbatim. Consider Prevention Controls when determining the
+best Occurrence estimate - Occurrence is a predictive qualitative rating, not a measurement of actual field data,
+made at the time of evaluation.
+
+O | Incidents per 1000 items/vehicles | Type of Control | Prevention Controls
+10 | > 100 per thousand (>= 1 in 10) | None | No prevention controls.
+9 | 50 per thousand (1 in 20) | Behavioral | Prevention controls will have little effect in preventing failure cause.
+8 | 20 per thousand (1 in 50) | Behavioral | Prevention controls will have little effect in preventing failure cause.
+7 | 10 per thousand (1 in 100) | Behavioral or Technical | Prevention controls somewhat effective in preventing failure cause.
+6 | 2 per thousand (1 in 500) | Behavioral or Technical | Prevention controls somewhat effective in preventing failure cause.
+5 | 0.5 per thousand (1 in 2,000) | Behavioral or Technical | Prevention controls are effective in preventing failure cause.
+4 | 0.1 per thousand (1 in 10,000) | Behavioral or Technical | Prevention controls are effective in preventing failure cause.
+3 | 0.01 per thousand (1 in 100,000) | Best Practices: Behavioral or Technical | Prevention controls are highly effective in preventing failure cause.
+2 | < 0.001 per thousand (1 in 1,000,000) | Best Practices: Behavioral or Technical | Prevention controls are highly effective in preventing failure cause.
+1 | Failure is eliminated through prevention control design (no incident rate applies) | Best Practices: Behavioral or Technical | Prevention controls are extremely effective in preventing failure cause from occurring due to design (e.g. part geometry) or process (e.g. fixture or tooling design) - intent is that the Failure Mode cannot be physically produced due to the Failure Cause.
 
 Note: use REAL production/defect data when available; this table is for estimation when historical data doesn't exist."""
 
