@@ -83,3 +83,9 @@ excel_part_labeler_csv/
 thar_csv/
 warranty/
 PartLabelerDashBoard/
+
+# pfmea_ai generated outputs - regenerated locally on every run, keeps
+# causing "would be overwritten by merge" conflicts when the same
+# filename differs between a local run and what's on the remote branch.
+# Use `git add -f` to explicitly share a specific run's output if needed.
+pfmea_ai/*__with_suggestions.xlsx

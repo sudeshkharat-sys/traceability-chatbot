@@ -216,7 +216,9 @@ Function of Process Work Element: {(function.get('of_work_element') or '').strip
 THIS SPECIFIC FAILURE:
 Failure Mode: {failure_mode_text.strip()}
 Failure Cause: {(failure.get('cause') or '(not recorded)').strip()}
-Plant's recorded Severity: {risk.get('severity')}{merged_mode_check_section}
+Plant's recorded Severity: {risk.get('severity')}
+Current Prevention Control (PC) already in place at this station: {(risk.get('prevention_control') or '(none recorded)').strip() if isinstance(risk.get('prevention_control'), str) else (risk.get('prevention_control') or '(none recorded)')}
+Current Detection Controls (DC) already in place at this station: {(risk.get('detection_control') or '(none recorded)').strip() if isinstance(risk.get('detection_control'), str) else (risk.get('detection_control') or '(none recorded)')}{merged_mode_check_section}
 
 FAILURE EFFECT, split by whose perspective it's recorded from:
 {effect_text}
@@ -227,7 +229,9 @@ SCORING RULES (apply in this fixed order - do not skip or reorder steps; this is
   - NOT a safety-consequence phrase, no matter how it reads: "discomfort", "eye strain", "annoyance", "irritation", "fatigue", or similar minor-nuisance wording. These describe a customer annoyance, not an injury/accident/unsafe-operation outcome, and must NEVER trigger Step 1 on their own - route them to Step 4/5 (cosmetic/NVH) like any other minor symptom, even though they technically describe something happening to the driver's body. Only wording that names an actual accident, collision, injury, or unsafe-operation condition qualifies - "discomfort" and "strain" are explicitly excluded, not borderline.
   - Plausibility check (do not skip this): only withhold Step 1 if the safety phrase has NO reasonable causal connection to the stated Failure Mode/Cause at all - e.g. a missing/loose screw's effect list containing "vehicle catches fire" with nothing in the Cause suggesting electrical/fuel involvement would be implausible boilerplate, not a real consequence of this failure, and should be reasoned past (state this explicitly in your reasoning). For a component whose stated function is itself safety-relevant (lighting, braking, steering, restraint systems), an explicit accident/injury phrase in its own effect list is essentially always plausible and should not be second-guessed.
 - The "pick the representative symptom, not the worst one" judgment below applies ONLY to distinguishing between non-safety symptoms of differing severity (e.g. choosing between "dim light" and "does not turn on" when nothing safety-related is stated). It never applies to filtering out an explicit safety-consequence phrase - that phrase always wins regardless of what else is in the list.
-- Outside of an explicit safety phrase: the End User effect text may list several distinct non-safety symptoms. Pick the outcome that is actually representative of THIS Failure Mode/Cause specifically - never pick the worst-sounding phrase in the list if it describes a rare/extreme case rather than what this particular failure typically causes. Prefer the symptom that follows most DIRECTLY from the stated Failure Cause's physical mechanism (e.g. a loose/under-torqued fastener directly causes rattling/vibration; it does NOT directly cause a cracked lens or water ingress, which would require an additional, unstated failure step - do not pick those indirect symptoms as representative unless the Failure Cause text itself describes that mechanism).
+- CAUSE/MODE MISMATCH CHECK (do this before the next rule): the plant's Failure Mode and Failure Cause cells are typed independently and sometimes get mismatched - e.g. the same Cause text is copy-pasted onto an adjacent row whose Mode describes a physically unrelated defect (a Mode about a scratch/cosmetic defect paired with a Cause about installing the wrong part, which doesn't scratch anything). Ask: does the stated Failure Cause describe a physical mechanism that could actually produce the stated Failure Mode? If NOT - the Cause reads like it belongs to a different failure mode entirely - then treat this as a mismatch: ignore the Cause's mechanism for the purpose of picking a representative End User effect, base the representative-symptom judgment on the Failure Mode text alone instead, and set "cause_mode_mismatch" to true with a one-sentence note of what the Cause looks like it actually belongs to. This keeps the answer stable/repeatable instead of having different runs arbitrarily side with the Mode vs. the Cause. If the Cause plausibly does explain the Mode, set "cause_mode_mismatch" to false and proceed normally.
+  - IMPORTANT interaction with the MERGED-MODE CHECK above: falling back to the Mode text does NOT mean picking whichever single symptom feels most representative of "the Mode" in general - if the Mode text itself is a merged cell (multiple distinct failure-mode phrases, e.g. "Scratch" + "Damage"), you must still apply the merged-mode rule and score the WORST-CASE-severity distinct sub-mode among them (e.g. a mere surface "scratch" is typically cosmetic/appearance-only, but "damage" can plausibly mean deeper/structural damage that degrades optical function - use the more severe of those two readings, not just the calmer one). Do not let the mismatch fallback cause you to silently drop the worst-case selection you would otherwise be required to make.
+- Outside of an explicit safety phrase: the End User effect text may list several distinct non-safety symptoms. Pick the outcome that is actually representative of THIS Failure Mode/Cause specifically - never pick the worst-sounding phrase in the list if it describes a rare/extreme case rather than what this particular failure typically causes. Prefer the symptom that follows most DIRECTLY from the stated Failure Cause's physical mechanism, UNLESS the cause/mode mismatch check above applies, in which case prefer the symptom that follows most directly from the Failure MODE's own physical mechanism instead (e.g. a loose/under-torqued fastener directly causes rattling/vibration; it does NOT directly cause a cracked lens or water ingress, which would require an additional, unstated failure step - do not pick those indirect symptoms as representative unless the Failure Cause text itself describes that mechanism).
 - If this End User effect text is reused verbatim across unrelated failure modes elsewhere in the sheet, treat it as generic/boilerplate and judge severity primarily from the Failure Mode/Cause above, not from matching the boilerplate's worst phrase. This boilerplate exception does NOT override the explicit-safety-phrase hard rule above - even boilerplate text, if it explicitly states a safety consequence, still triggers Step 1.
 
 Work through this decision tree, in order, and stop at the first step whose condition is satisfied - that step's score band is your answer. CRITICAL: per Table C2-1 above, the 9-vs-10 split is SAFETY/HEALTH RISK (10) vs. REGULATORY NONCOMPLIANCE (9) ONLY - there is no "with/without warning" concept in this table. Do not use warning-related reasoning anywhere below.
@@ -243,21 +247,41 @@ Also propose ONE recommended action. Default assumption: for MOST failures, Seve
 Only propose an actual SEVERITY-reducing design change (a fail-safe, redundancy, or a physical/functional change to what happens when the failure occurs) in the rare case where such a change is genuinely proportionate to this failure - not as your default answer, and never a full component/system redesign ("redesign the headlamp", "add a redundant lighting path") unless the failure mode itself is severe enough (Step 1/2 score) to warrant it. Do NOT propose a driver-warning/notification feature (per Table C2-1, warning is not part of how Severity is scored, so it wouldn't lower the score anyway).
 Keep the recommendation to ONE sentence, specific enough that someone on the line could actually implement it this quarter - name the specific part/step/mechanism from the Failure Cause above, not a generic engineering platitude.
 
-Before scoring, do this 4-part audit explicitly (this becomes the "applicable_effect" field below) - it exists so an engineer can check your work without re-deriving it themselves:
-1. State the ONE End User effect phrase you are treating as applicable to THIS Failure Mode/Cause (quote it).
-2. State why it is causally applicable to this specific Failure Mode/Cause (not just "it's in the list").
-3. State whether any OTHER effect phrase in the list was a candidate and, if so, why you did not use it instead (e.g. "less severe phrase 'dim light' was also present but the explicit safety phrase 'increased risk of accident' takes priority per the hard rule").
-4. Only if the supplied Failure Mode/Cause/Effect text is genuinely ambiguous between two plausible effects (not merely "there were multiple phrases"), say so explicitly instead of silently picking one.
+Also propose ONE detection recommendation - this is a DIFFERENT question from Prevention above. Prevention stops the Failure Cause from happening at all; Detection is about how this station (or the next one downstream) would CATCH this specific Failure Mode if it happened anyway, before the part ships further down the line or leaves the plant. Concretely: a sensor, gauge, vision/camera check, poka-yoke verification step, functional test (e.g. an electrical continuity/illumination test), or an inspection gate - specific to what would actually reveal THIS Failure Mode (e.g. a vision-inspection gate reveals a scratch; an illumination test reveals a non-functioning headlamp; a torque-verification readout reveals under/over-torque). Do NOT propose a control that would only catch a DIFFERENT failure mode than the one in this row. Keep it to ONE sentence, same implementability bar as the Prevention recommendation.
+
+EXISTING CONTROLS RULE (applies to both the Prevention recommendation above and any Detection recommendation you are asked for elsewhere): you are given the Current Prevention Control (PC) and Current Detection Controls (DC) already in place at this station. Your recommendation must NOT just restate or duplicate what is already there (e.g. if DC already lists "SELF CHECK, CHECKMAN CHECKING, ECOS SYSTEM", do not recommend "add a self-check" - that already exists and adds nothing). Instead:
+- If an existing control is manual/human-dependent (self-check, visual check, checksheet) and the failure is severe enough to warrant it, recommend the specific automated/poka-yoke upgrade that would close the gap a manual control leaves open (manual checks can be skipped or missed; a sensor/interlock cannot).
+- If an existing control already looks adequate for this specific failure cause, say so plainly instead of inventing an unnecessary addition - it is fine for the recommendation to be "the existing prevention control (PC) already addresses this; no change needed" when that is honestly true.
+- Never recommend something that is already listed verbatim (or as a clear paraphrase) in the Current Prevention Control / Current Detection Controls text.
+
+Before scoring, do this audit explicitly (this becomes the "applicable_effect" field below) - it exists so an engineer can check your work without re-deriving it themselves. Do this as ONE enumerate-then-classify pass, not a serial "pick the first one that seems to fit and stop" pass - evaluating candidates one at a time in whatever order they happen to occur to you is exactly what causes different runs to reach different answers, because whichever effect you happen to consider first ends up anchoring the rest of your reasoning.
+1. ENUMERATE every distinct End User effect phrase listed for this row, in the order given, before judging any of them. Do not skip any to save time.
+2. For EACH one, classify it DIRECT or INDIRECT relative to the stated Failure Mode/Cause's physical mechanism: DIRECT means it follows without any additional, unstated failure step; INDIRECT means it would need an extra unstated mechanism to occur (per the existing "prefer the symptom that follows most directly" rule). Do this classification for the full list up front, not just for whichever phrase you first considered - a phrase must not be dismissed as INDIRECT just because a different phrase was checked and accepted first.
+   - MERGED-MODE SUB-CAUSE CHECK (apply this before finalizing any INDIRECT classification): if the Failure Mode is a merged cell with a milder sub-mode (e.g. "scratch", cosmetic) and a more severe sub-mode (e.g. "damage", which can mean structural/functional/electrical harm, not just cosmetic), you must test each End User effect against BOTH sub-modes separately, not just against the milder one. An effect that would be INDIRECT for the mild sub-mode (e.g. "does not turn on" is indirect for a mere surface scratch) can still be DIRECT for the severe sub-mode (e.g. "does not turn on" IS a direct plausible outcome of "damage" broadly construed - a damaged connector/housing failing electrically). Do not default to the milder sub-mode's reading and dismiss the severe sub-mode's implications early; you must explicitly consider whether the severe sub-mode makes an otherwise-INDIRECT effect DIRECT instead.
+3. Among only the effects classified DIRECT (after the sub-cause check above), state which ONE is the single most representative reading - quote it - and why, UNLESS step 4 below applies.
+4. If two or more DIRECT effects remain equally representative (this is what "genuinely ambiguous" means - not merely "there were multiple phrases in the list", and not an effect you already classified INDIRECT and set aside), say so explicitly and list all of them - this feeds the "possible_severities" field below instead of forcing a single pick.
+5. State explicitly whether the CAUSE/MODE MISMATCH CHECK applies here (does the stated Failure Cause's mechanism actually produce the stated Failure Mode?) - if it doesn't, say so and confirm you based the representative-symptom choice on the Failure Mode text instead of the Cause.
+
+AMBIGUITY BREAKDOWN RULE (do NOT silently force a single number when the row is genuinely ambiguous): the source Excel data is kept exactly as the plant recorded it and is not being rewritten or split for this task. Some rows (merged failure modes like "Scratch/Damage", or a Mode word like "damage" that could mean either a cosmetic or a functional outcome) do NOT have one unambiguously correct severity - a human reviewer needs to see the real options and choose, rather than the model quietly guessing one and being wrong (or unstable) half the time. So, using the classification from the enumerate-then-classify audit above (do not redo it differently here):
+- Only effects classified DIRECT (after the MERGED-MODE SUB-CAUSE CHECK) are ever eligible for "possible_severities". An effect classified INDIRECT is NEVER a valid ambiguity candidate, no matter how it reads in isolation.
+- Genuine ambiguity, eligible for "possible_severities", exists ONLY when two or more DIRECT candidates are each independently and equally representative of the stated Mode/Cause's own mechanism (including its severe sub-mode, per the check above). If only ONE DIRECT candidate remains, that is NOT ambiguous - score it normally and set "possible_severities" to null, even if the Effect list happens to contain other unrelated phrases.
+- If genuine ambiguity was found, populate "possible_severities" with one entry per distinct plausible DIRECT reading, each with its own severity/definition/reasoning, sorted worst (highest severity) first.
+- If there is no genuine ambiguity, set "possible_severities" to null - do not manufacture options that aren't real.
+- "suggested_severity" must always be set to the WORST (highest) severity among the "possible_severities" entries when that list is non-null (consistent with the existing worst-case-among-merged-modes rule), so the single-number field stays usable for the existing pass/fail comparison against the plant's recorded severity - the bullet list is the reviewer-facing detail, not a replacement for that field.
 
 Return ONLY valid JSON, no other text, in this exact shape:
 {{
   "suggested_severity": <integer 1-10>,
   "matched_table_definition": "<the exact AIAG-VDA definition text this effect matches>",
-  "applicable_effect": "<the 4-part audit above, as 1-4 short numbered clauses>",
+  "applicable_effect": "<the enumerate-then-classify audit above, as short numbered clauses covering: the full DIRECT/INDIRECT classification of every listed effect, which one you picked as representative (or the ambiguous set), and why>",
+  "possible_severities": "<null if not genuinely ambiguous; otherwise a list of objects, worst-first, each shaped {{'severity': <int>, 'effect_used': '<quoted End User effect phrase>', 'matched_table_definition': '<table text>', 'reasoning': '<1-2 sentences>'}}, one per distinct plausible reading - this is what a human reviewer picks between instead of the model silently guessing>",
   "decision_path": "<one short clause per decision-tree step you passed through, e.g. 'Step1: no safety/health risk -> Step2: no regulatory noncompliance -> Step3: not total loss of primary function -> Step4: stopped here, total loss of secondary function'>",
   "reasoning": "<1-3 sentences explaining why THIS Failure Mode/Cause matches this score, referencing specific details from the End User effect text>",
   "recommended_action": "<one specific, implementable action - usually a targeted prevention/error-proofing action for this exact Failure Cause, occasionally a proportionate severity-reducing design change for high-severity effects; never a generic full-component redesign>",
-  "merged_modes_detected": {merged_modes_field}
+  "detection_recommendation": "<one specific, implementable way to CATCH this exact Failure Mode if it occurs - a sensor/gauge/vision check/functional test/inspection gate specific to this Mode, not a control that would only catch a different failure mode>",
+  "merged_modes_detected": {merged_modes_field},
+  "cause_mode_mismatch": <true if the Failure Cause's physical mechanism does not logically produce the stated Failure Mode (per the CAUSE/MODE MISMATCH CHECK rule above), false otherwise>,
+  "cause_mode_mismatch_note": "<null if cause_mode_mismatch is false; otherwise one sentence saying what the Cause text looks like it actually belongs to instead, e.g. 'This Cause (wrong part/mix-up) does not produce a scratch/damage Mode - it reads like the Cause for the adjacent Fitment/Wrong-selection row instead'>"
 }}"""
 
 
@@ -465,21 +489,29 @@ def main():
                     "agree": plant_sev == ai_sev,
                     "ai_matched_table_definition": runs[0]["matched_table_definition"],
                     "ai_applicable_effect": runs[0].get("applicable_effect"),
+                    "ai_possible_severities": runs[0].get("possible_severities"),
                     "ai_decision_path": runs[0].get("decision_path"),
                     "ai_reasoning": runs[0]["reasoning"],
                     "ai_recommended_action": runs[0].get("recommended_action"),
+                    "ai_detection_recommendation": runs[0].get("detection_recommendation"),
                     "ai_merged_modes_detected": merged_modes_detected,
                     "ai_split_suggestions": ai_split_suggestions,
+                    "ai_cause_mode_mismatch": runs[0].get("cause_mode_mismatch"),
+                    "ai_cause_mode_mismatch_note": runs[0].get("cause_mode_mismatch_note"),
                     "ai_consistent_across_runs": consistent,
                     "ai_runs": [
                         {
                             "suggested_severity": r["suggested_severity"],
                             "matched_table_definition": r["matched_table_definition"],
                             "applicable_effect": r.get("applicable_effect"),
+                            "possible_severities": r.get("possible_severities"),
                             "decision_path": r.get("decision_path"),
                             "reasoning": r["reasoning"],
                             "recommended_action": r.get("recommended_action"),
+                            "detection_recommendation": r.get("detection_recommendation"),
                             "merged_modes_detected": r.get("merged_modes_detected"),
+                            "cause_mode_mismatch": r.get("cause_mode_mismatch"),
+                            "cause_mode_mismatch_note": r.get("cause_mode_mismatch_note"),
                         }
                         for r in runs
                     ] if repeat > 1 else None,
@@ -487,7 +519,8 @@ def main():
             )
             agreement = "MATCH" if plant_sev == ai_sev else f"DIFFERS (plant={plant_sev}, AI={ai_sev})"
             stability = "" if repeat == 1 else (" [STABLE]" if consistent else f" [UNSTABLE: {severities}]")
-            print(f"[{sn}] {(failure_mode or '')[:40]!r:42} {agreement}{stability}")
+            ambiguous = " [AMBIGUOUS - see possible_severities]" if runs[0].get("possible_severities") else ""
+            print(f"[{sn}] {(failure_mode or '')[:40]!r:42} {agreement}{stability}{ambiguous}")
             if ai_split_suggestions:
                 print(f"    MERGED MODE CELL - scored {len(ai_split_suggestions)} modes separately:")
                 for s in ai_split_suggestions:
