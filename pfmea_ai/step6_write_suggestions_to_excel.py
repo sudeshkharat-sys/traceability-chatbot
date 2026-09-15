@@ -386,6 +386,13 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             detection = s.get("detection_recommendation") or "n/a"
             return f"Prevention: {prevention}\nDetection: {detection}"
 
+        def submode_severity_detection(s):
+            sev = s.get("suggested_severity")
+            det = s.get("suggested_detection")
+            sev_text = f"S{sev}" if sev is not None else "S?"
+            det_text = f"D{det}" if det is not None else "D(not scored - re-run needed)"
+            return f"{sev_text} / {det_text}"
+
         values = {
             severity_col: row["ai_suggested_severity"],
             severity_note_col: row.get("ai_reasoning") or "",
@@ -398,10 +405,10 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             # reading through the Remark paragraph - additional splits
             # beyond 2 (rare) still show up in Remark only.
             submode_a_col: splits[0]["failure_mode"] if len(splits) >= 1 else "",
-            submode_a_sd_col: f"S{splits[0]['suggested_severity']} / D{splits[0].get('suggested_detection')}" if len(splits) >= 1 else "",
+            submode_a_sd_col: submode_severity_detection(splits[0]) if len(splits) >= 1 else "",
             submode_a_actions_col: submode_actions(splits[0]) if len(splits) >= 1 else "",
             submode_b_col: splits[1]["failure_mode"] if len(splits) >= 2 else "",
-            submode_b_sd_col: f"S{splits[1]['suggested_severity']} / D{splits[1].get('suggested_detection')}" if len(splits) >= 2 else "",
+            submode_b_sd_col: submode_severity_detection(splits[1]) if len(splits) >= 2 else "",
             submode_b_actions_col: submode_actions(splits[1]) if len(splits) >= 2 else "",
             remark_col: build_remark(row, cause_to_modes, this_cause),
         }
