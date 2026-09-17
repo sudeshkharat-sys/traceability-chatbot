@@ -84,6 +84,13 @@ NEW_COLUMN_HEADERS = [
     "Remark",
 ]
 
+# merge_mode folds each sub-mode's Prevention/Detection action straight into
+# the Prevention/Detection Note columns as "A = ...\nB = ..." (same as
+# Severity/Detection above), so the separate Sub-mode Prevention/Sub-mode
+# Detection columns would just repeat that same text a second time - drop
+# them instead of shipping a duplicate column.
+MERGE_MODE_COLUMN_HEADERS = [h for h in NEW_COLUMN_HEADERS if h not in ("Sub-mode Prevention", "Sub-mode Detection")]
+
 # Distinct purple fill for the new Suggestion block, matching the plant's
 # own screenshot of this block, so it visually reads as a clearly-new,
 # AI-suggested area rather than blending into the existing green/blue
@@ -293,8 +300,9 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
     # its siblings (e.g. "Severity (S)" at row 15-17) - found by inspecting
     # an existing sub-header's own merged range rather than hardcoding row
     # numbers, so this keeps working if the template's row layout shifts.
+    headers = MERGE_MODE_COLUMN_HEADERS if merge_mode else NEW_COLUMN_HEADERS
     start_col = ws.max_column + 1
-    end_col = start_col + len(NEW_COLUMN_HEADERS) - 1
+    end_col = start_col + len(headers) - 1
 
     section_header_row_start, section_header_row_end, section_ref_cell = find_section_header_rows(ws, header_row)
     sub_header_row_start, sub_header_row_end, sub_ref_cell = find_sub_header_rows(ws, header_row)
@@ -310,17 +318,23 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
     # looks uniform instead of showing stray unstyled interior cells.
     style_merged_range(ws, section_header_row_start, section_header_row_end, start_col, end_col, section_ref_cell, center=True)
 
-    for i, header in enumerate(NEW_COLUMN_HEADERS):
+    for i, header in enumerate(headers):
         col = start_col + i
         ws.merge_cells(start_row=sub_header_row_start, start_column=col, end_row=sub_header_row_end, end_column=col)
         ws.cell(row=sub_header_row_start, column=col, value=header)
         style_merged_range(ws, sub_header_row_start, sub_header_row_end, col, col, sub_ref_cell, fill_rgb=SUGGESTION_FILL_RGB, center=True)
 
-    (
-        severity_col, severity_note_col, occurrence_col, detection_col, detection_note_col, prevention_col,
-        submodes_col, submode_prevention_col, submode_detection_col,
-        remark_col,
-    ) = range(start_col, start_col + len(NEW_COLUMN_HEADERS))
+    col_by_header = {header: start_col + i for i, header in enumerate(headers)}
+    severity_col = col_by_header["Severity (S)"]
+    severity_note_col = col_by_header["Severity Note"]
+    occurrence_col = col_by_header["Occurrence (O)"]
+    detection_col = col_by_header["Detection (D)"]
+    detection_note_col = col_by_header["Detection Note"]
+    prevention_col = col_by_header["Prevention"]
+    submodes_col = col_by_header["Sub-modes"]
+    submode_prevention_col = col_by_header.get("Sub-mode Prevention")
+    submode_detection_col = col_by_header.get("Sub-mode Detection")
+    remark_col = col_by_header["Remark"]
 
     # Widen the new columns so wrapped text is actually readable instead of
     # squeezing into the sheet's default column width - Severity/Occurrence/
@@ -341,6 +355,8 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
         remark_col: 50,
     }
     for col, width in column_widths.items():
+        if col is None:
+            continue
         ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = width
 
     log(f"  [{ws.title}] header row: {header_row}, Suggestion block: {ws.cell(row=header_row, column=start_col).coordinate.rstrip('0123456789')}-{ws.cell(row=header_row, column=end_col).coordinate.rstrip('0123456789')}")
@@ -381,20 +397,24 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             return str(det) if det is not None else "(not scored - re-run needed)"
 
         if merge_mode and splits:
-            # A/B split values move INTO the actual Severity/Detection
-            # columns (this is the point of merge_mode) - no single
-            # row-level worst-case number sitting next to them anymore.
-            # Sub-modes then only needs to say what A/B name each is.
+            # A/B split values move INTO the actual Severity/Detection/
+            # Prevention columns (this is the point of merge_mode) - no
+            # single row-level worst-case value sitting next to them, and
+            # no separate Sub-mode Prevention/Detection columns repeating
+            # the same text a second time. Sub-modes then only needs to
+            # say what A/B name each is.
             severity_value = "\n".join(f"{labels[i]} = {sev_text(s)}" for i, s in enumerate(splits))
             severity_note_value = "\n".join(f"{labels[i]} = {s.get('reasoning') or ''}" for i, s in enumerate(splits))
             detection_value = "\n".join(f"{labels[i]} = {det_text(s)}" for i, s in enumerate(splits))
             detection_note_value = "\n".join(f"{labels[i]} = {s.get('detection_recommendation') or 'n/a'}" for i, s in enumerate(splits))
+            prevention_value = "\n".join(f"{labels[i]} = {s.get('recommended_action') or 'n/a'}" for i, s in enumerate(splits))
             submodes_value = "\n".join(f"{labels[i]} = {s['failure_mode']}" for i, s in enumerate(splits))
         else:
             severity_value = row["ai_suggested_severity"]
             severity_note_value = row.get("ai_reasoning") or ""
             detection_value = row.get("ai_suggested_detection")
             detection_note_value = row.get("ai_detection_recommendation") or ""
+            prevention_value = row.get("ai_recommended_action") or ""
             # Non-merge_mode keeps the original "A = name (Sx/Dy)" combined
             # line in Sub-modes, unchanged from before merge_mode existed.
             submodes_value = "\n".join(
@@ -407,20 +427,23 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             # Occurrence intentionally left blank - requires real plant data.
             detection_col: detection_value,
             detection_note_col: detection_note_value,
-            prevention_col: row.get("ai_recommended_action") or "",
-            # First two split modes get compact "A = ..." / "B = ..." lines
-            # in dedicated columns, side-by-side with the row's own values,
-            # instead of only readable inside the Remark paragraph.
-            # Additional splits beyond 2 (rare) still show up in Remark only.
+            prevention_col: prevention_value,
             submodes_col: submodes_value,
-            submode_prevention_col: "\n".join(
-                f"{labels[i]} = {s.get('recommended_action') or 'n/a'}" for i, s in enumerate(splits)
-            ),
-            submode_detection_col: "\n".join(
-                f"{labels[i]} = {s.get('detection_recommendation') or 'n/a'}" for i, s in enumerate(splits)
-            ),
             remark_col: build_remark(row, cause_to_modes, this_cause),
         }
+        # Non-merge_mode only: dedicated Sub-mode Prevention/Detection
+        # columns with the same "A = ...\nB = ..." breakdown - in
+        # merge_mode this same text already lives in Prevention/Detection
+        # Note above, so these columns don't exist there (see
+        # MERGE_MODE_COLUMN_HEADERS).
+        if submode_prevention_col is not None:
+            values[submode_prevention_col] = "\n".join(
+                f"{labels[i]} = {s.get('recommended_action') or 'n/a'}" for i, s in enumerate(splits)
+            )
+        if submode_detection_col is not None:
+            values[submode_detection_col] = "\n".join(
+                f"{labels[i]} = {s.get('detection_recommendation') or 'n/a'}" for i, s in enumerate(splits)
+            )
         for col, value in values.items():
             if row_end > row_start:
                 ws.merge_cells(start_row=row_start, start_column=col, end_row=row_end, end_column=col)
