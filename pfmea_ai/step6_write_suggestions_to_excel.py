@@ -246,7 +246,7 @@ def build_remark(row, cause_to_modes, this_cause):
     return " ".join(parts) if parts else "Single failure mode, no flags."
 
 
-def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None, log=print):
+def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None, log=print, merge_mode=False):
     """Core of step6: given an already-open worksheet and this sheet's list
     of suggestion rows (step5's per-sheet output shape), append the
     Suggestion column block and write every row's values into it. Mutates
@@ -257,7 +257,16 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
     (e.g. if no severity_input data was available). Returns the number of
     rows written, or None if the sheet's header row couldn't be found (an
     error is logged instead of raising, so a multi-sheet caller can skip
-    just this one sheet and continue with the rest)."""
+    just this one sheet and continue with the rest).
+
+    merge_mode=True changes how a merged (2+ sub-modes) row's Severity/
+    Severity Note/Detection/Detection Note cells are written: instead of
+    the single row-level worst-case value, each cell gets one "A = ...\\nB
+    = ..." line per detected sub-mode - the same A/B labels as the
+    Sub-modes column, so a reviewer never has to go hunting in Sub-modes
+    for the actual number. The Sub-modes column itself then only needs to
+    say what A and B ARE (the failure-mode names), not repeat their
+    scores. A row with no detected sub-modes is unaffected either way."""
     cause_to_modes = cause_to_modes or {}
     cause_by_mode = cause_by_mode or {}
 
@@ -363,25 +372,47 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
         splits = (row.get("ai_split_suggestions") or [])[:2]
         labels = ["A", "B"]
 
-        def submode_line(label, s):
+        def sev_text(s):
             sev = s.get("suggested_severity")
+            return str(sev) if sev is not None else "?"
+
+        def det_text(s):
             det = s.get("suggested_detection")
-            sev_text = f"S{sev}" if sev is not None else "S?"
-            det_text = f"D{det}" if det is not None else "D(not scored - re-run needed)"
-            return f"{label} = {s['failure_mode']} ({sev_text}/{det_text})"
+            return str(det) if det is not None else "(not scored - re-run needed)"
+
+        if merge_mode and splits:
+            # A/B split values move INTO the actual Severity/Detection
+            # columns (this is the point of merge_mode) - no single
+            # row-level worst-case number sitting next to them anymore.
+            # Sub-modes then only needs to say what A/B name each is.
+            severity_value = "\n".join(f"{labels[i]} = {sev_text(s)}" for i, s in enumerate(splits))
+            severity_note_value = "\n".join(f"{labels[i]} = {s.get('reasoning') or ''}" for i, s in enumerate(splits))
+            detection_value = "\n".join(f"{labels[i]} = {det_text(s)}" for i, s in enumerate(splits))
+            detection_note_value = "\n".join(f"{labels[i]} = {s.get('detection_recommendation') or 'n/a'}" for i, s in enumerate(splits))
+            submodes_value = "\n".join(f"{labels[i]} = {s['failure_mode']}" for i, s in enumerate(splits))
+        else:
+            severity_value = row["ai_suggested_severity"]
+            severity_note_value = row.get("ai_reasoning") or ""
+            detection_value = row.get("ai_suggested_detection")
+            detection_note_value = row.get("ai_detection_recommendation") or ""
+            # Non-merge_mode keeps the original "A = name (Sx/Dy)" combined
+            # line in Sub-modes, unchanged from before merge_mode existed.
+            submodes_value = "\n".join(
+                f"{labels[i]} = {s['failure_mode']} (S{sev_text(s)}/D{det_text(s)})" for i, s in enumerate(splits)
+            )
 
         values = {
-            severity_col: row["ai_suggested_severity"],
-            severity_note_col: row.get("ai_reasoning") or "",
+            severity_col: severity_value,
+            severity_note_col: severity_note_value,
             # Occurrence intentionally left blank - requires real plant data.
-            detection_col: row.get("ai_suggested_detection"),
-            detection_note_col: row.get("ai_detection_recommendation") or "",
+            detection_col: detection_value,
+            detection_note_col: detection_note_value,
             prevention_col: row.get("ai_recommended_action") or "",
             # First two split modes get compact "A = ..." / "B = ..." lines
             # in dedicated columns, side-by-side with the row's own values,
             # instead of only readable inside the Remark paragraph.
             # Additional splits beyond 2 (rare) still show up in Remark only.
-            submodes_col: "\n".join(submode_line(labels[i], s) for i, s in enumerate(splits)),
+            submodes_col: submodes_value,
             submode_prevention_col: "\n".join(
                 f"{labels[i]} = {s.get('recommended_action') or 'n/a'}" for i, s in enumerate(splits)
             ),
@@ -405,25 +436,37 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
 
 
 def main():
-    if len(sys.argv) < 4:
-        print("Usage: python step6_write_suggestions_to_excel.py <source.xlsx> <sheet_name> <suggestions.json> [severity_input.json] [output.xlsx]")
+    args = sys.argv[1:]
+    # --merge-mode: A/B split values go into the Severity/Detection columns
+    # themselves instead of the row-level worst-case value (see
+    # apply_suggestions_to_sheet's docstring). Writes to a separate
+    # "__merge_mode.xlsx" file by default - never overwrites the plain
+    # "__with_suggestions.xlsx" output, so both formats stay available side
+    # by side for review.
+    merge_mode = "--merge-mode" in args
+    if merge_mode:
+        args.remove("--merge-mode")
+
+    if len(args) < 3:
+        print("Usage: python step6_write_suggestions_to_excel.py <source.xlsx> <sheet_name> <suggestions.json> [severity_input.json] [output.xlsx] [--merge-mode]")
         sys.exit(1)
 
-    source_path = Path(sys.argv[1])
-    sheet_name = sys.argv[2]
-    suggestions_path = Path(sys.argv[3])
+    source_path = Path(args[0])
+    sheet_name = args[1]
+    suggestions_path = Path(args[2])
 
     # 4th/5th args are both optional and positionally ambiguous (severity_input
     # json vs. output xlsx) - disambiguate by file extension.
     severity_input_path = None
     output_path = None
-    for extra in sys.argv[4:]:
+    for extra in args[3:]:
         if extra.lower().endswith(".json"):
             severity_input_path = Path(extra)
         else:
             output_path = Path(extra)
     if output_path is None:
-        output_path = source_path.with_name(f"{source_path.stem}__with_suggestions.xlsx")
+        suffix = "__merge_mode.xlsx" if merge_mode else "__with_suggestions.xlsx"
+        output_path = source_path.with_name(f"{source_path.stem}{suffix}")
 
     with open(suggestions_path, encoding="utf-8") as fh:
         suggestions = json.load(fh)
@@ -451,7 +494,7 @@ def main():
         sys.exit(1)
     ws = wb[sheet_name]
 
-    written = apply_suggestions_to_sheet(ws, rows, cause_to_modes=cause_to_modes, cause_by_mode=cause_by_mode)
+    written = apply_suggestions_to_sheet(ws, rows, cause_to_modes=cause_to_modes, cause_by_mode=cause_by_mode, merge_mode=merge_mode)
     if written is None:
         sys.exit(1)
 
