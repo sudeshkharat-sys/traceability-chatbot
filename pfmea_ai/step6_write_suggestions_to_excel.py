@@ -72,6 +72,14 @@ from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Border, PatternFill, Side
 
 NEW_COLUMN_HEADERS = [
+    # First column in the Suggestion block on purpose - the sheet's own
+    # Failure Mode column is far to the left (e.g. column P), so a reader
+    # who has scrolled all the way over to the Suggestion block at the
+    # right edge would otherwise have no idea which failure mode a row's
+    # Severity/Detection/Prevention values are even about, especially once
+    # split into "A = .../B = ...". Repeating the mode name(s) right here
+    # means the Suggestion section is readable entirely on its own.
+    "Failure Mode",
     "Severity (S)",
     "Severity Note",
     "Occurrence (O)",
@@ -336,6 +344,7 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
         style_merged_range(ws, sub_header_row_start, sub_header_row_end, col, col, sub_ref_cell, fill_rgb=SUGGESTION_FILL_RGB, center=True)
 
     col_by_header = {header: start_col + i for i, header in enumerate(headers)}
+    failure_mode_col = col_by_header["Failure Mode"]
     severity_col = col_by_header["Severity (S)"]
     severity_note_col = col_by_header["Severity Note"]
     occurrence_col = col_by_header["Occurrence (O)"]
@@ -354,6 +363,7 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
     # that so a sentence of reasoning doesn't look cramped/odd in a
     # single-number-width column.
     column_widths = {
+        failure_mode_col: 35,
         severity_col: 8,
         severity_note_col: 45,
         occurrence_col: 8,
@@ -399,6 +409,15 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
         splits = (row.get("ai_split_suggestions") or [])[:2]
         labels = ["A", "B"]
 
+        # Repeated at the start of the Suggestion block regardless of
+        # merge_mode, so the block reads on its own without scrolling back
+        # to the sheet's own Failure Mode column - single mode name normally,
+        # or "A = .../B = ..." when this row's cell was a merged/split mode.
+        failure_mode_value = (
+            "\n".join(f"{labels[i]} = {s['failure_mode']}" for i, s in enumerate(splits))
+            if splits else row["failure_mode"]
+        )
+
         def sev_text(s):
             sev = s.get("suggested_severity")
             return str(sev) if sev is not None else "?"
@@ -436,6 +455,7 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             )
 
         values = {
+            failure_mode_col: failure_mode_value,
             severity_col: severity_value,
             severity_note_col: severity_note_value,
             # Occurrence intentionally left blank - requires real plant data.
