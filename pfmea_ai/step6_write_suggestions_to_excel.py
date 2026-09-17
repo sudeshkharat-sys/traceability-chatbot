@@ -88,8 +88,13 @@ NEW_COLUMN_HEADERS = [
 # the Prevention/Detection Note columns as "A = ...\nB = ..." (same as
 # Severity/Detection above), so the separate Sub-mode Prevention/Sub-mode
 # Detection columns would just repeat that same text a second time - drop
-# them instead of shipping a duplicate column.
-MERGE_MODE_COLUMN_HEADERS = [h for h in NEW_COLUMN_HEADERS if h not in ("Sub-mode Prevention", "Sub-mode Detection")]
+# them instead of shipping a duplicate column. Sub-modes itself is also
+# dropped: the plant's own Failure Mode column (already the first column
+# on the sheet) already holds the raw merged text with both sub-modes in
+# it, so re-stating "A = <name> / B = <name>" in a second column next to
+# it is redundant - the A/B labels only need to live where the actual
+# per-mode values are (Severity/Detection/Prevention Note above).
+MERGE_MODE_COLUMN_HEADERS = [h for h in NEW_COLUMN_HEADERS if h not in ("Sub-modes", "Sub-mode Prevention", "Sub-mode Detection")]
 
 # Distinct purple fill for the new Suggestion block, matching the plant's
 # own screenshot of this block, so it visually reads as a clearly-new,
@@ -216,7 +221,7 @@ def build_duplicate_cause_map(severity_input_path):
     return cause_to_modes
 
 
-def build_remark(row, cause_to_modes, this_cause):
+def build_remark(row, cause_to_modes, this_cause, merge_mode=False):
     """Short, single-cell Remark text: notes merged failure modes, any
     cause/mode mismatch or ambiguity flag, plant-vs-AI disagreement, and
     (new) whether this row's Cause is duplicated on a different Mode
@@ -225,11 +230,17 @@ def build_remark(row, cause_to_modes, this_cause):
 
     merged = row.get("ai_merged_modes_detected")
     if merged:
-        # The per-sub-mode Severity/Detection/Prevention/Detection-action
-        # detail lives in the dedicated Sub-modes/Sub-mode Prevention/
-        # Sub-mode Detection columns now - keep this a short pointer
-        # instead of duplicating all of that as one long paragraph.
-        parts.append(f"Merged failure mode ({len(merged)} distinct modes detected) - see Sub-modes columns for per-mode Severity/Detection/actions. Row-level Severity/Detection above are the worst case; consider splitting this row in the plant sheet.")
+        if merge_mode:
+            # merge_mode has no Sub-modes column - the A/B breakdown lives
+            # directly in Severity/Detection/Prevention above, matched
+            # against the plant's own (still-merged) Failure Mode cell.
+            parts.append(f"Merged failure mode ({len(merged)} distinct modes detected) - see the A/B breakdown in Severity/Detection/Prevention above, matched against the Failure Mode text.")
+        else:
+            # The per-sub-mode Severity/Detection/Prevention/Detection-action
+            # detail lives in the dedicated Sub-modes/Sub-mode Prevention/
+            # Sub-mode Detection columns now - keep this a short pointer
+            # instead of duplicating all of that as one long paragraph.
+            parts.append(f"Merged failure mode ({len(merged)} distinct modes detected) - see Sub-modes columns for per-mode Severity/Detection/actions. Row-level Severity/Detection above are the worst case; consider splitting this row in the plant sheet.")
 
     if row.get("ai_cause_mode_mismatch"):
         note = row.get("ai_cause_mode_mismatch_note") or "Stated Cause does not logically produce the stated Mode."
@@ -331,7 +342,7 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
     detection_col = col_by_header["Detection (D)"]
     detection_note_col = col_by_header["Detection Note"]
     prevention_col = col_by_header["Prevention"]
-    submodes_col = col_by_header["Sub-modes"]
+    submodes_col = col_by_header.get("Sub-modes")
     submode_prevention_col = col_by_header.get("Sub-mode Prevention")
     submode_detection_col = col_by_header.get("Sub-mode Detection")
     remark_col = col_by_header["Remark"]
@@ -408,7 +419,10 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             detection_value = "\n".join(f"{labels[i]} = {det_text(s)}" for i, s in enumerate(splits))
             detection_note_value = "\n".join(f"{labels[i]} = {s.get('detection_recommendation') or 'n/a'}" for i, s in enumerate(splits))
             prevention_value = "\n".join(f"{labels[i]} = {s.get('recommended_action') or 'n/a'}" for i, s in enumerate(splits))
-            submodes_value = "\n".join(f"{labels[i]} = {s['failure_mode']}" for i, s in enumerate(splits))
+            # No Sub-modes column in merge_mode (see MERGE_MODE_COLUMN_HEADERS) -
+            # the plant's own Failure Mode column already shows the raw
+            # merged text, and the A/B labels above are enough to match it.
+            submodes_value = None
         else:
             severity_value = row["ai_suggested_severity"]
             severity_note_value = row.get("ai_reasoning") or ""
@@ -428,9 +442,10 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             detection_col: detection_value,
             detection_note_col: detection_note_value,
             prevention_col: prevention_value,
-            submodes_col: submodes_value,
-            remark_col: build_remark(row, cause_to_modes, this_cause),
+            remark_col: build_remark(row, cause_to_modes, this_cause, merge_mode=merge_mode),
         }
+        if submodes_col is not None:
+            values[submodes_col] = submodes_value
         # Non-merge_mode only: dedicated Sub-mode Prevention/Detection
         # columns with the same "A = ...\nB = ..." breakdown - in
         # merge_mode this same text already lives in Prevention/Detection
