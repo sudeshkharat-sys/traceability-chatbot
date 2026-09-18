@@ -40,10 +40,15 @@ nashik-chatbot-pq/.env):
     AZURE_API_VERSION_GPT5 (default "2025-01-01-preview"),
     REASONING_EFFORT (default "medium")
 
-To compare against a different Azure-deployed model (a cheaper GPT-5 tier,
-an open model like Llama served through an Azure AI Foundry
-OpenAI-compatible endpoint, etc.), set LLM_MODEL_PROFILE to any name other
-than "gpt5" (e.g. "llama") and define its own credential set:
+To compare against a different Azure-deployed model, set LLM_MODEL_PROFILE:
+    LLM_MODEL_PROFILE=gpt4omini reuses the gpt-4o-mini deployment already
+    configured for nashik-chatbot-pq (AZURE_CHAT_ENDPOINT/AZURE_CHAT_DEPLOYMENT/
+    AZURE_API_VERSION_CHAT) - same .env, no new Azure resource needed.
+
+For any other model (a cheaper GPT-5 tier, an open model like Llama served
+through an Azure AI Foundry OpenAI-compatible endpoint, etc.), set
+LLM_MODEL_PROFILE to any other name (e.g. "llama") and define its own
+credential set:
     AZURE_<PROFILE>_ENDPOINT, AZURE_<PROFILE>_DEPLOYMENT,
     AZURE_<PROFILE>_API_VERSION (default "2024-05-01-preview"),
     AZURE_<PROFILE>_API_KEY (optional - falls back to shared AZURE_API_KEY)
@@ -411,6 +416,13 @@ def get_llm():
         endpoint = os.environ.get("AZURE_GPT5_ENDPOINT") or os.environ.get("AZURE_CHAT_ENDPOINT")
         deployment = os.environ.get("AZURE_GPT_5_DEPLOYMENT", "gpt-5")
         api_version = os.environ.get("AZURE_API_VERSION_GPT5", "2025-01-01-preview")
+    elif profile == "gpt4omini":
+        # Reuses the gpt-4o-mini deployment nashik-chatbot-pq/app/config/config.py
+        # already defines (AZURE_CHAT_DEPLOYMENT/AZURE_CHAT_ENDPOINT/
+        # AZURE_API_VERSION_CHAT) - same .env, no new Azure resource needed.
+        endpoint = os.environ.get("AZURE_CHAT_ENDPOINT")
+        deployment = os.environ.get("AZURE_CHAT_DEPLOYMENT", "gpt-4o-mini")
+        api_version = os.environ.get("AZURE_API_VERSION_CHAT", "2024-12-01-preview")
     else:
         prefix = profile.upper()
         endpoint = os.environ.get(f"AZURE_{prefix}_ENDPOINT")
@@ -424,6 +436,10 @@ def get_llm():
             print("  AZURE_API_KEY")
             print("  AZURE_GPT5_ENDPOINT (or AZURE_CHAT_ENDPOINT as a fallback)")
             print("  AZURE_GPT_5_DEPLOYMENT (default \"gpt-5\")")
+        elif profile == "gpt4omini":
+            print("  AZURE_API_KEY")
+            print("  AZURE_CHAT_ENDPOINT")
+            print("  AZURE_CHAT_DEPLOYMENT (default \"gpt-4o-mini\")")
         else:
             print(f"  AZURE_{profile.upper()}_ENDPOINT")
             print(f"  AZURE_{profile.upper()}_DEPLOYMENT")
