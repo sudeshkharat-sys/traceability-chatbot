@@ -39,6 +39,15 @@ nashik-chatbot-pq/.env):
     AZURE_GPT_5_DEPLOYMENT (default "gpt-5"),
     AZURE_API_VERSION_GPT5 (default "2025-01-01-preview"),
     REASONING_EFFORT (default "medium")
+
+To compare against a different Azure-deployed model (a cheaper GPT-5 tier,
+an open model like Llama served through an Azure AI Foundry
+OpenAI-compatible endpoint, etc.), set LLM_MODEL_PROFILE to any name other
+than "gpt5" (e.g. "llama") and define its own credential set:
+    AZURE_<PROFILE>_ENDPOINT, AZURE_<PROFILE>_DEPLOYMENT,
+    AZURE_<PROFILE>_API_VERSION (default "2024-05-01-preview"),
+    AZURE_<PROFILE>_API_KEY (optional - falls back to shared AZURE_API_KEY)
+e.g. for LLM_MODEL_PROFILE=llama: AZURE_LLAMA_ENDPOINT, AZURE_LLAMA_DEPLOYMENT.
 """
 
 import json
@@ -379,23 +388,49 @@ def _load_dotenv_into_environ():
 
 
 def get_llm():
+    """Build the chat model for whichever profile LLM_MODEL_PROFILE selects.
+
+    The pipeline started out hardcoded to the single Azure "gpt-5" reasoning
+    deployment. To let other Azure-deployed models (a cheaper GPT-5 tier, an
+    open model like Llama served through Azure AI Foundry's OpenAI-compatible
+    endpoint, etc.) be compared against it without editing code, each
+    non-default profile reads its own credential set from
+    AZURE_<PROFILE>_ENDPOINT / _DEPLOYMENT / _API_VERSION (falling back to the
+    shared AZURE_API_KEY), selected by LLM_MODEL_PROFILE. "gpt5" (the
+    default) keeps the exact original env var names for backward
+    compatibility with existing .env files.
+    """
     from langchain_openai import AzureChatOpenAI
 
     _load_dotenv_into_environ()
 
+    profile = os.environ.get("LLM_MODEL_PROFILE", "gpt5").strip().lower()
     api_key = os.environ.get("AZURE_API_KEY")
-    endpoint = os.environ.get("AZURE_GPT5_ENDPOINT") or os.environ.get("AZURE_CHAT_ENDPOINT")
-    if not api_key or not endpoint:
-        print("ERROR: missing credentials. Set these environment variables (same as nashik-chatbot-pq/.env):")
-        print("  AZURE_API_KEY")
-        print("  AZURE_GPT5_ENDPOINT (or AZURE_CHAT_ENDPOINT as a fallback)")
+
+    if profile == "gpt5":
+        endpoint = os.environ.get("AZURE_GPT5_ENDPOINT") or os.environ.get("AZURE_CHAT_ENDPOINT")
+        deployment = os.environ.get("AZURE_GPT_5_DEPLOYMENT", "gpt-5")
+        api_version = os.environ.get("AZURE_API_VERSION_GPT5", "2025-01-01-preview")
+    else:
+        prefix = profile.upper()
+        endpoint = os.environ.get(f"AZURE_{prefix}_ENDPOINT")
+        deployment = os.environ.get(f"AZURE_{prefix}_DEPLOYMENT")
+        api_version = os.environ.get(f"AZURE_{prefix}_API_VERSION", "2024-05-01-preview")
+        api_key = os.environ.get(f"AZURE_{prefix}_API_KEY", api_key)
+
+    if not api_key or not endpoint or not deployment:
+        print(f"ERROR: missing credentials for LLM_MODEL_PROFILE={profile!r}. Set these environment variables:")
+        if profile == "gpt5":
+            print("  AZURE_API_KEY")
+            print("  AZURE_GPT5_ENDPOINT (or AZURE_CHAT_ENDPOINT as a fallback)")
+            print("  AZURE_GPT_5_DEPLOYMENT (default \"gpt-5\")")
+        else:
+            print(f"  AZURE_{profile.upper()}_ENDPOINT")
+            print(f"  AZURE_{profile.upper()}_DEPLOYMENT")
+            print(f"  AZURE_{profile.upper()}_API_KEY (or shared AZURE_API_KEY)")
         sys.exit(1)
 
-    deployment = os.environ.get("AZURE_GPT_5_DEPLOYMENT", "gpt-5")
-    api_version = os.environ.get("AZURE_API_VERSION_GPT5", "2025-01-01-preview")
-    reasoning_effort = os.environ.get("REASONING_EFFORT", "medium")
-
-    return AzureChatOpenAI(
+    kwargs = dict(
         azure_endpoint=endpoint,
         azure_deployment=deployment,
         api_key=api_key,
@@ -406,7 +441,6 @@ def get_llm():
         # output longer, so 4096 could be exhausted by reasoning alone and
         # leave an empty completion. Give it more headroom.
         max_tokens=8192,
-        reasoning_effort=reasoning_effort,
         # Without a timeout, a stalled/slow API call hangs the whole script
         # forever with no error and no output - looks identical to the
         # process just being "stuck". Fail loudly instead so a bad run is
@@ -414,6 +448,12 @@ def get_llm():
         timeout=180,
         max_retries=2,
     )
+    if profile == "gpt5":
+        # reasoning_effort is a GPT-5-reasoning-only parameter; other
+        # deployments (non-reasoning models like Llama) reject it.
+        kwargs["reasoning_effort"] = os.environ.get("REASONING_EFFORT", "medium")
+
+    return AzureChatOpenAI(**kwargs)
 
 
 def call_llm(llm, prompt):
