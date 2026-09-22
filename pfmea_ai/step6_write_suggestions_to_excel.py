@@ -260,10 +260,17 @@ def build_duplicate_cause_map(severity_input_path):
 
 def build_remark(row, cause_to_modes, this_cause, merge_mode=False):
     """Short, single-cell Remark text: notes merged failure modes, any
-    cause/mode mismatch or ambiguity flag, plant-vs-AI disagreement, and
-    (new) whether this row's Cause is duplicated on a different Mode
-    elsewhere in the sheet."""
+    cause/mode mismatch or ambiguity flag, plant-vs-AI disagreement,
+    whether this row's Cause is duplicated on a different Mode elsewhere
+    in the sheet, and any manually-added reviewer note (see
+    "manual_review_note" - not produced by the LLM, added by hand to a
+    row's suggestion JSON when a human reviewer flags something the AI
+    can't judge on its own, e.g. a gap in the plant's own input data)."""
     parts = []
+
+    manual_note = row.get("manual_review_note")
+    if manual_note:
+        parts.append(f"REVIEWER NOTE: {manual_note}")
 
     merged = row.get("ai_merged_modes_detected")
     if merged:
