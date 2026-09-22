@@ -54,7 +54,9 @@ Do NOT flag a row just because its Severity is low, or because you personally th
 2. Was given a materially different (richer, safety-relevant) effect list, AND
 3. Scored meaningfully higher as a direct result.
 
-For each row you flag, write ONE concise paragraph (plain text, no markdown) explaining: what the comparable row is, what effect(s) it had that this row didn't, and a recommendation to review whether that effect should also be added to THIS row's own Effect cell in the plant's source Excel - never suggest changing the AI/prompt logic to compensate.
+For each row you flag, write ONE SHORT sentence, 30 words maximum, plain text: name the comparable row, the missing effect(s), and "review/add to Effect cell". Do not explain your reasoning or restate the mechanism - the reader already has both rows open side by side. Never suggest changing the AI/prompt logic to compensate.
+
+Example of the target length: "Compare to Prefit Bolts (rows 24-25): missing beam-alignment/accident-risk effects - review and add to this row's Effect cell if applicable."
 
 If you find no such cases, return an empty array - do not force a finding.
 
