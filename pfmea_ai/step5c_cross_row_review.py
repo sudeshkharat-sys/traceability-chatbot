@@ -50,9 +50,11 @@ Each entry below is one Failure Mode group that was already scored independently
 Your job: find groups of rows that describe the SAME or a near-identical physical failure mechanism (e.g. two different fasteners on the same joint, two steps of the same operation) whose Severity results look inconsistent SOLELY because one row's listed End User effects include a safety/function-loss consequence that a mechanically similar row's list omits.
 
 Do NOT flag a row just because its Severity is low, or because you personally think the effect list is incomplete in general - only flag it when you can point to a SPECIFIC other row in this same sheet that:
-1. Shares the same physical mechanism/component/joint, AND
+1. Has a Cause describing the SAME physical action/mechanism (not just a vaguely related topic or component area) - e.g. "operator fails to tighten fastener A" and "operator fails to tighten fastener B" on the same joint DO match; "operator installs the wrong part" and "operator forgets to connect a socket" do NOT match even if both are somewhere near the headlamp, because they are different physical actions with different root causes, AND
 2. Was given a materially different (richer, safety-relevant) effect list, AND
 3. Scored meaningfully higher as a direct result.
+
+Be conservative: when in doubt whether two Causes are really the same mechanism, do NOT flag it.
 
 For each row you flag, write ONE SHORT sentence, 30 words maximum, plain text: name the comparable row, the missing effect(s), and "review/add to Effect cell". Do not explain your reasoning or restate the mechanism - the reader already has both rows open side by side. Never suggest changing the AI/prompt logic to compensate.
 
@@ -71,12 +73,14 @@ Respond with ONLY a JSON array, no markdown fences, no other text:
 """
 
 
-def build_entries_text(suggestions, effect_lookup):
+def build_entries_text(suggestions, effect_lookup, cause_lookup):
     lines = []
     for row in suggestions:
         fm = row["failure_mode"]
         lines.append(f"---\nFailure Mode: {fm}")
         lines.append(f"Source rows: {row.get('source_excel_rows')}")
+        cause = cause_lookup.get(fm, "").strip()
+        lines.append(f"Failure Cause (the actual physical action/mechanism): {cause or '(none found)'}")
         lines.append(f"Plant-recorded Severity: {row.get('plant_recorded_severity')}")
         lines.append(f"AI-suggested Severity: {row.get('ai_suggested_severity')}")
         effects = effect_lookup.get(fm, "").strip()
@@ -95,6 +99,21 @@ def build_effect_lookup(severity_input_groups):
             fm = mode_entry.get("failure_mode")
             if fm:
                 lookup[fm] = effect_text
+    return lookup
+
+
+def build_cause_lookup(severity_input_groups):
+    """Map failure_mode -> its Failure Cause text - the actual physical
+    action/mechanism, which is what "same mechanism" should really be
+    judged against, not just Failure Mode wording or component area
+    (see rule 1 in PROMPT_TEMPLATE)."""
+    lookup = {}
+    for group in severity_input_groups:
+        for mode_entry in group.get("modes_covered", []):
+            fm = mode_entry.get("failure_mode")
+            cause = mode_entry.get("failure_cause")
+            if fm and cause:
+                lookup[fm] = cause
     return lookup
 
 
@@ -125,7 +144,8 @@ def main():
 
     suggestions = suggestions_data[sheet_name]
     effect_lookup = build_effect_lookup(severity_input_groups)
-    entries_text = build_entries_text(suggestions, effect_lookup)
+    cause_lookup = build_cause_lookup(severity_input_groups)
+    entries_text = build_entries_text(suggestions, effect_lookup, cause_lookup)
     prompt = PROMPT_TEMPLATE.format(entries=entries_text)
 
     if dry_run:

@@ -1,13 +1,5 @@
 [
   {
-    "failure_mode": "FITMENT IS NOT FIRM\n WRONG SELECTION OF HEAD LAMP\n( NOT AS PER MODEL)",
-    "source_excel_rows": [
-      20,
-      21
-    ],
-    "review_note": "Compare to IMPROPER LOCKING / POOR LOCKING (rows 22-23): missing incorrect beam alignment, reduced road visibility, and accident-risk effects \u2014 review/add to this row's Effect cell if applicable."
-  },
-  {
     "failure_mode": "OPERATOR FAILED TO FIT SCREWS AND NOT MAINTAINED GAP",
     "source_excel_rows": [
       26,
