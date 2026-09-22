@@ -591,7 +591,13 @@ def main():
             for mode_entry in group.get("modes_covered", []):
                 cause_by_mode[mode_entry["failure_mode"].strip()] = mode_entry.get("failure_cause")
 
-    wb = load_workbook(source_path)
+    # rich_text=True - several of the plant's own cells (e.g. "Your Plant :"
+    # / "Ship to Plant :" / "End User :" inside Failure Effect) use per-run
+    # formatting (a red/bold label followed by plain text in the same
+    # cell). Without this, openpyxl silently flattens that into one plain
+    # string on load, so re-saving drops the inline coloring/bold even
+    # though this script never touches those cells' content.
+    wb = load_workbook(source_path, rich_text=True)
     if sheet_name not in wb.sheetnames:
         print(f"ERROR: sheet '{sheet_name}' not found in {source_path}. Available: {wb.sheetnames}")
         sys.exit(1)
