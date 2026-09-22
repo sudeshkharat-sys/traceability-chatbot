@@ -269,7 +269,7 @@ def build_remark(row, cause_to_modes, this_cause, merge_mode=False):
             listed = "; ".join(other_modes)
             parts.append(f"Same Failure Cause text is also used, verbatim, on a different Failure Mode: {listed}. Verify this Cause actually belongs to this row and wasn't copy-pasted.")
 
-    return " ".join(parts) if parts else "Single failure mode, no flags."
+    return "\n".join(f"- {p}" for p in parts) if parts else "Single failure mode, no flags."
 
 
 def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None, log=print, merge_mode=False):
