@@ -44,6 +44,9 @@ To compare against a different Azure-deployed model, set LLM_MODEL_PROFILE:
     LLM_MODEL_PROFILE=gpt4omini reuses the gpt-4o-mini deployment already
     configured for nashik-chatbot-pq (AZURE_CHAT_ENDPOINT/AZURE_CHAT_DEPLOYMENT/
     AZURE_API_VERSION_CHAT) - same .env, no new Azure resource needed.
+    LLM_MODEL_PROFILE=gpt54mini reuses the same AZURE_CHAT_ENDPOINT/AZURE_API_KEY
+    resource, pointed at a different deployment on it
+    (AZURE_GPT54MINI_DEPLOYMENT, default "gpt-5.4-mini").
 
 For any other model (a cheaper GPT-5 tier, an open model like Llama served
 through an Azure AI Foundry OpenAI-compatible endpoint, etc.), set
@@ -423,6 +426,12 @@ def get_llm():
         endpoint = os.environ.get("AZURE_CHAT_ENDPOINT")
         deployment = os.environ.get("AZURE_CHAT_DEPLOYMENT", "gpt-4o-mini")
         api_version = os.environ.get("AZURE_API_VERSION_CHAT", "2024-12-01-preview")
+    elif profile == "gpt54mini":
+        # Another deployment on the same Azure resource as AZURE_CHAT_ENDPOINT -
+        # only the deployment name differs, same endpoint/key as gpt4omini.
+        endpoint = os.environ.get("AZURE_CHAT_ENDPOINT")
+        deployment = os.environ.get("AZURE_GPT54MINI_DEPLOYMENT", "gpt-5.4-mini")
+        api_version = os.environ.get("AZURE_API_VERSION_GPT54MINI", "2024-12-01-preview")
     else:
         prefix = profile.upper()
         endpoint = os.environ.get(f"AZURE_{prefix}_ENDPOINT")
@@ -440,6 +449,10 @@ def get_llm():
             print("  AZURE_API_KEY")
             print("  AZURE_CHAT_ENDPOINT")
             print("  AZURE_CHAT_DEPLOYMENT (default \"gpt-4o-mini\")")
+        elif profile == "gpt54mini":
+            print("  AZURE_API_KEY")
+            print("  AZURE_CHAT_ENDPOINT")
+            print("  AZURE_GPT54MINI_DEPLOYMENT (default \"gpt-5.4-mini\")")
         else:
             print(f"  AZURE_{profile.upper()}_ENDPOINT")
             print(f"  AZURE_{profile.upper()}_DEPLOYMENT")
