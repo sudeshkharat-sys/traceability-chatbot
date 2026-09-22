@@ -90,6 +90,8 @@ NEW_COLUMN_HEADERS = [
     "Sub-mode Prevention",
     "Sub-mode Detection",
     "Remark",
+    "AI Review",
+    "Manual Review",
 ]
 
 # merge_mode folds each sub-mode's Prevention/Detection action straight into
@@ -260,17 +262,13 @@ def build_duplicate_cause_map(severity_input_path):
 
 def build_remark(row, cause_to_modes, this_cause, merge_mode=False):
     """Short, single-cell Remark text: notes merged failure modes, any
-    cause/mode mismatch or ambiguity flag, plant-vs-AI disagreement,
+    cause/mode mismatch or ambiguity flag, plant-vs-AI disagreement, and
     whether this row's Cause is duplicated on a different Mode elsewhere
-    in the sheet, and any manually-added reviewer note (see
-    "manual_review_note" - not produced by the LLM, added by hand to a
-    row's suggestion JSON when a human reviewer flags something the AI
-    can't judge on its own, e.g. a gap in the plant's own input data)."""
+    in the sheet. This is the LLM's own automated output only - a
+    separate human/reviewer finding goes in the dedicated "AI Review"
+    column (ai_review_note) instead, so the two don't get mixed
+    into one long cell."""
     parts = []
-
-    manual_note = row.get("manual_review_note")
-    if manual_note:
-        parts.append(f"REVIEWER NOTE: {manual_note}")
 
     merged = row.get("ai_merged_modes_detected")
     if merged:
@@ -391,6 +389,8 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
     submode_prevention_col = col_by_header.get("Sub-mode Prevention")
     submode_detection_col = col_by_header.get("Sub-mode Detection")
     remark_col = col_by_header["Remark"]
+    ai_review_col = col_by_header["AI Review"]
+    manual_review_col = col_by_header["Manual Review"]
 
     # Widen the new columns so wrapped text is actually readable instead of
     # squeezing into the sheet's default column width - Severity/Occurrence/
@@ -410,6 +410,8 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
         submode_prevention_col: 45,
         submode_detection_col: 45,
         remark_col: 50,
+        ai_review_col: 45,
+        manual_review_col: 35,
     }
     for col, width in column_widths.items():
         if col is None:
@@ -499,6 +501,8 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             detection_note_col: detection_note_value,
             prevention_col: prevention_value,
             remark_col: build_remark(row, cause_to_modes, this_cause, merge_mode=merge_mode),
+            ai_review_col: row.get("ai_review_note") or "",
+            manual_review_col: "",  # left blank for the human reviewer's own decision
         }
         if submodes_col is not None:
             values[submodes_col] = submodes_value

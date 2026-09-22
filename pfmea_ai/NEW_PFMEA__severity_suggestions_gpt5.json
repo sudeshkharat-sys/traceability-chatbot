@@ -227,7 +227,7 @@
       "ai_cause_mode_mismatch_note": "The recorded Cause addresses only gap uniformity between headlamp edge and fender and does not explain the merged Mode\u2019s \"failed to fit screws\" sub-mode.",
       "ai_consistent_across_runs": true,
       "ai_runs": null,
-      "manual_review_note": "Plant listed only cosmetic/NVH End User effects for this row (lens crack, LED burnout, water ingress, rattling, discomfort) - no beam-alignment/visibility/accident-risk option, unlike the near-identical 'Prefit bolts' step (same mounting joint) which lists those and scored S=10. If loose/missing screws can also misalign the beam, add that effect to this row's own Effect cell in the plant's source Excel so AI severity reflects it; do not change AI/prompt logic to compensate - broadening the effect list plant-wide risks re-inflating severity on unrelated rows (a documented past failure mode of this pipeline)."
+      "ai_review_note": "Plant listed only cosmetic/NVH End User effects for this row (lens crack, LED burnout, water ingress, rattling, discomfort) - no beam-alignment/visibility/accident-risk option, unlike the near-identical 'Prefit bolts' step (same mounting joint) which lists those and scored S=10. If loose/missing screws can also misalign the beam, add that effect to this row's own Effect cell in the plant's source Excel so AI severity reflects it; do not change AI/prompt logic to compensate - broadening the effect list plant-wide risks re-inflating severity on unrelated rows (a documented past failure mode of this pipeline)."
     },
     {
       "failure_mode": "TORQUE NOT ACHIEVED-UNDER TORQUE",

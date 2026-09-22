@@ -592,7 +592,7 @@
           "cause_mode_mismatch_note": "The stated Cause (not maintaining uniform gaps) does not explain the \u2018failed to fit screws\u2019 part of the Mode; it pertains only to the gap uniformity sub-mode."
         }
       ],
-      "manual_review_note": "Plant listed only cosmetic/NVH End User effects for this row (lens crack, LED burnout, water ingress, rattling, discomfort) - no beam-alignment/visibility/accident-risk option, unlike the near-identical 'Prefit bolts' step (same mounting joint) which lists those and scored S=10. If loose/missing screws can also misalign the beam, add that effect to this row's own Effect cell in the plant's source Excel so AI severity reflects it; do not change AI/prompt logic to compensate - broadening the effect list plant-wide risks re-inflating severity on unrelated rows (a documented past failure mode of this pipeline)."
+      "ai_review_note": "Plant listed only cosmetic/NVH End User effects for this row (lens crack, LED burnout, water ingress, rattling, discomfort) - no beam-alignment/visibility/accident-risk option, unlike the near-identical 'Prefit bolts' step (same mounting joint) which lists those and scored S=10. If loose/missing screws can also misalign the beam, add that effect to this row's own Effect cell in the plant's source Excel so AI severity reflects it; do not change AI/prompt logic to compensate - broadening the effect list plant-wide risks re-inflating severity on unrelated rows (a documented past failure mode of this pipeline)."
     },
     {
       "failure_mode": "TORQUE NOT ACHIEVED-UNDER TORQUE",
