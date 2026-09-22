@@ -550,8 +550,18 @@ def main():
     if merge_mode:
         args.remove("--merge-mode")
 
+    # --cross-review <file>: output of step5c_cross_row_review.py - a JSON
+    # array of {failure_mode, source_excel_rows, review_note} findings from
+    # the whole-sheet consistency pass, merged into each flagged row's "AI
+    # Review" column instead of the Remark column's per-row automated flags.
+    cross_review_path = None
+    if "--cross-review" in args:
+        idx = args.index("--cross-review")
+        cross_review_path = Path(args[idx + 1])
+        del args[idx:idx + 2]
+
     if len(args) < 3:
-        print("Usage: python step6_write_suggestions_to_excel.py <source.xlsx> <sheet_name> <suggestions.json> [severity_input.json] [output.xlsx] [--merge-mode]")
+        print("Usage: python step6_write_suggestions_to_excel.py <source.xlsx> <sheet_name> <suggestions.json> [severity_input.json] [output.xlsx] [--merge-mode] [--cross-review <file>]")
         sys.exit(1)
 
     source_path = Path(args[0])
@@ -579,6 +589,19 @@ def main():
         sys.exit(1)
 
     rows = suggestions[sheet_name]
+
+    if cross_review_path:
+        with open(cross_review_path, encoding="utf-8") as fh:
+            cross_review_findings = json.load(fh)
+        notes_by_mode = {f["failure_mode"]: f["review_note"] for f in cross_review_findings}
+        matched = 0
+        for row in rows:
+            note = notes_by_mode.get(row["failure_mode"])
+            if note:
+                row["ai_review_note"] = note
+                matched += 1
+        print(f"  [{sheet_name}] cross-review: matched {matched}/{len(cross_review_findings)} finding(s) from {cross_review_path}")
+
     cause_to_modes = build_duplicate_cause_map(severity_input_path)
 
     # Cause text per Failure Mode, for the duplicate-Cause check - only
