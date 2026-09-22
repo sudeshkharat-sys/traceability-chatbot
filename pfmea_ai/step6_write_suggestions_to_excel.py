@@ -195,6 +195,35 @@ def style_merged_range(ws, min_row, max_row, min_col, max_col, reference_cell, f
             style_like(ws.cell(row=r, column=c), reference_cell, fill_rgb=fill_rgb, center=center)
 
 
+def set_row_height_for_wrapped_text(ws, row_start, row_end, values, column_widths, points_per_line=15):
+    """Excel only auto-fits row height for UNMERGED cells - a merged range
+    (which every Suggestion-block cell is, when it spans a multi-row plant
+    entry) keeps whatever height the template's original rows had, so a
+    long wrapped/bulleted value like Remark gets visually clipped at the
+    bottom unless we size the row ourselves.
+
+    Estimates each cell's line count (explicit '\\n' breaks, plus wrapping
+    within the column's character width) and sets the merge's total height
+    to fit the tallest cell, split evenly across its rows."""
+    max_lines = 1
+    for col, value in values.items():
+        if not value:
+            continue
+        width_chars = max(column_widths.get(col, 20), 1)
+        # Sum of wrapped-line counts across this cell's explicit '\n'
+        # breaks - e.g. a 3-bullet Remark where each bullet itself wraps
+        # to 2 lines needs 6 lines of height, not 3.
+        total_lines = sum(max(1, (len(line) // width_chars) + 1) for line in str(value).split("\n"))
+        max_lines = max(max_lines, total_lines)
+
+    row_count = row_end - row_start + 1
+    height_per_row = max((max_lines * points_per_line) / row_count, points_per_line)
+    for r in range(row_start, row_end + 1):
+        current = ws.row_dimensions[r].height
+        if current is None or height_per_row > current:
+            ws.row_dimensions[r].height = height_per_row
+
+
 def normalize_header(text):
     """Collapse whitespace/newlines so header text matches regardless of
     Excel's wrapped-cell line breaks (e.g. 'Detectio\nn (D)' -> 'detection (d)')."""
@@ -488,6 +517,11 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             # look consistent (no stray unstyled interior cells) and text
             # vertically centered for readability.
             style_merged_range(ws, row_start, row_end, col, col, data_ref_cell, center=True)
+        # Excel never auto-fits row height across a MERGED cell (only
+        # unmerged ones), so a wrapped multi-line value - the bulleted
+        # Remark especially - gets visually clipped at the bottom of the
+        # merge unless we set an explicit height ourselves.
+        set_row_height_for_wrapped_text(ws, row_start, row_end, values, column_widths)
         written += 1
 
     return written
