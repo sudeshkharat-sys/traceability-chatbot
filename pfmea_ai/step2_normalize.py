@@ -82,6 +82,20 @@ def build_merge_lookup(ws):
     return lookup
 
 
+def build_merge_end_lookup(ws):
+    """Map every (row, col) inside a merged range to that merge's LAST row -
+    needed to tell a genuinely new value on its own row apart from a value
+    merely forward-filled from an earlier row's merge (see the Cause-based
+    entry-splitting comment in normalize_sheet). A cell not in any merge
+    maps to its own row."""
+    lookup = {}
+    for merged_range in ws.merged_cells.ranges:
+        for row in range(merged_range.min_row, merged_range.max_row + 1):
+            for col in range(merged_range.min_col, merged_range.max_col + 1):
+                lookup[(row, col)] = merged_range.max_row
+    return lookup
+
+
 def resolve(ws, merge_lookup, row, col):
     if (row, col) in merge_lookup:
         return merge_lookup[(row, col)]
@@ -107,13 +121,31 @@ def build_columns(ws, merge_lookup):
 
 def normalize_sheet(ws):
     merge_lookup = build_merge_lookup(ws)
+    merge_end_lookup = build_merge_end_lookup(ws)
     columns = build_columns(ws, merge_lookup)
+    cause_col = next((col for _g, f, col, _t in columns if f == FAILURE_CAUSE_FIELD), None)
 
     raw_rows = []
     for row in range(DATA_START_ROW, ws.max_row + 1):
         record = {"_source_rows": [row]}
         for group, field, col, _ftype in columns:
             record[(group, field)] = resolve(ws, merge_lookup, row, col)
+        # Whether THIS row is the last row of the Cause cell's own merged
+        # range (or an unmerged single-row Cause) - as opposed to merely
+        # inheriting a forward-filled Cause value from an earlier row's
+        # merge. Only a row meeting this condition should close out an
+        # entry below; otherwise a Cause cell merged across N rows (a
+        # single real value) would wrongly close N separate entries, one
+        # per row it happens to cover, splitting one failure entry into
+        # several duplicate ones with identical Mode/Cause/Effect text
+        # (confirmed against a real sheet: P18:Q19/R18:S19 - one merged
+        # Failure Mode + Cause spanning rows 18-19 - was being split into
+        # two separate entries, each independently re-scored by the LLM,
+        # so the same failure mode could get two different Severities
+        # purely from sampling noise on the duplicate call).
+        record["_is_cause_merge_end"] = (
+            cause_col is None or merge_end_lookup.get((row, cause_col), row) == row
+        )
         raw_rows.append(record)
 
     def mode_of(record):
@@ -147,7 +179,7 @@ def normalize_sheet(ws):
         current = []
         for record in block:
             current.append(record)
-            if cause_of(record) not in (None, ""):
+            if cause_of(record) not in (None, "") and record["_is_cause_merge_end"]:
                 entries.append(current)
                 current = []
         if current:
