@@ -286,7 +286,24 @@ def build_duplicate_cause_map(severity_input_path):
     return cause_to_modes
 
 
-def build_remark(row, cause_to_modes, this_cause, merge_mode=False):
+def build_mode_occurrence_map(rows):
+    """Map normalized Failure Mode text -> every row's source_excel_rows
+    that uses it, so build_remark can flag when the SAME Mode name is
+    reused on a separate, non-adjacent row group elsewhere in the sheet
+    (the mirror image of the existing duplicate-Cause-on-a-different-Mode
+    check below) - e.g. "Wrong chassis may feed" recorded once at rows
+    21-23 and again, independently, at row 34 with its own different
+    Cause. Not itself an error (a Mode name can legitimately repeat with a
+    genuinely different Cause), but worth a reviewer's second look in case
+    it's actually the same entry typed twice rather than two distinct
+    failures that happen to share a name."""
+    occurrences = defaultdict(list)
+    for row in rows:
+        occurrences[row["failure_mode"].strip()].append(tuple(row["source_excel_rows"]))
+    return occurrences
+
+
+def build_remark(row, cause_to_modes, this_cause, mode_occurrences=None, merge_mode=False):
     """Short, single-cell Remark text: notes merged failure modes, any
     cause/mode mismatch or ambiguity flag, plant-vs-AI disagreement, and
     whether this row's Cause is duplicated on a different Mode elsewhere
@@ -328,6 +345,15 @@ def build_remark(row, cause_to_modes, this_cause, merge_mode=False):
         if other_modes:
             listed = "; ".join(other_modes)
             parts.append(f"Same Failure Cause text is also used, verbatim, on a different Failure Mode: {listed}. Verify this Cause actually belongs to this row and wasn't copy-pasted.")
+
+    if mode_occurrences:
+        this_rows = tuple(row["source_excel_rows"])
+        other_row_groups = sorted(
+            r for r in mode_occurrences.get(row["failure_mode"].strip(), []) if r != this_rows
+        )
+        if other_row_groups:
+            listed = "; ".join(f"rows {min(r)}-{max(r)}" if len(r) > 1 else f"row {r[0]}" for r in other_row_groups)
+            parts.append(f"Same Failure Mode name is also used, separately, at {listed} elsewhere in the sheet. Verify these are genuinely distinct causes/entries, not the same failure recorded twice.")
 
     return "\n".join(f"- {p}" for p in parts) if parts else "Single failure mode, no flags."
 
@@ -372,6 +398,7 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
     scores. A row with no detected sub-modes is unaffected either way."""
     cause_to_modes = cause_to_modes or {}
     cause_by_mode = cause_by_mode or {}
+    mode_occurrences = build_mode_occurrence_map(rows)
 
     # Header row is wherever "Failure Mode (FM)" appears - detected instead
     # of hardcoded row 15 so this survives minor template edits. Matched on
@@ -585,7 +612,7 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             detection_col: detection_value,
             detection_note_col: detection_note_value,
             prevention_col: prevention_value,
-            remark_col: build_remark(row, cause_to_modes, this_cause, merge_mode=merge_mode),
+            remark_col: build_remark(row, cause_to_modes, this_cause, mode_occurrences=mode_occurrences, merge_mode=merge_mode),
             ai_review_col: build_ai_review(row),
             manual_review_col: "",  # left blank for the human reviewer's own decision
         }
