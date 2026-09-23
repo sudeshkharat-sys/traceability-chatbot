@@ -517,11 +517,26 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             if projected_score is not None:
                 projection = f"If adopted, Detection = {projected_score}"
                 if projected_note:
-                    # Defensive: strip any stray "(D<n>)"/"D<n>" the model
-                    # wrote into its own note text despite the prompt asking
-                    # it not to - that's what was producing the confusing
-                    # nested "...= 7 (... (D7))" text.
-                    clean_note = re.sub(r"\(?\bD\d+\)?", "", projected_note).strip(" ()")
+                    # Defensive: strip any stray bare "D<n>" the model wrote
+                    # into its own note text despite the prompt asking it
+                    # not to - that's what was producing the confusing
+                    # nested "...= 7 (... D7)" text. Only remove the bare
+                    # token itself (plus an adjacent comma/space), never an
+                    # adjacent parenthesis character - an earlier version of
+                    # this also ate one side of the note's OWN legitimate
+                    # parentheses (e.g. "...processing (robust system)"
+                    # losing its closing ")"), unbalancing the wrapper paren
+                    # added below whenever the model's D-number happened to
+                    # sit inside a larger parenthetical the note already had.
+                    clean_note = re.sub(r",?\s*\bD\d+\b\s*,?", " ", projected_note)
+                    # Cosmetic cleanup of what that removal can leave behind:
+                    # an empty "()" pair, or a dangling ", )"/"(, " next to
+                    # the paren this function itself wraps the note in.
+                    clean_note = re.sub(r"\(\s*\)", "", clean_note)
+                    clean_note = re.sub(r",\s*\)", ")", clean_note)
+                    clean_note = re.sub(r"\(\s*,", "(", clean_note)
+                    clean_note = re.sub(r"\s+\)", ")", clean_note)
+                    clean_note = re.sub(r"\s+", " ", clean_note).strip(" ,")
                     if clean_note:
                         projection += f" ({clean_note})"
                 text = f"{text}\n{projection}"
