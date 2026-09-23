@@ -5,20 +5,20 @@
       26,
       27
     ],
-    "review_note": "Compare to OPERATOR FAILED TO PREFIT BOLTS (rows 24-25): missing incorrect beam alignment, reduced visibility, accident-risk effects; review/add to this row's Effect cell if applicable."
+    "review_note": "Compare to OPERATOR FAILED TO PREFIT BOLTS (rows 24-25): missing beam-alignment, reduced road visibility, accident-risk effects \u2014 review/add to this row's Effect cell if applicable."
   },
   {
     "failure_mode": "TORQUE NOT ACHIEVED-UNDER TORQUE",
     "source_excel_rows": [
       28
     ],
-    "review_note": "Compare to OPERATOR FAILED TO PREFIT BOLTS (rows 24-25): missing incorrect beam alignment, reduced visibility, accident-risk effects; review/add to this row's Effect cell if applicable."
+    "review_note": "Compare to OPERATOR FAILED TO PREFIT BOLTS (rows 24-25): missing incorrect beam alignment and reduced visibility/accident-risk effects \u2014 review/add to this row's Effect cell if applicable."
   },
   {
     "failure_mode": "TORQUE NOT ACHIEVED - OVER TORQUE",
     "source_excel_rows": [
       29
     ],
-    "review_note": "Compare to OPERATOR FAILED TO PREFIT BOLTS (rows 24-25): missing incorrect beam alignment, reduced visibility, accident-risk effects; review/add to this row's Effect cell if applicable."
+    "review_note": "Compare to OPERATOR FAILED TO PREFIT BOLTS (rows 24-25): missing incorrect beam alignment and reduced visibility/accident-risk effects \u2014 review/add to this row's Effect cell if applicable."
   }
 ]
