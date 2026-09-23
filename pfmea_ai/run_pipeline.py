@@ -200,7 +200,16 @@ def run_pipeline(
     # Load the SAME workbook again with formulas/formatting intact - this
     # is the copy that gets written into and saved. The data_only load
     # above is only used for reading values to build the scoring input.
-    out_wb = load_workbook(source_path)
+    # rich_text=True - several of the plant's own cells (e.g. "Your Plant :"
+    # / "Ship to Plant :" / "End User :" inside Failure Effect) use per-run
+    # formatting (a red/bold label followed by plain text in the same
+    # cell). Without this, openpyxl silently flattens that into one plain
+    # string on load, so re-saving drops the inline coloring/bold even
+    # though this script never touches those cells' content. Matches
+    # step6_write_suggestions_to_excel.py's own CLI, which already does
+    # this - app.py only goes through run_pipeline(), so it needs the same
+    # fix here too.
+    out_wb = load_workbook(source_path, rich_text=True)
 
     for sheet_name in sheet_names:
         if sheet_name not in wb.sheetnames:
