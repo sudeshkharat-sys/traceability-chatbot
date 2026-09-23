@@ -20,8 +20,8 @@ New columns added, in order:
   Detection Note - AI suggested detection method (sensor/gauge/vision
                    check/functional test/inspection gate) specific to
                    catching THIS Failure Mode, distinct from Prevention.
-                   Followed by a short "-> if adopted: D<x> (...)" line:
-                   the projected Detection score if this recommended
+                   Followed by a short "If adopted, Detection = <x> (...)"
+                   line: the projected Detection score if this recommended
                    technique were actually implemented, so a reviewer can
                    see its payoff without guessing.
   Prevention     - AI suggested prevention/poka-yoke action
@@ -79,6 +79,23 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Border, PatternFill, Side
+
+# XML (and so .xlsx) cannot contain most ASCII control characters (only
+# tab/\x09, newline/\x0A, carriage-return/\x0D are legal). LLM output
+# occasionally contains a stray control character (e.g. \x0b, \x1c) that
+# openpyxl will happily write into the cell without complaint, producing a
+# .xlsx whose XML is technically invalid - Excel then opens it with a
+# "needs repair" prompt instead of erroring at write time. Strip those
+# characters before they ever reach a cell.
+_ILLEGAL_XML_CHARS_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f]")
+
+
+def sanitize_cell_value(value):
+    """Strip characters Excel's XML can't hold from any string value before
+    it's written to a cell. Non-strings (ints, None) pass through unchanged."""
+    if isinstance(value, str):
+        return _ILLEGAL_XML_CHARS_RE.sub("", value)
+    return value
 
 NEW_COLUMN_HEADERS = [
     # First column in the Suggestion block on purpose - the sheet's own
@@ -498,7 +515,7 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             score be"."""
             text = recommendation or "n/a"
             if projected_score is not None:
-                projection = f"-> if adopted: D{projected_score}"
+                projection = f"If adopted, Detection = {projected_score}"
                 if projected_note:
                     projection += f" ({projected_note})"
                 text = f"{text}\n{projection}"
@@ -569,7 +586,7 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
         for col, value in values.items():
             if row_end > row_start:
                 ws.merge_cells(start_row=row_start, start_column=col, end_row=row_end, end_column=col)
-            ws.cell(row=row_start, column=col, value=value)
+            ws.cell(row=row_start, column=col, value=sanitize_cell_value(value))
             # Style every cell in the merge, not just the anchor, and force
             # centered+wrapped alignment - this is what keeps the border
             # look consistent (no stray unstyled interior cells) and text
