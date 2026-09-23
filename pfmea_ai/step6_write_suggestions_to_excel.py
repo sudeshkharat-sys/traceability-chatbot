@@ -517,7 +517,13 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             if projected_score is not None:
                 projection = f"If adopted, Detection = {projected_score}"
                 if projected_note:
-                    projection += f" ({projected_note})"
+                    # Defensive: strip any stray "(D<n>)"/"D<n>" the model
+                    # wrote into its own note text despite the prompt asking
+                    # it not to - that's what was producing the confusing
+                    # nested "...= 7 (... (D7))" text.
+                    clean_note = re.sub(r"\(?\bD\d+\)?", "", projected_note).strip(" ()")
+                    if clean_note:
+                        projection += f" ({clean_note})"
                 text = f"{text}\n{projection}"
             return text
 

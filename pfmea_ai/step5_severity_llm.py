@@ -337,7 +337,7 @@ Return ONLY valid JSON, no other text, in this exact shape:
   "suggested_detection": <integer 1-10, per the AIAG-VDA DETECTION SCORING TABLE and the CURRENT Detection Controls (DC) text as actually described - NOT based on your recommended upgrade above, and NOT inferred from the Severity score>,
   "detection_matched_table_definition": "<the exact Detection table definition/category text this DC matches>",
   "projected_detection_after_recommendation": <integer 1-10, the Detection score if detection_recommendation above were implemented instead of the current DC - same table, same axes, same Failure Mode>,
-  "projected_detection_note": "<one short clause naming the Detection table category/definition the recommended control would land in, e.g. 'Machine-based, in-station, stops further processing (D3)' - not a restatement of the recommendation text itself>",
+  "projected_detection_note": "<one short clause naming the Detection table category/definition the recommended control would land in, e.g. 'Machine-based, in-station, stops further processing' - do NOT include the score/number itself anywhere in this text (it is shown separately), and do not restate the recommendation text itself>",
   "merged_modes_detected": {merged_modes_field},
   "cause_mode_mismatch": <true if the Failure Cause's physical mechanism does not logically produce the stated Failure Mode (per the CAUSE/MODE MISMATCH CHECK rule above), false otherwise>,
   "cause_mode_mismatch_note": "<null if cause_mode_mismatch is false; otherwise one sentence saying what the Cause text looks like it actually belongs to instead, e.g. 'This Cause (wrong part/mix-up) does not produce a scratch/damage Mode - it reads like the Cause for the adjacent Fitment/Wrong-selection row instead'>",
