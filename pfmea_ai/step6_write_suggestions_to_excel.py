@@ -19,7 +19,11 @@ New columns added, in order:
                    from the recommendation below
   Detection Note - AI suggested detection method (sensor/gauge/vision
                    check/functional test/inspection gate) specific to
-                   catching THIS Failure Mode, distinct from Prevention
+                   catching THIS Failure Mode, distinct from Prevention.
+                   Followed by a short "-> if adopted: D<x> (...)" line:
+                   the projected Detection score if this recommended
+                   technique were actually implemented, so a reviewer can
+                   see its payoff without guessing.
   Prevention     - AI suggested prevention/poka-yoke action
   Sub-modes      - when the Failure Mode cell was flagged as containing
                    2+ distinct modes merged into one cell, one compact
@@ -50,6 +54,11 @@ New columns added, in order:
                    detail already shown in the Sub-modes columns above -
                    just a short pointer to look there, so this cell
                    stays short instead of duplicating that data as text.
+  AI Review      - short, per-row data-completeness flags from step5's
+                   audit (e.g. "Missing: Ship-to-Plant effect", "Vague:
+                   Failure Cause"), plus - if step5c's cross-row
+                   consistency pass was merged in via --cross-review -
+                   that finding too. Blank when nothing was flagged.
 
 The duplicate-Cause check needs the original Failure Cause text, which
 is not in step5's suggestions JSON (only Failure Mode is) - it's read
@@ -306,6 +315,23 @@ def build_remark(row, cause_to_modes, this_cause, merge_mode=False):
     return "\n".join(f"- {p}" for p in parts) if parts else "Single failure mode, no flags."
 
 
+def build_ai_review(row):
+    """AI Review column text: this row's own data-completeness flags
+    (ai_row_completeness_note, from step5's per-row audit - "Missing:
+    Ship-to-Plant effect", "Vague: Failure Cause", etc.) plus, if step5c's
+    cross-row consistency pass was merged in via --cross-review, that
+    finding too. Kept separate from Remark, which is the LLM's own
+    scoring-flow flags (mismatch, ambiguity, plant-vs-AI disagreement)."""
+    parts = []
+    completeness = row.get("ai_row_completeness_note")
+    if completeness:
+        parts.append(f"- {completeness}")
+    cross_row = row.get("ai_review_note")
+    if cross_row:
+        parts.append(f"- {cross_row}")
+    return "\n".join(parts)
+
+
 def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None, log=print, merge_mode=False):
     """Core of step6: given an already-open worksheet and this sheet's list
     of suggestion rows (step5's per-sheet output shape), append the
@@ -464,6 +490,20 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             det = s.get("suggested_detection")
             return str(det) if det is not None else "(not scored - re-run needed)"
 
+        def det_note_with_projection(recommendation, projected_score, projected_note):
+            """Append a short 'if adopted' projection to a Detection
+            Note/recommendation, so a reviewer sees the payoff of the
+            recommendation without having to guess it - the manager's ask:
+            "if we use this detection technique what will the detection
+            score be"."""
+            text = recommendation or "n/a"
+            if projected_score is not None:
+                projection = f"-> if adopted: D{projected_score}"
+                if projected_note:
+                    projection += f" ({projected_note})"
+                text = f"{text}\n{projection}"
+            return text
+
         if merge_mode and splits:
             # A/B split values move INTO the actual Severity/Detection/
             # Prevention columns (this is the point of merge_mode) - no
@@ -474,7 +514,10 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             severity_value = "\n".join(f"{labels[i]} = {sev_text(s)}" for i, s in enumerate(splits))
             severity_note_value = "\n".join(f"{labels[i]} = {s.get('reasoning') or ''}" for i, s in enumerate(splits))
             detection_value = "\n".join(f"{labels[i]} = {det_text(s)}" for i, s in enumerate(splits))
-            detection_note_value = "\n".join(f"{labels[i]} = {s.get('detection_recommendation') or 'n/a'}" for i, s in enumerate(splits))
+            detection_note_value = "\n".join(
+                f"{labels[i]} = {det_note_with_projection(s.get('detection_recommendation'), s.get('projected_detection_after_recommendation'), s.get('projected_detection_note'))}"
+                for i, s in enumerate(splits)
+            )
             prevention_value = "\n".join(f"{labels[i]} = {s.get('recommended_action') or 'n/a'}" for i, s in enumerate(splits))
             # No Sub-modes column in merge_mode (see MERGE_MODE_COLUMN_HEADERS) -
             # the plant's own Failure Mode column already shows the raw
@@ -484,7 +527,11 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             severity_value = row["ai_suggested_severity"]
             severity_note_value = row.get("ai_reasoning") or ""
             detection_value = row.get("ai_suggested_detection")
-            detection_note_value = row.get("ai_detection_recommendation") or ""
+            detection_note_value = det_note_with_projection(
+                row.get("ai_detection_recommendation"),
+                row.get("ai_projected_detection_after_recommendation"),
+                row.get("ai_projected_detection_note"),
+            )
             prevention_value = row.get("ai_recommended_action") or ""
             # Non-merge_mode keeps the original "A = name (Sx/Dy)" combined
             # line in Sub-modes, unchanged from before merge_mode existed.
@@ -501,7 +548,7 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             detection_note_col: detection_note_value,
             prevention_col: prevention_value,
             remark_col: build_remark(row, cause_to_modes, this_cause, merge_mode=merge_mode),
-            ai_review_col: row.get("ai_review_note") or "",
+            ai_review_col: build_ai_review(row),
             manual_review_col: "",  # left blank for the human reviewer's own decision
         }
         if submodes_col is not None:

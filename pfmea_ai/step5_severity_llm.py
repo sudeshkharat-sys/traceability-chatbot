@@ -295,6 +295,15 @@ Also score Detection (1-10), a SEPARATE question from Severity/the recommendatio
 - Opportunity for Detection: what does the method actually DO on detection - a machine-based method that PREVENTS the discrepant part from being produced (D2), one that stops it IN-STATION (D3), one that stops it DOWNSTREAM before it leaves the facility (D4), automated with just a notification/buzzer (D5/D7), or manual human inspection/gauging (D6/D8)? A method physically incapable of missing the failure (design/process makes the failure mode impossible, or detection proven to always catch it) is D1.
 Do NOT infer the score from Severity or Occurrence, do NOT invent a detection method that is not actually described in the DC text, and do NOT assume "proven/experienced" unless the DC text or context supports it - when maturity is genuinely unstated, prefer the NOT-proven (worse) reading of that method type rather than assuming the best case. If DC is "(not recorded - no prevention control currently exists)" or similarly empty/absent, score Detection at 10 (no current detection method) rather than guessing a method that was never stated.
 
+Also score a PROJECTED Detection (1-10) - a THIRD, separate Detection question, requested so a reviewer can see the payoff of actually adopting your detection_recommendation above rather than just reading the recommendation text and guessing its impact. Assume the detection_recommendation above IS implemented, in place of (or alongside, if it plausibly would coexist with) the current DC, and re-score Detection against the SAME AIAG-VDA DETECTION SCORING TABLE (Table C2.4) and the SAME two axes (Method Maturity, Opportunity for Detection) using ONLY what the recommendation text itself actually describes - a NEWLY introduced automated/poka-yoke method should normally be treated as proven going forward only if the recommendation describes it as a standard, well-understood technique (e.g. a keyed connector, a limit switch, a standard vision-inspection gate); do not assume "proven" for a novel or vaguely-described method. This projected score must be for the SAME Failure Mode as suggested_detection above - do not project a fix for a different failure.
+
+Also produce a short "row completeness" audit, requested so a reviewer scanning many rows quickly sees exactly what is thin or missing in THIS row's own data, without reading the full reasoning again. This is NOT the Severity/Detection scoring itself and NOT a re-statement of cause_mode_mismatch/merged_modes_detected above (those already have their own fields) - it is specifically about gaps in what the plant recorded for this row. Check, in this exact order, and list ONLY the ones that actually apply (skip entirely if none apply):
+- An effect section (Your Plant / Ship to Plant / End User) that is blank/"(none recorded)" while a sibling section is filled in with something substantive.
+- Failure Cause is missing, or is too generic/vague to describe an actual physical mechanism (e.g. just repeats the Failure Mode text, or says something like "process not followed" with no specific action named).
+- Current Prevention Control (PC) or Current Detection Controls (DC) is missing/blank entirely (not just weak - genuinely absent), which usually means the plant hasn't filled that cell in yet.
+- Current Detection Controls (DC) text is present but too vague to actually judge (e.g. names no method at all, just a general phrase like "inspection" with no instrument/step named).
+Each item you list must be a plain short tag, 3-6 words, in the form "Missing: <what>" or "Vague: <what>" - e.g. "Missing: Ship-to-Plant effect", "Vague: Failure Cause". Do not explain why, do not add reasoning, do not repeat information already captured elsewhere in this JSON. Do NOT flag a section merely because it says "Nil"/"None"/"N/A" if that is a plausible genuine answer (e.g. Ship-to-Plant effect really can be Nil for many failures) - only flag when something looks unintentionally left blank or is too vague to use.
+
 EXISTING CONTROLS RULE (applies to both the Prevention recommendation above and any Detection recommendation you are asked for elsewhere): you are given the Current Prevention Control (PC) and Current Detection Controls (DC) already in place at this station. Your recommendation must NOT just restate or duplicate what is already there (e.g. if DC already lists "SELF CHECK, CHECKMAN CHECKING, ECOS SYSTEM", do not recommend "add a self-check" - that already exists and adds nothing). Instead:
 - If an existing control is manual/human-dependent (self-check, visual check, checksheet) and the failure is severe enough to warrant it, recommend the specific automated/poka-yoke upgrade that would close the gap a manual control leaves open (manual checks can be skipped or missed; a sensor/interlock cannot).
 - If an existing control already looks adequate for this specific failure cause, say so plainly instead of inventing an unnecessary addition - it is fine for the recommendation to be "the existing prevention control (PC) already addresses this; no change needed" when that is honestly true.
@@ -327,9 +336,12 @@ Return ONLY valid JSON, no other text, in this exact shape:
   "detection_recommendation": "<one specific, implementable way to CATCH this exact Failure Mode if it occurs - a sensor/gauge/vision check/functional test/inspection gate specific to this Mode, not a control that would only catch a different failure mode>",
   "suggested_detection": <integer 1-10, per the AIAG-VDA DETECTION SCORING TABLE and the CURRENT Detection Controls (DC) text as actually described - NOT based on your recommended upgrade above, and NOT inferred from the Severity score>,
   "detection_matched_table_definition": "<the exact Detection table definition/category text this DC matches>",
+  "projected_detection_after_recommendation": <integer 1-10, the Detection score if detection_recommendation above were implemented instead of the current DC - same table, same axes, same Failure Mode>,
+  "projected_detection_note": "<one short clause naming the Detection table category/definition the recommended control would land in, e.g. 'Machine-based, in-station, stops further processing (D3)' - not a restatement of the recommendation text itself>",
   "merged_modes_detected": {merged_modes_field},
   "cause_mode_mismatch": <true if the Failure Cause's physical mechanism does not logically produce the stated Failure Mode (per the CAUSE/MODE MISMATCH CHECK rule above), false otherwise>,
-  "cause_mode_mismatch_note": "<null if cause_mode_mismatch is false; otherwise one sentence saying what the Cause text looks like it actually belongs to instead, e.g. 'This Cause (wrong part/mix-up) does not produce a scratch/damage Mode - it reads like the Cause for the adjacent Fitment/Wrong-selection row instead'>"
+  "cause_mode_mismatch_note": "<null if cause_mode_mismatch is false; otherwise one sentence saying what the Cause text looks like it actually belongs to instead, e.g. 'This Cause (wrong part/mix-up) does not produce a scratch/damage Mode - it reads like the Cause for the adjacent Fitment/Wrong-selection row instead'>",
+  "row_completeness_note": "<null if nothing applies; otherwise a semicolon-separated list of short 'Missing: ...' / 'Vague: ...' tags per the row completeness audit above, max ~20 words total, e.g. 'Missing: Ship-to-Plant effect; Vague: Failure Cause'>"
 }}"""
 
 
@@ -366,6 +378,8 @@ def score_split_modes(entry, merged_phrases, severity_table_text, call_fn):
                 "detection_recommendation": result.get("detection_recommendation"),
                 "suggested_detection": result.get("suggested_detection"),
                 "detection_matched_table_definition": result.get("detection_matched_table_definition"),
+                "projected_detection_after_recommendation": result.get("projected_detection_after_recommendation"),
+                "projected_detection_note": result.get("projected_detection_note"),
             }
         )
     return splits
@@ -590,10 +604,13 @@ def main():
                     "plant_recorded_detection": (entry.get("risk") or {}).get("detection"),
                     "ai_suggested_detection": runs[0].get("suggested_detection"),
                     "ai_detection_matched_table_definition": runs[0].get("detection_matched_table_definition"),
+                    "ai_projected_detection_after_recommendation": runs[0].get("projected_detection_after_recommendation"),
+                    "ai_projected_detection_note": runs[0].get("projected_detection_note"),
                     "ai_merged_modes_detected": merged_modes_detected,
                     "ai_split_suggestions": ai_split_suggestions,
                     "ai_cause_mode_mismatch": runs[0].get("cause_mode_mismatch"),
                     "ai_cause_mode_mismatch_note": runs[0].get("cause_mode_mismatch_note"),
+                    "ai_row_completeness_note": runs[0].get("row_completeness_note"),
                     "ai_consistent_across_runs": consistent,
                     "ai_runs": [
                         {
@@ -607,9 +624,12 @@ def main():
                             "detection_recommendation": r.get("detection_recommendation"),
                             "suggested_detection": r.get("suggested_detection"),
                             "detection_matched_table_definition": r.get("detection_matched_table_definition"),
+                            "projected_detection_after_recommendation": r.get("projected_detection_after_recommendation"),
+                            "projected_detection_note": r.get("projected_detection_note"),
                             "merged_modes_detected": r.get("merged_modes_detected"),
                             "cause_mode_mismatch": r.get("cause_mode_mismatch"),
                             "cause_mode_mismatch_note": r.get("cause_mode_mismatch_note"),
+                            "row_completeness_note": r.get("row_completeness_note"),
                         }
                         for r in runs
                     ] if repeat > 1 else None,
