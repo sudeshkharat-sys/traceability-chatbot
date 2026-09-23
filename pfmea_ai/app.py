@@ -82,7 +82,11 @@ if uploaded_file is not None:
                     source_path,
                     sheet_names=chosen_sheets,
                     repeat=int(repeat),
-                    output_path=work_dir / f"{source_path.stem}__with_suggestions.xlsx",
+                    # output_path=None lets run_pipeline() pick the name based
+                    # on merge_mode itself ("__merge_mode.xlsx" vs.
+                    # "__with_suggestions.xlsx"), same as the CLI - so the
+                    # downloaded filename actually reflects which mode ran.
+                    output_path=None if merge_mode else work_dir / f"{source_path.stem}__with_suggestions.xlsx",
                     merge_mode=merge_mode,
                     cross_review=cross_review,
                     log=ui_log,
