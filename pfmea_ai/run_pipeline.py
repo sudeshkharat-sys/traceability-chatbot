@@ -45,6 +45,12 @@ from step5_severity_llm import (
     get_reference_text,
     score_split_modes,
 )
+from step5c_cross_row_review import (
+    PROMPT_TEMPLATE as CROSS_ROW_PROMPT_TEMPLATE,
+    build_cause_lookup as build_cross_row_cause_lookup,
+    build_effect_lookup as build_cross_row_effect_lookup,
+    build_entries_text as build_cross_row_entries_text,
+)
 from step6_write_suggestions_to_excel import apply_suggestions_to_sheet, normalize_cause_text
 
 
@@ -106,10 +112,13 @@ def score_entries(entries, llm, severity_table_text, repeat, log=print):
                 "plant_recorded_detection": (entry.get("risk") or {}).get("detection"),
                 "ai_suggested_detection": runs[0].get("suggested_detection"),
                 "ai_detection_matched_table_definition": runs[0].get("detection_matched_table_definition"),
+                "ai_projected_detection_after_recommendation": runs[0].get("projected_detection_after_recommendation"),
+                "ai_projected_detection_note": runs[0].get("projected_detection_note"),
                 "ai_merged_modes_detected": merged_modes_detected,
                 "ai_split_suggestions": ai_split_suggestions,
                 "ai_cause_mode_mismatch": runs[0].get("cause_mode_mismatch"),
                 "ai_cause_mode_mismatch_note": runs[0].get("cause_mode_mismatch_note"),
+                "ai_row_completeness_note": runs[0].get("row_completeness_note"),
                 "ai_possible_severities": runs[0].get("possible_severities"),
                 "ai_consistent_across_runs": consistent,
             }
@@ -122,6 +131,116 @@ def score_entries(entries, llm, severity_table_text, repeat, log=print):
             for s in ai_split_suggestions:
                 log(f"        - {s['failure_mode'][:50]!r:52} severity={s['suggested_severity']} detection={s.get('suggested_detection')}")
     return results
+
+
+def run_cross_row_review(rows, groups, llm, log=print):
+    """Run step5c's whole-sheet consistency pass in-memory (no JSON round
+    trip) and merge any findings into rows[i]["ai_review_note"], which
+    apply_suggestions_to_sheet already knows how to display in the AI
+    Review column. Mutates rows in place."""
+    effect_lookup = build_cross_row_effect_lookup(groups)
+    cause_lookup = build_cross_row_cause_lookup(groups)
+    entries_text = build_cross_row_entries_text(rows, effect_lookup, cause_lookup)
+    prompt = CROSS_ROW_PROMPT_TEMPLATE.format(entries=entries_text)
+
+    findings = call_llm(llm, prompt)
+    if not isinstance(findings, list):
+        log(f"  WARNING: cross-row review returned {type(findings)}, expected a list - skipping.")
+        return
+
+    notes_by_mode = {f["failure_mode"]: f["review_note"] for f in findings}
+    matched = 0
+    for row in rows:
+        note = notes_by_mode.get(row["failure_mode"])
+        if note:
+            row["ai_review_note"] = note
+            matched += 1
+    log(f"  cross-row review: {matched} row(s) flagged")
+
+
+def run_pipeline(
+    source_path,
+    sheet_names=None,
+    repeat=3,
+    output_path=None,
+    handbook_index_path=None,
+    merge_mode=False,
+    cross_review=False,
+    log=print,
+):
+    """Core of the pipeline, callable directly (e.g. from a UI) instead of
+    only via the CLI below. Returns the output Path on success.
+
+    sheet_names=None processes every sheet in the workbook. merge_mode and
+    cross_review mirror step6/step5c's own flags - see their docstrings."""
+    source_path = Path(source_path)
+    if output_path is None:
+        suffix = "__merge_mode.xlsx" if merge_mode else "__with_suggestions.xlsx"
+        output_path = source_path.with_name(f"{source_path.stem}{suffix}")
+    else:
+        output_path = Path(output_path)
+
+    reference_path = str(Path(__file__).with_name("AIAG_VDA_Scoring_Reference.xlsx"))
+    reference_lookup = load_reference_lookup(reference_path)
+
+    severity_table_text = get_reference_text(
+        handbook_index_path,
+        query="Severity rating table effect on customer safe vehicle operation loss of function",
+        fallback_text=SEVERITY_TABLE_TEXT,
+    )
+    if handbook_index_path:
+        log(f"Using handbook-grounded Severity reference from {handbook_index_path}\n")
+
+    log(f"Loading {source_path} ...")
+    wb = load_workbook(source_path, data_only=True)
+    sheet_names = sheet_names if sheet_names else wb.sheetnames
+
+    llm = get_llm()
+
+    # Load the SAME workbook again with formulas/formatting intact - this
+    # is the copy that gets written into and saved. The data_only load
+    # above is only used for reading values to build the scoring input.
+    out_wb = load_workbook(source_path)
+
+    for sheet_name in sheet_names:
+        if sheet_name not in wb.sheetnames:
+            log(f"WARNING: sheet '{sheet_name}' not found in {source_path} - skipping. Available: {wb.sheetnames}")
+            continue
+
+        log(f"\n=== {sheet_name} ===")
+        ws = wb[sheet_name]
+        _columns, records = normalize_sheet(ws)
+        entries = [build_entry(record, reference_lookup) for record in records]
+
+        if not entries:
+            log(f"  (no Failure Mode rows found in '{sheet_name}' - skipping)")
+            continue
+
+        groups = build_groups(entries)
+        cause_by_mode, cause_to_modes = build_cause_lookups(groups)
+
+        log(f"  Scoring {len(entries)} failure mode(s) with repeat={repeat} ...")
+        rows = score_entries(entries, llm, severity_table_text, repeat, log=log)
+
+        if cross_review:
+            log("  Running cross-row consistency check ...")
+            run_cross_row_review(rows, groups, llm, log=log)
+
+        out_ws = out_wb[sheet_name]
+        written = apply_suggestions_to_sheet(
+            out_ws,
+            rows,
+            cause_to_modes=cause_to_modes,
+            cause_by_mode=cause_by_mode,
+            log=lambda msg: log(f"  {msg}"),
+            merge_mode=merge_mode,
+        )
+        if written is None:
+            log(f"  WARNING: could not write Suggestion columns into '{sheet_name}' (see error above) - sheet left unchanged.")
+
+    out_wb.save(output_path)
+    log(f"\nDone. Wrote {output_path}")
+    return output_path
 
 
 def main():
@@ -145,65 +264,30 @@ def main():
         output_path = Path(args[idx + 1])
         args = args[:idx] + args[idx + 2 :]
 
+    merge_mode = "--merge-mode" in args
+    if merge_mode:
+        args.remove("--merge-mode")
+
+    cross_review = "--cross-review" in args
+    if cross_review:
+        args.remove("--cross-review")
+
     if len(args) < 1:
-        print("Usage: python run_pipeline.py <path-to-excel> [sheet_name ...] [--repeat N] [--handbook-index <path>] [--output <path>]")
+        print("Usage: python run_pipeline.py <path-to-excel> [sheet_name ...] [--repeat N] [--handbook-index <path>] [--output <path>] [--merge-mode] [--cross-review]")
         sys.exit(1)
 
     source_path = Path(args[0])
     requested_sheets = args[1:] or None
 
-    if output_path is None:
-        output_path = source_path.with_name(f"{source_path.stem}__with_suggestions.xlsx")
-
-    reference_path = str(Path(__file__).with_name("AIAG_VDA_Scoring_Reference.xlsx"))
-    reference_lookup = load_reference_lookup(reference_path)
-
-    severity_table_text = get_reference_text(
-        handbook_index_path,
-        query="Severity rating table effect on customer safe vehicle operation loss of function",
-        fallback_text=SEVERITY_TABLE_TEXT,
+    run_pipeline(
+        source_path,
+        sheet_names=requested_sheets,
+        repeat=repeat,
+        output_path=output_path,
+        handbook_index_path=handbook_index_path,
+        merge_mode=merge_mode,
+        cross_review=cross_review,
     )
-    if handbook_index_path:
-        print(f"Using handbook-grounded Severity reference from {handbook_index_path}\n")
-
-    print(f"Loading {source_path} ...")
-    wb = load_workbook(source_path, data_only=True)
-    sheet_names = requested_sheets if requested_sheets else wb.sheetnames
-
-    llm = get_llm()
-
-    # Load the SAME workbook again with formulas/formatting intact - this
-    # is the copy that gets written into and saved. The data_only load
-    # above is only used for reading values to build the scoring input.
-    out_wb = load_workbook(source_path)
-
-    for sheet_name in sheet_names:
-        if sheet_name not in wb.sheetnames:
-            print(f"WARNING: sheet '{sheet_name}' not found in {source_path} - skipping. Available: {wb.sheetnames}")
-            continue
-
-        print(f"\n=== {sheet_name} ===")
-        ws = wb[sheet_name]
-        _columns, records = normalize_sheet(ws)
-        entries = [build_entry(record, reference_lookup) for record in records]
-
-        if not entries:
-            print(f"  (no Failure Mode rows found in '{sheet_name}' - skipping)")
-            continue
-
-        groups = build_groups(entries)
-        cause_by_mode, cause_to_modes = build_cause_lookups(groups)
-
-        print(f"  Scoring {len(entries)} failure mode(s) with repeat={repeat} ...")
-        rows = score_entries(entries, llm, severity_table_text, repeat)
-
-        out_ws = out_wb[sheet_name]
-        written = apply_suggestions_to_sheet(out_ws, rows, cause_to_modes=cause_to_modes, cause_by_mode=cause_by_mode, log=lambda msg: print(f"  {msg}"))
-        if written is None:
-            print(f"  WARNING: could not write Suggestion columns into '{sheet_name}' (see error above) - sheet left unchanged.")
-
-    out_wb.save(output_path)
-    print(f"\nDone. Wrote {output_path}")
 
 
 if __name__ == "__main__":
