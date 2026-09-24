@@ -297,12 +297,29 @@ def run_pipeline(
     reference_path = str(Path(__file__).with_name("AIAG_VDA_Scoring_Reference.xlsx"))
     reference_lookup = load_reference_lookup(reference_path)
 
+    # prefer/avoid: the handbook has TWO Severity tables that are textually
+    # very similar - "Product General Evaluation Criteria Severity (S)"
+    # (DFMEA, pages 65/141/188 in the bundled handbook) and "Process General
+    # Evaluation Criteria Severity (S)" (PFMEA, pages 111/112/198/199) - this
+    # script is PFMEA-only, but a plain similarity search on this query
+    # scored the Product/DFMEA table above the correct Process/PFMEA one in
+    # a real run (verified against an actual PFMEA sheet: retrieval returned
+    # only the Product table, producing different Severity scores on
+    # several rows than the correct table would have). The same
+    # prefer/avoid mechanism retrieve() already has for Occurrence/Detection
+    # (see step4b_embed_handbook.py's docstring) was never applied here -
+    # this is that fix. "Corporate or Product Line Examples" is NOT used as
+    # an avoid_term even though it also appears in the DFMEA table's own
+    # docstring-cited example text, because it's ALSO a real column header
+    # in the correct Process table - penalizing it would hit both tables.
     severity_table_text, severity_source = get_reference_text(
         handbook_index_path,
         query="Severity rating table effect on customer safe vehicle operation loss of function",
         fallback_text=SEVERITY_TABLE_TEXT,
         top_k=top_k,
         return_source=True,
+        prefer_terms=["process general evaluation criteria", "impact to your plant"],
+        avoid_terms=["product general evaluation criteria"],
     )
     log(f"Severity reference source: {severity_source}\n")
 
