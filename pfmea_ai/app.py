@@ -28,6 +28,17 @@ SEVERITY_RETRIEVAL_QUERY = "Severity rating table effect on customer safe vehicl
 # default instead of asking for a fresh PDF upload + re-embedding every session.
 BUNDLED_HANDBOOK_INDEXES = sorted(Path(__file__).parent.glob("*__handbook_index.json"))
 
+# Public per-1K-token list pricing (USD) as a starting point for the cost
+# estimator - NOT read from Azure (its API reports token usage, never a
+# dollar figure - see get_llm()'s cost tracking notes in run_pipeline.py).
+# Azure's actual billed rate can differ by region/contract, and these
+# figures drift as pricing changes, so they're only a pre-filled DEFAULT -
+# always editable in the UI, never presented as your real invoiced rate.
+DEFAULT_PRICING_PER_1K = {
+    "gpt5": {"input": 0.00125, "output": 0.0100},
+    "gpt4omini": {"input": 0.00015, "output": 0.00060},
+}
+
 
 def embedding_credentials_missing():
     """Same check get_embedding_model() does, but as a plain bool so app.py
@@ -214,20 +225,33 @@ if uploaded_file is not None:
             "Estimate cost (USD)",
             value=False,
             help="Token counts always show after a run (real numbers from Azure's usage_metadata, not "
-                 "an estimate). Turning this on additionally multiplies them by the $/1K rates below to "
-                 "estimate cost - enter your actual Azure deployment pricing, since it isn't looked up "
-                 "automatically and varies by model/region.",
+                 "an estimate - Azure's API reports tokens used, never a dollar figure). Turning this on "
+                 "additionally multiplies them by the $/1K rates below to estimate cost.",
         )
         price_per_1k_input = price_per_1k_output = None
         if estimate_cost:
+            _load_dotenv_into_environ()
+            active_profile = os.environ.get("LLM_MODEL_PROFILE", "gpt5").strip().lower()
+            defaults = DEFAULT_PRICING_PER_1K.get(active_profile, {"input": 0.0, "output": 0.0})
+            if active_profile in DEFAULT_PRICING_PER_1K:
+                st.caption(
+                    f"Pre-filled with public list pricing for LLM_MODEL_PROFILE={active_profile!r} - "
+                    "this is a starting point, NOT read from Azure (it doesn't report a $ rate) and can "
+                    "drift out of date or differ from your actual contract/region. Correct it below if "
+                    "your invoice says otherwise."
+                )
+            else:
+                st.caption(
+                    f"No built-in default for LLM_MODEL_PROFILE={active_profile!r} - enter your rate manually."
+                )
             cost_col1, cost_col2 = st.columns(2)
             with cost_col1:
                 price_per_1k_input = st.number_input(
-                    "$ per 1K input tokens", min_value=0.0, value=0.0, step=0.0001, format="%.4f",
+                    "$ per 1K input tokens", min_value=0.0, value=defaults["input"], step=0.0001, format="%.5f",
                 )
             with cost_col2:
                 price_per_1k_output = st.number_input(
-                    "$ per 1K output tokens", min_value=0.0, value=0.0, step=0.0001, format="%.4f",
+                    "$ per 1K output tokens", min_value=0.0, value=defaults["output"], step=0.0001, format="%.5f",
                 )
 
     # Mirrors run_pipeline()'s own output_path naming - computed here (not
