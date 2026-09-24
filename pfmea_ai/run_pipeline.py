@@ -29,6 +29,7 @@ Example:
 
 import sys
 from collections import Counter, defaultdict
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from openpyxl import load_workbook
@@ -54,6 +55,33 @@ from step5c_cross_row_review import (
 from step6_write_suggestions_to_excel import apply_suggestions_to_sheet, normalize_cause_text
 
 
+CHECKPOINT_EVERY_ROWS = 5
+
+
+def make_row_checkpoint(out_wb, out_ws, output_path, cause_to_modes, cause_by_mode, merge_mode, log):
+    """Every CHECKPOINT_EVERY_ROWS rows scored, write what's done so far
+    into the real output file on disk. Each LLM call in score_entries() is
+    real API spend - if Streamlit dies or the connection drops mid-sheet,
+    this means the already-scored rows are sitting in a downloadable .xlsx
+    instead of vanishing with the killed process."""
+
+    def checkpoint(results_so_far):
+        if len(results_so_far) % CHECKPOINT_EVERY_ROWS != 0:
+            return
+        apply_suggestions_to_sheet(
+            out_ws,
+            results_so_far,
+            cause_to_modes=cause_to_modes,
+            cause_by_mode=cause_by_mode,
+            log=lambda msg: None,
+            merge_mode=merge_mode,
+        )
+        out_wb.save(output_path)
+        log(f"  [checkpoint] saved progress after {len(results_so_far)} row(s) -> {output_path}")
+
+    return checkpoint
+
+
 def build_cause_lookups(groups):
     """From step4's build_groups() output for one sheet, build both lookups
     apply_suggestions_to_sheet needs: cause text per Failure Mode, and the
@@ -72,17 +100,34 @@ def build_cause_lookups(groups):
     return cause_by_mode, cause_to_modes
 
 
-def score_entries(entries, llm, severity_table_text, repeat, log=print):
+def _call_llm_repeated(llm, prompt, repeat):
+    """Run the same prompt `repeat` times concurrently - these are
+    independent samples of one row (majority-vote noise insurance, see
+    run_pipeline()'s docstring), not a sequence, so there's nothing to wait
+    on between them. Cuts per-row latency by roughly `repeat`x instead of
+    paying it repeat times in series."""
+    if repeat == 1:
+        return [call_llm(llm, prompt)]
+    with ThreadPoolExecutor(max_workers=repeat) as executor:
+        return list(executor.map(lambda _: call_llm(llm, prompt), range(repeat)))
+
+
+def score_entries(entries, llm, severity_table_text, repeat, log=print, on_row_scored=None):
     """Run step5's per-row LLM scoring for every entry in a sheet. Returns
     the same row shape step5_severity_llm.py's JSON output uses, so
-    apply_suggestions_to_sheet() can consume it unchanged."""
+    apply_suggestions_to_sheet() can consume it unchanged.
+
+    on_row_scored(results_so_far), if given, is called after every row is
+    appended, with the SAME list object being built here (mutated, not
+    copied) - lets a caller checkpoint partial progress to disk without
+    this function knowing anything about files."""
     results = []
     for entry in entries:
         prompt = build_prompt_for_entry(entry, severity_table_text=severity_table_text)
         failure_mode = (entry.get("failure") or {}).get("mode")
         plant_sev = (entry.get("risk") or {}).get("severity")
 
-        runs = [call_llm(llm, prompt) for _ in range(repeat)]
+        runs = _call_llm_repeated(llm, prompt, repeat)
         severities = [r["suggested_severity"] for r in runs]
         consistent = len(set(severities)) == 1
         counts = Counter(severities)
@@ -130,6 +175,8 @@ def score_entries(entries, llm, severity_table_text, repeat, log=print):
             log(f"      MERGED MODE CELL - scored {len(ai_split_suggestions)} modes separately:")
             for s in ai_split_suggestions:
                 log(f"        - {s['failure_mode'][:50]!r:52} severity={s['suggested_severity']} detection={s.get('suggested_detection')}")
+        if on_row_scored:
+            on_row_scored(results)
     return results
 
 
@@ -228,14 +275,16 @@ def run_pipeline(
         groups = build_groups(entries)
         cause_by_mode, cause_to_modes = build_cause_lookups(groups)
 
+        out_ws = out_wb[sheet_name]
+        row_checkpoint = make_row_checkpoint(out_wb, out_ws, output_path, cause_to_modes, cause_by_mode, merge_mode, log)
+
         log(f"  Scoring {len(entries)} failure mode(s) with repeat={repeat} ...")
-        rows = score_entries(entries, llm, severity_table_text, repeat, log=log)
+        rows = score_entries(entries, llm, severity_table_text, repeat, log=log, on_row_scored=row_checkpoint)
 
         if cross_review:
             log("  Running cross-row consistency check ...")
             run_cross_row_review(rows, groups, llm, log=log)
 
-        out_ws = out_wb[sheet_name]
         written = apply_suggestions_to_sheet(
             out_ws,
             rows,
@@ -246,6 +295,13 @@ def run_pipeline(
         )
         if written is None:
             log(f"  WARNING: could not write Suggestion columns into '{sheet_name}' (see error above) - sheet left unchanged.")
+
+        # Save after every sheet, not just once at the very end - if a
+        # later sheet fails or the process is interrupted, everything
+        # already-completed (including cross-row review notes, which the
+        # mid-sheet row checkpoints above don't have yet) is safely on disk.
+        out_wb.save(output_path)
+        log(f"  [checkpoint] saved '{sheet_name}' -> {output_path}")
 
     out_wb.save(output_path)
     log(f"\nDone. Wrote {output_path}")

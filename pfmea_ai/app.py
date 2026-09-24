@@ -9,8 +9,8 @@ Usage:
     streamlit run app.py
 """
 
+import hashlib
 import os
-import shutil
 import tempfile
 from pathlib import Path
 
@@ -38,15 +38,22 @@ st.caption("Upload a PFMEA Excel file, choose what to run it on, and download th
 uploaded_file = st.file_uploader("Upload PFMEA Excel file", type=["xlsx"])
 
 if uploaded_file is not None:
-    # Work in a per-session temp dir so concurrent users / re-uploads don't
-    # collide, and the original upload is never modified in place.
-    if "work_dir" not in st.session_state or st.session_state.get("uploaded_name") != uploaded_file.name:
-        st.session_state.work_dir = tempfile.mkdtemp(prefix="pfmea_ui_")
-        st.session_state.uploaded_name = uploaded_file.name
+    # Deterministic (not random mkdtemp) per-file work dir, keyed by name +
+    # size, so it resolves to the SAME path if Streamlit restarts mid-run
+    # (a crash, a manual restart) and the same file is re-uploaded - that's
+    # what makes the partial-result recovery below possible: the on-disk
+    # checkpoints from run_pipeline() survive even though st.session_state
+    # itself was wiped by the restart.
+    file_bytes = uploaded_file.getvalue()
+    file_key = hashlib.sha1(f"{uploaded_file.name}:{len(file_bytes)}".encode()).hexdigest()[:16]
+    work_dir = Path(tempfile.gettempdir()) / "pfmea_ui_sessions" / file_key
+    work_dir.mkdir(parents=True, exist_ok=True)
+    st.session_state.work_dir = str(work_dir)
+    st.session_state.uploaded_name = uploaded_file.name
 
-    work_dir = Path(st.session_state.work_dir)
     source_path = work_dir / uploaded_file.name
-    source_path.write_bytes(uploaded_file.getvalue())
+    if not source_path.is_file():
+        source_path.write_bytes(file_bytes)
 
     try:
         wb = load_workbook(source_path, read_only=True)
@@ -155,6 +162,30 @@ if uploaded_file is not None:
             help="A second AI pass over the whole sheet that flags rows scored inconsistently vs. a mechanically similar row (see AI Review column).",
         )
 
+    # Mirrors run_pipeline()'s own output_path naming - computed here (not
+    # left to run_pipeline's default) so its path is known BEFORE a run
+    # starts, which is what lets an interrupted run's on-disk checkpoints
+    # (see run_pipeline.py's row/sheet checkpoints) be found and offered
+    # for download again below, even after this session's state was lost.
+    output_suffix = "__merge_mode.xlsx" if merge_mode else "__with_suggestions.xlsx"
+    output_path = work_dir / f"{source_path.stem}{output_suffix}"
+
+    if output_path.is_file():
+        st.info(
+            f"A result file already exists for this upload at this setting ('{output_path.name}') - "
+            "either from a previous completed run, or one that was interrupted partway through "
+            "(the pipeline saves progress every few rows and after each sheet, so this may already "
+            "contain most of the scored rows without spending any more API calls)."
+        )
+        with open(output_path, "rb") as fh:
+            st.download_button(
+                "Download existing/partial result",
+                data=fh.read(),
+                file_name=output_path.name,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="download_existing",
+            )
+
     run_disabled = scope == "Choose specific sheet(s)" and not chosen_sheets
     if st.button("Run", type="primary", disabled=run_disabled):
         log_box = st.empty()
@@ -170,11 +201,7 @@ if uploaded_file is not None:
                     source_path,
                     sheet_names=chosen_sheets,
                     repeat=int(repeat),
-                    # output_path=None lets run_pipeline() pick the name based
-                    # on merge_mode itself ("__merge_mode.xlsx" vs.
-                    # "__with_suggestions.xlsx"), same as the CLI - so the
-                    # downloaded filename actually reflects which mode ran.
-                    output_path=None if merge_mode else work_dir / f"{source_path.stem}__with_suggestions.xlsx",
+                    output_path=output_path,
                     handbook_index_path=str(handbook_index_path) if handbook_index_path else None,
                     merge_mode=merge_mode,
                     cross_review=cross_review,
