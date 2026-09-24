@@ -23,6 +23,11 @@ from step5_severity_llm import SEVERITY_TABLE_TEXT, _load_dotenv_into_environ, g
 
 SEVERITY_RETRIEVAL_QUERY = "Severity rating table effect on customer safe vehicle operation loss of function"
 
+# step4b_embed_handbook.py already produced aiag-vda-fmea-handbook-1__handbook_index.json
+# (the AIAG-VDA handbook, pre-embedded, sitting next to this script) - reuse THAT by
+# default instead of asking for a fresh PDF upload + re-embedding every session.
+BUNDLED_HANDBOOK_INDEXES = sorted(Path(__file__).parent.glob("*__handbook_index.json"))
+
 
 def embedding_credentials_missing():
     """Same check get_embedding_model() does, but as a plain bool so app.py
@@ -79,14 +84,21 @@ if uploaded_file is not None:
         "to the LLM before running."
     )
 
+    bundled_options = [f"Use bundled: {p.name}" for p in BUNDLED_HANDBOOK_INDEXES]
+    mode_options = bundled_options + ["Upload handbook PDF", "Upload prebuilt index (.json)", "None (use built-in table)"]
     handbook_mode = st.radio(
         "Handbook source",
-        ["None (use built-in table)", "Upload handbook PDF", "Upload prebuilt index (.json)"],
+        mode_options,
+        # Default to the already-embedded handbook sitting next to app.py if one
+        # exists - no reason to re-upload/re-embed a PDF that's already indexed.
+        index=0,
         key="handbook_mode",
     )
 
     handbook_index_path = None
-    if handbook_mode == "Upload handbook PDF":
+    if handbook_mode in bundled_options:
+        handbook_index_path = BUNDLED_HANDBOOK_INDEXES[bundled_options.index(handbook_mode)]
+    elif handbook_mode == "Upload handbook PDF":
         pdf_file = st.file_uploader("AIAG-VDA handbook PDF", type=["pdf"], key="handbook_pdf")
         if pdf_file is not None:
             pdf_path = work_dir / pdf_file.name
