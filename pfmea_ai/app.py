@@ -172,12 +172,13 @@ if uploaded_file is not None:
             else:
                 with st.spinner("Retrieving..."):
                     try:
-                        text, source = get_reference_text(
+                        text, source, chunks = get_reference_text(
                             str(handbook_index_path), preview_query,
-                            fallback_text=SEVERITY_TABLE_TEXT, top_k=int(top_k), return_source=True,
+                            fallback_text=SEVERITY_TABLE_TEXT, top_k=int(top_k), return_chunks=True,
                         )
                         st.session_state.handbook_preview_text = text
                         st.session_state.handbook_preview_source = source
+                        st.session_state.handbook_preview_chunks = chunks
                         st.session_state.handbook_preview_key = preview_key
                     except Exception as e:
                         st.error(f"Retrieval failed: {e}")
@@ -191,6 +192,30 @@ if uploaded_file is not None:
                 "hardcoded table, not your PDF. Check the index was built from the right PDF, or that "
                 "the query actually matches content in it."
             )
+
+        # QLense-style citations - same idea as CitationsTable.js (Document
+        # Name + Page, deduplicated): which page(s) of which document the
+        # answer is actually grounded in, so it's visible at a glance
+        # exactly like a chat answer's source list, not just buried in the
+        # raw context text below.
+        preview_chunks = st.session_state.get("handbook_preview_chunks") or []
+        if preview_chunks:
+            doc_name = handbook_index_path.stem.replace("__handbook_index", "")
+            seen_pages = set()
+            citation_rows = []
+            for c in preview_chunks:
+                page = c["page"]
+                if page in seen_pages:
+                    continue
+                seen_pages.add(page)
+                citation_rows.append({
+                    "Document": doc_name,
+                    "Page": page,
+                    "Type": "Table" if c["type"] == "table" else ("Note (same-page)" if c.get("stitched_same_page_note") else "Prose"),
+                })
+            citation_rows.sort(key=lambda r: r["Page"])
+            st.caption("Citations - source page(s) this Severity context was retrieved from:")
+            st.dataframe(citation_rows, use_container_width=True, hide_index=True)
 
         with st.expander("Context the LLM will actually receive for Severity", expanded=True):
             if "handbook_preview_text" in st.session_state:

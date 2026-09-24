@@ -179,7 +179,7 @@ def dedupe_reference_chunks(chunks):
     return unique
 
 
-def get_reference_text(handbook_index_path, query, fallback_text, prefer_terms=None, avoid_terms=None, top_k=3, return_source=False):
+def get_reference_text(handbook_index_path, query, fallback_text, prefer_terms=None, avoid_terms=None, top_k=3, return_source=False, return_chunks=False):
     """Return grounded reference text retrieved from the embedded AIAG-VDA
     handbook (step4b_embed_handbook.py) if a handbook index was provided,
     otherwise fall back to the hardcoded table text embedded directly in
@@ -190,9 +190,18 @@ def get_reference_text(handbook_index_path, query, fallback_text, prefer_terms=N
     where the text actually came from - "PDF" or "fallback", and why in
     the fallback case (no index given vs. retrieval came back empty) -
     since a caller (e.g. the Streamlit UI) can't otherwise tell whether a
-    handbook index was silently ignored."""
+    handbook index was silently ignored.
+
+    return_chunks=True additionally returns the raw deduped chunk list
+    (each with page/type/score, no embedding) - lets a caller build a
+    citations-style "which page did this come from" display (e.g. the
+    Streamlit UI) without a second retrieval call. Implies return_source;
+    always returns a 3-tuple (text, source, chunks) when set, regardless
+    of return_source's own value."""
     if not handbook_index_path:
         source = "fallback (no handbook index given)"
+        if return_chunks:
+            return fallback_text, source, []
         return (fallback_text, source) if return_source else fallback_text
 
     from step4b_embed_handbook import retrieve
@@ -201,12 +210,16 @@ def get_reference_text(handbook_index_path, query, fallback_text, prefer_terms=N
     results = dedupe_reference_chunks(results)
     if not results:
         source = "fallback (handbook index given, but retrieval returned nothing)"
+        if return_chunks:
+            return fallback_text, source, []
         return (fallback_text, source) if return_source else fallback_text
 
     text = "\n\n---\n\n".join(f"(From handbook page {r['page']})\n{r['text']}" for r in results)
+    pages = sorted({r["page"] for r in results})
+    source = f"PDF (top_k={top_k}, {len(results)} chunk(s) retrieved, page(s) {pages})"
+    if return_chunks:
+        return text, source, results
     if return_source:
-        pages = sorted({r["page"] for r in results})
-        source = f"PDF (top_k={top_k}, {len(results)} chunk(s) retrieved, page(s) {pages})"
         return text, source
     return text
 
