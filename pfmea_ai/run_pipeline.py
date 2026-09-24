@@ -59,12 +59,19 @@ from step6_write_suggestions_to_excel import apply_suggestions_to_sheet, normali
 CHECKPOINT_EVERY_ROWS = 5
 
 
-def make_row_checkpoint(out_wb, out_ws, output_path, cause_to_modes, cause_by_mode, merge_mode, log):
+def make_row_checkpoint(out_wb, out_ws, output_path, cause_to_modes, cause_by_mode, merge_mode, log, block_start_col):
     """Every CHECKPOINT_EVERY_ROWS rows scored, write what's done so far
     into the real output file on disk. Each LLM call in score_entries() is
     real API spend - if Streamlit dies or the connection drops mid-sheet,
     this means the already-scored rows are sitting in a downloadable .xlsx
-    instead of vanishing with the killed process."""
+    instead of vanishing with the killed process.
+
+    block_start_col MUST be the same fixed column for every checkpoint call
+    AND the sheet's final apply_suggestions_to_sheet call below - passed
+    through to start_col so each call overwrites/extends the SAME
+    Suggestion block instead of apply_suggestions_to_sheet's default
+    behavior of appending a brand new one every time it's called, which
+    would stack a duplicate block per checkpoint within a single run."""
 
     def checkpoint(results_so_far):
         if len(results_so_far) % CHECKPOINT_EVERY_ROWS != 0:
@@ -76,6 +83,7 @@ def make_row_checkpoint(out_wb, out_ws, output_path, cause_to_modes, cause_by_mo
             cause_by_mode=cause_by_mode,
             log=lambda msg: None,
             merge_mode=merge_mode,
+            start_col=block_start_col,
         )
         out_wb.save(output_path)
         log(f"  [checkpoint] saved progress after {len(results_so_far)} row(s) -> {output_path}")
@@ -334,7 +342,12 @@ def run_pipeline(
         cause_by_mode, cause_to_modes = build_cause_lookups(groups)
 
         out_ws = out_wb[sheet_name]
-        row_checkpoint = make_row_checkpoint(out_wb, out_ws, output_path, cause_to_modes, cause_by_mode, merge_mode, log)
+        # Fixed ONCE per sheet, before any Suggestion column exists for this
+        # run - every apply_suggestions_to_sheet call below (each row
+        # checkpoint AND the final write) passes this same start_col so
+        # they all target the one block instead of each appending its own.
+        block_start_col = out_ws.max_column + 1
+        row_checkpoint = make_row_checkpoint(out_wb, out_ws, output_path, cause_to_modes, cause_by_mode, merge_mode, log, block_start_col)
 
         log(f"  Scoring {len(entries)} failure mode(s) with repeat={repeat} ...")
         rows = score_entries(
@@ -354,6 +367,7 @@ def run_pipeline(
             cause_by_mode=cause_by_mode,
             log=lambda msg: log(f"  {msg}"),
             merge_mode=merge_mode,
+            start_col=block_start_col,
         )
         if written is None:
             log(f"  WARNING: could not write Suggestion columns into '{sheet_name}' (see error above) - sheet left unchanged.")

@@ -20,6 +20,7 @@ from openpyxl import load_workbook
 from run_pipeline import run_pipeline
 from step4b_embed_handbook import build_index
 from step5_severity_llm import SEVERITY_TABLE_TEXT, _load_dotenv_into_environ, get_reference_text
+from step6_write_suggestions_to_excel import find_suggestion_blocks, strip_suggestion_blocks
 
 SEVERITY_RETRIEVAL_QUERY = "Severity rating table effect on customer safe vehicle operation loss of function"
 
@@ -79,6 +80,33 @@ if uploaded_file is not None:
         st.stop()
 
     st.success(f"Loaded '{uploaded_file.name}' - {len(sheet_names)} sheet(s) found.")
+
+    # Detect leftover Suggestion block(s) from an earlier run on this exact
+    # file - step6_write_suggestions_to_excel.py ALWAYS appends a brand new
+    # block rather than overwriting an old one (so AI output is never
+    # ambiguously mixed with a previous run's), which means re-running on
+    # an already-suggested file silently stacks another block next to the
+    # old ones every time instead of erroring - this is what catches that
+    # before it happens again.
+    scan_wb = load_workbook(source_path)
+    blocks_by_sheet = {sn: find_suggestion_blocks(scan_wb[sn]) for sn in sheet_names}
+    total_blocks = sum(len(b) for b in blocks_by_sheet.values())
+    scan_wb.close()
+
+    strip_old_blocks = False
+    if total_blocks:
+        detail = ", ".join(f"'{sn}': {len(b)}" for sn, b in blocks_by_sheet.items() if b)
+        st.warning(
+            f"This file already has **{total_blocks} existing Suggestion block(s)** from earlier run(s) - "
+            f"{detail}. Running again will stack ANOTHER block next to them unless removed first."
+        )
+        strip_old_blocks = st.checkbox(
+            "Remove existing Suggestion block(s) before running (recommended)",
+            value=True,
+            help="Deletes the old Suggestion column block(s) from a copy of this file before scoring, so "
+                 "the output has exactly one clean block instead of several stacked side by side. The "
+                 "original uploaded file is never modified.",
+        )
 
     scope = st.radio("What do you want to run this on?", ["Run on all sheets", "Choose specific sheet(s)"])
     if scope == "Choose specific sheet(s)":
@@ -323,11 +351,30 @@ if uploaded_file is not None:
             log_lines.append(str(msg))
             log_box.code("\n".join(log_lines[-40:]))  # last 40 lines is enough to show progress
 
+        pipeline_source_path = source_path
+        if strip_old_blocks and total_blocks:
+            cleaned_path = work_dir / f"{source_path.stem}__cleaned.xlsx"
+            # rich_text=True mirrors run_pipeline()'s own load - preserves
+            # the plant's red/bold inline formatting in cells like "Your
+            # Plant :" that a plain load would silently flatten.
+            clean_wb = load_workbook(source_path, rich_text=True)
+            for sn, blocks in blocks_by_sheet.items():
+                if blocks:
+                    strip_suggestion_blocks(clean_wb[sn], blocks=blocks)
+            clean_wb.save(cleaned_path)
+            clean_wb.close()
+            pipeline_source_path = cleaned_path
+            ui_log_note = f"Removed {total_blocks} old Suggestion block(s) before running - scoring from a cleaned copy."
+        else:
+            ui_log_note = None
+
         usage_rows = []
         with st.spinner("Scoring with the LLM - this calls the API once per row (x repeat), so it can take a while for a large sheet..."):
+            if ui_log_note:
+                st.info(ui_log_note)
             try:
                 output_path = run_pipeline(
-                    source_path,
+                    pipeline_source_path,
                     sheet_names=chosen_sheets,
                     repeat=int(repeat),
                     output_path=output_path,

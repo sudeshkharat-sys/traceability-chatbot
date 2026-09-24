@@ -375,7 +375,38 @@ def build_ai_review(row):
     return "\n".join(parts)
 
 
-def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None, log=print, merge_mode=False):
+def find_suggestion_blocks(ws):
+    """Find every existing "Suggestion" column block already written into
+    this sheet by a PREVIOUS run of apply_suggestions_to_sheet() - each one
+    left its own merged "Suggestion" section header cell (see below), which
+    is enough to locate it without knowing merge_mode or the exact header
+    list used at the time. Returns a list of (start_col, end_col), one per
+    block found, left-to-right. Re-running the pipeline on an
+    already-suggested file (instead of a fresh copy) silently stacks a new
+    block next to the old one every time rather than erroring, so this is
+    what lets a caller detect/warn/clean that up instead of it going
+    unnoticed until someone counts four "Severity (S)" columns by hand."""
+    blocks = []
+    for merged_range in ws.merged_cells.ranges:
+        top_left = ws.cell(row=merged_range.min_row, column=merged_range.min_col)
+        if str(top_left.value).strip().lower() == "suggestion":
+            blocks.append((merged_range.min_col, merged_range.max_col))
+    blocks.sort()
+    return blocks
+
+
+def strip_suggestion_blocks(ws, blocks=None):
+    """Delete every existing Suggestion block found by find_suggestion_blocks()
+    (or a caller-supplied list from an earlier call, so it isn't scanned
+    twice) - e.g. to clean up a file that's already been run through the
+    pipeline multiple times and stacked several blocks, before running it
+    again. Deletes right-to-left so earlier blocks' column numbers don't
+    shift out from under the loop. Mutates ws in place; does not save."""
+    for start_col, end_col in sorted(blocks or find_suggestion_blocks(ws), reverse=True):
+        ws.delete_cols(start_col, end_col - start_col + 1)
+
+
+def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None, log=print, merge_mode=False, start_col=None):
     """Core of step6: given an already-open worksheet and this sheet's list
     of suggestion rows (step5's per-sheet output shape), append the
     Suggestion column block and write every row's values into it. Mutates
@@ -387,6 +418,16 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
     rows written, or None if the sheet's header row couldn't be found (an
     error is logged instead of raising, so a multi-sheet caller can skip
     just this one sheet and continue with the rest).
+
+    start_col=None (default) appends a brand new block after the last
+    existing column, same as always. Pass an explicit start_col to instead
+    write into/overwrite THAT exact block - needed when this function is
+    called more than once for the SAME sheet within a single run (e.g.
+    run_pipeline.py's row checkpoints firing every few rows, then the final
+    full write): without this, each call has no memory of the previous
+    one's block and would append yet another brand new block next to it
+    every time, stacking several duplicate "Suggestion" sections in one run
+    instead of progressively filling in the same one.
 
     merge_mode=True changes how a merged (2+ sub-modes) row's Severity/
     Severity Note/Detection/Detection Note cells are written: instead of
@@ -424,7 +465,8 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
     # an existing sub-header's own merged range rather than hardcoding row
     # numbers, so this keeps working if the template's row layout shifts.
     headers = MERGE_MODE_COLUMN_HEADERS if merge_mode else NEW_COLUMN_HEADERS
-    start_col = ws.max_column + 1
+    if start_col is None:
+        start_col = ws.max_column + 1
     end_col = start_col + len(headers) - 1
 
     section_header_row_start, section_header_row_end, section_ref_cell = find_section_header_rows(ws, header_row)
