@@ -44,7 +44,6 @@ from step5_severity_llm import (
     build_prompt_for_entry,
     call_llm,
     get_llm,
-    get_reference_text,
     score_split_modes,
 )
 from step5c_cross_row_review import (
@@ -279,8 +278,10 @@ def run_pipeline(
 
     sheet_names=None processes every sheet in the workbook. merge_mode and
     cross_review mirror step6/step5c's own flags - see their docstrings.
-    top_k is how many handbook chunks get_reference_text() retrieves per
-    query - only matters when handbook_index_path is set.
+    handbook_index_path/top_k are accepted for backward compatibility (the
+    CLI and app.py's standalone retrieval preview still use them) but are
+    NO LONGER used for Severity scoring - see the comment where
+    severity_table_text is set, below, for why.
 
     usage_rows, if given, is a list this function APPENDS a per-row token
     (input/output/total) dict into, one per Severity-scored row across
@@ -297,30 +298,30 @@ def run_pipeline(
     reference_path = str(Path(__file__).with_name("AIAG_VDA_Scoring_Reference.xlsx"))
     reference_lookup = load_reference_lookup(reference_path)
 
-    # prefer/avoid: the handbook has TWO Severity tables that are textually
-    # very similar - "Product General Evaluation Criteria Severity (S)"
-    # (DFMEA, pages 65/141/188 in the bundled handbook) and "Process General
-    # Evaluation Criteria Severity (S)" (PFMEA, pages 111/112/198/199) - this
-    # script is PFMEA-only, but a plain similarity search on this query
-    # scored the Product/DFMEA table above the correct Process/PFMEA one in
-    # a real run (verified against an actual PFMEA sheet: retrieval returned
-    # only the Product table, producing different Severity scores on
-    # several rows than the correct table would have). The same
-    # prefer/avoid mechanism retrieve() already has for Occurrence/Detection
-    # (see step4b_embed_handbook.py's docstring) was never applied here -
-    # this is that fix. "Corporate or Product Line Examples" is NOT used as
-    # an avoid_term even though it also appears in the DFMEA table's own
-    # docstring-cited example text, because it's ALSO a real column header
-    # in the correct Process table - penalizing it would hit both tables.
-    severity_table_text, severity_source = get_reference_text(
-        handbook_index_path,
-        query="Severity rating table effect on customer safe vehicle operation loss of function",
-        fallback_text=SEVERITY_TABLE_TEXT,
-        top_k=top_k,
-        return_source=True,
-        prefer_terms=["process general evaluation criteria", "impact to your plant"],
-        avoid_terms=["product general evaluation criteria"],
-    )
+    # Severity ALWAYS uses the hardcoded, hand-verified table text (see
+    # SEVERITY_TABLE_TEXT in step5_severity_llm.py, checked against the real
+    # PDF in an earlier commit) - deliberately reverted from RAG retrieval.
+    # Reasoning: the table is ~10 rows and always fits whole in the prompt,
+    # so there was never a "too big to include" problem for retrieval to
+    # solve - and retrieval instead introduced a real bug (the handbook has
+    # a near-identical DFMEA "Product" table alongside the correct PFMEA
+    # "Process" one; a plain similarity search grabbed the wrong one on a
+    # real run, silently changing several rows' scores - see the earlier
+    # fix commit for the prefer/avoid terms that were needed to correct it).
+    # A short, fixed, already-verified table is safer served whole than
+    # retrieved. handbook_index_path/top_k are still accepted (kept for the
+    # standalone retrieval-quality preview in app.py and
+    # check_retrieval_regression.py) but intentionally NOT used for scoring
+    # - the embedded PDF index itself is being kept for a planned future
+    # PFMEA Q&A feature, not for grounding this scoring step.
+    severity_table_text = SEVERITY_TABLE_TEXT
+    severity_source = "hardcoded (fixed, hand-verified table - not retrieved from PDF)"
+    if handbook_index_path:
+        log(
+            f"NOTE: handbook_index_path was given ({handbook_index_path}) but is no longer used for "
+            "Severity scoring - the hardcoded table is always used now. The PDF index is still valid "
+            "for retrieval-quality preview/checks, just not wired into scoring.\n"
+        )
     log(f"Severity reference source: {severity_source}\n")
 
     log(f"Loading {source_path} ...")

@@ -115,12 +115,15 @@ if uploaded_file is not None:
         chosen_sheets = None  # None = every sheet, same as the CLI's default
 
     st.divider()
-    st.subheader("Handbook grounding (RAG)")
-    st.caption(
-        "By default, Severity scoring uses a fixed table text baked into the script. "
-        "Upload the AIAG-VDA handbook PDF (or a prebuilt index) instead to ground it in "
-        "text actually retrieved from the handbook, and preview exactly what gets sent "
-        "to the LLM before running."
+    st.subheader("Handbook retrieval preview (not used for scoring)")
+    st.warning(
+        "Severity scoring always uses the hardcoded, hand-verified table below now - this section no "
+        "longer affects the Run below at all. It was RAG-grounded earlier, but retrieval was reverted "
+        "after it silently pulled a near-identical but WRONG table variant (DFMEA instead of PFMEA) on "
+        "a real run - the table is short enough (~10 rows) to always include whole rather than "
+        "selectively retrieve, so retrieval was solving a problem that didn't exist here while adding a "
+        "real failure mode. This section is kept only as a standalone retrieval-quality tool, and "
+        "because the embedded PDF index is being kept for a planned future PFMEA Q&A feature."
     )
 
     bundled_options = [f"Use bundled: {p.name}" for p in BUNDLED_HANDBOOK_INDEXES]
