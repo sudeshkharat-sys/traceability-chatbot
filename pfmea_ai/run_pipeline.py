@@ -160,7 +160,14 @@ def score_entries(
     results = []
     for entry in entries:
         prompt = build_prompt_for_entry(entry, severity_table_text=severity_table_text)
-        failure_mode = (entry.get("failure") or {}).get("mode")
+        # Normalize to "" (never None) here, at the source - a blank plant
+        # Failure Mode cell means entry["failure"]["mode"] is None, and
+        # step6_write_suggestions_to_excel.py calls row["failure_mode"].strip()
+        # directly in several places with no None-guard (build_remark,
+        # build_mode_occurrence_map, cause_by_mode lookups) - crashed the
+        # whole pipeline with "NoneType has no attribute 'strip'" the first
+        # time a real sheet had a blank Failure Mode cell.
+        failure_mode = (entry.get("failure") or {}).get("mode") or ""
         plant_sev = (entry.get("risk") or {}).get("severity")
 
         runs, usage_list = _call_llm_repeated(llm, prompt, repeat)
