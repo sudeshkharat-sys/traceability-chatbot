@@ -777,7 +777,9 @@ def main():
             groups = json.load(fh)
         for group in groups:
             for mode_entry in group.get("modes_covered", []):
-                cause_by_mode[mode_entry["failure_mode"].strip()] = mode_entry.get("failure_cause")
+                # Same "" - not None - guard as run_pipeline.py's own
+                # build_cause_lookups(), for a blank plant Failure Mode cell.
+                cause_by_mode[(mode_entry["failure_mode"] or "").strip()] = mode_entry.get("failure_cause")
 
     # rich_text=True - several of the plant's own cells (e.g. "Your Plant :"
     # / "Ship to Plant :" / "End User :" inside Failure Effect) use per-run

@@ -99,7 +99,12 @@ def build_cause_lookups(groups):
     cause_to_modes = defaultdict(list)
     for group in groups:
         for mode_entry in group["modes_covered"]:
-            mode = mode_entry["failure_mode"]
+            # A blank plant Failure Mode cell makes this None, not "" - this
+            # runs BEFORE score_entries() even starts scoring, so it crashed
+            # ("'NoneType' object has no attribute 'strip'") before the
+            # earlier fix to score_entries()'s own failure_mode ever had a
+            # chance to help; that fix was necessary but not sufficient.
+            mode = mode_entry["failure_mode"] or ""
             cause = mode_entry["failure_cause"]
             cause_by_mode[mode.strip()] = cause
             normalized = normalize_cause_text(cause)
