@@ -140,9 +140,15 @@ if uploaded_file is not None:
     elif handbook_mode == "Upload handbook PDF":
         pdf_file = st.file_uploader("AIAG-VDA handbook PDF", type=["pdf"], key="handbook_pdf")
         if pdf_file is not None:
+            pdf_bytes = pdf_file.getvalue()
+            # Keyed on name + content hash, not just name (same reasoning as
+            # work_dir's own file_key above) - re-uploading a CORRECTED PDF
+            # under the same filename must not silently reuse a stale index
+            # embedded from the old content.
+            pdf_key = hashlib.sha1(f"{pdf_file.name}:{len(pdf_bytes)}".encode() + pdf_bytes[:4096]).hexdigest()[:16]
             pdf_path = work_dir / pdf_file.name
             index_path = pdf_path.with_name(f"{pdf_path.stem}__handbook_index.json")
-            already_built = index_path.is_file() and st.session_state.get("handbook_pdf_name") == pdf_file.name
+            already_built = index_path.is_file() and st.session_state.get("handbook_pdf_key") == pdf_key
             if not already_built:
                 if embedding_credentials_missing():
                     st.error(
@@ -150,7 +156,7 @@ if uploaded_file is not None:
                         "Set these in the app's .env, same as the other Azure credentials."
                     )
                 else:
-                    pdf_path.write_bytes(pdf_file.getvalue())
+                    pdf_path.write_bytes(pdf_bytes)
                     with st.spinner("Embedding handbook PDF (one API call per chunk - only needed once per PDF)..."):
                         try:
                             build_index(pdf_path, index_path)
@@ -158,7 +164,7 @@ if uploaded_file is not None:
                             st.error(f"Failed to embed handbook: {e}")
                             index_path = None
                     if index_path:
-                        st.session_state.handbook_pdf_name = pdf_file.name
+                        st.session_state.handbook_pdf_key = pdf_key
             if index_path and index_path.is_file():
                 handbook_index_path = index_path
     elif handbook_mode == "Upload prebuilt index (.json)":
