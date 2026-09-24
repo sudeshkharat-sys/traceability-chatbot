@@ -195,7 +195,8 @@ PREFER_BOOST = 0.05
 AVOID_PENALTY = 0.05
 
 
-def retrieve(index_path, query, top_k=5, prefer_terms=None, avoid_terms=None):
+def retrieve(index_path, query, top_k=5, prefer_terms=None, avoid_terms=None,
+             include_same_page_notes=True, max_notes_per_page=1):
     """Return the top_k most relevant chunks (dicts with text/page/type,
     highest similarity first) for query, embedding the query fresh each
     call. Reads the index built by build_index() - no server, no external
@@ -209,7 +210,18 @@ def retrieve(index_path, query, top_k=5, prefer_terms=None, avoid_terms=None):
     control" scored the DFMEA table above the correct PFMEA one in
     testing. A soft boost/penalty (not a hard filter) is used because a
     hard filter on a keyword the model happens to phrase differently
-    would silently return zero results instead of degrading gracefully."""
+    would silently return zero results instead of degrading gracefully.
+
+    include_same_page_notes: when a returned chunk is a table, also pull up
+    to max_notes_per_page prose chunk(s) from that SAME page, ranked by
+    their own similarity to the query - separate from and on top of top_k.
+    A query phrased close to a table's own header text (e.g. "Severity
+    rating table...") tends to make the table chunk dominate top_k on its
+    own, crowding out a footnote/caveat sitting right next to it on the
+    page (the handbook's 9-vs-10 safety-vs-regulatory distinction is
+    exactly this kind of note) - this stitches that back in instead of
+    silently losing it. Doesn't affect which chunks are eligible for the
+    top_k ranking itself, only adds page-adjacent context after."""
     with open(index_path, encoding="utf-8") as fh:
         index = json.load(fh)
 
@@ -219,18 +231,41 @@ def retrieve(index_path, query, top_k=5, prefer_terms=None, avoid_terms=None):
     prefer_terms = [t.lower() for t in (prefer_terms or [])]
     avoid_terms = [t.lower() for t in (avoid_terms or [])]
 
-    scored = []
-    for chunk in index["chunks"]:
+    def score_chunk(chunk):
         score = cosine_similarity(query_vector, chunk["embedding"])
         text_lower = chunk["text"].lower()
         if any(t in text_lower for t in prefer_terms):
             score += PREFER_BOOST
         if any(t in text_lower for t in avoid_terms):
             score -= AVOID_PENALTY
-        scored.append((score, chunk))
+        return score
 
+    scored = [(score_chunk(chunk), chunk) for chunk in index["chunks"]]
     scored.sort(key=lambda pair: pair[0], reverse=True)
-    return [{"score": score, **{k: v for k, v in chunk.items() if k != "embedding"}} for score, chunk in scored[:top_k]]
+    top = scored[:top_k]
+
+    included_texts = {chunk["text"] for _, chunk in top}
+    results = [{"score": score, **{k: v for k, v in chunk.items() if k != "embedding"}} for score, chunk in top]
+
+    if include_same_page_notes:
+        matched_table_pages = {chunk["page"] for _, chunk in top if chunk["type"] == "table"}
+        for page in matched_table_pages:
+            page_prose = sorted(
+                (
+                    (score_chunk(chunk), chunk)
+                    for chunk in index["chunks"]
+                    if chunk["type"] == "prose" and chunk["page"] == page and chunk["text"] not in included_texts
+                ),
+                key=lambda pair: pair[0], reverse=True,
+            )
+            for score, chunk in page_prose[:max_notes_per_page]:
+                included_texts.add(chunk["text"])
+                results.append({
+                    "score": score, "stitched_same_page_note": True,
+                    **{k: v for k, v in chunk.items() if k != "embedding"},
+                })
+
+    return results
 
 
 def main():
