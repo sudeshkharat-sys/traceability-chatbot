@@ -52,7 +52,7 @@ from step5c_cross_row_review import (
     build_effect_lookup as build_cross_row_effect_lookup,
     build_entries_text as build_cross_row_entries_text,
 )
-from step6_write_suggestions_to_excel import apply_suggestions_to_sheet, normalize_cause_text
+from step6_write_suggestions_to_excel import apply_suggestions_to_sheet, normalize_cause_text, true_last_column
 
 
 CHECKPOINT_EVERY_ROWS = 5
@@ -378,7 +378,12 @@ def run_pipeline(
         # run - every apply_suggestions_to_sheet call below (each row
         # checkpoint AND the final write) passes this same start_col so
         # they all target the one block instead of each appending its own.
-        block_start_col = out_ws.max_column + 1
+        # true_last_column(), not out_ws.max_column - a workbook that had a
+        # Suggestion block stripped and was then saved+reloaded (app.py's
+        # strip-old-blocks path) reports a stale, too-large max_column, an
+        # openpyxl quirk that left a real gap of ghost-blank columns before
+        # the new block in a real run (see true_last_column()'s docstring).
+        block_start_col = true_last_column(out_ws) + 1
         row_checkpoint = make_row_checkpoint(out_wb, out_ws, output_path, cause_to_modes, cause_by_mode, merge_mode, log, block_start_col)
 
         log(f"  Scoring {len(entries)} failure mode(s) with repeat={repeat} ...")

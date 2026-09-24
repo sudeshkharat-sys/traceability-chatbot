@@ -403,6 +403,28 @@ def find_suggestion_blocks(ws):
     return blocks
 
 
+def true_last_column(ws):
+    """The real last column with actual cell content, scanned directly -
+    NOT ws.max_column, which openpyxl gets wrong after delete_cols(): it
+    correctly shrinks in memory right after the delete, but a save+reload
+    (exactly what happens between app.py stripping old Suggestion blocks
+    and run_pipeline() loading that cleaned file back from disk) restores
+    the OLD, too-large max_column, because delete_cols() clears cell
+    values but leaves stale column-width/formatting metadata behind for
+    the deleted range, which openpyxl re-derives max_column from on load.
+    Verified directly: stripped a real file's Suggestion block, saved,
+    reloaded - max_column came back as 49 instead of the true 38, leaving
+    an 11-column gap of ghost-blank columns before the next block. Use
+    this wherever a NEW block's start column is computed; ws.max_column
+    is still fine for plain iteration bounds."""
+    last = 0
+    for row in ws.iter_rows():
+        for cell in row:
+            if cell.value not in (None, "") and cell.column > last:
+                last = cell.column
+    return last
+
+
 def strip_suggestion_blocks(ws, blocks=None):
     """Delete every existing Suggestion block found by find_suggestion_blocks()
     (or a caller-supplied list from an earlier call, so it isn't scanned
@@ -474,7 +496,7 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
     # numbers, so this keeps working if the template's row layout shifts.
     headers = MERGE_MODE_COLUMN_HEADERS if merge_mode else NEW_COLUMN_HEADERS
     if start_col is None:
-        start_col = ws.max_column + 1
+        start_col = true_last_column(ws) + 1
     end_col = start_col + len(headers) - 1
 
     section_header_row_start, section_header_row_end, section_ref_cell = find_section_header_rows(ws, header_row)
