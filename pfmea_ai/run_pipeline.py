@@ -211,6 +211,7 @@ def run_pipeline(
     repeat=3,
     output_path=None,
     handbook_index_path=None,
+    top_k=3,
     merge_mode=False,
     cross_review=False,
     log=print,
@@ -219,7 +220,9 @@ def run_pipeline(
     only via the CLI below. Returns the output Path on success.
 
     sheet_names=None processes every sheet in the workbook. merge_mode and
-    cross_review mirror step6/step5c's own flags - see their docstrings."""
+    cross_review mirror step6/step5c's own flags - see their docstrings.
+    top_k is how many handbook chunks get_reference_text() retrieves per
+    query - only matters when handbook_index_path is set."""
     source_path = Path(source_path)
     if output_path is None:
         suffix = "__merge_mode.xlsx" if merge_mode else "__with_suggestions.xlsx"
@@ -230,13 +233,14 @@ def run_pipeline(
     reference_path = str(Path(__file__).with_name("AIAG_VDA_Scoring_Reference.xlsx"))
     reference_lookup = load_reference_lookup(reference_path)
 
-    severity_table_text = get_reference_text(
+    severity_table_text, severity_source = get_reference_text(
         handbook_index_path,
         query="Severity rating table effect on customer safe vehicle operation loss of function",
         fallback_text=SEVERITY_TABLE_TEXT,
+        top_k=top_k,
+        return_source=True,
     )
-    if handbook_index_path:
-        log(f"Using handbook-grounded Severity reference from {handbook_index_path}\n")
+    log(f"Severity reference source: {severity_source}\n")
 
     log(f"Loading {source_path} ...")
     wb = load_workbook(source_path, data_only=True)
@@ -323,6 +327,12 @@ def main():
         handbook_index_path = args[idx + 1]
         args = args[:idx] + args[idx + 2 :]
 
+    top_k = 3
+    if "--top-k" in args:
+        idx = args.index("--top-k")
+        top_k = int(args[idx + 1])
+        args = args[:idx] + args[idx + 2 :]
+
     output_path = None
     if "--output" in args:
         idx = args.index("--output")
@@ -338,7 +348,7 @@ def main():
         args.remove("--cross-review")
 
     if len(args) < 1:
-        print("Usage: python run_pipeline.py <path-to-excel> [sheet_name ...] [--repeat N] [--handbook-index <path>] [--output <path>] [--merge-mode] [--cross-review]")
+        print("Usage: python run_pipeline.py <path-to-excel> [sheet_name ...] [--repeat N] [--handbook-index <path>] [--top-k N] [--output <path>] [--merge-mode] [--cross-review]")
         sys.exit(1)
 
     source_path = Path(args[0])
@@ -350,6 +360,7 @@ def main():
         repeat=repeat,
         output_path=output_path,
         handbook_index_path=handbook_index_path,
+        top_k=top_k,
         merge_mode=merge_mode,
         cross_review=cross_review,
     )

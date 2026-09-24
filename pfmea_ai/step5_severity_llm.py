@@ -179,22 +179,36 @@ def dedupe_reference_chunks(chunks):
     return unique
 
 
-def get_reference_text(handbook_index_path, query, fallback_text, prefer_terms=None, avoid_terms=None, top_k=3):
+def get_reference_text(handbook_index_path, query, fallback_text, prefer_terms=None, avoid_terms=None, top_k=3, return_source=False):
     """Return grounded reference text retrieved from the embedded AIAG-VDA
     handbook (step4b_embed_handbook.py) if a handbook index was provided,
     otherwise fall back to the hardcoded table text embedded directly in
     this script. Keeping the fallback means step5/step5b still work
-    exactly as before when no PDF has been embedded yet."""
+    exactly as before when no PDF has been embedded yet.
+
+    return_source=True also returns a short human-readable string saying
+    where the text actually came from - "PDF" or "fallback", and why in
+    the fallback case (no index given vs. retrieval came back empty) -
+    since a caller (e.g. the Streamlit UI) can't otherwise tell whether a
+    handbook index was silently ignored."""
     if not handbook_index_path:
-        return fallback_text
+        source = "fallback (no handbook index given)"
+        return (fallback_text, source) if return_source else fallback_text
 
     from step4b_embed_handbook import retrieve
 
     results = retrieve(handbook_index_path, query, top_k=top_k, prefer_terms=prefer_terms, avoid_terms=avoid_terms)
     results = dedupe_reference_chunks(results)
     if not results:
-        return fallback_text
-    return "\n\n---\n\n".join(f"(From handbook page {r['page']})\n{r['text']}" for r in results)
+        source = "fallback (handbook index given, but retrieval returned nothing)"
+        return (fallback_text, source) if return_source else fallback_text
+
+    text = "\n\n---\n\n".join(f"(From handbook page {r['page']})\n{r['text']}" for r in results)
+    if return_source:
+        pages = sorted({r["page"] for r in results})
+        source = f"PDF (top_k={top_k}, {len(results)} chunk(s) retrieved, page(s) {pages})"
+        return text, source
+    return text
 
 
 def build_prompt_for_entry(entry, severity_table_text=SEVERITY_TABLE_TEXT, detection_table_text=DETECTION_TABLE_TEXT, mode_override=None, skip_merged_check=False):

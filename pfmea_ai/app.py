@@ -117,33 +117,68 @@ if uploaded_file is not None:
             index_path.write_bytes(json_file.getvalue())
             handbook_index_path = index_path
 
+    top_k = 3
     if handbook_index_path:
-        st.success(f"Will use handbook-grounded Severity reference: {handbook_index_path.name}")
-        with st.expander("Preview retrieved context (what the LLM will actually see)"):
-            preview_query = st.text_input(
-                "Retrieval query (this is the exact query run_pipeline uses for Severity - edit it to test a different one)",
-                value=SEVERITY_RETRIEVAL_QUERY,
-                key="handbook_preview_query",
+        top_k = st.number_input(
+            "top_k (how many handbook chunks to retrieve per query)",
+            min_value=1, max_value=10, value=3,
+            help=(
+                "The retriever embeds the query, scores every chunk in the handbook index by cosine "
+                "similarity, and keeps the top_k highest-scoring ones - those are concatenated together "
+                "as the reference text handed to the LLM. Higher top_k = more surrounding context (safer "
+                "if the right table spans multiple chunks) but a longer, noisier prompt; lower top_k = "
+                "tighter and cheaper but risks missing the right chunk if it didn't score #1. 3 is the "
+                "script's own default and is usually enough for one table."
+            ),
+            key="handbook_top_k",
+        )
+
+        preview_query = st.text_input(
+            "Retrieval query (the exact query run_pipeline uses for Severity - edit it to test a different one)",
+            value=SEVERITY_RETRIEVAL_QUERY,
+            key="handbook_preview_query",
+        )
+
+        # Auto-refresh (not gated behind a button) whenever the handbook,
+        # query, or top_k changes, so what's shown here is always exactly
+        # what the upcoming Run would use - never a stale preview.
+        preview_key = (str(handbook_index_path), preview_query, top_k)
+        if st.session_state.get("handbook_preview_key") != preview_key:
+            if embedding_credentials_missing():
+                st.error("Missing AZURE_API_KEY / AZURE_EMBEDDING_ENDPOINT - cannot embed the query.")
+            else:
+                with st.spinner("Retrieving..."):
+                    try:
+                        text, source = get_reference_text(
+                            str(handbook_index_path), preview_query,
+                            fallback_text=SEVERITY_TABLE_TEXT, top_k=int(top_k), return_source=True,
+                        )
+                        st.session_state.handbook_preview_text = text
+                        st.session_state.handbook_preview_source = source
+                        st.session_state.handbook_preview_key = preview_key
+                    except Exception as e:
+                        st.error(f"Retrieval failed: {e}")
+
+        source = st.session_state.get("handbook_preview_source", "")
+        if source.startswith("PDF"):
+            st.success(f"Context source: {source}")
+        elif source:
+            st.warning(
+                f"Context source: {source} - a handbook was selected, but the LLM will still get the "
+                "hardcoded table, not your PDF. Check the index was built from the right PDF, or that "
+                "the query actually matches content in it."
             )
-            if st.button("Preview retrieval", key="handbook_preview_btn"):
-                if embedding_credentials_missing():
-                    st.error("Missing AZURE_API_KEY / AZURE_EMBEDDING_ENDPOINT - cannot embed the query.")
-                else:
-                    with st.spinner("Retrieving..."):
-                        try:
-                            st.session_state.handbook_preview_text = get_reference_text(
-                                str(handbook_index_path), preview_query, fallback_text=SEVERITY_TABLE_TEXT,
-                            )
-                        except Exception as e:
-                            st.error(f"Retrieval failed: {e}")
+
+        with st.expander("Context the LLM will actually receive for Severity", expanded=True):
             if "handbook_preview_text" in st.session_state:
                 st.code(st.session_state.handbook_preview_text[:4000], language="text")
                 st.caption(
-                    "This same text is inserted into the Severity section of EVERY row's prompt in this run "
-                    "- retrieval runs once per run, not per row, so what you see here is what every row got."
+                    "This same text is inserted into the Severity section of EVERY row's prompt in this "
+                    "run - retrieval runs once per run (not per row), so what you see here is what every "
+                    "row got."
                 )
     else:
-        st.caption("No handbook selected - Severity scoring will use the built-in hardcoded table text.")
+        st.caption("No handbook selected - Severity scoring will use the built-in hardcoded table text (source: fallback).")
 
     with st.expander("Advanced options"):
         repeat = st.number_input(
@@ -203,6 +238,7 @@ if uploaded_file is not None:
                     repeat=int(repeat),
                     output_path=output_path,
                     handbook_index_path=str(handbook_index_path) if handbook_index_path else None,
+                    top_k=int(top_k),
                     merge_mode=merge_mode,
                     cross_review=cross_review,
                     log=ui_log,
