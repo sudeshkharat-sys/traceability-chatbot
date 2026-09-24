@@ -40,6 +40,7 @@ from step3c_to_json import build_entry
 from step4_severity_input import build_groups
 from step5_severity_llm import (
     SEVERITY_TABLE_TEXT,
+    _invoke_llm,
     build_prompt_for_entry,
     call_llm,
     get_llm,
@@ -105,14 +106,35 @@ def _call_llm_repeated(llm, prompt, repeat):
     independent samples of one row (majority-vote noise insurance, see
     run_pipeline()'s docstring), not a sequence, so there's nothing to wait
     on between them. Cuts per-row latency by roughly `repeat`x instead of
-    paying it repeat times in series."""
+    paying it repeat times in series.
+
+    Returns (runs, usage_list): runs is the parsed-JSON list every caller
+    already expects; usage_list is each call's raw usage_metadata dict
+    (input_tokens/output_tokens/total_tokens), same order, for cost
+    tracking - all `repeat` calls are real, separately-billed API calls,
+    so all of them count."""
     if repeat == 1:
-        return [call_llm(llm, prompt)]
+        parsed, usage = _invoke_llm(llm, prompt)
+        return [parsed], [usage]
     with ThreadPoolExecutor(max_workers=repeat) as executor:
-        return list(executor.map(lambda _: call_llm(llm, prompt), range(repeat)))
+        pairs = list(executor.map(lambda _: _invoke_llm(llm, prompt), range(repeat)))
+    return [p for p, _ in pairs], [u for _, u in pairs]
 
 
-def score_entries(entries, llm, severity_table_text, repeat, log=print, on_row_scored=None):
+def _sum_usage(usage_list):
+    """Total input/output/total tokens across a list of usage_metadata
+    dicts - missing keys count as 0 (some deployments/profiles don't
+    report every field)."""
+    input_tokens = sum(u.get("input_tokens", 0) for u in usage_list)
+    output_tokens = sum(u.get("output_tokens", 0) for u in usage_list)
+    total_tokens = sum(u.get("total_tokens", 0) for u in usage_list) or (input_tokens + output_tokens)
+    return input_tokens, output_tokens, total_tokens
+
+
+def score_entries(
+    entries, llm, severity_table_text, repeat, log=print, on_row_scored=None,
+    usage_rows=None, sheet_name=None, price_per_1k_input=None, price_per_1k_output=None,
+):
     """Run step5's per-row LLM scoring for every entry in a sheet. Returns
     the same row shape step5_severity_llm.py's JSON output uses, so
     apply_suggestions_to_sheet() can consume it unchanged.
@@ -120,14 +142,24 @@ def score_entries(entries, llm, severity_table_text, repeat, log=print, on_row_s
     on_row_scored(results_so_far), if given, is called after every row is
     appended, with the SAME list object being built here (mutated, not
     copied) - lets a caller checkpoint partial progress to disk without
-    this function knowing anything about files."""
+    this function knowing anything about files.
+
+    usage_rows, if given, is a list this function APPENDS a per-row token
+    (and, if price_per_1k_input/output are given, estimated cost) dict
+    into - one entry per row, covering all `repeat` calls for that row.
+    Doesn't cover the separate merged-mode split-scoring or cross-row
+    review calls, which aren't per-row in the same sense."""
     results = []
     for entry in entries:
         prompt = build_prompt_for_entry(entry, severity_table_text=severity_table_text)
         failure_mode = (entry.get("failure") or {}).get("mode")
         plant_sev = (entry.get("risk") or {}).get("severity")
 
-        runs = _call_llm_repeated(llm, prompt, repeat)
+        runs, usage_list = _call_llm_repeated(llm, prompt, repeat)
+        input_tokens, output_tokens, total_tokens = _sum_usage(usage_list)
+        cost_usd = None
+        if price_per_1k_input is not None and price_per_1k_output is not None:
+            cost_usd = (input_tokens / 1000) * price_per_1k_input + (output_tokens / 1000) * price_per_1k_output
         severities = [r["suggested_severity"] for r in runs]
         consistent = len(set(severities)) == 1
         counts = Counter(severities)
@@ -170,11 +202,24 @@ def score_entries(entries, llm, severity_table_text, repeat, log=print, on_row_s
         )
         agreement = "MATCH" if plant_sev == ai_sev else f"DIFFERS (plant={plant_sev}, AI={ai_sev})"
         stability = "" if repeat == 1 else (" [STABLE]" if consistent else f" [UNSTABLE: {severities}]")
-        log(f"    {(failure_mode or '')[:40]!r:42} {agreement}{stability}")
+        cost_text = f" cost=${cost_usd:.4f}" if cost_usd is not None else ""
+        log(f"    {(failure_mode or '')[:40]!r:42} {agreement}{stability}  tokens: in={input_tokens} out={output_tokens} total={total_tokens}{cost_text}")
         if ai_split_suggestions:
             log(f"      MERGED MODE CELL - scored {len(ai_split_suggestions)} modes separately:")
             for s in ai_split_suggestions:
                 log(f"        - {s['failure_mode'][:50]!r:52} severity={s['suggested_severity']} detection={s.get('suggested_detection')}")
+        if usage_rows is not None:
+            usage_rows.append(
+                {
+                    "sheet": sheet_name,
+                    "failure_mode": failure_mode,
+                    "repeat": repeat,
+                    "input_tokens": input_tokens,
+                    "output_tokens": output_tokens,
+                    "total_tokens": total_tokens,
+                    "cost_usd": cost_usd,
+                }
+            )
         if on_row_scored:
             on_row_scored(results)
     return results
@@ -215,6 +260,9 @@ def run_pipeline(
     merge_mode=False,
     cross_review=False,
     log=print,
+    usage_rows=None,
+    price_per_1k_input=None,
+    price_per_1k_output=None,
 ):
     """Core of the pipeline, callable directly (e.g. from a UI) instead of
     only via the CLI below. Returns the output Path on success.
@@ -222,7 +270,13 @@ def run_pipeline(
     sheet_names=None processes every sheet in the workbook. merge_mode and
     cross_review mirror step6/step5c's own flags - see their docstrings.
     top_k is how many handbook chunks get_reference_text() retrieves per
-    query - only matters when handbook_index_path is set."""
+    query - only matters when handbook_index_path is set.
+
+    usage_rows, if given, is a list this function APPENDS a per-row token
+    (input/output/total) dict into, one per Severity-scored row across
+    every sheet processed - see score_entries()'s docstring. Passing
+    price_per_1k_input/price_per_1k_output (USD) also fills in each row's
+    estimated cost; leave both None to only track tokens, no cost."""
     source_path = Path(source_path)
     if output_path is None:
         suffix = "__merge_mode.xlsx" if merge_mode else "__with_suggestions.xlsx"
@@ -283,7 +337,11 @@ def run_pipeline(
         row_checkpoint = make_row_checkpoint(out_wb, out_ws, output_path, cause_to_modes, cause_by_mode, merge_mode, log)
 
         log(f"  Scoring {len(entries)} failure mode(s) with repeat={repeat} ...")
-        rows = score_entries(entries, llm, severity_table_text, repeat, log=log, on_row_scored=row_checkpoint)
+        rows = score_entries(
+            entries, llm, severity_table_text, repeat, log=log, on_row_scored=row_checkpoint,
+            usage_rows=usage_rows, sheet_name=sheet_name,
+            price_per_1k_input=price_per_1k_input, price_per_1k_output=price_per_1k_output,
+        )
 
         if cross_review:
             log("  Running cross-row consistency check ...")
@@ -308,6 +366,12 @@ def run_pipeline(
         log(f"  [checkpoint] saved '{sheet_name}' -> {output_path}")
 
     out_wb.save(output_path)
+    if usage_rows:
+        total_in = sum(r["input_tokens"] for r in usage_rows)
+        total_out = sum(r["output_tokens"] for r in usage_rows)
+        total_cost = sum(r["cost_usd"] for r in usage_rows if r["cost_usd"] is not None)
+        cost_text = f", est. cost ${total_cost:.4f}" if price_per_1k_input is not None else ""
+        log(f"\nTotal Severity-scoring usage: {len(usage_rows)} row(s), tokens in={total_in} out={total_out}{cost_text}")
     log(f"\nDone. Wrote {output_path}")
     return output_path
 

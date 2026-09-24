@@ -197,6 +197,27 @@ if uploaded_file is not None:
             help="A second AI pass over the whole sheet that flags rows scored inconsistently vs. a mechanically similar row (see AI Review column).",
         )
 
+        st.caption("Cost tracking")
+        estimate_cost = st.checkbox(
+            "Estimate cost (USD)",
+            value=False,
+            help="Token counts always show after a run (real numbers from Azure's usage_metadata, not "
+                 "an estimate). Turning this on additionally multiplies them by the $/1K rates below to "
+                 "estimate cost - enter your actual Azure deployment pricing, since it isn't looked up "
+                 "automatically and varies by model/region.",
+        )
+        price_per_1k_input = price_per_1k_output = None
+        if estimate_cost:
+            cost_col1, cost_col2 = st.columns(2)
+            with cost_col1:
+                price_per_1k_input = st.number_input(
+                    "$ per 1K input tokens", min_value=0.0, value=0.0, step=0.0001, format="%.4f",
+                )
+            with cost_col2:
+                price_per_1k_output = st.number_input(
+                    "$ per 1K output tokens", min_value=0.0, value=0.0, step=0.0001, format="%.4f",
+                )
+
     # Mirrors run_pipeline()'s own output_path naming - computed here (not
     # left to run_pipeline's default) so its path is known BEFORE a run
     # starts, which is what lets an interrupted run's on-disk checkpoints
@@ -230,6 +251,7 @@ if uploaded_file is not None:
             log_lines.append(str(msg))
             log_box.code("\n".join(log_lines[-40:]))  # last 40 lines is enough to show progress
 
+        usage_rows = []
         with st.spinner("Scoring with the LLM - this calls the API once per row (x repeat), so it can take a while for a large sheet..."):
             try:
                 output_path = run_pipeline(
@@ -242,6 +264,9 @@ if uploaded_file is not None:
                     merge_mode=merge_mode,
                     cross_review=cross_review,
                     log=ui_log,
+                    usage_rows=usage_rows,
+                    price_per_1k_input=price_per_1k_input,
+                    price_per_1k_output=price_per_1k_output,
                 )
             except Exception as e:
                 st.error(f"Pipeline failed: {e}")
@@ -255,3 +280,21 @@ if uploaded_file is not None:
                 file_name=output_path.name,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
+
+        if usage_rows:
+            st.subheader("Token usage per row (Severity scoring)")
+            st.caption(
+                "Real counts from Azure's usage_metadata per API response - not an estimate. Each row's "
+                f"total covers all {int(repeat)} repeat call(s) for that row. Doesn't include the separate "
+                "merged-mode split-scoring or cross-row review calls."
+            )
+            st.dataframe(usage_rows, use_container_width=True)
+
+            total_in = sum(r["input_tokens"] for r in usage_rows)
+            total_out = sum(r["output_tokens"] for r in usage_rows)
+            total_tokens = sum(r["total_tokens"] for r in usage_rows)
+            summary = f"**{len(usage_rows)} row(s)** scored - input: **{total_in:,}** tokens, output: **{total_out:,}** tokens, total: **{total_tokens:,}** tokens"
+            if price_per_1k_input is not None:
+                total_cost = sum(r["cost_usd"] for r in usage_rows if r["cost_usd"] is not None)
+                summary += f", estimated cost: **${total_cost:.4f}**"
+            st.markdown(summary)

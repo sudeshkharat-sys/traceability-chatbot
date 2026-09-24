@@ -504,12 +504,17 @@ def get_llm():
     return AzureChatOpenAI(**kwargs)
 
 
-def call_llm(llm, prompt):
+def _invoke_llm(llm, prompt):
+    """Do the actual API call + JSON parsing, and also hand back the raw
+    token usage Azure reports on the response (input_tokens/output_tokens/
+    total_tokens) - needed for cost tracking (see run_pipeline.py), but
+    call_llm() below stays the single-value function every other caller in
+    this codebase already expects."""
     response = llm.invoke(prompt)
     text = (response.content or "").strip()
+    usage = getattr(response, "usage_metadata", None) or {}
     if not text:
         finish_reason = (response.response_metadata or {}).get("finish_reason")
-        usage = getattr(response, "usage_metadata", None)
         raise RuntimeError(
             f"LLM returned an empty response (finish_reason={finish_reason!r}, usage={usage!r}). "
             "This usually means max_tokens was exhausted by hidden reasoning tokens before any "
@@ -521,9 +526,14 @@ def call_llm(llm, prompt):
             text = text[4:]
     text = text.strip()
     try:
-        return json.loads(text)
+        return json.loads(text), usage
     except json.JSONDecodeError as e:
         raise RuntimeError(f"LLM response was not valid JSON: {e}\n---RAW RESPONSE---\n{text[:2000]}") from e
+
+
+def call_llm(llm, prompt):
+    parsed, _usage = _invoke_llm(llm, prompt)
+    return parsed
 
 
 def main():
