@@ -194,11 +194,22 @@ if uploaded_file is not None:
 
         with st.expander("Context the LLM will actually receive for Severity", expanded=True):
             if "handbook_preview_text" in st.session_state:
-                st.code(st.session_state.handbook_preview_text[:4000], language="text")
+                context_text = st.session_state.handbook_preview_text
+                # Rough estimate only - not the real Azure tokenizer, which
+                # isn't installed here. Good enough to gauge scale, not to
+                # bill against. The real, exact figure IS in the per-row
+                # usage table after a run: this context text is baked into
+                # every row's prompt, so it's already counted inside that
+                # row's input_tokens (Azure counts the whole prompt).
+                approx_tokens = len(context_text) // 4
+                st.code(context_text[:4000], language="text")
                 st.caption(
-                    "This same text is inserted into the Severity section of EVERY row's prompt in this "
-                    "run - retrieval runs once per run (not per row), so what you see here is what every "
-                    "row got."
+                    f"~{approx_tokens:,} tokens (rough estimate, ~4 chars/token - not the exact Azure "
+                    "tokenizer). This same text is inserted into the Severity section of EVERY row's "
+                    "prompt in this run - retrieval runs once per run (not per row). It's already counted "
+                    "inside each row's 'input_tokens' in the usage table after running, since Azure's "
+                    "usage_metadata counts the whole prompt sent, context included - there's no separate "
+                    "'context tokens' column because there's nothing to add, it's already in there."
                 )
     else:
         st.caption("No handbook selected - Severity scoring will use the built-in hardcoded table text (source: fallback).")
@@ -321,8 +332,10 @@ if uploaded_file is not None:
             st.subheader("Token usage per row (Severity scoring)")
             st.caption(
                 "Real counts from Azure's usage_metadata per API response - not an estimate. Each row's "
-                f"total covers all {int(repeat)} repeat call(s) for that row. Doesn't include the separate "
-                "merged-mode split-scoring or cross-row review calls."
+                f"total covers all {int(repeat)} repeat call(s) for that row, and already includes the "
+                "handbook context shown above (same block for every row, baked into each row's prompt) - "
+                "there's no separate context-tokens column because it's already folded into input_tokens "
+                "below. Doesn't include the separate merged-mode split-scoring or cross-row review calls."
             )
             st.dataframe(usage_rows, use_container_width=True)
 
