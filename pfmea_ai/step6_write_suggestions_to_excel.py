@@ -118,6 +118,14 @@ NEW_COLUMN_HEADERS = [
     "Remark",
     "AI Review",
     "Manual Review",
+    # The Severity table text actually sent to the LLM for this whole run -
+    # PDF-retrieved (with page numbers) or the hardcoded fallback (see
+    # get_reference_text() in step5_severity_llm.py). Same value repeated
+    # on every row of a given run (retrieval happens once per run, not per
+    # row - see run_pipeline.py), but kept per-row so it's visible directly
+    # next to that row's Severity Note without needing the Streamlit UI
+    # open, and so a reviewer auditing the file later still knows.
+    "AI Context Source",
 ]
 
 # merge_mode folds each sub-mode's Prevention/Detection action straight into
@@ -503,6 +511,7 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
     remark_col = col_by_header["Remark"]
     ai_review_col = col_by_header["AI Review"]
     manual_review_col = col_by_header["Manual Review"]
+    context_source_col = col_by_header["AI Context Source"]
 
     # Widen the new columns so wrapped text is actually readable instead of
     # squeezing into the sheet's default column width - Severity/Occurrence/
@@ -524,6 +533,7 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
         remark_col: 50,
         ai_review_col: 45,
         manual_review_col: 35,
+        context_source_col: 40,
     }
     for col, width in column_widths.items():
         if col is None:
@@ -657,6 +667,7 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             remark_col: build_remark(row, cause_to_modes, this_cause, mode_occurrences=mode_occurrences, merge_mode=merge_mode),
             ai_review_col: build_ai_review(row),
             manual_review_col: "",  # left blank for the human reviewer's own decision
+            context_source_col: row.get("ai_context_source") or "",
         }
         if submodes_col is not None:
             values[submodes_col] = submodes_value

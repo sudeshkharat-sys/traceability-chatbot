@@ -142,6 +142,7 @@ def _sum_usage(usage_list):
 def score_entries(
     entries, llm, severity_table_text, repeat, log=print, on_row_scored=None,
     usage_rows=None, sheet_name=None, price_per_1k_input=None, price_per_1k_output=None,
+    context_source=None,
 ):
     """Run step5's per-row LLM scoring for every entry in a sheet. Returns
     the same row shape step5_severity_llm.py's JSON output uses, so
@@ -206,6 +207,7 @@ def score_entries(
                 "ai_row_completeness_note": runs[0].get("row_completeness_note"),
                 "ai_possible_severities": runs[0].get("possible_severities"),
                 "ai_consistent_across_runs": consistent,
+                "ai_context_source": context_source,
             }
         )
         agreement = "MATCH" if plant_sev == ai_sev else f"DIFFERS (plant={plant_sev}, AI={ai_sev})"
@@ -354,6 +356,7 @@ def run_pipeline(
             entries, llm, severity_table_text, repeat, log=log, on_row_scored=row_checkpoint,
             usage_rows=usage_rows, sheet_name=sheet_name,
             price_per_1k_input=price_per_1k_input, price_per_1k_output=price_per_1k_output,
+            context_source=severity_source,
         )
 
         if cross_review:
