@@ -280,7 +280,7 @@ Function of Process Step: {(function.get('of_step') or '').strip()}
 Function of Process Work Element: {(function.get('of_work_element') or '').strip()}
 
 THIS SPECIFIC FAILURE:
-Failure Mode: {failure_mode_text.strip()}
+Failure Mode: {failure_mode_text.strip() or '(not recorded)'}
 Failure Cause: {(failure.get('cause') or '(not recorded)').strip()}
 Plant's recorded Severity: {risk.get('severity')}
 Current Prevention Control (PC) already in place at this station: {(risk.get('prevention_control') or '(none recorded)').strip() if isinstance(risk.get('prevention_control'), str) else (risk.get('prevention_control') or '(none recorded)')}
@@ -326,6 +326,7 @@ Do NOT infer the score from Severity or Occurrence, do NOT invent a detection me
 Also score a PROJECTED Detection (1-10) - a THIRD, separate Detection question, requested so a reviewer can see the payoff of actually adopting your detection_recommendation above rather than just reading the recommendation text and guessing its impact. Assume the detection_recommendation above IS implemented, in place of (or alongside, if it plausibly would coexist with) the current DC, and re-score Detection against the SAME AIAG-VDA DETECTION SCORING TABLE (Table C2.4) and the SAME two axes (Method Maturity, Opportunity for Detection) using ONLY what the recommendation text itself actually describes - a NEWLY introduced automated/poka-yoke method should normally be treated as proven going forward only if the recommendation describes it as a standard, well-understood technique (e.g. a keyed connector, a limit switch, a standard vision-inspection gate); do not assume "proven" for a novel or vaguely-described method. This projected score must be for the SAME Failure Mode as suggested_detection above - do not project a fix for a different failure.
 
 Also produce a short "row completeness" audit, requested so a reviewer scanning many rows quickly sees exactly what is thin or missing in THIS row's own data, without reading the full reasoning again. This is NOT the Severity/Detection scoring itself and NOT a re-statement of cause_mode_mismatch/merged_modes_detected above (those already have their own fields) - it is specifically about gaps in what the plant recorded for this row. Check, in this exact order, and list ONLY the ones that actually apply (skip entirely if none apply):
+- Failure Mode is missing (shown as "(not recorded)" above) - you were still asked to score Severity/Detection from whatever else is given (Cause, Effect, etc.), but a reviewer needs to know the row has no named Failure Mode at all.
 - An effect section (Your Plant / Ship to Plant / End User) that is blank/"(none recorded)" while a sibling section is filled in with something substantive.
 - Failure Cause is missing, or is too generic/vague to describe an actual physical mechanism (e.g. just repeats the Failure Mode text, or says something like "process not followed" with no specific action named).
 - Current Prevention Control (PC) or Current Detection Controls (DC) is missing/blank entirely (not just weak - genuinely absent), which usually means the plant hasn't filled that cell in yet.
