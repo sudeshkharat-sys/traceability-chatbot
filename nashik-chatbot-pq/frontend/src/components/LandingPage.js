@@ -10,7 +10,7 @@ import utilityLogo from "../assests/image.png";
 import mahindraRiseLogo from "../assests/mahindra_rise_logo.png";
 import { authService } from "../services/api";
 
-const BASE_ENABLED = ["traceability", "guideline", "part-labeler", "part-labeler-plant", "part-labeler-ev", "z-stage", "qlense"];
+const BASE_ENABLED = ["traceability", "guideline", "part-labeler", "part-labeler-plant", "part-labeler-ev", "z-stage", "pfmea", "qlense"];
 const PART_LABELER_ALLOWED = ["part-labeler", "part-labeler-plant", "part-labeler-ev"];
 
 const ROLE_ALLOWED = {
@@ -89,6 +89,13 @@ function LandingPage() {
       icon: dashboardIcon,
       description: "Design and visualize production layouts with Z-Stage",
       route: "/z-stage",
+    },
+    {
+      id: "pfmea",
+      title: "PFMEA Assistant",
+      icon: dashboardIcon,
+      description: "AI-reviewed Severity and Detection suggestions for your PFMEA sheet",
+      route: "/pfmea",
     },
     {
       id: "qlense",

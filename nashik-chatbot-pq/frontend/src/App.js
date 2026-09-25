@@ -5,6 +5,7 @@ import LandingPage from "./components/LandingPage";
 import ChatPage from "./components/ChatPage";
 import PartLabeler from "./components/PartLabeler/PartLabeler";
 import ZStage from "./components/ZStage/ZStage";
+import PFMEA from "./components/PFMEA/PFMEA";
 import AdminPanel from "./components/AdminPanel/AdminPanel";
 import authService from "./services/api/authService";
 
@@ -69,6 +70,15 @@ function App() {
           element={
             <ProtectedRoute>
               <ZStage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/pfmea"
+          element={
+            <ProtectedRoute>
+              <PFMEA />
             </ProtectedRoute>
           }
         />

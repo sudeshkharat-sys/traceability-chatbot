@@ -1,0 +1,289 @@
+.pfmea-page {
+  min-height: 100vh;
+  background: #f5f6fa;
+  padding: 24px 32px 64px;
+}
+
+.pfmea-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.pfmea-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  color: #344054;
+  font-size: 14px;
+}
+
+.pfmea-back-btn:hover {
+  background: #eef0f4;
+}
+
+.pfmea-header h2 {
+  margin: 0;
+  color: #1d2939;
+}
+
+.pfmea-upload-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
+  max-width: 720px;
+  margin-bottom: 24px;
+}
+
+.pfmea-upload-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1.5px dashed #98a2b3;
+  border-radius: 10px;
+  padding: 16px;
+  cursor: pointer;
+  color: #475467;
+}
+
+.pfmea-upload-label:hover {
+  border-color: #7f56d9;
+  color: #7f56d9;
+}
+
+.pfmea-hint {
+  color: #667085;
+  font-size: 13px;
+  margin: 12px 0 6px;
+}
+
+.pfmea-sheet-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pfmea-sheet-chip {
+  border: 1px solid #d0d5dd;
+  background: #fff;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #344054;
+}
+
+.pfmea-sheet-chip.selected {
+  background: #7f56d9;
+  border-color: #7f56d9;
+  color: #fff;
+}
+
+.pfmea-analyze-btn {
+  margin-top: 16px;
+  background: #7f56d9;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 18px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.pfmea-analyze-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pfmea-error {
+  color: #d92d20;
+  font-size: 13px;
+  margin-top: 10px;
+}
+
+.pfmea-results-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.pfmea-sheet-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pfmea-sheet-tab {
+  border: 1px solid #d0d5dd;
+  background: #fff;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #344054;
+}
+
+.pfmea-sheet-tab.active {
+  background: #1d2939;
+  color: #fff;
+  border-color: #1d2939;
+}
+
+.pfmea-results-summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 13px;
+  color: #475467;
+}
+
+.pfmea-summary-warn {
+  color: #b54708;
+  font-weight: 600;
+}
+
+.pfmea-download-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #12b76a;
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 14px;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.pfmea-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.pfmea-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pfmea-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.pfmea-card-header h4 {
+  margin: 0;
+  font-size: 15px;
+  color: #1d2939;
+}
+
+.pfmea-agree-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+.pfmea-agree-badge.agree {
+  background: #ecfdf3;
+  color: #027a48;
+}
+
+.pfmea-agree-badge.differs {
+  background: #fff4e5;
+  color: #b54708;
+}
+
+.pfmea-card-scores {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.pfmea-score-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.pfmea-score-label {
+  color: #667085;
+}
+
+.pfmea-score-pill {
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.pfmea-score-pill.band-high { background: #d92d20; }
+.pfmea-score-pill.band-medium { background: #f79009; }
+.pfmea-score-pill.band-low { background: #eaaa08; color: #1d2939; }
+.pfmea-score-pill.band-minimal { background: #12b76a; }
+.pfmea-score-pill.band-unknown { background: #98a2b3; }
+
+.pfmea-score-plant {
+  color: #475467;
+}
+
+.pfmea-score-plant.mismatch {
+  color: #b54708;
+  font-weight: 600;
+}
+
+.pfmea-ambiguous {
+  background: #fffaeb;
+  border: 1px solid #fedf89;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: #93370d;
+}
+
+.pfmea-ambiguous ul {
+  margin: 4px 0 0 16px;
+  padding: 0;
+}
+
+.pfmea-reasoning,
+.pfmea-recommendation {
+  font-size: 13px;
+  color: #344054;
+  margin: 0;
+}
+
+.pfmea-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.pfmea-flag-chip {
+  background: #f2f4f7;
+  color: #475467;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+}
