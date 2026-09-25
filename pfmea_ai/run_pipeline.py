@@ -186,7 +186,16 @@ def score_entries(
         best_count = max(counts.values())
         ai_sev = max(s for s, c in counts.items() if c == best_count)
 
-        merged_modes_detected = runs[0].get("merged_modes_detected")
+        # ai_sev is the majority-vote/tie-break winner across all `repeat`
+        # runs, not necessarily runs[0] - always pulling the explanatory
+        # fields from runs[0] regardless of which run produced ai_sev let the
+        # written Severity and its Note/reasoning come from two different LLM
+        # answers (e.g. Severity=7 next to a Note arguing for S10, because
+        # runs[0] said 10 but the vote picked 7). Use whichever run actually
+        # produced the winning score instead.
+        winning_run = next((r for r in runs if r["suggested_severity"] == ai_sev), runs[0])
+
+        merged_modes_detected = winning_run.get("merged_modes_detected")
         ai_split_suggestions = None
         if isinstance(merged_modes_detected, list) and len(merged_modes_detected) > 1:
             ai_split_suggestions = score_split_modes(
@@ -203,20 +212,20 @@ def score_entries(
                 "plant_recorded_severity": plant_sev,
                 "ai_suggested_severity": ai_sev,
                 "agree": plant_sev == ai_sev,
-                "ai_reasoning": runs[0]["reasoning"],
-                "ai_recommended_action": runs[0].get("recommended_action"),
-                "ai_detection_recommendation": runs[0].get("detection_recommendation"),
+                "ai_reasoning": winning_run["reasoning"],
+                "ai_recommended_action": winning_run.get("recommended_action"),
+                "ai_detection_recommendation": winning_run.get("detection_recommendation"),
                 "plant_recorded_detection": (entry.get("risk") or {}).get("detection"),
-                "ai_suggested_detection": runs[0].get("suggested_detection"),
-                "ai_detection_matched_table_definition": runs[0].get("detection_matched_table_definition"),
-                "ai_projected_detection_after_recommendation": runs[0].get("projected_detection_after_recommendation"),
-                "ai_projected_detection_note": runs[0].get("projected_detection_note"),
+                "ai_suggested_detection": winning_run.get("suggested_detection"),
+                "ai_detection_matched_table_definition": winning_run.get("detection_matched_table_definition"),
+                "ai_projected_detection_after_recommendation": winning_run.get("projected_detection_after_recommendation"),
+                "ai_projected_detection_note": winning_run.get("projected_detection_note"),
                 "ai_merged_modes_detected": merged_modes_detected,
                 "ai_split_suggestions": ai_split_suggestions,
-                "ai_cause_mode_mismatch": runs[0].get("cause_mode_mismatch"),
-                "ai_cause_mode_mismatch_note": runs[0].get("cause_mode_mismatch_note"),
-                "ai_row_completeness_note": runs[0].get("row_completeness_note"),
-                "ai_possible_severities": runs[0].get("possible_severities"),
+                "ai_cause_mode_mismatch": winning_run.get("cause_mode_mismatch"),
+                "ai_cause_mode_mismatch_note": winning_run.get("cause_mode_mismatch_note"),
+                "ai_row_completeness_note": winning_run.get("row_completeness_note"),
+                "ai_possible_severities": winning_run.get("possible_severities"),
                 "ai_consistent_across_runs": consistent,
                 "ai_context_source": context_source,
             }
