@@ -366,17 +366,27 @@ def build_remark(row, cause_to_modes, this_cause, mode_occurrences=None, merge_m
     return "\n".join(f"- {p}" for p in parts) if parts else "Single failure mode, no flags."
 
 
-def build_ai_review(row):
+def build_ai_review(row, this_cause=None):
     """AI Review column text: this row's own data-completeness flags
     (ai_row_completeness_note, from step5's per-row audit - "Missing:
     Ship-to-Plant effect", "Vague: Failure Cause", etc.) plus, if step5c's
     cross-row consistency pass was merged in via --cross-review, that
     finding too. Kept separate from Remark, which is the LLM's own
-    scoring-flow flags (mismatch, ambiguity, plant-vs-AI disagreement)."""
+    scoring-flow flags (mismatch, ambiguity, plant-vs-AI disagreement).
+
+    A blank Failure Cause is checked here directly, in code, rather than
+    relying solely on the LLM's own row-completeness audit above: testing
+    showed the model's audit reliably catches a missing Failure Mode but
+    inconsistently skips flagging a missing Failure Cause (it's one check
+    among five in that prompt section, and isn't always surfaced) - so this
+    is a deterministic backstop for that one specific, easy-to-verify case,
+    added only when the model's own text didn't already mention it."""
     parts = []
     completeness = row.get("ai_row_completeness_note")
     if completeness:
         parts.append(f"- {completeness}")
+    if not (this_cause or "").strip() and (not completeness or "cause" not in completeness.lower()):
+        parts.append("- Missing: Failure Cause")
     cross_row = row.get("ai_review_note")
     if cross_row:
         parts.append(f"- {cross_row}")
@@ -687,7 +697,7 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             detection_note_col: detection_note_value,
             prevention_col: prevention_value,
             remark_col: build_remark(row, cause_to_modes, this_cause, mode_occurrences=mode_occurrences, merge_mode=merge_mode),
-            ai_review_col: build_ai_review(row),
+            ai_review_col: build_ai_review(row, this_cause=this_cause),
             manual_review_col: "",  # left blank for the human reviewer's own decision
             context_source_col: row.get("ai_context_source") or "",
         }
