@@ -33,12 +33,23 @@ _download_cache: dict[str, bytes] = {}
 
 def list_sheet_names(file_bytes: bytes) -> list[str]:
     """Sheet names in the uploaded workbook, so the frontend can offer a
-    sheet picker before running the (LLM-cost-incurring) analysis."""
-    with tempfile.NamedTemporaryFile(suffix=".xlsx") as tmp:
-        tmp.write(file_bytes)
-        tmp.flush()
-        wb = load_workbook(tmp.name, read_only=True)
-        return wb.sheetnames
+    sheet picker before running the (LLM-cost-incurring) analysis.
+
+    Writes to a real TemporaryDirectory rather than NamedTemporaryFile:
+    NamedTemporaryFile keeps its own handle open on the file for as long as
+    the `with` block runs, and Windows (unlike Linux) refuses to let
+    openpyxl open that same path a second time while that handle is still
+    held - this is exactly what caused the "[Errno 13] Permission denied"
+    crash on a Windows deployment. A TemporaryDirectory only holds the
+    directory open, not the file inside it, so openpyxl can open the file
+    freely on every OS."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir) / "input.xlsx"
+        tmp_path.write_bytes(file_bytes)
+        wb = load_workbook(tmp_path, read_only=True)
+        sheet_names = wb.sheetnames
+        wb.close()
+        return sheet_names
 
 
 def analyze_workbook(

@@ -1,65 +1,132 @@
+/* Same tokens as PartLabeler.css / ZStage.css - the house style (Mahindra
+   red accent, Inter font, light gray background, red-tinted stat chips) -
+   duplicated here rather than imported since each feature page defines its
+   own scoped copy the same way the existing pages already do. */
+:root {
+  --pfmea-red: #dc143c;
+  --pfmea-red-dark: #b01030;
+  --pfmea-bg-light: #f8f9fa;
+  --pfmea-text-dark: #2c3e50;
+  --pfmea-text-gray: #7f8c8d;
+  --pfmea-border-color: #e9ecef;
+  --pfmea-card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
 .pfmea-page {
   min-height: 100vh;
-  background: #f5f6fa;
-  padding: 24px 32px 64px;
+  background: var(--pfmea-bg-light);
+  font-family: 'Inter', -apple-system, sans-serif;
+  padding-bottom: 48px;
 }
 
 .pfmea-header {
+  height: 60px;
+  background: #fff;
+  padding: 0 2rem;
   display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 16px;
+  border-bottom: 1px solid var(--pfmea-border-color);
   margin-bottom: 24px;
 }
 
-.pfmea-back-btn {
+.header-title-group {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 16px;
+}
+
+.sidebar-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   background: none;
-  border: 1px solid #d0d5dd;
-  border-radius: 8px;
-  padding: 8px 14px;
+  border: none;
+  color: var(--pfmea-text-gray);
+  font-weight: 600;
   cursor: pointer;
-  color: #344054;
-  font-size: 14px;
+  padding: 0.5rem;
+  border-radius: 6px;
+  transition: all 0.2s;
+  font-size: 0.85rem;
 }
 
-.pfmea-back-btn:hover {
-  background: #eef0f4;
+.sidebar-back-btn:hover {
+  background: var(--pfmea-bg-light);
+  color: var(--pfmea-text-dark);
 }
 
-.pfmea-header h2 {
+.pfmea-header .header-title h1 {
   margin: 0;
-  color: #1d2939;
+  font-size: 1.25rem;
+  color: var(--pfmea-red);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+
+.pfmea-header .header-title p {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--pfmea-text-gray);
+}
+
+.header-stats {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.header-stats .stat-card {
+  background: #fff5f5;
+  padding: 0.4rem 1rem;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border: 1px solid #fed7d7;
+}
+
+.stat-value {
+  font-weight: 800;
+  color: var(--pfmea-red);
+  font-size: 1.1rem;
+}
+
+.stat-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: #c53030;
+  letter-spacing: 0.5px;
 }
 
 .pfmea-upload-card {
   background: #fff;
   border-radius: 12px;
   padding: 24px;
-  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
+  box-shadow: var(--pfmea-card-shadow);
   max-width: 720px;
-  margin-bottom: 24px;
+  margin: 0 2rem 24px;
 }
 
 .pfmea-upload-label {
   display: flex;
   align-items: center;
   gap: 10px;
-  border: 1.5px dashed #98a2b3;
+  border: 1.5px dashed #cbd5e0;
   border-radius: 10px;
   padding: 16px;
   cursor: pointer;
-  color: #475467;
+  color: var(--pfmea-text-gray);
 }
 
 .pfmea-upload-label:hover {
-  border-color: #7f56d9;
-  color: #7f56d9;
+  border-color: var(--pfmea-red);
+  color: var(--pfmea-red);
 }
 
 .pfmea-hint {
-  color: #667085;
+  color: var(--pfmea-text-gray);
   font-size: 13px;
   margin: 12px 0 6px;
 }
@@ -71,30 +138,38 @@
 }
 
 .pfmea-sheet-chip {
-  border: 1px solid #d0d5dd;
+  border: 1px solid var(--pfmea-border-color);
   background: #fff;
   border-radius: 999px;
   padding: 6px 14px;
   font-size: 13px;
   cursor: pointer;
-  color: #344054;
+  color: var(--pfmea-text-dark);
+  font-family: inherit;
 }
 
 .pfmea-sheet-chip.selected {
-  background: #7f56d9;
-  border-color: #7f56d9;
+  background: var(--pfmea-red);
+  border-color: var(--pfmea-red);
   color: #fff;
 }
 
 .pfmea-analyze-btn {
   margin-top: 16px;
-  background: #7f56d9;
+  background: var(--pfmea-red);
   color: #fff;
   border: none;
   border-radius: 8px;
   padding: 10px 18px;
   font-size: 14px;
+  font-family: inherit;
+  font-weight: 700;
   cursor: pointer;
+  transition: background 0.15s;
+}
+
+.pfmea-analyze-btn:hover:not(:disabled) {
+  background: var(--pfmea-red-dark);
 }
 
 .pfmea-analyze-btn:disabled {
@@ -103,9 +178,16 @@
 }
 
 .pfmea-error {
-  color: #d92d20;
+  color: var(--pfmea-red-dark);
+  background: #fff0f0;
+  border-radius: 8px;
+  padding: 8px 12px;
   font-size: 13px;
   margin-top: 10px;
+}
+
+.pfmea-results {
+  padding: 0 2rem;
 }
 
 .pfmea-results-toolbar {
@@ -124,44 +206,33 @@
 }
 
 .pfmea-sheet-tab {
-  border: 1px solid #d0d5dd;
+  border: 1px solid var(--pfmea-border-color);
   background: #fff;
   border-radius: 8px;
   padding: 6px 12px;
   font-size: 13px;
   cursor: pointer;
-  color: #344054;
+  color: var(--pfmea-text-dark);
+  font-family: inherit;
 }
 
 .pfmea-sheet-tab.active {
-  background: #1d2939;
+  background: var(--pfmea-red);
   color: #fff;
-  border-color: #1d2939;
-}
-
-.pfmea-results-summary {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  font-size: 13px;
-  color: #475467;
-}
-
-.pfmea-summary-warn {
-  color: #b54708;
-  font-weight: 600;
+  border-color: var(--pfmea-red);
 }
 
 .pfmea-download-btn {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: #12b76a;
+  background: #1a7f3c;
   color: #fff;
   border-radius: 8px;
   padding: 8px 14px;
   text-decoration: none;
   font-size: 13px;
+  font-weight: 600;
 }
 
 .pfmea-card-grid {
@@ -174,10 +245,11 @@
   background: #fff;
   border-radius: 12px;
   padding: 18px;
-  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.08);
+  box-shadow: var(--pfmea-card-shadow);
   display: flex;
   flex-direction: column;
   gap: 10px;
+  border-left: 3px solid var(--pfmea-border-color);
 }
 
 .pfmea-card-header {
@@ -190,7 +262,7 @@
 .pfmea-card-header h4 {
   margin: 0;
   font-size: 15px;
-  color: #1d2939;
+  color: var(--pfmea-text-dark);
 }
 
 .pfmea-agree-badge {
@@ -201,16 +273,17 @@
   white-space: nowrap;
   border-radius: 999px;
   padding: 3px 8px;
+  font-weight: 600;
 }
 
 .pfmea-agree-badge.agree {
-  background: #ecfdf3;
-  color: #027a48;
+  background: #f0fff4;
+  color: #1a7f3c;
 }
 
 .pfmea-agree-badge.differs {
-  background: #fff4e5;
-  color: #b54708;
+  background: #fff5f5;
+  color: var(--pfmea-red-dark);
 }
 
 .pfmea-card-scores {
@@ -227,38 +300,38 @@
 }
 
 .pfmea-score-label {
-  color: #667085;
+  color: var(--pfmea-text-gray);
 }
 
 .pfmea-score-pill {
   border-radius: 6px;
   padding: 2px 8px;
-  font-weight: 600;
+  font-weight: 700;
   color: #fff;
 }
 
-.pfmea-score-pill.band-high { background: #d92d20; }
-.pfmea-score-pill.band-medium { background: #f79009; }
-.pfmea-score-pill.band-low { background: #eaaa08; color: #1d2939; }
-.pfmea-score-pill.band-minimal { background: #12b76a; }
-.pfmea-score-pill.band-unknown { background: #98a2b3; }
+.pfmea-score-pill.band-high { background: var(--pfmea-red); }
+.pfmea-score-pill.band-medium { background: #dd6b20; }
+.pfmea-score-pill.band-low { background: #d69e2e; }
+.pfmea-score-pill.band-minimal { background: #1a7f3c; }
+.pfmea-score-pill.band-unknown { background: #a0aec0; }
 
 .pfmea-score-plant {
-  color: #475467;
+  color: var(--pfmea-text-gray);
 }
 
 .pfmea-score-plant.mismatch {
-  color: #b54708;
-  font-weight: 600;
+  color: var(--pfmea-red-dark);
+  font-weight: 700;
 }
 
 .pfmea-ambiguous {
-  background: #fffaeb;
-  border: 1px solid #fedf89;
+  background: #fffaf0;
+  border: 1px solid #fbd38d;
   border-radius: 8px;
   padding: 8px 10px;
   font-size: 12px;
-  color: #93370d;
+  color: #7b341e;
 }
 
 .pfmea-ambiguous ul {
@@ -269,7 +342,7 @@
 .pfmea-reasoning,
 .pfmea-recommendation {
   font-size: 13px;
-  color: #344054;
+  color: var(--pfmea-text-dark);
   margin: 0;
 }
 
@@ -281,8 +354,8 @@
 }
 
 .pfmea-flag-chip {
-  background: #f2f4f7;
-  color: #475467;
+  background: var(--pfmea-bg-light);
+  color: var(--pfmea-text-gray);
   border-radius: 6px;
   padding: 3px 8px;
   font-size: 11px;

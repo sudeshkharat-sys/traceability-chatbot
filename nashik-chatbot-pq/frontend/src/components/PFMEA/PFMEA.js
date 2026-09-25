@@ -153,10 +153,27 @@ function PFMEA() {
   return (
     <div className="pfmea-page">
       <div className="pfmea-header">
-        <button className="pfmea-back-btn" onClick={() => navigate('/')}>
-          <ArrowLeft size={16} /><span>Dashboard</span>
-        </button>
-        <h2>PFMEA Assistant</h2>
+        <div className="header-title-group">
+          <button className="sidebar-back-btn" onClick={() => navigate('/')}>
+            <ArrowLeft size={16} /><span>Dashboard</span>
+          </button>
+          <div className="header-title">
+            <h1>PFMEA Assistant</h1>
+            <p>AI-reviewed Severity and Detection suggestions for your PFMEA sheet</p>
+          </div>
+        </div>
+        {result && (
+          <div className="header-stats">
+            <div className="stat-card">
+              <span className="stat-value">{rows.length}</span>
+              <span className="stat-label">Rows reviewed</span>
+            </div>
+            <div className="stat-card">
+              <span className="stat-value">{mismatchCount}</span>
+              <span className="stat-label">Differ from plant</span>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="pfmea-upload-card">
@@ -209,10 +226,6 @@ function PFMEA() {
               ))}
             </div>
             <div className="pfmea-results-summary">
-              <span>{rows.length} row(s) reviewed</span>
-              <span className={mismatchCount > 0 ? 'pfmea-summary-warn' : ''}>
-                {mismatchCount} differ from plant Severity
-              </span>
               <a
                 className="pfmea-download-btn"
                 href={pfmeaApi.downloadUrl(result.download_token)}
