@@ -13,9 +13,23 @@
 }
 
 .pfmea-page {
-  min-height: 100vh;
+  height: 100vh;
   background: var(--pfmea-bg-light);
   font-family: 'Inter', -apple-system, sans-serif;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* index.css sets body { overflow: hidden } and #root { height: 100vh } -
+   the app scrolls per-page, not at the document level - so everything
+   below the fixed header lives in its own scrolling region instead of
+   relying on page scroll, which the CSS above disables. Without this, a
+   full-sheet run's cards simply got clipped at the viewport edge with no
+   way to reach them. */
+.pfmea-scroll-body {
+  flex: 1;
+  overflow-y: auto;
   padding-bottom: 48px;
 }
 
@@ -463,6 +477,73 @@
 .pfmea-score-plant.mismatch {
   color: var(--pfmea-red-dark);
   font-weight: 700;
+}
+
+.pfmea-repeat-panel {
+  border-radius: 8px;
+  border: 1px solid var(--pfmea-border-color);
+  overflow: hidden;
+}
+
+.pfmea-repeat-panel.unstable {
+  border-color: #fbd38d;
+}
+
+.pfmea-repeat-toggle {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  background: var(--pfmea-bg-light);
+  border: none;
+  cursor: pointer;
+  padding: 6px 10px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pfmea-text-dark);
+}
+
+.pfmea-repeat-panel.unstable .pfmea-repeat-toggle {
+  background: #fffaf0;
+  color: #7b341e;
+}
+
+.pfmea-repeat-list {
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pfmea-repeat-run {
+  border-left: 2px solid var(--pfmea-border-color);
+  padding-left: 8px;
+}
+
+.pfmea-repeat-run.winner {
+  border-left-color: var(--pfmea-red);
+}
+
+.pfmea-repeat-run-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pfmea-text-gray);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.pfmea-repeat-run.winner .pfmea-repeat-run-header {
+  color: var(--pfmea-red-dark);
+}
+
+.pfmea-repeat-run-reasoning {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--pfmea-text-dark);
 }
 
 .pfmea-ambiguous {

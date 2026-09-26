@@ -51,8 +51,11 @@ async def analyze(
 
     sheet_names is a comma-separated list of sheet names to process (blank
     = every sheet). repeat is how many times each row is independently
-    scored by the LLM for stability (see run_pipeline's own docs - keep at
-    3, it's cheap insurance against single-call sampling variance).
+    scored by the LLM for stability (see run_pipeline's own docs - default
+    3 is cheap insurance against single-call sampling variance; the
+    frontend offers 2/3/5 as a cost-vs-confidence tradeoff the reviewer
+    picks). Restricted to 1-5 here - not a hard technical limit, just a
+    sanity cap so a stray value can't multiply LLM spend unexpectedly.
 
     The pipeline itself runs in a worker thread (analyze_workbook is
     synchronous and can take minutes on a full sheet) while this coroutine
@@ -61,6 +64,8 @@ async def analyze(
     into a threading.Event the pipeline checks between rows/sheets, so an
     abandoned run stops spending LLM calls instead of running to
     completion for a response nobody's waiting for."""
+    if not 1 <= repeat <= 5:
+        raise HTTPException(status_code=400, detail="repeat must be between 1 and 5")
     try:
         file_bytes = await file.read()
         requested_sheets = (

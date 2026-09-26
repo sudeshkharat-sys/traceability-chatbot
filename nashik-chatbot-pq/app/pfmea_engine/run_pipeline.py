@@ -252,6 +252,24 @@ def score_entries(
             "ai_possible_severities": winning_run.get("possible_severities"),
             "ai_consistent_across_runs": consistent,
             "ai_context_source": context_source,
+            # Every independent repeat call's own severity/detection/
+            # reasoning, in call order - not just the majority-vote winner
+            # above. Streamlit's log line only ever showed the bare
+            # severity numbers when runs disagreed ("[UNSTABLE: [7, 9, 7]]")
+            # with no way to see WHY a run picked a different number; this
+            # is that same information, but with each run's own reasoning
+            # attached, for every row (not just unstable ones) so a
+            # reviewer can actually judge the disagreement instead of just
+            # being told it happened.
+            "ai_repeat_runs": [
+                {
+                    "severity": r["suggested_severity"],
+                    "detection": r.get("suggested_detection"),
+                    "reasoning": r["reasoning"],
+                    "is_winner": r is winning_run,
+                }
+                for r in runs
+            ],
         }
 
         agreement = "MATCH" if plant_sev == ai_sev else f"DIFFERS (plant={plant_sev}, AI={ai_sev})"

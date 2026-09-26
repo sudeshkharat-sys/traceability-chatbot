@@ -69,6 +69,40 @@ function ScoreBadge({ label, plantValue, aiValue }) {
   );
 }
 
+function RepeatRunsPanel({ runs, consistent }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!runs || runs.length < 2) return null; // repeat=1 has nothing to compare
+
+  return (
+    <div className={`pfmea-repeat-panel ${consistent ? 'consistent' : 'unstable'}`}>
+      <button type="button" className="pfmea-repeat-toggle" onClick={() => setExpanded((v) => !v)}>
+        <span>
+          {consistent
+            ? `All ${runs.length} AI runs agreed`
+            : `⚠ ${runs.length} AI runs disagreed — see why below`}
+        </span>
+        {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+      </button>
+
+      {expanded && (
+        <div className="pfmea-repeat-list">
+          {runs.map((r, i) => (
+            <div key={i} className={`pfmea-repeat-run ${r.is_winner ? 'winner' : ''}`}>
+              <div className="pfmea-repeat-run-header">
+                <span>Run {i + 1}{r.is_winner ? ' (used)' : ''}</span>
+                <span className="pfmea-repeat-run-scores">
+                  S{r.severity ?? '—'} / D{r.detection ?? '—'}
+                </span>
+              </div>
+              {r.reasoning && <p className="pfmea-repeat-run-reasoning">{r.reasoning}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RowCard({ row }) {
   const flags = [];
   if (row.ai_row_completeness_note) flags.push(row.ai_row_completeness_note);
@@ -94,6 +128,8 @@ function RowCard({ row }) {
         <ScoreBadge label="Severity" plantValue={row.plant_recorded_severity} aiValue={row.ai_suggested_severity} />
         <ScoreBadge label="Detection" plantValue={row.plant_recorded_detection} aiValue={row.ai_suggested_detection} />
       </div>
+
+      <RepeatRunsPanel runs={row.ai_repeat_runs} consistent={row.ai_consistent_across_runs} />
 
       {row.ai_possible_severities && (
         <div className="pfmea-ambiguous">
@@ -195,6 +231,7 @@ function PFMEA() {
   const [sheetNames, setSheetNames] = useState([]);
   const [selectedSheets, setSelectedSheets] = useState([]);
   const [scope, setScope] = useState('all'); // 'all' | 'select'
+  const [repeat, setRepeat] = useState(3); // how many independent AI passes per row - 2/3/5
   const [loadingSheets, setLoadingSheets] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
@@ -255,7 +292,7 @@ function PFMEA() {
     abortControllerRef.current = controller;
     try {
       const sheetsToRun = scope === 'all' ? [] : selectedSheets;
-      const res = await pfmeaApi.analyze(file, sheetsToRun, 3, controller.signal);
+      const res = await pfmeaApi.analyze(file, sheetsToRun, repeat, controller.signal);
       setResult(res.data);
       saveResultToSession(file.name, res.data);
       const firstSheet = Object.keys(res.data.sheets || {})[0];
@@ -305,6 +342,7 @@ function PFMEA() {
         )}
       </div>
 
+      <div className="pfmea-scroll-body">
       <div className="pfmea-upload-card">
         <label className="pfmea-upload-label">
           <UploadCloud size={20} />
@@ -350,6 +388,23 @@ function PFMEA() {
                 </div>
               </>
             )}
+
+            <p className="pfmea-hint">
+              AI passes per row — more passes cost more (repeat × LLM calls) but catch
+              sampling noise better:
+            </p>
+            <div className="pfmea-scope-toggle">
+              {[2, 3, 5].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className={`pfmea-scope-btn ${repeat === n ? 'active' : ''}`}
+                  onClick={() => setRepeat(n)}
+                >
+                  {n} passes{n === 3 ? ' (recommended)' : ''}
+                </button>
+              ))}
+            </div>
           </div>
         )}
 
@@ -427,6 +482,7 @@ function PFMEA() {
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
