@@ -114,14 +114,46 @@
   letter-spacing: 0.5px;
 }
 
-.pfmea-upload-card {
+/* One consistent card shell for each step (Upload / Options / Results) -
+   gives the page a clear top-to-bottom flow instead of one undifferentiated
+   block of controls. */
+.pfmea-step-card {
   background: #fff;
   border-radius: 12px;
-  padding: 24px;
+  padding: 20px 24px;
   box-shadow: var(--pfmea-card-shadow);
-  max-width: 720px;
+  max-width: 900px;
   width: calc(100% - 4rem);
-  margin: 0 auto 24px;
+  margin: 0 auto 20px;
+}
+
+.pfmea-results {
+  max-width: 1200px;
+}
+
+.pfmea-step-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pfmea-text-gray);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 16px;
+}
+
+.pfmea-step-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--pfmea-red);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .pfmea-upload-label {
@@ -142,27 +174,56 @@
 
 .pfmea-hint {
   color: var(--pfmea-text-gray);
-  font-size: 13px;
-  margin: 12px 0 6px;
+  font-size: 12px;
+  margin: 10px 0 0;
+}
+
+/* Step 2's controls sit in one compact horizontal bar instead of stacked
+   sections with explanatory paragraphs between each one. */
+.pfmea-options-bar {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.pfmea-option-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pfmea-option-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--pfmea-text-gray);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.pfmea-run-group {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
 }
 
 .pfmea-scope-toggle {
   display: flex;
   gap: 8px;
-  margin-bottom: 14px;
 }
 
 .pfmea-scope-btn {
-  flex: 1;
   border: 1.5px solid var(--pfmea-border-color);
   background: #fff;
   border-radius: 8px;
-  padding: 10px 14px;
+  padding: 8px 14px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   color: var(--pfmea-text-dark);
   font-family: inherit;
+  white-space: nowrap;
   transition: all 0.15s;
 }
 
@@ -176,30 +237,27 @@
   color: #fff;
 }
 
-.pfmea-repeat-slider-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.pfmea-repeat-slider {
-  flex: 1;
-  max-width: 260px;
-  accent-color: var(--pfmea-red);
+.pfmea-repeat-select {
+  border: 1.5px solid var(--pfmea-border-color);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--pfmea-text-dark);
+  background: #fff;
   cursor: pointer;
 }
 
-.pfmea-repeat-slider-value {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--pfmea-text-dark);
-  white-space: nowrap;
+.pfmea-repeat-select:hover {
+  border-color: var(--pfmea-red);
 }
 
 .pfmea-sheet-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-top: 16px;
 }
 
 .pfmea-sheet-chip {
@@ -219,67 +277,15 @@
   color: #fff;
 }
 
-.pfmea-run-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.pfmea-cancel-btn {
-  margin-top: 16px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: #fff;
-  color: var(--pfmea-red-dark);
-  border: 1.5px solid var(--pfmea-red-dark);
-  border-radius: 8px;
-  padding: 10px 16px;
-  font-size: 14px;
-  font-family: inherit;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.pfmea-cancel-btn:hover {
-  background: #fff0f0;
-}
-
-.pfmea-restored-banner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  background: #fffaf0;
-  border: 1px solid #fbd38d;
-  color: #7b341e;
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 13px;
-  margin-bottom: 16px;
-}
-
-.pfmea-restored-dismiss {
-  background: none;
-  border: 1px solid #7b341e;
-  color: #7b341e;
-  border-radius: 6px;
-  padding: 4px 10px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  font-family: inherit;
-  white-space: nowrap;
-}
-
 .pfmea-analyze-btn {
-  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   background: var(--pfmea-red);
   color: #fff;
   border: none;
   border-radius: 8px;
-  padding: 10px 18px;
+  padding: 9px 22px;
   font-size: 14px;
   font-family: inherit;
   font-weight: 700;
@@ -296,17 +302,78 @@
   cursor: not-allowed;
 }
 
+.pfmea-spin {
+  animation: pfmea-spin 0.8s linear infinite;
+}
+
+@keyframes pfmea-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.pfmea-cancel-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #fff;
+  color: var(--pfmea-red-dark);
+  border: 1.5px solid var(--pfmea-red-dark);
+  border-radius: 8px;
+  padding: 9px 16px;
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.pfmea-cancel-btn:hover:not(:disabled) {
+  background: #fff0f0;
+}
+
+.pfmea-cancel-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Numbers-only progress - no cost/time text, just where the run actually
+   is right now. */
+.pfmea-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.pfmea-progress-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--pfmea-bg-light);
+  overflow: hidden;
+}
+
+.pfmea-progress-fill {
+  height: 100%;
+  background: var(--pfmea-red);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.pfmea-progress-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--pfmea-text-dark);
+  white-space: nowrap;
+}
+
 .pfmea-error {
   color: var(--pfmea-red-dark);
   background: #fff0f0;
   border-radius: 8px;
   padding: 8px 12px;
   font-size: 13px;
-  margin-top: 10px;
-}
-
-.pfmea-results {
-  padding: 0 2rem;
+  margin-top: 12px;
 }
 
 .pfmea-results-toolbar {
@@ -315,7 +382,7 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .pfmea-sheet-tabs {
@@ -354,10 +421,68 @@
   font-weight: 600;
 }
 
+.pfmea-card-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.pfmea-filter-chip {
+  border: 1px solid var(--pfmea-border-color);
+  background: #fff;
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--pfmea-text-dark);
+  font-family: inherit;
+}
+
+.pfmea-filter-chip.active {
+  background: var(--pfmea-text-dark);
+  border-color: var(--pfmea-text-dark);
+  color: #fff;
+}
+
+.pfmea-filter-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--pfmea-text-gray);
+}
+
+.pfmea-restored-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #fffaf0;
+  border: 1px solid #fbd38d;
+  color: #7b341e;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 16px;
+}
+
+.pfmea-restored-dismiss {
+  background: none;
+  border: 1px solid #7b341e;
+  color: #7b341e;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
 .pfmea-usage-card {
   background: #fff;
   border-radius: 12px;
-  box-shadow: var(--pfmea-card-shadow);
+  border: 1px solid var(--pfmea-border-color);
   margin-bottom: 16px;
   overflow: hidden;
 }

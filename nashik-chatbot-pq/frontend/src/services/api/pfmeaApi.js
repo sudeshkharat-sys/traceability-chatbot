@@ -11,7 +11,12 @@ export const pfmeaApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
-  analyze: (file, sheetNames, repeat = 3, signal) => {
+  // Starts the review as a background job and returns { token } right
+  // away - poll getProgress(token) for live status, then getResult(token)
+  // once it reports done/cancelled. Replaces the old single long-lived
+  // request, which had no way to show real progress and could only be
+  // "cancelled" by dropping the connection.
+  startAnalysis: (file, sheetNames, repeat = 3) => {
     const formData = new FormData();
     formData.append('file', file);
     if (sheetNames && sheetNames.length) {
@@ -20,15 +25,10 @@ export const pfmeaApi = {
     formData.append('repeat', repeat);
     return axios.post(`${BASE_URL}/analyze`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
-      // Row-by-row LLM scoring on a real sheet can take several minutes -
-      // axios's default timeout would cut the request off well before the
-      // pipeline finishes.
-      timeout: 15 * 60 * 1000,
-      // Passed an AbortController's signal so the Cancel button can drop
-      // the connection - the backend's /analyze route detects that
-      // disconnect and stops the pipeline from starting new rows.
-      signal,
     });
   },
+  getProgress: (token) => axios.get(`${BASE_URL}/progress/${token}`),
+  getResult: (token) => axios.get(`${BASE_URL}/result/${token}`),
+  cancelRun: (token) => axios.post(`${BASE_URL}/cancel/${token}`),
   downloadUrl: (token) => `${BASE_URL}/download/${token}`,
 };

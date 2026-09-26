@@ -360,6 +360,7 @@ def run_pipeline(
     all_rows_out=None,
     max_concurrent_rows=MAX_CONCURRENT_ROWS,
     cancel_check=None,
+    progress_callback=None,
 ):
     """Core of the pipeline, callable directly (e.g. from a UI) instead of
     only via the CLI below. Returns the output Path on success.
@@ -391,7 +392,12 @@ def run_pipeline(
     score_entries()) AND between sheets - once it returns True, no new
     sheet is started either, and whatever's been written to output_path so
     far (via the per-sheet/per-row checkpoints) is what the caller gets
-    back."""
+    back.
+
+    progress_callback, if given, is called as
+    progress_callback(sheet_name, rows_done_in_sheet, rows_total_in_sheet)
+    every time a row finishes - a caller driving a UI progress bar/counter
+    uses this instead of parsing log() text."""
     source_path = Path(source_path)
     if output_path is None:
         suffix = "__merge_mode.xlsx" if merge_mode else "__with_suggestions.xlsx"
@@ -481,9 +487,14 @@ def run_pipeline(
         block_start_col = true_last_column(out_ws) + 1
         row_checkpoint = make_row_checkpoint(out_wb, out_ws, output_path, cause_to_modes, cause_by_mode, merge_mode, log, block_start_col)
 
+        def on_row_scored(results_so_far, _sheet_name=sheet_name, _total=len(entries)):
+            row_checkpoint(results_so_far)
+            if progress_callback:
+                progress_callback(_sheet_name, len(results_so_far), _total)
+
         log(f"  Scoring {len(entries)} failure mode(s) with repeat={repeat} ...")
         rows = score_entries(
-            entries, llm, severity_table_text, repeat, log=log, on_row_scored=row_checkpoint,
+            entries, llm, severity_table_text, repeat, log=log, on_row_scored=on_row_scored,
             usage_rows=usage_rows, sheet_name=sheet_name,
             price_per_1k_input=price_per_1k_input, price_per_1k_output=price_per_1k_output,
             context_source=severity_source, max_workers=max_concurrent_rows,

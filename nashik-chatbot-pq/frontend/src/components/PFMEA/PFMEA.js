@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, UploadCloud, Download, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, XCircle } from 'lucide-react';
+import { ArrowLeft, UploadCloud, Download, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, XCircle, Loader2 } from 'lucide-react';
 import { pfmeaApi } from '../../services/api/pfmeaApi';
 import './PFMEA.css';
 
@@ -39,6 +38,9 @@ function clearResultFromSession() {
     // ignore
   }
 }
+
+// How often the frontend polls /pfmea/progress while a review is running.
+const POLL_INTERVAL_MS = 1500;
 
 // Severity/Detection 1-10: colour band purely for the at-a-glance badge -
 // matches the AIAG-VDA table's own rough grouping (see
@@ -224,6 +226,16 @@ function UsageReport({ usage }) {
   );
 }
 
+const CARD_FILTERS = [
+  { key: 'all', label: 'All' },
+  { key: 'differs', label: 'Differs from plant' },
+  { key: 'ambiguous', label: 'Ambiguous' },
+];
+
+function StepBadge({ n }) {
+  return <span className="pfmea-step-badge">{n}</span>;
+}
+
 function PFMEA() {
   const navigate = useNavigate();
 
@@ -231,14 +243,18 @@ function PFMEA() {
   const [sheetNames, setSheetNames] = useState([]);
   const [selectedSheets, setSelectedSheets] = useState([]);
   const [scope, setScope] = useState('all'); // 'all' | 'select'
-  const [repeat, setRepeat] = useState(3); // how many independent AI passes per row - 2/3/5
+  const [repeat, setRepeat] = useState(3); // 1 ("None") - 5 independent AI passes per row
   const [loadingSheets, setLoadingSheets] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [progress, setProgress] = useState(null); // { completed_rows, total_rows, current_sheet }
+  const [runToken, setRunToken] = useState(null);
   const [error, setError] = useState('');
-  const [result, setResult] = useState(null); // { sheets: { name: [rows] }, download_token }
+  const [result, setResult] = useState(null); // { sheets: { name: [rows] }, download_token, usage }
   const [activeSheet, setActiveSheet] = useState(null);
+  const [cardFilter, setCardFilter] = useState('all');
   const [restoredFileName, setRestoredFileName] = useState(null);
-  const abortControllerRef = useRef(null);
+  const pollRef = useRef(null);
 
   // Restore the last saved run once, on first mount - e.g. after an
   // accidental refresh or a nav-away-and-back, rather than losing paid-for
@@ -252,6 +268,8 @@ function PFMEA() {
       setActiveSheet(firstSheet || null);
     }
   }, []);
+
+  useEffect(() => () => clearInterval(pollRef.current), []);
 
   const handleFileChange = async (e) => {
     const chosen = e.target.files?.[0];
@@ -281,40 +299,84 @@ function PFMEA() {
     );
   };
 
+  const stopPolling = () => {
+    clearInterval(pollRef.current);
+    pollRef.current = null;
+  };
+
+  const pollProgress = (token) => {
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await pfmeaApi.getProgress(token);
+        const state = res.data;
+        setProgress(state);
+
+        if (state.status === 'running') return;
+
+        stopPolling();
+        if (state.status === 'error') {
+          setError(state.error || 'PFMEA analysis failed.');
+          setAnalyzing(false);
+          setCancelling(false);
+          return;
+        }
+
+        // done or cancelled - fetch the final payload
+        const resultRes = await pfmeaApi.getResult(token);
+        setResult(resultRes.data);
+        saveResultToSession(file?.name, resultRes.data);
+        const firstSheet = Object.keys(resultRes.data.sheets || {})[0];
+        setActiveSheet(firstSheet || null);
+        if (state.status === 'cancelled') {
+          setError('Review cancelled - rows already in progress were kept, no further rows were scored.');
+        }
+      } catch (err) {
+        stopPolling();
+        setError(err?.response?.data?.detail || 'PFMEA analysis failed.');
+      } finally {
+        setAnalyzing(false);
+        setCancelling(false);
+      }
+    }, POLL_INTERVAL_MS);
+  };
+
   const handleAnalyze = async () => {
     if (!file) return;
     if (scope === 'select' && selectedSheets.length === 0) return;
     setAnalyzing(true);
+    setCancelling(false);
     setError('');
     setResult(null);
     setRestoredFileName(null);
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
+    setProgress({ completed_rows: 0, total_rows: 0, current_sheet: null });
     try {
       const sheetsToRun = scope === 'all' ? [] : selectedSheets;
-      const res = await pfmeaApi.analyze(file, sheetsToRun, repeat, controller.signal);
-      setResult(res.data);
-      saveResultToSession(file.name, res.data);
-      const firstSheet = Object.keys(res.data.sheets || {})[0];
-      setActiveSheet(firstSheet || null);
+      const res = await pfmeaApi.startAnalysis(file, sheetsToRun, repeat);
+      setRunToken(res.data.token);
+      pollProgress(res.data.token);
     } catch (err) {
-      if (axios.isCancel?.(err) || err.code === 'ERR_CANCELED') {
-        setError('Review cancelled - no further rows were sent for scoring.');
-      } else {
-        setError(err?.response?.data?.detail || 'PFMEA analysis failed.');
-      }
-    } finally {
+      setError(err?.response?.data?.detail || 'PFMEA analysis failed to start.');
       setAnalyzing(false);
-      abortControllerRef.current = null;
     }
   };
 
-  const handleCancel = () => {
-    abortControllerRef.current?.abort();
+  const handleCancel = async () => {
+    if (!runToken) return;
+    setCancelling(true);
+    try {
+      await pfmeaApi.cancelRun(runToken);
+    } catch {
+      // Progress polling will surface the real state either way.
+    }
   };
 
-  const rows = result && activeSheet ? result.sheets[activeSheet] || [] : [];
-  const mismatchCount = rows.filter((r) => !r.agree).length;
+  const allRows = result && activeSheet ? result.sheets[activeSheet] || [] : [];
+  const rows = allRows.filter((r) => {
+    if (cardFilter === 'differs') return !r.agree;
+    if (cardFilter === 'ambiguous') return !!r.ai_possible_severities;
+    return true;
+  });
+  const mismatchCount = allRows.filter((r) => !r.agree).length;
 
   return (
     <div className="pfmea-page">
@@ -331,7 +393,7 @@ function PFMEA() {
         {result && (
           <div className="header-stats">
             <div className="stat-card">
-              <span className="stat-value">{rows.length}</span>
+              <span className="stat-value">{allRows.length}</span>
               <span className="stat-label">Rows reviewed</span>
             </div>
             <div className="stat-card">
@@ -343,148 +405,184 @@ function PFMEA() {
       </div>
 
       <div className="pfmea-scroll-body">
-      <div className="pfmea-upload-card">
-        <label className="pfmea-upload-label">
-          <UploadCloud size={20} />
-          <span>{file ? file.name : 'Choose a PFMEA Excel file'}</span>
-          <input type="file" accept=".xlsx" onChange={handleFileChange} hidden />
-        </label>
-
-        {loadingSheets && <p className="pfmea-hint">Reading sheet names…</p>}
+        <div className="pfmea-step-card">
+          <div className="pfmea-step-heading">
+            <StepBadge n={1} />
+            <span>Upload</span>
+          </div>
+          <label className="pfmea-upload-label">
+            <UploadCloud size={20} />
+            <span>{file ? file.name : 'Choose a PFMEA Excel file'}</span>
+            <input type="file" accept=".xlsx" onChange={handleFileChange} hidden />
+          </label>
+          {loadingSheets && <p className="pfmea-hint">Reading sheet names…</p>}
+        </div>
 
         {sheetNames.length > 0 && (
-          <div className="pfmea-sheet-picker">
-            <p className="pfmea-hint">What should the AI review run on?</p>
-            <div className="pfmea-scope-toggle">
-              <button
-                type="button"
-                className={`pfmea-scope-btn ${scope === 'all' ? 'active' : ''}`}
-                onClick={() => setScope('all')}
-              >
-                Full sheet — all {sheetNames.length} tab{sheetNames.length !== 1 ? 's' : ''}
-              </button>
-              <button
-                type="button"
-                className={`pfmea-scope-btn ${scope === 'select' ? 'active' : ''}`}
-                onClick={() => setScope('select')}
-              >
-                Choose specific tabs
-              </button>
+          <div className="pfmea-step-card">
+            <div className="pfmea-step-heading">
+              <StepBadge n={2} />
+              <span>Options</span>
+            </div>
+
+            <div className="pfmea-options-bar">
+              <div className="pfmea-option-group">
+                <label className="pfmea-option-label">Run on</label>
+                <div className="pfmea-scope-toggle">
+                  <button
+                    type="button"
+                    className={`pfmea-scope-btn ${scope === 'all' ? 'active' : ''}`}
+                    onClick={() => setScope('all')}
+                  >
+                    Full sheet ({sheetNames.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`pfmea-scope-btn ${scope === 'select' ? 'active' : ''}`}
+                    onClick={() => setScope('select')}
+                  >
+                    Choose tabs
+                  </button>
+                </div>
+              </div>
+
+              <div className="pfmea-option-group">
+                <label className="pfmea-option-label" htmlFor="pfmea-repeat-select">AI passes per row</label>
+                <select
+                  id="pfmea-repeat-select"
+                  className="pfmea-repeat-select"
+                  value={repeat}
+                  onChange={(e) => setRepeat(Number(e.target.value))}
+                >
+                  <option value={1}>None</option>
+                  <option value={2}>2</option>
+                  <option value={3}>3 (recommended)</option>
+                  <option value={4}>4</option>
+                  <option value={5}>5</option>
+                </select>
+              </div>
+
+              <div className="pfmea-option-group pfmea-run-group">
+                <button
+                  className="pfmea-analyze-btn"
+                  onClick={handleAnalyze}
+                  disabled={analyzing || (scope === 'select' && selectedSheets.length === 0)}
+                >
+                  {analyzing ? <Loader2 size={16} className="pfmea-spin" /> : null}
+                  Run
+                </button>
+                {analyzing && (
+                  <button className="pfmea-cancel-btn" onClick={handleCancel} disabled={cancelling}>
+                    <XCircle size={16} /> {cancelling ? 'Cancelling…' : 'Cancel'}
+                  </button>
+                )}
+              </div>
             </div>
 
             {scope === 'select' && (
-              <>
-                <p className="pfmea-hint">Select the tab(s) to review:</p>
-                <div className="pfmea-sheet-chips">
-                  {sheetNames.map((name) => (
-                    <button
-                      key={name}
-                      className={`pfmea-sheet-chip ${selectedSheets.includes(name) ? 'selected' : ''}`}
-                      onClick={() => toggleSheet(name)}
-                    >
-                      {name}
-                    </button>
-                  ))}
+              <div className="pfmea-sheet-chips">
+                {sheetNames.map((name) => (
+                  <button
+                    key={name}
+                    className={`pfmea-sheet-chip ${selectedSheets.includes(name) ? 'selected' : ''}`}
+                    onClick={() => toggleSheet(name)}
+                  >
+                    {name}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {analyzing && progress && (
+              <div className="pfmea-progress-row">
+                <div className="pfmea-progress-track">
+                  <div
+                    className="pfmea-progress-fill"
+                    style={{
+                      width: progress.total_rows
+                        ? `${Math.min(100, (progress.completed_rows / progress.total_rows) * 100)}%`
+                        : '4%',
+                    }}
+                  />
                 </div>
-              </>
+                <span className="pfmea-progress-label">
+                  {progress.total_rows ? `Row ${progress.completed_rows} of ${progress.total_rows}` : 'Starting…'}
+                </span>
+              </div>
             )}
 
-            <p className="pfmea-hint">
-              AI passes per row — more passes cost more (repeat × LLM calls) but catch
-              sampling noise better. 3 is a good default; go lower to save cost, higher
-              for more confidence on a critical sheet.
-            </p>
-            <div className="pfmea-repeat-slider-row">
-              <input
-                type="range"
-                min={1}
-                max={5}
-                step={1}
-                value={repeat}
-                onChange={(e) => setRepeat(Number(e.target.value))}
-                className="pfmea-repeat-slider"
-              />
-              <span className="pfmea-repeat-slider-value">
-                {repeat} pass{repeat !== 1 ? 'es' : ''}{repeat === 3 ? ' (recommended)' : ''}
-              </span>
-            </div>
+            {error && <p className="pfmea-error">{error}</p>}
           </div>
         )}
 
-        {file && sheetNames.length > 0 && (
-          <div className="pfmea-run-row">
-            <button
-              className="pfmea-analyze-btn"
-              onClick={handleAnalyze}
-              disabled={analyzing || (scope === 'select' && selectedSheets.length === 0)}
-            >
-              {analyzing
-                ? 'Running AI review… this can take a few minutes'
-                : scope === 'all'
-                ? `Run PFMEA AI Review — full sheet (${sheetNames.length} tab${sheetNames.length !== 1 ? 's' : ''})`
-                : `Run PFMEA AI Review — ${selectedSheets.length} tab${selectedSheets.length !== 1 ? 's' : ''} selected`}
-            </button>
-            {analyzing && (
-              <button className="pfmea-cancel-btn" onClick={handleCancel}>
-                <XCircle size={16} /> Cancel
-              </button>
-            )}
-          </div>
-        )}
-
-        {error && <p className="pfmea-error">{error}</p>}
-      </div>
-
-      {result && (
-        <div className="pfmea-results">
-          {restoredFileName && (
-            <div className="pfmea-restored-banner">
-              Showing your last review ({restoredFileName}) restored from this browser session.
-              <button
-                className="pfmea-restored-dismiss"
-                onClick={() => {
-                  setResult(null);
-                  setRestoredFileName(null);
-                  clearResultFromSession();
-                }}
-              >
-                Clear
-              </button>
+        {result && (
+          <div className="pfmea-step-card pfmea-results">
+            <div className="pfmea-step-heading">
+              <StepBadge n={3} />
+              <span>Results</span>
             </div>
-          )}
 
-          <UsageReport usage={result.usage} />
-
-          <div className="pfmea-results-toolbar">
-            <div className="pfmea-sheet-tabs">
-              {Object.keys(result.sheets).map((name) => (
+            {restoredFileName && (
+              <div className="pfmea-restored-banner">
+                Showing your last review ({restoredFileName}) restored from this browser session.
                 <button
-                  key={name}
-                  className={`pfmea-sheet-tab ${activeSheet === name ? 'active' : ''}`}
-                  onClick={() => setActiveSheet(name)}
+                  className="pfmea-restored-dismiss"
+                  onClick={() => {
+                    setResult(null);
+                    setRestoredFileName(null);
+                    clearResultFromSession();
+                  }}
                 >
-                  {name} ({result.sheets[name].length})
+                  Clear
+                </button>
+              </div>
+            )}
+
+            <UsageReport usage={result.usage} />
+
+            <div className="pfmea-results-toolbar">
+              <div className="pfmea-sheet-tabs">
+                {Object.keys(result.sheets).map((name) => (
+                  <button
+                    key={name}
+                    className={`pfmea-sheet-tab ${activeSheet === name ? 'active' : ''}`}
+                    onClick={() => setActiveSheet(name)}
+                  >
+                    {name} ({result.sheets[name].length})
+                  </button>
+                ))}
+              </div>
+              <div className="pfmea-results-summary">
+                <a
+                  className="pfmea-download-btn"
+                  href={pfmeaApi.downloadUrl(result.download_token)}
+                  download
+                >
+                  <Download size={16} /> Download annotated Excel
+                </a>
+              </div>
+            </div>
+
+            <div className="pfmea-card-filters">
+              {CARD_FILTERS.map((f) => (
+                <button
+                  key={f.key}
+                  className={`pfmea-filter-chip ${cardFilter === f.key ? 'active' : ''}`}
+                  onClick={() => setCardFilter(f.key)}
+                >
+                  {f.label}
                 </button>
               ))}
+              <span className="pfmea-filter-count">{rows.length} shown</span>
             </div>
-            <div className="pfmea-results-summary">
-              <a
-                className="pfmea-download-btn"
-                href={pfmeaApi.downloadUrl(result.download_token)}
-                download
-              >
-                <Download size={16} /> Download annotated Excel
-              </a>
-            </div>
-          </div>
 
-          <div className="pfmea-card-grid">
-            {rows.map((row, i) => (
-              <RowCard key={i} row={row} />
-            ))}
+            <div className="pfmea-card-grid">
+              {rows.map((row, i) => (
+                <RowCard key={i} row={row} />
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
       </div>
     </div>
   );
