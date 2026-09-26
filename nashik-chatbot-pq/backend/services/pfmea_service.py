@@ -52,6 +52,14 @@ def list_sheet_names(file_bytes: bytes) -> list[str]:
         return sheet_names
 
 
+# Same starting-point $/1K rates as the pfmea_ai/ Streamlit prototype's
+# "Advanced options" panel - NOT read from Azure (its API reports tokens
+# used, never a dollar figure), so treat the resulting cost as an estimate
+# to sanity-check spend, not an invoice.
+_DEFAULT_PRICE_PER_1K_INPUT = 0.00015
+_DEFAULT_PRICE_PER_1K_OUTPUT = 0.0006
+
+
 def analyze_workbook(
     file_bytes: bytes,
     sheet_names: Optional[list[str]] = None,
@@ -60,7 +68,8 @@ def analyze_workbook(
 ) -> dict:
     """Run the PFMEA AI review pipeline on an uploaded workbook.
 
-    Returns {"sheets": {sheet_name: [row, ...]}, "download_token": str} -
+    Returns {"sheets": {sheet_name: [row, ...]}, "download_token": str,
+    "usage": {...}} -
     "sheets" is what the PFMEA Assistant screen renders as review cards,
     one per Failure Mode row (each row dict has failure_mode,
     plant_recorded_severity, ai_suggested_severity, ai_reasoning,
@@ -68,6 +77,11 @@ def analyze_workbook(
     step5_severity_llm.py's score_entries() for the full per-row shape).
     "download_token" is passed to get_download() to retrieve the same
     annotated workbook as a downloadable .xlsx.
+    "usage" is the same per-row token/cost report the pfmea_ai/ Streamlit
+    prototype shows after a run: {"rows": [...], "total_input_tokens",
+    "total_output_tokens", "total_tokens", "total_cost_usd"} - real counts
+    from Azure's usage_metadata, not an estimate (cost is the one estimated
+    figure, from the $/1K rates above).
 
     merge_mode=True matches the reviewed/tested BLANK-TEST output shape
     (A/B sub-mode values folded directly into Severity/Detection/
@@ -79,6 +93,7 @@ def analyze_workbook(
         output_path = Path(tmp_dir) / "output.xlsx"
 
         all_rows: dict[str, list] = {}
+        usage_rows: list[dict] = []
         run_pipeline(
             source_path,
             sheet_names=sheet_names,
@@ -87,6 +102,9 @@ def analyze_workbook(
             merge_mode=merge_mode,
             log=logger.info,
             all_rows_out=all_rows,
+            usage_rows=usage_rows,
+            price_per_1k_input=_DEFAULT_PRICE_PER_1K_INPUT,
+            price_per_1k_output=_DEFAULT_PRICE_PER_1K_OUTPUT,
         )
 
         output_bytes = output_path.read_bytes()
@@ -94,7 +112,17 @@ def analyze_workbook(
     token = uuid.uuid4().hex
     _download_cache[token] = output_bytes
 
-    return {"sheets": all_rows, "download_token": token}
+    usage = {
+        "rows": usage_rows,
+        "total_input_tokens": sum(r["input_tokens"] for r in usage_rows),
+        "total_output_tokens": sum(r["output_tokens"] for r in usage_rows),
+        "total_tokens": sum(r["total_tokens"] for r in usage_rows),
+        "total_cost_usd": sum(
+            r["cost_usd"] for r in usage_rows if r.get("cost_usd") is not None
+        ) if usage_rows else 0.0,
+    }
+
+    return {"sheets": all_rows, "download_token": token, "usage": usage}
 
 
 def get_download(token: str) -> Optional[bytes]:

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, UploadCloud, Download, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, UploadCloud, Download, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
 import { pfmeaApi } from '../../services/api/pfmeaApi';
 import './PFMEA.css';
 
@@ -87,6 +87,65 @@ function RowCard({ row }) {
           {flags.map((f, i) => (
             <span key={i} className="pfmea-flag-chip">{f}</span>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UsageReport({ usage }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!usage || !usage.rows || usage.rows.length === 0) return null;
+
+  return (
+    <div className="pfmea-usage-card">
+      <button
+        type="button"
+        className="pfmea-usage-summary"
+        onClick={() => setExpanded((v) => !v)}
+      >
+        <span>
+          <strong>{usage.rows.length}</strong> row(s) scored — tokens in{' '}
+          <strong>{usage.total_input_tokens.toLocaleString()}</strong>, out{' '}
+          <strong>{usage.total_output_tokens.toLocaleString()}</strong>, total{' '}
+          <strong>{usage.total_tokens.toLocaleString()}</strong>
+          {usage.total_cost_usd != null && (
+            <> — est. cost <strong>${usage.total_cost_usd.toFixed(4)}</strong></>
+          )}
+        </span>
+        {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      </button>
+
+      {expanded && (
+        <div className="pfmea-usage-table-wrap">
+          <p className="pfmea-hint">
+            Real per-row token counts from Azure's usage_metadata (not an estimate); cost is
+            estimated from a fixed $/1K rate, not read from Azure.
+          </p>
+          <table className="pfmea-usage-table">
+            <thead>
+              <tr>
+                <th>Sheet</th>
+                <th>Failure Mode</th>
+                <th>Input</th>
+                <th>Output</th>
+                <th>Total</th>
+                <th>Est. cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              {usage.rows.map((r, i) => (
+                <tr key={i}>
+                  <td>{r.sheet}</td>
+                  <td>{r.failure_mode || '—'}</td>
+                  <td>{r.input_tokens.toLocaleString()}</td>
+                  <td>{r.output_tokens.toLocaleString()}</td>
+                  <td>{r.total_tokens.toLocaleString()}</td>
+                  <td>{r.cost_usd != null ? `$${r.cost_usd.toFixed(4)}` : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
@@ -247,6 +306,8 @@ function PFMEA() {
 
       {result && (
         <div className="pfmea-results">
+          <UsageReport usage={result.usage} />
+
           <div className="pfmea-results-toolbar">
             <div className="pfmea-sheet-tabs">
               {Object.keys(result.sheets).map((name) => (

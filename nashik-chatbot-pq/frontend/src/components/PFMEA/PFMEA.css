@@ -266,6 +266,61 @@
   font-weight: 600;
 }
 
+.pfmea-usage-card {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: var(--pfmea-card-shadow);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.pfmea-usage-summary {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 14px 18px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--pfmea-text-dark);
+  text-align: left;
+}
+
+.pfmea-usage-summary:hover {
+  background: var(--pfmea-bg-light);
+}
+
+.pfmea-usage-table-wrap {
+  padding: 0 18px 18px;
+  border-top: 1px solid var(--pfmea-border-color);
+}
+
+.pfmea-usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.pfmea-usage-table th,
+.pfmea-usage-table td {
+  text-align: left;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--pfmea-border-color);
+}
+
+.pfmea-usage-table th {
+  color: var(--pfmea-text-gray);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.4px;
+}
+
 .pfmea-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
