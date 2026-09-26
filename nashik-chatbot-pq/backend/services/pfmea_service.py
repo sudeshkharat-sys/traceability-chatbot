@@ -80,8 +80,13 @@ def _count_total_rows(source_path: Path, sheet_names: Optional[list[str]]) -> in
     requested sheet - computed with the same normalize_sheet() the real
     pipeline uses (so it's the true count, not raw Excel rows), just
     without any LLM calls, so this is free to run up front for the
-    progress bar's denominator."""
-    wb = load_workbook(source_path, data_only=True, read_only=True)
+    progress bar's denominator.
+
+    Not read_only=True - normalize_sheet() needs ws.merged_cells, which
+    openpyxl's read-only worksheet mode doesn't support at all
+    (AttributeError, not just slower) - only load_workbook's normal mode
+    exposes it."""
+    wb = load_workbook(source_path, data_only=True)
     try:
         names = sheet_names if sheet_names else wb.sheetnames
         total = 0
