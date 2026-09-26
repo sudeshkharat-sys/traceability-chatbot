@@ -167,64 +167,12 @@ function RowCard({ row }) {
   );
 }
 
-function UsageReport({ usage }) {
-  const [expanded, setExpanded] = useState(false);
-  if (!usage || !usage.rows || usage.rows.length === 0) return null;
-
-  return (
-    <div className="pfmea-usage-card">
-      <button
-        type="button"
-        className="pfmea-usage-summary"
-        onClick={() => setExpanded((v) => !v)}
-      >
-        <span>
-          <strong>{usage.rows.length}</strong> row(s) scored — tokens in{' '}
-          <strong>{usage.total_input_tokens.toLocaleString()}</strong>, out{' '}
-          <strong>{usage.total_output_tokens.toLocaleString()}</strong>, total{' '}
-          <strong>{usage.total_tokens.toLocaleString()}</strong>
-          {usage.total_cost_usd != null && (
-            <> — est. cost <strong>${usage.total_cost_usd.toFixed(4)}</strong></>
-          )}
-        </span>
-        {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-      </button>
-
-      {expanded && (
-        <div className="pfmea-usage-table-wrap">
-          <p className="pfmea-hint">
-            Real per-row token counts from Azure's usage_metadata (not an estimate); cost is
-            estimated from a fixed $/1K rate, not read from Azure.
-          </p>
-          <table className="pfmea-usage-table">
-            <thead>
-              <tr>
-                <th>Sheet</th>
-                <th>Failure Mode</th>
-                <th>Input</th>
-                <th>Output</th>
-                <th>Total</th>
-                <th>Est. cost</th>
-              </tr>
-            </thead>
-            <tbody>
-              {usage.rows.map((r, i) => (
-                <tr key={i}>
-                  <td>{r.sheet}</td>
-                  <td>{r.failure_mode || '—'}</td>
-                  <td>{r.input_tokens.toLocaleString()}</td>
-                  <td>{r.output_tokens.toLocaleString()}</td>
-                  <td>{r.total_tokens.toLocaleString()}</td>
-                  <td>{r.cost_usd != null ? `$${r.cost_usd.toFixed(4)}` : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  );
-}
+// Cost/token usage is deliberately not shown in this UI for now (product
+// call: reviewers shouldn't see per-run $ figures here). The backend still
+// computes and returns result.usage in full - see UsageReport in git
+// history, or pfmea_service.py's usage dict - so it's a one-line change to
+// bring back if that changes later; there's just no component rendering
+// it right now.
 
 const CARD_FILTERS = [
   { key: 'all', label: 'All' },
@@ -537,8 +485,6 @@ function PFMEA() {
                 </button>
               </div>
             )}
-
-            <UsageReport usage={result.usage} />
 
             <div className="pfmea-results-toolbar">
               <div className="pfmea-sheet-tabs">
