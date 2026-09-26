@@ -1,8 +1,44 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, UploadCloud, Download, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, UploadCloud, Download, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, XCircle } from 'lucide-react';
 import { pfmeaApi } from '../../services/api/pfmeaApi';
 import './PFMEA.css';
+
+// The AI review is real, billed Azure OpenAI calls per row - losing the
+// result to an accidental refresh/back-nav means paying for it again to
+// see it. Keeps only the most recent run (sessionStorage, not
+// localStorage - a stale review from days ago showing up unprompted would
+// be more confusing than losing it, and this already keeps it across a
+// same-tab reload/nav which is the actual accident being guarded against).
+const SESSION_STORAGE_KEY = 'pfmea_last_result';
+
+function saveResultToSession(fileName, result) {
+  try {
+    sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({ fileName, result, savedAt: Date.now() }));
+  } catch {
+    // Storage full/unavailable (private browsing, quota) - the review
+    // still works this session, it just won't survive a reload. Not worth
+    // surfacing to the user over.
+  }
+}
+
+function loadResultFromSession() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearResultFromSession() {
+  try {
+    sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 // Severity/Detection 1-10: colour band purely for the at-a-glance badge -
 // matches the AIAG-VDA table's own rough grouping (see
@@ -164,12 +200,29 @@ function PFMEA() {
   const [error, setError] = useState('');
   const [result, setResult] = useState(null); // { sheets: { name: [rows] }, download_token }
   const [activeSheet, setActiveSheet] = useState(null);
+  const [restoredFileName, setRestoredFileName] = useState(null);
+  const abortControllerRef = useRef(null);
+
+  // Restore the last saved run once, on first mount - e.g. after an
+  // accidental refresh or a nav-away-and-back, rather than losing paid-for
+  // AI output.
+  useEffect(() => {
+    const saved = loadResultFromSession();
+    if (saved?.result) {
+      setResult(saved.result);
+      setRestoredFileName(saved.fileName || null);
+      const firstSheet = Object.keys(saved.result.sheets || {})[0];
+      setActiveSheet(firstSheet || null);
+    }
+  }, []);
 
   const handleFileChange = async (e) => {
     const chosen = e.target.files?.[0];
     if (!chosen) return;
     setFile(chosen);
     setResult(null);
+    setRestoredFileName(null);
+    clearResultFromSession();
     setError('');
     setSheetNames([]);
     setSelectedSheets([]);
@@ -197,17 +250,30 @@ function PFMEA() {
     setAnalyzing(true);
     setError('');
     setResult(null);
+    setRestoredFileName(null);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     try {
       const sheetsToRun = scope === 'all' ? [] : selectedSheets;
-      const res = await pfmeaApi.analyze(file, sheetsToRun);
+      const res = await pfmeaApi.analyze(file, sheetsToRun, 3, controller.signal);
       setResult(res.data);
+      saveResultToSession(file.name, res.data);
       const firstSheet = Object.keys(res.data.sheets || {})[0];
       setActiveSheet(firstSheet || null);
     } catch (err) {
-      setError(err?.response?.data?.detail || 'PFMEA analysis failed.');
+      if (axios.isCancel?.(err) || err.code === 'ERR_CANCELED') {
+        setError('Review cancelled - no further rows were sent for scoring.');
+      } else {
+        setError(err?.response?.data?.detail || 'PFMEA analysis failed.');
+      }
     } finally {
       setAnalyzing(false);
+      abortControllerRef.current = null;
     }
+  };
+
+  const handleCancel = () => {
+    abortControllerRef.current?.abort();
   };
 
   const rows = result && activeSheet ? result.sheets[activeSheet] || [] : [];
@@ -288,17 +354,24 @@ function PFMEA() {
         )}
 
         {file && sheetNames.length > 0 && (
-          <button
-            className="pfmea-analyze-btn"
-            onClick={handleAnalyze}
-            disabled={analyzing || (scope === 'select' && selectedSheets.length === 0)}
-          >
-            {analyzing
-              ? 'Running AI review… this can take a few minutes'
-              : scope === 'all'
-              ? `Run PFMEA AI Review — full sheet (${sheetNames.length} tab${sheetNames.length !== 1 ? 's' : ''})`
-              : `Run PFMEA AI Review — ${selectedSheets.length} tab${selectedSheets.length !== 1 ? 's' : ''} selected`}
-          </button>
+          <div className="pfmea-run-row">
+            <button
+              className="pfmea-analyze-btn"
+              onClick={handleAnalyze}
+              disabled={analyzing || (scope === 'select' && selectedSheets.length === 0)}
+            >
+              {analyzing
+                ? 'Running AI review… this can take a few minutes'
+                : scope === 'all'
+                ? `Run PFMEA AI Review — full sheet (${sheetNames.length} tab${sheetNames.length !== 1 ? 's' : ''})`
+                : `Run PFMEA AI Review — ${selectedSheets.length} tab${selectedSheets.length !== 1 ? 's' : ''} selected`}
+            </button>
+            {analyzing && (
+              <button className="pfmea-cancel-btn" onClick={handleCancel}>
+                <XCircle size={16} /> Cancel
+              </button>
+            )}
+          </div>
         )}
 
         {error && <p className="pfmea-error">{error}</p>}
@@ -306,6 +379,22 @@ function PFMEA() {
 
       {result && (
         <div className="pfmea-results">
+          {restoredFileName && (
+            <div className="pfmea-restored-banner">
+              Showing your last review ({restoredFileName}) restored from this browser session.
+              <button
+                className="pfmea-restored-dismiss"
+                onClick={() => {
+                  setResult(null);
+                  setRestoredFileName(null);
+                  clearResultFromSession();
+                }}
+              >
+                Clear
+              </button>
+            </div>
+          )}
+
           <UsageReport usage={result.usage} />
 
           <div className="pfmea-results-toolbar">

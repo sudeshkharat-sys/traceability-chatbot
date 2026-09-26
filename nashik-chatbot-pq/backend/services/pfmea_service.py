@@ -65,6 +65,7 @@ def analyze_workbook(
     sheet_names: Optional[list[str]] = None,
     repeat: int = 3,
     merge_mode: bool = True,
+    cancel_check=None,
 ) -> dict:
     """Run the PFMEA AI review pipeline on an uploaded workbook.
 
@@ -86,7 +87,12 @@ def analyze_workbook(
     merge_mode=True matches the reviewed/tested BLANK-TEST output shape
     (A/B sub-mode values folded directly into Severity/Detection/
     Prevention) - the alternative (merge_mode=False) keeps a separate
-    worst-case row-level value plus a Sub-modes column instead."""
+    worst-case row-level value plus a Sub-modes column instead.
+
+    cancel_check, if given, is polled by run_pipeline() between rows and
+    between sheets - see its docstring. Rows already in flight when it
+    starts returning True still finish and are included in the result;
+    only rows/sheets that hadn't started yet are skipped."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         source_path = Path(tmp_dir) / "input.xlsx"
         source_path.write_bytes(file_bytes)
@@ -105,6 +111,7 @@ def analyze_workbook(
             usage_rows=usage_rows,
             price_per_1k_input=_DEFAULT_PRICE_PER_1K_INPUT,
             price_per_1k_output=_DEFAULT_PRICE_PER_1K_OUTPUT,
+            cancel_check=cancel_check,
         )
 
         output_bytes = output_path.read_bytes()
@@ -122,7 +129,12 @@ def analyze_workbook(
         ) if usage_rows else 0.0,
     }
 
-    return {"sheets": all_rows, "download_token": token, "usage": usage}
+    return {
+        "sheets": all_rows,
+        "download_token": token,
+        "usage": usage,
+        "cancelled": bool(cancel_check and cancel_check()),
+    }
 
 
 def get_download(token: str) -> Optional[bytes]:

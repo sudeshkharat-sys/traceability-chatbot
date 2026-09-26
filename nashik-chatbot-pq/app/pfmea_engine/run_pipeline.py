@@ -28,8 +28,9 @@ Example:
 """
 
 import sys
+import threading
 from collections import Counter, defaultdict
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from openpyxl import load_workbook
@@ -56,6 +57,14 @@ from app.pfmea_engine.step6_write_suggestions_to_excel import apply_suggestions_
 
 
 CHECKPOINT_EVERY_ROWS = 5
+
+# How many Failure Mode rows are scored at once. Each row already fires its
+# own `repeat` calls concurrently (see _call_llm_repeated), so the actual
+# in-flight call count can reach roughly MAX_CONCURRENT_ROWS * repeat -
+# kept modest so a big full-sheet run doesn't blow past the Azure OpenAI
+# deployment's per-minute rate limit and start getting 429s. Raise this
+# only alongside a check of the deployment's actual TPM/RPM quota.
+MAX_CONCURRENT_ROWS = 6
 
 
 def make_row_checkpoint(out_wb, out_ws, output_path, cause_to_modes, cause_by_mode, merge_mode, log, block_start_col):
@@ -146,24 +155,40 @@ def _sum_usage(usage_list):
 def score_entries(
     entries, llm, severity_table_text, repeat, log=print, on_row_scored=None,
     usage_rows=None, sheet_name=None, price_per_1k_input=None, price_per_1k_output=None,
-    context_source=None,
+    context_source=None, max_workers=MAX_CONCURRENT_ROWS, cancel_check=None,
 ):
     """Run step5's per-row LLM scoring for every entry in a sheet. Returns
     the same row shape step5_severity_llm.py's JSON output uses, so
     apply_suggestions_to_sheet() can consume it unchanged.
 
-    on_row_scored(results_so_far), if given, is called after every row is
-    appended, with the SAME list object being built here (mutated, not
-    copied) - lets a caller checkpoint partial progress to disk without
-    this function knowing anything about files.
+    Rows are scored concurrently, up to max_workers at a time (each row's
+    own `repeat` calls were already concurrent - see _call_llm_repeated;
+    this adds a second, row-level layer of concurrency on top, since
+    scoring one row at a time was the actual bottleneck on a full sheet).
+    The final list is returned in original entry order regardless of which
+    order rows actually finished in.
+
+    on_row_scored(results_so_far), if given, is called after every row
+    completes, with the rows completed SO FAR (in completion order, not
+    entry order - callers like the row checkpoint only care about the
+    count and each row's own source_excel_rows, not list position).
 
     usage_rows, if given, is a list this function APPENDS a per-row token
     (and, if price_per_1k_input/output are given, estimated cost) dict
     into - one entry per row, covering all `repeat` calls for that row.
     Doesn't cover the separate merged-mode split-scoring or cross-row
-    review calls, which aren't per-row in the same sense."""
-    results = []
-    for entry in entries:
+    review calls, which aren't per-row in the same sense.
+
+    cancel_check, if given, is called before each row starts; once it
+    returns True, no NEW row starts (rows already in flight still finish -
+    an HTTP call already sent to Azure can't be aborted mid-flight, so this
+    bounds the extra cost to at most max_workers rows instead of the whole
+    sheet). Skipped rows are simply left out of the returned list."""
+
+    def score_one(index, entry):
+        if cancel_check and cancel_check():
+            return index, None, None
+
         prompt = build_prompt_for_entry(entry, severity_table_text=severity_table_text)
         # Normalize to "" (never None) here, at the source - a blank plant
         # Failure Mode cell means entry["failure"]["mode"] is None, and
@@ -205,31 +230,30 @@ def score_entries(
                 call_fn=lambda p: call_llm(llm, p),
             )
 
-        results.append(
-            {
-                "failure_mode": failure_mode,
-                "source_excel_rows": entry["source_excel_rows"],
-                "plant_recorded_severity": plant_sev,
-                "ai_suggested_severity": ai_sev,
-                "agree": plant_sev == ai_sev,
-                "ai_reasoning": winning_run["reasoning"],
-                "ai_recommended_action": winning_run.get("recommended_action"),
-                "ai_detection_recommendation": winning_run.get("detection_recommendation"),
-                "plant_recorded_detection": (entry.get("risk") or {}).get("detection"),
-                "ai_suggested_detection": winning_run.get("suggested_detection"),
-                "ai_detection_matched_table_definition": winning_run.get("detection_matched_table_definition"),
-                "ai_projected_detection_after_recommendation": winning_run.get("projected_detection_after_recommendation"),
-                "ai_projected_detection_note": winning_run.get("projected_detection_note"),
-                "ai_merged_modes_detected": merged_modes_detected,
-                "ai_split_suggestions": ai_split_suggestions,
-                "ai_cause_mode_mismatch": winning_run.get("cause_mode_mismatch"),
-                "ai_cause_mode_mismatch_note": winning_run.get("cause_mode_mismatch_note"),
-                "ai_row_completeness_note": winning_run.get("row_completeness_note"),
-                "ai_possible_severities": winning_run.get("possible_severities"),
-                "ai_consistent_across_runs": consistent,
-                "ai_context_source": context_source,
-            }
-        )
+        row = {
+            "failure_mode": failure_mode,
+            "source_excel_rows": entry["source_excel_rows"],
+            "plant_recorded_severity": plant_sev,
+            "ai_suggested_severity": ai_sev,
+            "agree": plant_sev == ai_sev,
+            "ai_reasoning": winning_run["reasoning"],
+            "ai_recommended_action": winning_run.get("recommended_action"),
+            "ai_detection_recommendation": winning_run.get("detection_recommendation"),
+            "plant_recorded_detection": (entry.get("risk") or {}).get("detection"),
+            "ai_suggested_detection": winning_run.get("suggested_detection"),
+            "ai_detection_matched_table_definition": winning_run.get("detection_matched_table_definition"),
+            "ai_projected_detection_after_recommendation": winning_run.get("projected_detection_after_recommendation"),
+            "ai_projected_detection_note": winning_run.get("projected_detection_note"),
+            "ai_merged_modes_detected": merged_modes_detected,
+            "ai_split_suggestions": ai_split_suggestions,
+            "ai_cause_mode_mismatch": winning_run.get("cause_mode_mismatch"),
+            "ai_cause_mode_mismatch_note": winning_run.get("cause_mode_mismatch_note"),
+            "ai_row_completeness_note": winning_run.get("row_completeness_note"),
+            "ai_possible_severities": winning_run.get("possible_severities"),
+            "ai_consistent_across_runs": consistent,
+            "ai_context_source": context_source,
+        }
+
         agreement = "MATCH" if plant_sev == ai_sev else f"DIFFERS (plant={plant_sev}, AI={ai_sev})"
         stability = "" if repeat == 1 else (" [STABLE]" if consistent else f" [UNSTABLE: {severities}]")
         cost_text = f" cost=${cost_usd:.4f}" if cost_usd is not None else ""
@@ -238,21 +262,43 @@ def score_entries(
             log(f"      MERGED MODE CELL - scored {len(ai_split_suggestions)} modes separately:")
             for s in ai_split_suggestions:
                 log(f"        - {s['failure_mode'][:50]!r:52} severity={s['suggested_severity']} detection={s.get('suggested_detection')}")
+
+        usage_entry = None
         if usage_rows is not None:
-            usage_rows.append(
-                {
-                    "sheet": sheet_name,
-                    "failure_mode": failure_mode,
-                    "repeat": repeat,
-                    "input_tokens": input_tokens,
-                    "output_tokens": output_tokens,
-                    "total_tokens": total_tokens,
-                    "cost_usd": cost_usd,
-                }
-            )
-        if on_row_scored:
-            on_row_scored(results)
-    return results
+            usage_entry = {
+                "sheet": sheet_name,
+                "failure_mode": failure_mode,
+                "repeat": repeat,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "total_tokens": total_tokens,
+                "cost_usd": cost_usd,
+            }
+        return index, row, usage_entry
+
+    if not entries:
+        return []
+
+    results_by_index = {}
+    completed_so_far = []
+    lock = threading.Lock()
+    workers = max(1, min(max_workers, len(entries)))
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = [executor.submit(score_one, i, entry) for i, entry in enumerate(entries)]
+        for future in as_completed(futures):
+            index, row, usage_entry = future.result()
+            if row is None:
+                continue  # cancelled before this row's API call was made
+            with lock:
+                results_by_index[index] = row
+                completed_so_far.append(row)
+                if usage_rows is not None and usage_entry is not None:
+                    usage_rows.append(usage_entry)
+                if on_row_scored:
+                    on_row_scored(completed_so_far)
+
+    return [results_by_index[i] for i in sorted(results_by_index)]
 
 
 def run_cross_row_review(rows, groups, llm, log=print):
@@ -294,6 +340,8 @@ def run_pipeline(
     price_per_1k_input=None,
     price_per_1k_output=None,
     all_rows_out=None,
+    max_concurrent_rows=MAX_CONCURRENT_ROWS,
+    cancel_check=None,
 ):
     """Core of the pipeline, callable directly (e.g. from a UI) instead of
     only via the CLI below. Returns the output Path on success.
@@ -316,7 +364,16 @@ def run_pipeline(
     dicts score_entries() produces, before they're flattened into Excel
     cells by apply_suggestions_to_sheet(). This is what a caller building a
     JSON API response (e.g. the PFMEA Assistant card's backend route) reads
-    to render one card per row, without re-parsing the output .xlsx."""
+    to render one card per row, without re-parsing the output .xlsx.
+
+    max_concurrent_rows caps how many rows are scored at once within a
+    sheet - see score_entries()'s docstring.
+
+    cancel_check, if given, is checked before each row (see
+    score_entries()) AND between sheets - once it returns True, no new
+    sheet is started either, and whatever's been written to output_path so
+    far (via the per-sheet/per-row checkpoints) is what the caller gets
+    back."""
     source_path = Path(source_path)
     if output_path is None:
         suffix = "__merge_mode.xlsx" if merge_mode else "__with_suggestions.xlsx"
@@ -374,6 +431,9 @@ def run_pipeline(
     out_wb = load_workbook(source_path, rich_text=True)
 
     for sheet_name in sheet_names:
+        if cancel_check and cancel_check():
+            log(f"\nCancelled before '{sheet_name}' - stopping (already-completed sheets are saved).")
+            break
         if sheet_name not in wb.sheetnames:
             log(f"WARNING: sheet '{sheet_name}' not found in {source_path} - skipping. Available: {wb.sheetnames}")
             continue
@@ -408,7 +468,8 @@ def run_pipeline(
             entries, llm, severity_table_text, repeat, log=log, on_row_scored=row_checkpoint,
             usage_rows=usage_rows, sheet_name=sheet_name,
             price_per_1k_input=price_per_1k_input, price_per_1k_output=price_per_1k_output,
-            context_source=severity_source,
+            context_source=severity_source, max_workers=max_concurrent_rows,
+            cancel_check=cancel_check,
         )
 
         if cross_review:

@@ -11,7 +11,7 @@ export const pfmeaApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
-  analyze: (file, sheetNames, repeat = 3) => {
+  analyze: (file, sheetNames, repeat = 3, signal) => {
     const formData = new FormData();
     formData.append('file', file);
     if (sheetNames && sheetNames.length) {
@@ -24,6 +24,10 @@ export const pfmeaApi = {
       // axios's default timeout would cut the request off well before the
       // pipeline finishes.
       timeout: 15 * 60 * 1000,
+      // Passed an AbortController's signal so the Cancel button can drop
+      // the connection - the backend's /analyze route detects that
+      // disconnect and stops the pipeline from starting new rows.
+      signal,
     });
   },
   downloadUrl: (token) => `${BASE_URL}/download/${token}`,

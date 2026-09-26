@@ -4,10 +4,12 @@ Upload a PFMEA Excel sheet, get back AI Severity/Detection review cards
 plus a downloadable annotated workbook.
 """
 
+import asyncio
 import logging
+import threading
 from typing import Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 
 logger = logging.getLogger(__name__)
@@ -40,6 +42,7 @@ async def list_sheets(file: UploadFile = File(...)):
 
 @router.post("/analyze")
 async def analyze(
+    request: Request,
     file: UploadFile = File(...),
     sheet_names: Optional[str] = Form(None),
     repeat: int = Form(3),
@@ -49,7 +52,15 @@ async def analyze(
     sheet_names is a comma-separated list of sheet names to process (blank
     = every sheet). repeat is how many times each row is independently
     scored by the LLM for stability (see run_pipeline's own docs - keep at
-    3, it's cheap insurance against single-call sampling variance)."""
+    3, it's cheap insurance against single-call sampling variance).
+
+    The pipeline itself runs in a worker thread (analyze_workbook is
+    synchronous and can take minutes on a full sheet) while this coroutine
+    polls request.is_disconnected() alongside it - if the frontend's
+    Cancel button aborts the request, that's detected here and flipped
+    into a threading.Event the pipeline checks between rows/sheets, so an
+    abandoned run stops spending LLM calls instead of running to
+    completion for a response nobody's waiting for."""
     try:
         file_bytes = await file.read()
         requested_sheets = (
@@ -57,10 +68,40 @@ async def analyze(
             if sheet_names
             else None
         )
-        result = get_service().analyze_workbook(
-            file_bytes, sheet_names=requested_sheets, repeat=repeat
+
+        cancel_event = threading.Event()
+
+        async def watch_for_disconnect():
+            while not cancel_event.is_set():
+                if await request.is_disconnected():
+                    cancel_event.set()
+                    return
+                await asyncio.sleep(1)
+
+        pipeline_task = asyncio.create_task(
+            asyncio.to_thread(
+                get_service().analyze_workbook,
+                file_bytes,
+                sheet_names=requested_sheets,
+                repeat=repeat,
+                cancel_check=cancel_event.is_set,
+            )
         )
-        return result
+        watcher_task = asyncio.create_task(watch_for_disconnect())
+
+        try:
+            done, _ = await asyncio.wait(
+                {pipeline_task, watcher_task}, return_when=asyncio.FIRST_COMPLETED
+            )
+            if pipeline_task not in done:
+                # Client gone - let already-in-flight rows wind down (bounded
+                # by max_concurrent_rows) instead of abandoning the thread.
+                cancel_event.set()
+                await pipeline_task
+        finally:
+            watcher_task.cancel()
+
+        return pipeline_task.result()
     except Exception as e:
         logger.exception("PFMEA analysis failed")
         raise HTTPException(status_code=500, detail=f"PFMEA analysis failed: {e}")
