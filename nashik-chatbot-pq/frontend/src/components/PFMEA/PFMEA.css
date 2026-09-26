@@ -176,6 +176,26 @@
   color: #fff;
 }
 
+.pfmea-repeat-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.pfmea-repeat-slider {
+  flex: 1;
+  max-width: 260px;
+  accent-color: var(--pfmea-red);
+  cursor: pointer;
+}
+
+.pfmea-repeat-slider-value {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--pfmea-text-dark);
+  white-space: nowrap;
+}
+
 .pfmea-sheet-chips {
   display: flex;
   flex-wrap: wrap;

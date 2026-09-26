@@ -391,19 +391,22 @@ function PFMEA() {
 
             <p className="pfmea-hint">
               AI passes per row — more passes cost more (repeat × LLM calls) but catch
-              sampling noise better:
+              sampling noise better. 3 is a good default; go lower to save cost, higher
+              for more confidence on a critical sheet.
             </p>
-            <div className="pfmea-scope-toggle">
-              {[2, 3, 5].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  className={`pfmea-scope-btn ${repeat === n ? 'active' : ''}`}
-                  onClick={() => setRepeat(n)}
-                >
-                  {n} passes{n === 3 ? ' (recommended)' : ''}
-                </button>
-              ))}
+            <div className="pfmea-repeat-slider-row">
+              <input
+                type="range"
+                min={1}
+                max={5}
+                step={1}
+                value={repeat}
+                onChange={(e) => setRepeat(Number(e.target.value))}
+                className="pfmea-repeat-slider"
+              />
+              <span className="pfmea-repeat-slider-value">
+                {repeat} pass{repeat !== 1 ? 'es' : ''}{repeat === 3 ? ' (recommended)' : ''}
+              </span>
             </div>
           </div>
         )}
