@@ -99,6 +99,7 @@ function PFMEA() {
   const [file, setFile] = useState(null);
   const [sheetNames, setSheetNames] = useState([]);
   const [selectedSheets, setSelectedSheets] = useState([]);
+  const [scope, setScope] = useState('all'); // 'all' | 'select'
   const [loadingSheets, setLoadingSheets] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState('');
@@ -113,6 +114,7 @@ function PFMEA() {
     setError('');
     setSheetNames([]);
     setSelectedSheets([]);
+    setScope('all');
     setLoadingSheets(true);
     try {
       const res = await pfmeaApi.listSheets(chosen);
@@ -132,11 +134,13 @@ function PFMEA() {
 
   const handleAnalyze = async () => {
     if (!file) return;
+    if (scope === 'select' && selectedSheets.length === 0) return;
     setAnalyzing(true);
     setError('');
     setResult(null);
     try {
-      const res = await pfmeaApi.analyze(file, selectedSheets);
+      const sheetsToRun = scope === 'all' ? [] : selectedSheets;
+      const res = await pfmeaApi.analyze(file, sheetsToRun);
       setResult(res.data);
       const firstSheet = Object.keys(res.data.sheets || {})[0];
       setActiveSheet(firstSheet || null);
@@ -187,24 +191,54 @@ function PFMEA() {
 
         {sheetNames.length > 0 && (
           <div className="pfmea-sheet-picker">
-            <p className="pfmea-hint">Pick sheet(s) to review (none selected = all sheets):</p>
-            <div className="pfmea-sheet-chips">
-              {sheetNames.map((name) => (
-                <button
-                  key={name}
-                  className={`pfmea-sheet-chip ${selectedSheets.includes(name) ? 'selected' : ''}`}
-                  onClick={() => toggleSheet(name)}
-                >
-                  {name}
-                </button>
-              ))}
+            <p className="pfmea-hint">What should the AI review run on?</p>
+            <div className="pfmea-scope-toggle">
+              <button
+                type="button"
+                className={`pfmea-scope-btn ${scope === 'all' ? 'active' : ''}`}
+                onClick={() => setScope('all')}
+              >
+                Full sheet — all {sheetNames.length} tab{sheetNames.length !== 1 ? 's' : ''}
+              </button>
+              <button
+                type="button"
+                className={`pfmea-scope-btn ${scope === 'select' ? 'active' : ''}`}
+                onClick={() => setScope('select')}
+              >
+                Choose specific tabs
+              </button>
             </div>
+
+            {scope === 'select' && (
+              <>
+                <p className="pfmea-hint">Select the tab(s) to review:</p>
+                <div className="pfmea-sheet-chips">
+                  {sheetNames.map((name) => (
+                    <button
+                      key={name}
+                      className={`pfmea-sheet-chip ${selectedSheets.includes(name) ? 'selected' : ''}`}
+                      onClick={() => toggleSheet(name)}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         )}
 
         {file && sheetNames.length > 0 && (
-          <button className="pfmea-analyze-btn" onClick={handleAnalyze} disabled={analyzing}>
-            {analyzing ? 'Running AI review… this can take a few minutes' : 'Run PFMEA AI Review'}
+          <button
+            className="pfmea-analyze-btn"
+            onClick={handleAnalyze}
+            disabled={analyzing || (scope === 'select' && selectedSheets.length === 0)}
+          >
+            {analyzing
+              ? 'Running AI review… this can take a few minutes'
+              : scope === 'all'
+              ? `Run PFMEA AI Review — full sheet (${sheetNames.length} tab${sheetNames.length !== 1 ? 's' : ''})`
+              : `Run PFMEA AI Review — ${selectedSheets.length} tab${selectedSheets.length !== 1 ? 's' : ''} selected`}
           </button>
         )}
 

@@ -106,7 +106,8 @@
   padding: 24px;
   box-shadow: var(--pfmea-card-shadow);
   max-width: 720px;
-  margin: 0 2rem 24px;
+  width: calc(100% - 4rem);
+  margin: 0 auto 24px;
 }
 
 .pfmea-upload-label {
@@ -129,6 +130,36 @@
   color: var(--pfmea-text-gray);
   font-size: 13px;
   margin: 12px 0 6px;
+}
+
+.pfmea-scope-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.pfmea-scope-btn {
+  flex: 1;
+  border: 1.5px solid var(--pfmea-border-color);
+  background: #fff;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--pfmea-text-dark);
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.pfmea-scope-btn:hover {
+  border-color: var(--pfmea-red);
+}
+
+.pfmea-scope-btn.active {
+  background: var(--pfmea-red);
+  border-color: var(--pfmea-red);
+  color: #fff;
 }
 
 .pfmea-sheet-chips {
