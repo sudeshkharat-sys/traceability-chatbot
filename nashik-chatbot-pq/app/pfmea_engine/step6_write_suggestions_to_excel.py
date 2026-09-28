@@ -80,14 +80,20 @@ from pathlib import Path
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Border, PatternFill, Side
 
-# XML (and so .xlsx) cannot contain most ASCII control characters (only
-# tab/\x09, newline/\x0A, carriage-return/\x0D are legal). LLM output
-# occasionally contains a stray control character (e.g. \x0b, \x1c) that
-# openpyxl will happily write into the cell without complaint, producing a
-# .xlsx whose XML is technically invalid - Excel then opens it with a
-# "needs repair" prompt instead of erroring at write time. Strip those
-# characters before they ever reach a cell.
-_ILLEGAL_XML_CHARS_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f]")
+# XML 1.0's legal character set is narrow: #x9 (tab) | #xA (LF) | #xD (CR) |
+# [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF] - everything else is
+# illegal, including the whole C0 control block (\x00-\x1F minus the three
+# above), \x7F (DEL), AND the C1 control block \x80-\x9F (e.g. \x85 NEL) -
+# that last range was missing here and is exactly the kind of character an
+# LLM can emit (confirmed: a real download's Excel repair log named
+# "String properties from /xl/worksheets/sheetN.xml part" after this same
+# sanitizer had already been applied - \x7F-\x9F was the gap). openpyxl
+# writes any of these into a cell without complaint, producing a .xlsx
+# whose XML is technically invalid - Excel then opens it with a "needs
+# repair" prompt instead of erroring at write time. Strip them all before
+# they ever reach a cell. Lone UTF-16 surrogates (\uD800-\uDFFF) are also
+# illegal but can't occur in a well-formed Python str, so aren't included.
+_ILLEGAL_XML_CHARS_RE = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
 
 
 def sanitize_cell_value(value):
