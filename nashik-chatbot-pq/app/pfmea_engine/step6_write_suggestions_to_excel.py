@@ -158,6 +158,42 @@ UNIFORM_BORDER = Border(
 )
 
 
+def safe_merge_cells(ws, start_row, start_column, end_row, end_column, log=print):
+    """ws.merge_cells() wrapper that refuses to write a range overlapping
+    an EXISTING merge that isn't identical to it. openpyxl itself does not
+    guard against this - it happily accepts two overlapping (but not
+    identical) MergedCellRanges and saves the workbook without error,
+    which produces invalid .xlsx XML (Excel forbids overlapping merges)
+    and is exactly what makes Excel show "We found a problem with some
+    content... do you want us to try to recover?" on open. Confirmed
+    directly against openpyxl 3.1.5: merging A1:B3 then A2:B4 saves fine
+    with both ranges present, no exception raised anywhere.
+
+    Merging the SAME range again (e.g. run_pipeline.py's row checkpoints
+    re-calling apply_suggestions_to_sheet on cumulative results every few
+    rows) is fine and expected - only a genuine overlap with a DIFFERENT
+    range is refused, logged, and skipped instead of silently corrupting
+    the file."""
+    new_range = (start_column, start_row, end_column, end_row)
+    for merged_range in list(ws.merged_cells.ranges):
+        existing = (merged_range.min_col, merged_range.min_row, merged_range.max_col, merged_range.max_row)
+        if existing == new_range:
+            return  # identical range already merged - nothing to do
+        overlaps = (
+            new_range[0] <= existing[2] and existing[0] <= new_range[2]
+            and new_range[1] <= existing[3] and existing[1] <= new_range[3]
+        )
+        if overlaps:
+            log(
+                f"  WARNING: skipped merging {ws.cell(row=start_row, column=start_column).coordinate}:"
+                f"{ws.cell(row=end_row, column=end_column).coordinate} - it overlaps an existing merge "
+                f"({merged_range}) that isn't identical to it. Writing this would have produced an "
+                f"invalid workbook (Excel's 'needs repair' prompt on open)."
+            )
+            return
+    ws.merge_cells(start_row=start_row, start_column=start_column, end_row=end_row, end_column=end_column)
+
+
 def find_merge_containing(ws, row, col):
     for merged_range in ws.merged_cells.ranges:
         if merged_range.min_row <= row <= merged_range.max_row and merged_range.min_col <= col <= merged_range.max_col:
@@ -514,7 +550,7 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
     section_header_row_start, section_header_row_end, section_ref_cell = find_section_header_rows(ws, header_row)
     sub_header_row_start, sub_header_row_end, sub_ref_cell = find_sub_header_rows(ws, header_row)
 
-    ws.merge_cells(start_row=section_header_row_start, start_column=start_col, end_row=section_header_row_end, end_column=end_col)
+    safe_merge_cells(ws, section_header_row_start, start_col, section_header_row_end, end_col, log=log)
     ws.cell(row=section_header_row_start, column=start_col, value="Suggestion")
     # Top-level section header stays plain (no fill) like its siblings
     # ("Risk Analysis (Step5)", "Optimization (Step6)") - only the
@@ -527,7 +563,7 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
 
     for i, header in enumerate(headers):
         col = start_col + i
-        ws.merge_cells(start_row=sub_header_row_start, start_column=col, end_row=sub_header_row_end, end_column=col)
+        safe_merge_cells(ws, sub_header_row_start, col, sub_header_row_end, col, log=log)
         ws.cell(row=sub_header_row_start, column=col, value=header)
         style_merged_range(ws, sub_header_row_start, sub_header_row_end, col, col, sub_ref_cell, fill_rgb=SUGGESTION_FILL_RGB, center=True)
 
@@ -717,7 +753,7 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             )
         for col, value in values.items():
             if row_end > row_start:
-                ws.merge_cells(start_row=row_start, start_column=col, end_row=row_end, end_column=col)
+                safe_merge_cells(ws, row_start, col, row_end, col, log=log)
             ws.cell(row=row_start, column=col, value=sanitize_cell_value(value))
             # Style every cell in the merge, not just the anchor, and force
             # centered+wrapped alignment - this is what keeps the border
