@@ -259,6 +259,13 @@ function PFMEA() {
         const state = res.data;
         setProgress(state);
 
+        // Still running - leave analyzing/cancelling untouched and wait
+        // for the next tick. This used to fall through to a `finally`
+        // block that ran setAnalyzing(false) on EVERY tick including this
+        // early return (finally always runs after a try, `return` or
+        // not) - flipping the Run button back to idle red and hiding the
+        // whole progress block on the very first poll, even though the
+        // job was still running fine in the background.
         if (state.status === 'running') return;
 
         stopPolling();
@@ -278,10 +285,11 @@ function PFMEA() {
         if (state.status === 'cancelled') {
           setError('Review cancelled - rows already in progress were kept, no further rows were scored.');
         }
+        setAnalyzing(false);
+        setCancelling(false);
       } catch (err) {
         stopPolling();
         setError(err?.response?.data?.detail || 'PFMEA analysis failed.');
-      } finally {
         setAnalyzing(false);
         setCancelling(false);
       }
