@@ -480,20 +480,31 @@ def get_llm():
         api_key = os.environ.get(f"AZURE_{prefix}_API_KEY", api_key)
 
     if not api_key or not endpoint or not deployment:
-        print(f"ERROR: missing credentials for LLM_MODEL_PROFILE={profile!r}. Set these environment variables:")
         if profile == "gpt5":
-            print("  AZURE_API_KEY")
-            print("  AZURE_GPT5_ENDPOINT (or AZURE_CHAT_ENDPOINT as a fallback)")
-            print("  AZURE_GPT_5_DEPLOYMENT (default \"gpt-5\")")
+            missing = "AZURE_API_KEY, AZURE_GPT5_ENDPOINT (or AZURE_CHAT_ENDPOINT), AZURE_GPT_5_DEPLOYMENT"
         elif profile == "gpt4omini":
-            print("  AZURE_API_KEY")
-            print("  AZURE_CHAT_ENDPOINT")
-            print("  AZURE_CHAT_DEPLOYMENT (default \"gpt-4o-mini\")")
+            missing = "AZURE_API_KEY, AZURE_CHAT_ENDPOINT, AZURE_CHAT_DEPLOYMENT"
         else:
-            print(f"  AZURE_{profile.upper()}_ENDPOINT")
-            print(f"  AZURE_{profile.upper()}_DEPLOYMENT")
-            print(f"  AZURE_{profile.upper()}_API_KEY (or shared AZURE_API_KEY)")
-        sys.exit(1)
+            missing = (
+                f"AZURE_{profile.upper()}_ENDPOINT, AZURE_{profile.upper()}_DEPLOYMENT, "
+                f"AZURE_{profile.upper()}_API_KEY (or shared AZURE_API_KEY)"
+            )
+        # Deliberately NOT sys.exit(1): that raises SystemExit, which is a
+        # BaseException, not an Exception - the PFMEA Assistant's background
+        # worker thread (backend/services/pfmea_service.py) only catches
+        # `except Exception`, and Python's threading module silently
+        # swallows an uncaught SystemExit in a non-main thread (no
+        # traceback, nothing in the terminal). The result was a run stuck
+        # forever at status="running"/completed_rows=0 with zero error
+        # surfaced anywhere - looked identical to a hang. Raising a normal
+        # exception lets the worker's except block catch it, set
+        # status="error", and actually show the missing-credentials
+        # message in the UI. sys.exit(1) is still correct for the plain
+        # CLI usage (run_pipeline.py run directly, not through the API).
+        raise RuntimeError(
+            f"Missing Azure OpenAI credentials for LLM_MODEL_PROFILE={profile!r}. "
+            f"Set these environment variables in your .env: {missing}"
+        )
 
     kwargs = dict(
         azure_endpoint=endpoint,
