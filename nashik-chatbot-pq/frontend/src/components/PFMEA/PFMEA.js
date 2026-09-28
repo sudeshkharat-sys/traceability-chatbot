@@ -304,7 +304,7 @@ function PFMEA() {
     setError('');
     setResult(null);
     setRestoredFileName(null);
-    setProgress({ completed_rows: 0, total_rows: 0, current_sheet: null });
+    setProgress({ completed_rows: 0, total_rows: 0, current_sheet: null, current_failure_mode: null });
     try {
       const sheetsToRun = scope === 'all' ? [] : selectedSheets;
       const res = await pfmeaApi.startAnalysis(file, sheetsToRun, repeat);
@@ -454,8 +454,10 @@ function PFMEA() {
                 <div className="pfmea-progress-status">
                   <span className="pfmea-progress-dot" />
                   <span>
-                    {progress.current_sheet
-                      ? `Scoring "${progress.current_sheet}"…`
+                    {progress.current_failure_mode
+                      ? `Scoring "${progress.current_failure_mode}"…`
+                      : progress.current_sheet
+                      ? `Reading "${progress.current_sheet}"…`
                       : 'Starting the review…'}
                   </span>
                 </div>

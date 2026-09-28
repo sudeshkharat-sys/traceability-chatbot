@@ -156,6 +156,7 @@ def score_entries(
     entries, llm, severity_table_text, repeat, log=print, on_row_scored=None,
     usage_rows=None, sheet_name=None, price_per_1k_input=None, price_per_1k_output=None,
     context_source=None, max_workers=MAX_CONCURRENT_ROWS, cancel_check=None,
+    on_row_started=None,
 ):
     """Run step5's per-row LLM scoring for every entry in a sheet. Returns
     the same row shape step5_severity_llm.py's JSON output uses, so
@@ -183,13 +184,21 @@ def score_entries(
     returns True, no NEW row starts (rows already in flight still finish -
     an HTTP call already sent to Azure can't be aborted mid-flight, so this
     bounds the extra cost to at most max_workers rows instead of the whole
-    sheet). Skipped rows are simply left out of the returned list."""
+    sheet). Skipped rows are simply left out of the returned list.
+
+    on_row_started(failure_mode), if given, is called right as a row's
+    LLM call is about to start (before the request goes out), not when it
+    finishes - on_row_scored only fires on completion, which for a small
+    sheet (or a slow single row) can leave the UI showing nothing for the
+    whole first row's worth of wait. Rows run concurrently (up to
+    max_workers), so this can fire out of order / in a burst for several
+    rows at once - it's meant as a "here's what's in flight right now"
+    signal for a progress display, not a precise per-row timeline."""
 
     def score_one(index, entry):
         if cancel_check and cancel_check():
             return index, None, None
 
-        prompt = build_prompt_for_entry(entry, severity_table_text=severity_table_text)
         # Normalize to "" (never None) here, at the source - a blank plant
         # Failure Mode cell means entry["failure"]["mode"] is None, and
         # step6_write_suggestions_to_excel.py calls row["failure_mode"].strip()
@@ -198,6 +207,10 @@ def score_entries(
         # whole pipeline with "NoneType has no attribute 'strip'" the first
         # time a real sheet had a blank Failure Mode cell.
         failure_mode = (entry.get("failure") or {}).get("mode") or ""
+        if on_row_started:
+            on_row_started(failure_mode)
+
+        prompt = build_prompt_for_entry(entry, severity_table_text=severity_table_text)
         plant_sev = (entry.get("risk") or {}).get("severity")
 
         runs, usage_list = _call_llm_repeated(llm, prompt, repeat)
@@ -361,6 +374,7 @@ def run_pipeline(
     max_concurrent_rows=MAX_CONCURRENT_ROWS,
     cancel_check=None,
     progress_callback=None,
+    row_started_callback=None,
 ):
     """Core of the pipeline, callable directly (e.g. from a UI) instead of
     only via the CLI below. Returns the output Path on success.
@@ -397,7 +411,14 @@ def run_pipeline(
     progress_callback, if given, is called as
     progress_callback(sheet_name, rows_done_in_sheet, rows_total_in_sheet)
     every time a row finishes - a caller driving a UI progress bar/counter
-    uses this instead of parsing log() text."""
+    uses this instead of parsing log() text.
+
+    row_started_callback, if given, is called as
+    row_started_callback(sheet_name, failure_mode) right as a row's LLM
+    call is about to start, not when it finishes - see score_entries()'s
+    on_row_started docstring for why this exists separately from
+    progress_callback (which only fires on completion, and can leave a UI
+    showing nothing for the whole first row's wait on a small/slow sheet)."""
     source_path = Path(source_path)
     if output_path is None:
         suffix = "__merge_mode.xlsx" if merge_mode else "__with_suggestions.xlsx"
@@ -492,13 +513,17 @@ def run_pipeline(
             if progress_callback:
                 progress_callback(_sheet_name, len(results_so_far), _total)
 
+        def on_row_started(failure_mode, _sheet_name=sheet_name):
+            if row_started_callback:
+                row_started_callback(_sheet_name, failure_mode)
+
         log(f"  Scoring {len(entries)} failure mode(s) with repeat={repeat} ...")
         rows = score_entries(
             entries, llm, severity_table_text, repeat, log=log, on_row_scored=on_row_scored,
             usage_rows=usage_rows, sheet_name=sheet_name,
             price_per_1k_input=price_per_1k_input, price_per_1k_output=price_per_1k_output,
             context_source=severity_source, max_workers=max_concurrent_rows,
-            cancel_check=cancel_check,
+            cancel_check=cancel_check, on_row_started=on_row_started,
         )
 
         if cross_review:

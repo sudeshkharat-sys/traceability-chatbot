@@ -124,6 +124,12 @@ def start_analysis(
         "completed_rows": 0,
         "total_rows": total_rows,
         "current_sheet": None,
+        # Which row is actively being scored right now (set as soon as its
+        # LLM call starts, not when it finishes) - completed_rows alone can
+        # sit unchanged for the whole duration of a slow/first row, which
+        # looked indistinguishable from a hang. See run_pipeline()'s
+        # row_started_callback docstring.
+        "current_failure_mode": None,
         "result": None,
         "error": None,
         "cancel_event": cancel_event,
@@ -144,6 +150,11 @@ def start_analysis(
                     done_per_sheet[sheet_name] = done_in_sheet
                 state["current_sheet"] = sheet_name
 
+        def row_started_callback(sheet_name, failure_mode):
+            with _run_lock:
+                state["current_sheet"] = sheet_name
+                state["current_failure_mode"] = failure_mode
+
         try:
             all_rows: dict[str, list] = {}
             usage_rows: list[dict] = []
@@ -160,6 +171,7 @@ def start_analysis(
                 price_per_1k_output=_DEFAULT_PRICE_PER_1K_OUTPUT,
                 cancel_check=cancel_event.is_set,
                 progress_callback=progress_callback,
+                row_started_callback=row_started_callback,
             )
 
             download_token = uuid.uuid4().hex
@@ -205,6 +217,7 @@ def get_progress(token: str) -> Optional[dict]:
             "completed_rows": state["completed_rows"],
             "total_rows": state["total_rows"],
             "current_sheet": state["current_sheet"],
+            "current_failure_mode": state["current_failure_mode"],
             "error": state["error"],
         }
 
