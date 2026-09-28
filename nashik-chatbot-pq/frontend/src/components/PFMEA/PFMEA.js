@@ -412,12 +412,12 @@ function PFMEA() {
 
               <div className="pfmea-option-group pfmea-run-group">
                 <button
-                  className="pfmea-analyze-btn"
+                  className={`pfmea-analyze-btn ${analyzing ? 'running' : ''}`}
                   onClick={handleAnalyze}
                   disabled={analyzing || (scope === 'select' && selectedSheets.length === 0)}
                 >
                   {analyzing ? <Loader2 size={16} className="pfmea-spin" /> : null}
-                  Run
+                  {analyzing ? 'Running…' : 'Run'}
                 </button>
                 {analyzing && (
                   <button className="pfmea-cancel-btn" onClick={handleCancel} disabled={cancelling}>
@@ -442,21 +442,31 @@ function PFMEA() {
             )}
 
             {analyzing && progress && (
-              <div className="pfmea-progress-row">
-                <div className="pfmea-progress-track">
-                  <div
-                    className="pfmea-progress-fill"
-                    style={{
-                      width: progress.total_rows
-                        ? `${Math.min(100, (progress.completed_rows / progress.total_rows) * 100)}%`
-                        : '4%',
-                    }}
-                  />
+              <>
+                <div className="pfmea-progress-status">
+                  <span className="pfmea-progress-dot" />
+                  <span>
+                    {progress.current_sheet
+                      ? `Scoring "${progress.current_sheet}"…`
+                      : 'Starting the review…'}
+                  </span>
                 </div>
-                <span className="pfmea-progress-label">
-                  {progress.total_rows ? `Row ${progress.completed_rows} of ${progress.total_rows}` : 'Starting…'}
-                </span>
-              </div>
+                <div className="pfmea-progress-row">
+                  <div className="pfmea-progress-track">
+                    <div
+                      className="pfmea-progress-fill"
+                      style={{
+                        width: progress.total_rows
+                          ? `${Math.min(100, (progress.completed_rows / progress.total_rows) * 100)}%`
+                          : '4%',
+                      }}
+                    />
+                  </div>
+                  <span className="pfmea-progress-label">
+                    {progress.total_rows ? `Row ${progress.completed_rows} of ${progress.total_rows}` : 'Starting…'}
+                  </span>
+                </div>
+              </>
             )}
 
             {error && <p className="pfmea-error">{error}</p>}

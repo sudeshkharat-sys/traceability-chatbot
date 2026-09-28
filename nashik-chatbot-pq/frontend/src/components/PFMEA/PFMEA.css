@@ -10,6 +10,12 @@
   --pfmea-text-gray: #7f8c8d;
   --pfmea-border-color: #e9ecef;
   --pfmea-card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  /* Deliberately NOT red - the Run button used --pfmea-red for every
+     state (idle, running, disabled), so a user watching it go dim mid-run
+     couldn't tell "still working" apart from "failed"/"stopped". Running
+     gets its own blue so red stays a signal reserved for errors. */
+  --pfmea-running: #2f6fed;
+  --pfmea-running-dark: #1e50c4;
 }
 
 .pfmea-page {
@@ -302,6 +308,14 @@
   cursor: not-allowed;
 }
 
+/* Actively running - solid blue, full opacity, no "disabled/dimmed" look,
+   so it reads as "working" rather than "broken/stopped" at a glance. */
+.pfmea-analyze-btn.running:disabled {
+  background: var(--pfmea-running);
+  opacity: 1;
+  cursor: default;
+}
+
 .pfmea-spin {
   animation: pfmea-spin 0.8s linear infinite;
 }
@@ -355,7 +369,7 @@
 
 .pfmea-progress-fill {
   height: 100%;
-  background: var(--pfmea-red);
+  background: var(--pfmea-running);
   border-radius: 999px;
   transition: width 0.3s ease;
 }
@@ -365,6 +379,34 @@
   font-weight: 700;
   color: var(--pfmea-text-dark);
   white-space: nowrap;
+}
+
+/* Live "still working" line above the bar - the current sheet/row being
+   scored right now, so a user watching it doesn't have to guess whether
+   it's stuck between progress-bar ticks (checkpoints only land every 5
+   rows, and one row can take several seconds of real LLM call time). */
+.pfmea-progress-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pfmea-running-dark);
+  margin-bottom: 6px;
+}
+
+.pfmea-progress-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pfmea-running);
+  animation: pfmea-pulse 1.1s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes pfmea-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
 }
 
 .pfmea-error {
