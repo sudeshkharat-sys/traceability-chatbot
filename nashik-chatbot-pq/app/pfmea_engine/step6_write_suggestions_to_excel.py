@@ -80,7 +80,7 @@ from pathlib import Path
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Border, PatternFill, Side
 
-from app.pfmea_engine.step2_normalize import detect_legacy_layout
+from app.pfmea_engine.layouts import find_header_row
 
 # XML 1.0's legal character set is narrow: #x9 (tab) | #xA (LF) | #xD (CR) |
 # [#x20-#xD7FF] | [#xE000-#xFFFD] | [#x10000-#x10FFFF] - everything else is
@@ -538,11 +538,9 @@ def apply_suggestions_to_sheet(ws, rows, cause_to_modes=None, cause_by_mode=None
             header_row = r
             break
     if header_row is None:
-        # Legacy compact PFMEA layout has no "(FM)" wording - reuse the same
-        # detector the reader (step2) used so both agree on the header row.
-        legacy = detect_legacy_layout(ws)
-        if legacy is not None:
-            header_row = legacy[0]
+        # Other plant layouts (e.g. Chakan) have no "(FM)" wording - ask the
+        # layout registry, the same detector the reader used, so both agree.
+        header_row = find_header_row(ws)
     if header_row is None:
         log(f"ERROR: could not find the header row (no cell containing 'Failure Mode (FM)') in sheet '{ws.title}'.")
         return None

@@ -37,8 +37,9 @@ async def list_sheets(file: UploadFile = File(...)):
     /analyze so the user can choose which sheet(s) to spend LLM calls on."""
     try:
         file_bytes = await file.read()
-        sheet_names = get_service().list_sheet_names(file_bytes)
-        return {"sheets": sheet_names}
+        # "sheets" stays a plain list of names (existing clients); the
+        # per-sheet detected layout and the selectable formats ride along.
+        return get_service().inspect_workbook(file_bytes)
     except Exception as e:
         logger.exception("PFMEA sheet listing failed")
         raise HTTPException(status_code=400, detail=f"Could not read workbook: {e}")
@@ -49,6 +50,7 @@ async def analyze(
     file: UploadFile = File(...),
     sheet_names: Optional[str] = Form(None),
     repeat: int = Form(3),
+    layout: str = Form("auto"),
 ):
     """Start the AI review pipeline in the background and return a token.
 
@@ -72,9 +74,13 @@ async def analyze(
             else None
         )
         token = get_service().start_analysis(
-            file_bytes, sheet_names=requested_sheets, repeat=repeat
+            file_bytes, sheet_names=requested_sheets, repeat=repeat, layout=layout
         )
         return {"token": token}
+    except ValueError as e:
+        # LayoutMismatch (unknown format / no PFMEA rows found) is the
+        # caller's input problem, not a server fault.
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("PFMEA analysis failed to start")
         raise HTTPException(status_code=500, detail=f"PFMEA analysis failed to start: {e}")

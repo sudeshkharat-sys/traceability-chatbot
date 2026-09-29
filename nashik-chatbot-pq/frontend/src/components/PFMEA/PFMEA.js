@@ -191,6 +191,9 @@ function PFMEA() {
   const [sheetNames, setSheetNames] = useState([]);
   const [selectedSheets, setSelectedSheets] = useState([]);
   const [scope, setScope] = useState('all'); // 'all' | 'select'
+  const [layout, setLayout] = useState('auto'); // 'auto' | a layout id from the backend registry
+  const [layouts, setLayouts] = useState([]); // [{ id, label }] selectable sheet formats
+  const [sheetLayouts, setSheetLayouts] = useState({}); // { sheetName: layoutId | null } as auto-detected
   const [repeat, setRepeat] = useState(3); // 1 ("None") - 5 independent AI passes per row
   const [loadingSheets, setLoadingSheets] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
@@ -229,11 +232,15 @@ function PFMEA() {
     setError('');
     setSheetNames([]);
     setSelectedSheets([]);
+    setLayout('auto');
+    setSheetLayouts({});
     setScope('all');
     setLoadingSheets(true);
     try {
       const res = await pfmeaApi.listSheets(chosen);
       setSheetNames(res.data.sheets || []);
+      setLayouts(res.data.layouts || []);
+      setSheetLayouts(res.data.sheet_layouts || {});
     } catch (err) {
       setError(err?.response?.data?.detail || 'Could not read that workbook.');
     } finally {
@@ -307,7 +314,7 @@ function PFMEA() {
     setProgress({ completed_rows: 0, total_rows: 0, current_sheet: null, current_failure_mode: null });
     try {
       const sheetsToRun = scope === 'all' ? [] : selectedSheets;
-      const res = await pfmeaApi.startAnalysis(file, sheetsToRun, repeat);
+      const res = await pfmeaApi.startAnalysis(file, sheetsToRun, repeat, layout);
       setRunToken(res.data.token);
       pollProgress(res.data.token);
     } catch (err) {
@@ -403,6 +410,22 @@ function PFMEA() {
               </div>
 
               <div className="pfmea-option-group">
+                <label className="pfmea-option-label" htmlFor="pfmea-layout-select">Sheet format</label>
+                <select
+                  id="pfmea-layout-select"
+                  className="pfmea-repeat-select"
+                  value={layout}
+                  onChange={(e) => setLayout(e.target.value)}
+                  disabled={analyzing}
+                >
+                  <option value="auto">Auto-detect (recommended)</option>
+                  {layouts.map((l) => (
+                    <option key={l.id} value={l.id}>{l.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="pfmea-option-group">
                 <label className="pfmea-option-label" htmlFor="pfmea-repeat-select">AI passes per row</label>
                 <select
                   id="pfmea-repeat-select"
@@ -444,6 +467,9 @@ function PFMEA() {
                     onClick={() => toggleSheet(name)}
                   >
                     {name}
+                    <span className="pfmea-sheet-format">
+                      {(layouts.find((l) => l.id === sheetLayouts[name]) || {}).label || 'not recognized'}
+                    </span>
                   </button>
                 ))}
               </div>

@@ -375,6 +375,7 @@ def run_pipeline(
     cancel_check=None,
     progress_callback=None,
     row_started_callback=None,
+    layout="auto",
 ):
     """Core of the pipeline, callable directly (e.g. from a UI) instead of
     only via the CLI below. Returns the output Path on success.
@@ -485,7 +486,7 @@ def run_pipeline(
 
         log(f"\n=== {sheet_name} ===")
         ws = wb[sheet_name]
-        _columns, records = normalize_sheet(ws)
+        _columns, records = normalize_sheet(ws, layout)
         entries = [build_entry(record, reference_lookup) for record in records]
 
         if not entries:

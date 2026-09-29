@@ -16,13 +16,14 @@ export const pfmeaApi = {
   // once it reports done/cancelled. Replaces the old single long-lived
   // request, which had no way to show real progress and could only be
   // "cancelled" by dropping the connection.
-  startAnalysis: (file, sheetNames, repeat = 3) => {
+  startAnalysis: (file, sheetNames, repeat = 3, layout = 'auto') => {
     const formData = new FormData();
     formData.append('file', file);
     if (sheetNames && sheetNames.length) {
       formData.append('sheet_names', sheetNames.join(','));
     }
     formData.append('repeat', repeat);
+    formData.append('layout', layout);
     return axios.post(`${BASE_URL}/analyze`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });

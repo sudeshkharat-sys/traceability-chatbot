@@ -27,6 +27,7 @@ from typing import Optional
 from openpyxl import load_workbook
 
 from app.pfmea_engine.run_pipeline import run_pipeline
+from app.pfmea_engine.layouts import LayoutMismatch, available_layouts, detect_layout, get_layout
 from app.pfmea_engine.step2_normalize import normalize_sheet
 
 logger = logging.getLogger(__name__)
@@ -75,7 +76,31 @@ def list_sheet_names(file_bytes: bytes) -> list[str]:
         return sheet_names
 
 
-def _count_total_rows(source_path: Path, sheet_names: Optional[list[str]]) -> int:
+def inspect_workbook(file_bytes: bytes) -> dict:
+    """Sheet names plus the sheet layout detected for each (Nashik AIAG-VDA,
+    Chakan RPN, ... see app.pfmea_engine.layouts), so the UI can show what
+    each tab was recognized as and offer a manual override. Needs a normal
+    (non read-only) load - detection reads merged cells. `layout` is None for
+    tabs nothing recognizes (cover pages, process flow, Control Plans)."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir) / "input.xlsx"
+        tmp_path.write_bytes(file_bytes)
+        wb = load_workbook(tmp_path, data_only=True)
+        try:
+            sheets = []
+            for ws in wb.worksheets:
+                layout_id = detect_layout(ws)
+                sheets.append({"name": ws.title, "layout": layout_id})
+            return {
+                "sheets": [s["name"] for s in sheets],
+                "sheet_layouts": {s["name"]: s["layout"] for s in sheets},
+                "layouts": available_layouts(),
+            }
+        finally:
+            wb.close()
+
+
+def _count_total_rows(source_path: Path, sheet_names: Optional[list[str]], layout: str = "auto") -> int:
     """How many Failure Mode entries the run will score, across every
     requested sheet - computed with the same normalize_sheet() the real
     pipeline uses (so it's the true count, not raw Excel rows), just
@@ -93,7 +118,7 @@ def _count_total_rows(source_path: Path, sheet_names: Optional[list[str]]) -> in
         for name in names:
             if name not in wb.sheetnames:
                 continue
-            _columns, records = normalize_sheet(wb[name])
+            _columns, records = normalize_sheet(wb[name], layout)
             total += len(records)
         return total
     finally:
@@ -105,6 +130,7 @@ def start_analysis(
     sheet_names: Optional[list[str]] = None,
     repeat: int = 3,
     merge_mode: bool = True,
+    layout: str = "auto",
 ) -> str:
     """Kick off the AI review pipeline in a background thread and return a
     token immediately - the caller polls get_progress(token) for live
@@ -115,7 +141,18 @@ def start_analysis(
     source_path.write_bytes(file_bytes)
     output_path = Path(tmp_dir) / "output.xlsx"
 
-    total_rows = _count_total_rows(source_path, sheet_names)
+    if layout not in ("auto", "", None):
+        get_layout(layout)  # raises LayoutMismatch for an unknown id
+    total_rows = _count_total_rows(source_path, sheet_names, layout)
+    if total_rows == 0:
+        detected = inspect_workbook(file_bytes)["sheet_layouts"]
+        summary = ", ".join(f"'{n}': {l or 'not recognized'}" for n, l in detected.items())
+        raise LayoutMismatch(
+            "No failure-mode rows were found in the selected sheet(s). "
+            f"Selected format: {layout or 'auto'}. Detected per sheet - {summary}. "
+            "Check that this is a PFMEA sheet (not a Control Plan / process flow) "
+            "and that the plant format matches."
+        )
 
     token = uuid.uuid4().hex
     cancel_event = threading.Event()
@@ -164,6 +201,7 @@ def start_analysis(
                 repeat=repeat,
                 output_path=output_path,
                 merge_mode=merge_mode,
+                layout=layout,
                 log=logger.info,
                 all_rows_out=all_rows,
                 usage_rows=usage_rows,
