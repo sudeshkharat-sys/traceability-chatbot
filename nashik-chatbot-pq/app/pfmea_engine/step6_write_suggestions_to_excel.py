@@ -357,6 +357,13 @@ def build_mode_occurrence_map(rows):
     return occurrences
 
 
+def _as_int(value):
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
+
 def build_remark(row, cause_to_modes, this_cause, mode_occurrences=None, merge_mode=False):
     """Short, single-cell Remark text: notes merged failure modes, any
     cause/mode mismatch or ambiguity flag, plant-vs-AI disagreement, and
@@ -392,6 +399,32 @@ def build_remark(row, cause_to_modes, this_cause, mode_occurrences=None, merge_m
 
     if not row.get("agree"):
         parts.append(f"AI severity ({row['ai_suggested_severity']}) differs from plant-recorded ({row['plant_recorded_severity']}) - review recommended.")
+
+    # Detection is compared the same way Severity is above - previously only
+    # Severity disagreements were ever surfaced, so a reviewer had no way to
+    # see that the AI rated the EXISTING Detection Control differently from
+    # the plant's recorded D (the AI reads the recorded control text against
+    # the AIAG-VDA table, and takes the not-proven reading of a method when
+    # the sheet doesn't say it is proven - so it commonly scores one or more
+    # points worse than a plant's own D).
+    plant_d = _as_int(row.get("plant_recorded_detection"))
+    ai_d = _as_int(row.get("ai_suggested_detection"))
+    if plant_d is not None and ai_d is not None and ai_d != plant_d:
+        direction = "weaker (harder to catch)" if ai_d > plant_d else "stronger (easier to catch)"
+        basis = (row.get("ai_detection_matched_table_definition") or "").strip()
+        if len(basis) > 220:
+            basis = basis[:217].rstrip() + "..."
+        parts.append(
+            f"AI Detection ({ai_d}) differs from plant-recorded ({plant_d}) - AI rates the existing Detection Control as {direction} than recorded"
+            + (f" (table match: {basis})" if basis else "")
+            + ". Review recommended."
+        )
+    projected_d = _as_int(row.get("ai_projected_detection_after_recommendation"))
+    if plant_d is not None and projected_d is not None and projected_d >= plant_d:
+        parts.append(
+            f"Recommended detection control projects D={projected_d}, which does not improve on the plant-recorded D={plant_d} - "
+            "it only helps if the existing control is really weaker than recorded."
+        )
 
     if this_cause:
         normalized = normalize_cause_text(this_cause)
