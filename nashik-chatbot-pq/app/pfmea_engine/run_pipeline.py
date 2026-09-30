@@ -35,6 +35,7 @@ from pathlib import Path
 
 from openpyxl import load_workbook
 
+from app.pfmea_engine.layouts.convert import convert_workbook_to_nashik
 from app.pfmea_engine.step2_normalize import normalize_sheet
 from app.pfmea_engine.step3b_explain_scores import load_reference_lookup
 from app.pfmea_engine.step3c_to_json import build_entry
@@ -455,6 +456,15 @@ def run_pipeline(
             "for retrieval-quality preview/checks, just not wired into scoring.\n"
         )
     log(f"Severity reference source: {severity_source}\n")
+
+    # Any sheet that is not already Nashik AIAG-VDA format (e.g. Chakan RPN)
+    # is rebuilt in Nashik format first, so scoring and write-back below only
+    # ever deal with the Nashik layout. The upload itself is left untouched.
+    converted_path = output_path.with_name(f"{output_path.stem}__nashik_input.xlsx")
+    converted = convert_workbook_to_nashik(source_path, converted_path, layout=layout, log=log)
+    if converted:
+        source_path = converted_path
+        layout = "nashik_vda"
 
     log(f"Loading {source_path} ...")
     wb = load_workbook(source_path, data_only=True)
