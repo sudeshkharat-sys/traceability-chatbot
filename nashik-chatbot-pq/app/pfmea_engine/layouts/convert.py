@@ -168,6 +168,38 @@ def _merge_like_nashik(ws, first_row, last_row):
                            end_row=first_row + end, end_column=last)
 
 
+def _fit_row_heights(ws, first_row, last_row):
+    """Excel never auto-grows rows that hold merged cells, so wrapped text
+    (Failure Effect's "Your Plant: ... End User: ..." etc.) would show only its
+    first line. Size each row so every cell's full text fits; a cell merged
+    over several rows shares its needed height across them."""
+    def width_of(col_first, col_last):
+        return sum(ws.column_dimensions[get_column_letter(c)].width or 14 for c in range(col_first, col_last + 1))
+
+    spans = {}
+    for merged in ws.merged_cells.ranges:
+        if merged.min_row >= first_row:
+            spans[(merged.min_row, merged.min_col)] = merged
+    height = {r: 15.0 for r in range(first_row, last_row + 1)}
+    for r in range(first_row, last_row + 1):
+        for c in range(1, 39):
+            value = ws.cell(row=r, column=c).value
+            if value is None or isinstance(value, (int, float)):
+                continue
+            merged = spans.get((r, c))
+            r_end, c_end = (merged.max_row, merged.max_col) if merged else (r, c)
+            chars = max(8, int(width_of(c, c_end) * 1.05))
+            lines = sum(max(1, -(-len(part) // chars)) for part in str(value).split("\n"))
+            needed = lines * 12.5 + 3
+            have = sum(height[x] for x in range(r, r_end + 1))
+            if needed > have:
+                extra = (needed - have) / (r_end - r + 1)
+                for x in range(r, r_end + 1):
+                    height[x] += extra
+    for r, h in height.items():
+        ws.row_dimensions[r].height = min(h, 409)
+
+
 def _write_nashik_sheet(ws, records, info=None):
     """Fill an empty worksheet with the Nashik header (rows 13-17) and one
     data row per record from row 18."""
@@ -244,6 +276,7 @@ def _write_nashik_sheet(ws, records, info=None):
         if first in (13, 18, 20, 23):
             ws.column_dimensions[get_column_letter(first)].width = 40
 
+    _fit_row_heights(ws, 18, 18 + len(records) - 1)
 
 def convert_workbook_to_nashik(source_path, dest_path, layout="auto", log=print, info_out=None):
     """Save a copy of the workbook at dest_path where every PFMEA sheet that
