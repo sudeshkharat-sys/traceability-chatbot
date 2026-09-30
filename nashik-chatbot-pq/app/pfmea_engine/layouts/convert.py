@@ -14,7 +14,6 @@ from openpyxl.styles import Alignment, Border, PatternFill, Side, Font
 from openpyxl.utils import get_column_letter
 
 from app.pfmea_engine.layouts import LAYOUTS, get_layout, nashik_vda
-from app.pfmea_engine.layouts.ap import action_priority
 
 _GROUPS = [
     ("Structure Analysis (Step2)", 1, 6),
@@ -225,17 +224,14 @@ def _write_nashik_sheet(ws, records, info=None):
         # Work Element (6M) is left blank: the source has no such data.
         if info.get("aggregatepartdescrptn"):
             ws.cell(row=row, column=1, value=info["aggregatepartdescrptn"])
-        # Action Priority is derived, never copied: Nashik has no RPN.
-        risk = [ws.cell(row=row, column=c).value for c in (15, 22, 25)]
-        ws.cell(row=row, column=26, value=action_priority(*risk))
+        # Action Priority is left blank: the source has RPN, not AP, and only
+        # data present in the input is filled.
         # The plant's own action tracking, into the matching optimization columns.
         extra = record.get("_extra") or {}
         for role, col in (("recommended", 28), ("responsibility", 30), ("action_taken", 33),
                           ("sev_after", 35), ("occ_after", 36), ("det_after", 37)):
             if extra.get(role) is not None:
                 ws.cell(row=row, column=col, value=extra[role])
-        after = [ws.cell(row=row, column=c).value for c in (35, 36, 37)]
-        ws.cell(row=row, column=38, value=action_priority(*after))
         for first, last, _t in _FIELDS:
             for c in range(first, last + 1):
                 cell = ws.cell(row=row, column=c)
