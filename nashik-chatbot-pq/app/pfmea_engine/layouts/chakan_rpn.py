@@ -91,6 +91,18 @@ def _detect_context(ws):
                 role = "detection_ctrl"
             elif text == "DETECTION":
                 role = "detection"
+            elif text.startswith("RECOMMENDED"):
+                role = "recommended"
+            elif text.startswith("RESPONSIBILITY"):
+                role = "responsibility"
+            elif text.startswith("ACTIONRESULTS") or text.startswith("ACTIONTAKEN"):
+                role = "action_taken"
+            elif text == "SEV":
+                role = "sev_after"
+            elif text == "OCC":
+                role = "occ_after"
+            elif text == "DET":
+                role = "det_after"
             # first match wins: the sheet may repeat "Operation No" etc. in a
             # trailing tracking block far to the right
             if role and role not in cols:
@@ -155,6 +167,13 @@ def normalize(ws, layout=None):
             continue
         severity = cell(row, "severity")
         record = {"_source_rows": [row], "_is_cause_merge_end": True}
+        # Not part of the scoring fields; carried only so the Nashik converter
+        # can keep the plant's own Operation No and action-tracking data.
+        if cell(row, "op_no") is not None:
+            carry["op_no"] = cell(row, "op_no")
+        record["_op_no"] = carry.get("op_no")
+        record["_extra"] = {r: cell(row, r) for r in (
+            "recommended", "responsibility", "action_taken", "sev_after", "occ_after", "det_after")}
         values = {
             "step": carry["step"],
             "requirements": carry["requirements"],
@@ -176,6 +195,39 @@ def normalize(ws, layout=None):
             record[("Structure Analysis (Step2)", field)] = None
         rows.append(record)
     return columns, rows
+
+
+def header_info(ws):
+    """Plant / document details from the band above the column headers
+    ("Plant : Chakan", "Model : U171 ...", "Rev. No : 1" ...), keyed by a
+    normalized label, plus the Cross Functional Team names listed under their
+    own heading. Used by the Nashik converter to fill the title block."""
+    ctx = _detect_context(ws)
+    if ctx is None:
+        return {}
+    info, team_col = {}, None
+    for row in range(1, ctx[0]):
+        for col in range(1, ws.max_column + 1):
+            value = ws.cell(row=row, column=col).value
+            if not isinstance(value, str) or not value.strip():
+                continue
+            text = value.strip()
+            if text.lower().startswith("cross functional team"):
+                team_col, team_row = col, row
+                continue
+            label, sep, rest = text.partition(":")
+            key = re.sub(r"[^a-z0-9]", "", label.lower())
+            if sep and rest.strip() and key not in info:
+                info[key] = rest.strip()
+            elif not sep and col > 4 and "company" not in info and ("ltd" in text.lower() or "limited" in text.lower()):
+                info["company"] = text
+    if team_col is not None:
+        names = [str(ws.cell(row=r, column=team_col).value).strip()
+                 for r in range(team_row + 1, ctx[0])
+                 if ws.cell(row=r, column=team_col).value]
+        if names:
+            info["team"] = ", ".join(names)
+    return info
 
 
 def detect(ws):

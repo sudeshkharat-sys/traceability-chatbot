@@ -14,6 +14,7 @@ from openpyxl.styles import Alignment, Border, PatternFill, Side, Font
 from openpyxl.utils import get_column_letter
 
 from app.pfmea_engine.layouts import LAYOUTS, get_layout, nashik_vda
+from app.pfmea_engine.layouts.ap import action_priority
 
 _GROUPS = [
     ("Structure Analysis (Step2)", 1, 6),
@@ -62,12 +63,56 @@ _PINK, _GREEN = "FFF769BE", "FF009900"
 _GROUP_FILL = "FFFFC000"
 
 
-def _write_nashik_sheet(ws, records):
+# Nashik title block: (label cell, value cell) pairs; A-C / D-F / G-H are merged
+# three / three / two wide like the template.
+_TITLE_BLOCK = [
+    ("A5", "Company Name ", "A6", "company"),
+    ("A7", "Manufacturing Location", "A8", "plant"),
+    ("A9", "Customer Name ", "A10", None),
+    ("A11", "Model Year / Program", "A12", "model"),
+    ("D5", "Subject ", "D6", "partnameprocess"),
+    ("D7", "PFMEA Start Date", "D8", "fmeadateorig"),
+    ("D9", "PFMEA Revision Date", "D10", "revdate"),
+    ("D11", "Cross Functional Team", "D12", "team"),
+    ("G5", "PFMEA ID Number", "G6", "docno"),
+    ("G7", "Process Responsibility", "G8", "responsibility"),
+    ("G9", "PFMEA Rev No", "G10", "revno"),
+    ("G11", "Confidential Level", "G12", None),
+]
+
+
+def _write_title_block(ws, info):
+    """Fill the Nashik title block from whatever the source sheet carried;
+    fields the source has no equivalent for stay blank."""
+    info = dict(info)
+    reviewed, approved = info.get("reviewedby"), info.get("approvedby")
+    if reviewed or approved:
+        info["responsibility"] = "; ".join(
+            x for x in (f"Reviewed by: {reviewed}" if reviewed else None,
+                        f"Approved by: {approved}" if approved else None) if x)
+    ws.cell(row=3, column=1, value="Planning and Preparation (Step 1)")
+    ws.merge_cells("A3:H4")
+    for label_ref, label, value_ref, key in _TITLE_BLOCK:
+        width = 3 if label_ref[0] in "AD" else 2
+        for ref, text in ((label_ref, label), (value_ref, info.get(key) if key else None)):
+            cell = ws[ref]
+            cell.value = text
+            cell.alignment = Alignment(wrap_text=True, vertical="center")
+            cell.border = _BORDER
+            if text is not None and ref == label_ref:
+                cell.font = Font(bold=True)
+            end = cell.column + width - 1
+            ws.merge_cells(start_row=cell.row, start_column=cell.column, end_row=cell.row, end_column=end)
+
+
+def _write_nashik_sheet(ws, records, info=None):
     """Fill an empty worksheet with the Nashik header (rows 13-17) and one
     data row per record from row 18."""
     ws.cell(row=1, column=1, value="Process Failure Mode and Effects Analysis (Converted to Nashik AIAG-VDA format)")
     ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=20)
     ws.cell(row=1, column=1).font = Font(bold=True, size=14)
+
+    _write_title_block(ws, info or {})
 
     for name, first, last in _GROUPS:
         ws.merge_cells(start_row=13, start_column=first, end_row=14, end_column=last)
@@ -105,6 +150,21 @@ def _write_nashik_sheet(ws, records):
             if col is None or value is None:
                 continue
             ws.cell(row=row, column=col, value=value)
+        # Nashik's Step column is "Station No. and Name": keep the Operation No.
+        op_no, step = record.get("_op_no"), ws.cell(row=row, column=3).value
+        if op_no is not None and step is not None:
+            ws.cell(row=row, column=3, value=f"{op_no} - {step}")
+        # Action Priority is derived, never copied: Nashik has no RPN.
+        risk = [ws.cell(row=row, column=c).value for c in (15, 22, 25)]
+        ws.cell(row=row, column=26, value=action_priority(*risk))
+        # The plant's own action tracking, into the matching optimization columns.
+        extra = record.get("_extra") or {}
+        for role, col in (("recommended", 28), ("responsibility", 30), ("action_taken", 33),
+                          ("sev_after", 35), ("occ_after", 36), ("det_after", 37)):
+            if extra.get(role) is not None:
+                ws.cell(row=row, column=col, value=extra[role])
+        after = [ws.cell(row=row, column=c).value for c in (35, 36, 37)]
+        ws.cell(row=row, column=38, value=action_priority(*after))
         for first, last, _t in _FIELDS:
             for c in range(first, last + 1):
                 cell = ws.cell(row=row, column=c)
@@ -138,18 +198,19 @@ def convert_workbook_to_nashik(source_path, dest_path, layout="auto", log=print,
             continue
         _cols, records = module.normalize(ws)
         if records:
-            plan.append((ws.title, module.LABEL, records))
+            header = getattr(module, "header_info", None)
+            plan.append((ws.title, module.LABEL, records, header(ws) if header else {}))
     if not plan:
         return []
 
     out = load_workbook(source_path, rich_text=True)
-    for title, label, records in plan:
+    for title, label, records, info in plan:
         index = out.sheetnames.index(title)
         del out[title]
         new_ws = out.create_sheet(title, index)
-        _write_nashik_sheet(new_ws, records)
+        _write_nashik_sheet(new_ws, records, info)
         log(f"Converted '{title}' from {label} to Nashik AIAG-VDA format ({len(records)} rows)")
     out.save(dest_path)
     if info_out is not None:
-        info_out.extend({"title": t, "label": l, "records": r} for t, l, r in plan)
-    return [t for t, _l, _r in plan]
+        info_out.extend({"title": t, "label": l, "records": r} for t, l, r, _i in plan)
+    return [t for t, _l, _r, _i in plan]

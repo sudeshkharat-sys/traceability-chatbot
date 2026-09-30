@@ -27,6 +27,7 @@ from typing import Optional
 from openpyxl import load_workbook
 
 from app.pfmea_engine.run_pipeline import run_pipeline
+from app.pfmea_engine.layouts.ap import action_priority
 from app.pfmea_engine.layouts.convert import convert_workbook_to_nashik
 from app.pfmea_engine.layouts import LayoutMismatch, available_layouts, detect_layout, get_layout
 from app.pfmea_engine.step2_normalize import normalize_sheet
@@ -143,6 +144,9 @@ def convert_to_nashik(file_bytes: bytes, layout: str = "auto") -> dict:
                    "effect_before": rec.get("_raw_effect")}
             for key, field in _PREVIEW_FIELDS:
                 row[key] = next((v for k, v in rec.items() if isinstance(k, tuple) and k[1] == field), None)
+            if rec.get("_op_no") is not None and row["step"] is not None:
+                row["step"] = f"{rec['_op_no']} - {row['step']}"
+            row["action_priority"] = action_priority(row["severity"], row["occurrence"], row["detection"])
             row["effect_after"] = next((v for k, v in rec.items() if isinstance(k, tuple) and k[1] == _EFFECT_KEY), None)
             rows.append(row)
         sheets.append({"name": item["title"], "from_label": item["label"], "rows": rows})

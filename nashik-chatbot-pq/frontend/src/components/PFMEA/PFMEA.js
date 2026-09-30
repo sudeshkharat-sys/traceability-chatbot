@@ -202,7 +202,7 @@ function ConversionPreview({ conversion, confirmed, onConfirm, onDiscard }) {
             <tr>
               <th>Src row</th><th>Step</th><th>Failure Effect (original → Nashik)</th><th>S</th>
               <th>Failure Mode</th><th>Failure Cause</th><th>Prevention</th><th>O</th>
-              <th>Detection control</th><th>D</th>
+              <th>Detection control</th><th>D</th><th>AP</th>
             </tr>
           </thead>
           <tbody>
@@ -221,6 +221,7 @@ function ConversionPreview({ conversion, confirmed, onConfirm, onDiscard }) {
                 <td>{r.occurrence}</td>
                 <td>{r.detection_ctrl}</td>
                 <td>{r.detection}</td>
+                <td>{r.action_priority}</td>
               </tr>
             ))}
           </tbody>
