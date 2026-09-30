@@ -9,6 +9,8 @@ one unmerged row per failure cause with context repeated on every row, which
 the Nashik reader handles the same as merged cells.
 """
 
+import re
+
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Border, PatternFill, Side, Font
 from openpyxl.utils import get_column_letter
@@ -105,10 +107,72 @@ def _write_title_block(ws, info):
             ws.merge_cells(start_row=cell.row, start_column=cell.column, end_row=cell.row, end_column=end)
 
 
+_CAUSE_FIELD = "3. Failure Cause (FC) of the Work Element"
+
+# Keyword -> 6M category for the Work Element column. The old form has no such
+# column, so this is a best-effort reading of the cause text; a cause that
+# matches nothing is left blank rather than guessed.
+_SIX_M = [
+    ("Man", r"human|operator|\bsop\b|not follow|not ensure|not fully|not ref|improper handling|miss"),
+    ("Machine", r"tool|torque|socket|\bbit\b|print|cartridge|machine|sensor|scanner|equipment|fixture|gauge"),
+    ("Material", r"screw|biw|part defect|cross fitment|material|supplier|bought"),
+    ("Method", r"method|procedure|sequence|process not"),
+    ("Measurement", r"measure|calibrat"),
+    ("Mother earth (Environment)", r"environment|temperature|humidity|dust|lighting"),
+]
+
+
+def infer_work_element(cause):
+    text = str(cause).lower() if cause else ""
+    for label, pattern in _SIX_M:
+        if re.search(pattern, text):
+            return label
+    return None
+
+
+def _runs(values):
+    """(start, end) index pairs of consecutive equal values."""
+    runs, start = [], 0
+    for i in range(1, len(values) + 1):
+        if i == len(values) or values[i] != values[start]:
+            runs.append((start, i - 1))
+            start = i
+    return runs
+
+
+def _merge_like_nashik(ws, first_row, last_row):
+    """Merge repeated context the way the Nashik form does, instead of
+    repeating it on every cause row: Process Item / its function over the whole
+    sheet, Step and its Function per consecutive run, and Effect + Severity +
+    Failure Mode + Special Characteristics once per failure-mode block.
+    Everything else (cause, controls, O, D, AP) stays one row each."""
+    rows = range(first_row, last_row + 1)
+
+    def col_values(col):
+        return [ws.cell(row=r, column=col).value for r in rows]
+
+    mode_block = list(zip(col_values(16), col_values(13), col_values(15)))
+    # field first-col -> grouping key per row (None = never merge vertically)
+    keys = {
+        1: [0] * len(rows), 7: [0] * len(rows), 11: None,
+        3: col_values(3), 9: list(zip(col_values(3), col_values(9))), 5: None,
+        13: mode_block, 15: mode_block, 16: mode_block, 27: mode_block,
+    }
+    for first, last, _t in _FIELDS:
+        key_list = keys.get(first)
+        runs = _runs(key_list) if key_list else [(i, i) for i in range(len(rows))]
+        for start, end in runs:
+            if start == end and last == first:
+                continue
+            ws.merge_cells(start_row=first_row + start, start_column=first,
+                           end_row=first_row + end, end_column=last)
+
+
 def _write_nashik_sheet(ws, records, info=None):
     """Fill an empty worksheet with the Nashik header (rows 13-17) and one
     data row per record from row 18."""
-    ws.cell(row=1, column=1, value="Process Failure Mode and Effects Analysis (Converted to Nashik AIAG-VDA format)")
+    info = info or {}
+    ws.cell(row=1, column=1, value="Process Failure Mode and Effects Analysis")
     ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=20)
     ws.cell(row=1, column=1).font = Font(bold=True, size=14)
 
@@ -150,10 +214,11 @@ def _write_nashik_sheet(ws, records, info=None):
             if col is None or value is None:
                 continue
             ws.cell(row=row, column=col, value=value)
-        # Nashik's Step column is "Station No. and Name": keep the Operation No.
-        op_no, step = record.get("_op_no"), ws.cell(row=row, column=3).value
-        if op_no is not None and step is not None:
-            ws.cell(row=row, column=3, value=f"{op_no} - {step}")
+        # Process Item (system/part) and the 6M Work Element, which the old form lacks.
+        if info.get("aggregatepartdescrptn"):
+            ws.cell(row=row, column=1, value=info["aggregatepartdescrptn"])
+        cause = next((v for k, v in record.items() if isinstance(k, tuple) and k[1] == _CAUSE_FIELD), None)
+        ws.cell(row=row, column=5, value=infer_work_element(cause))
         # Action Priority is derived, never copied: Nashik has no RPN.
         risk = [ws.cell(row=row, column=c).value for c in (15, 22, 25)]
         ws.cell(row=row, column=26, value=action_priority(*risk))
@@ -170,8 +235,8 @@ def _write_nashik_sheet(ws, records, info=None):
                 cell = ws.cell(row=row, column=c)
                 cell.border = _BORDER
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
-            if last > first:
-                ws.merge_cells(start_row=row, start_column=first, end_row=row, end_column=last)
+
+    _merge_like_nashik(ws, 18, 18 + len(records) - 1)
 
     for c in range(1, 39):
         ws.column_dimensions[get_column_letter(c)].width = 14
