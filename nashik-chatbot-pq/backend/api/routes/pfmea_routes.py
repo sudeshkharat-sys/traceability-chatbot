@@ -45,12 +45,39 @@ async def list_sheets(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=f"Could not read workbook: {e}")
 
 
+@router.post("/convert")
+async def convert(file: UploadFile = File(...), layout: str = Form("auto")):
+    """Convert non-Nashik sheets to Nashik format (no AI calls) and return a
+    before/after preview. Confirm it, then call /analyze with convert_token."""
+    try:
+        return get_service().convert_to_nashik(await file.read(), layout=layout)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception("PFMEA conversion failed")
+        raise HTTPException(status_code=500, detail=f"Conversion failed: {e}")
+
+
+@router.get("/converted/{token}")
+async def converted(token: str):
+    """The converted Nashik-format .xlsx, to open in Excel and check."""
+    data = get_service().get_converted(token)
+    if data is None:
+        raise HTTPException(status_code=404, detail="Converted file not found or expired")
+    return Response(
+        content=data,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=pfmea_nashik_format.xlsx"},
+    )
+
+
 @router.post("/analyze")
 async def analyze(
     file: UploadFile = File(...),
     sheet_names: Optional[str] = Form(None),
     repeat: int = Form(3),
     layout: str = Form("auto"),
+    convert_token: Optional[str] = Form(None),
 ):
     """Start the AI review pipeline in the background and return a token.
 
@@ -68,6 +95,12 @@ async def analyze(
         raise HTTPException(status_code=400, detail="repeat must be between 1 and 5")
     try:
         file_bytes = await file.read()
+        if convert_token:
+            # Run on the converted workbook the user already reviewed.
+            file_bytes = get_service().get_converted(convert_token)
+            if file_bytes is None:
+                raise HTTPException(status_code=400, detail="Converted file expired - convert again")
+            layout = "auto"
         requested_sheets = (
             [s.strip() for s in sheet_names.split(",") if s.strip()]
             if sheet_names
@@ -77,6 +110,8 @@ async def analyze(
             file_bytes, sheet_names=requested_sheets, repeat=repeat, layout=layout
         )
         return {"token": token}
+    except HTTPException:
+        raise
     except ValueError as e:
         # LayoutMismatch (unknown format / no PFMEA rows found) is the
         # caller's input problem, not a server fault.

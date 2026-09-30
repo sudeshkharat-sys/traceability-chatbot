@@ -27,6 +27,7 @@ from typing import Optional
 from openpyxl import load_workbook
 
 from app.pfmea_engine.run_pipeline import run_pipeline
+from app.pfmea_engine.layouts.convert import convert_workbook_to_nashik
 from app.pfmea_engine.layouts import LayoutMismatch, available_layouts, detect_layout, get_layout
 from app.pfmea_engine.step2_normalize import normalize_sheet
 
@@ -98,6 +99,58 @@ def inspect_workbook(file_bytes: bytes) -> dict:
             }
         finally:
             wb.close()
+
+
+# Converted workbooks waiting for the user's confirm-then-run, by token.
+_converted_cache: dict[str, bytes] = {}
+
+_PREVIEW_FIELDS = [
+    ("step", "2. Process Step Station No. and Name of\nFocus Element"),
+    ("severity", "Severity (S) of FE\n"),
+    ("mode", "2. Failure Mode (FM) of the\nFocus Element"),
+    ("cause", "3. Failure Cause (FC) of the Work Element"),
+    ("prevention", "Current Prevention Control (PC) of FC"),
+    ("occurrence", "Occurrence (O) of FC"),
+    ("detection_ctrl", "Current Detection Controls (DC) of FC or FM"),
+    ("detection", "Detection (D) of FC/FM"),
+]
+_EFFECT_KEY = "1. Failure Effects (FE) to the Next Higher Level Element and/or End User"
+
+
+def convert_to_nashik(file_bytes: bytes, layout: str = "auto") -> dict:
+    """Convert every non-Nashik PFMEA sheet to Nashik format WITHOUT running
+    any AI, and return a before/after preview so the user can confirm it
+    looks right before spending LLM calls. The converted workbook is cached
+    under convert_token: pass it to /analyze to run on it, or fetch it with
+    get_converted() to open in Excel."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        src = Path(tmp_dir) / "input.xlsx"
+        dst = Path(tmp_dir) / "converted.xlsx"
+        src.write_bytes(file_bytes)
+        info: list = []
+        if layout not in ("auto", "", None):
+            get_layout(layout)
+        converted = convert_workbook_to_nashik(src, dst, layout=layout, log=logger.info, info_out=info)
+        if not converted:
+            return {"converted": False, "sheets": []}
+        token = uuid.uuid4().hex
+        _converted_cache[token] = dst.read_bytes()
+    sheets = []
+    for item in info:
+        rows = []
+        for rec in item["records"]:
+            row = {"source_row": (rec.get("_source_rows") or [None])[0],
+                   "effect_before": rec.get("_raw_effect")}
+            for key, field in _PREVIEW_FIELDS:
+                row[key] = next((v for k, v in rec.items() if isinstance(k, tuple) and k[1] == field), None)
+            row["effect_after"] = next((v for k, v in rec.items() if isinstance(k, tuple) and k[1] == _EFFECT_KEY), None)
+            rows.append(row)
+        sheets.append({"name": item["title"], "from_label": item["label"], "rows": rows})
+    return {"converted": True, "convert_token": token, "sheets": sheets}
+
+
+def get_converted(token: str) -> Optional[bytes]:
+    return _converted_cache.get(token)
 
 
 def _count_total_rows(source_path: Path, sheet_names: Optional[list[str]], layout: str = "auto") -> int:

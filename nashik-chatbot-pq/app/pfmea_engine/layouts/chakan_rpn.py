@@ -170,6 +170,7 @@ def normalize(ws, layout=None):
         }
         for role, group, field, _t in role_fields:
             record[(group, field)] = values[role]
+        record["_raw_effect"] = values["effect"]  # for the convert preview (before/after)
         record[("Failure Analysis (Step4)", _EFFECT_FIELD)] = translate_effect(values["effect"])
         for field in _BLANK_FIELDS:
             record[("Structure Analysis (Step2)", field)] = None

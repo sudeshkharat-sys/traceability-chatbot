@@ -120,11 +120,13 @@ def _write_nashik_sheet(ws, records):
             ws.column_dimensions[get_column_letter(first)].width = 40
 
 
-def convert_workbook_to_nashik(source_path, dest_path, layout="auto", log=print):
+def convert_workbook_to_nashik(source_path, dest_path, layout="auto", log=print, info_out=None):
     """Save a copy of the workbook at dest_path where every PFMEA sheet that
     is not already Nashik format is rebuilt in Nashik format. Returns the
     list of converted sheet names (empty = nothing to convert; dest_path is
-    then not written). The original file is never modified."""
+    then not written). If info_out is a list, one {title, label, records}
+    dict per converted sheet is appended (for the UI preview). The original
+    file is never modified."""
     wb = load_workbook(source_path, data_only=True)
     plan = []
     for ws in wb.worksheets:
@@ -148,4 +150,6 @@ def convert_workbook_to_nashik(source_path, dest_path, layout="auto", log=print)
         _write_nashik_sheet(new_ws, records)
         log(f"Converted '{title}' from {label} to Nashik AIAG-VDA format ({len(records)} rows)")
     out.save(dest_path)
+    if info_out is not None:
+        info_out.extend({"title": t, "label": l, "records": r} for t, l, r in plan)
     return [t for t, _l, _r in plan]

@@ -16,7 +16,18 @@ export const pfmeaApi = {
   // once it reports done/cancelled. Replaces the old single long-lived
   // request, which had no way to show real progress and could only be
   // "cancelled" by dropping the connection.
-  startAnalysis: (file, sheetNames, repeat = 3, layout = 'auto') => {
+  // Converts non-Nashik sheets to Nashik format (no AI calls) and returns a
+  // before/after preview + convert_token to confirm and then run on.
+  convertToNashik: (file, layout = 'auto') => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('layout', layout);
+    return axios.post(`${BASE_URL}/convert`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  convertedUrl: (token) => `${BASE_URL}/converted/${token}`,
+  startAnalysis: (file, sheetNames, repeat = 3, layout = 'auto', convertToken = null) => {
     const formData = new FormData();
     formData.append('file', file);
     if (sheetNames && sheetNames.length) {
@@ -24,6 +35,7 @@ export const pfmeaApi = {
     }
     formData.append('repeat', repeat);
     formData.append('layout', layout);
+    if (convertToken) formData.append('convert_token', convertToken);
     return axios.post(`${BASE_URL}/analyze`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
