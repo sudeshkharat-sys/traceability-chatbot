@@ -9,8 +9,6 @@ one unmerged row per failure cause with context repeated on every row, which
 the Nashik reader handles the same as merged cells.
 """
 
-import re
-
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Border, PatternFill, Side, Font
 from openpyxl.utils import get_column_letter
@@ -105,29 +103,6 @@ def _write_title_block(ws, info):
                 cell.font = Font(bold=True)
             end = cell.column + width - 1
             ws.merge_cells(start_row=cell.row, start_column=cell.column, end_row=cell.row, end_column=end)
-
-
-_CAUSE_FIELD = "3. Failure Cause (FC) of the Work Element"
-
-# Keyword -> 6M category for the Work Element column. The old form has no such
-# column, so this is a best-effort reading of the cause text; a cause that
-# matches nothing is left blank rather than guessed.
-_SIX_M = [
-    ("Man", r"human|operator|\bsop\b|not follow|not ensure|not fully|not ref|improper handling|miss"),
-    ("Machine", r"tool|torque|socket|\bbit\b|print|cartridge|machine|sensor|scanner|equipment|fixture|gauge"),
-    ("Material", r"screw|biw|part defect|cross fitment|material|supplier|bought"),
-    ("Method", r"method|procedure|sequence|process not"),
-    ("Measurement", r"measure|calibrat"),
-    ("Mother earth (Environment)", r"environment|temperature|humidity|dust|lighting"),
-]
-
-
-def infer_work_element(cause):
-    text = str(cause).lower() if cause else ""
-    for label, pattern in _SIX_M:
-        if re.search(pattern, text):
-            return label
-    return None
 
 
 def _runs(values):
@@ -246,11 +221,10 @@ def _write_nashik_sheet(ws, records, info=None):
             if col is None or value is None:
                 continue
             ws.cell(row=row, column=col, value=value)
-        # Process Item (system/part) and the 6M Work Element, which the old form lacks.
+        # Process Item comes from the source's own "Aggregate Part Descrptn".
+        # Work Element (6M) is left blank: the source has no such data.
         if info.get("aggregatepartdescrptn"):
             ws.cell(row=row, column=1, value=info["aggregatepartdescrptn"])
-        cause = next((v for k, v in record.items() if isinstance(k, tuple) and k[1] == _CAUSE_FIELD), None)
-        ws.cell(row=row, column=5, value=infer_work_element(cause))
         # Action Priority is derived, never copied: Nashik has no RPN.
         risk = [ws.cell(row=row, column=c).value for c in (15, 22, 25)]
         ws.cell(row=row, column=26, value=action_priority(*risk))

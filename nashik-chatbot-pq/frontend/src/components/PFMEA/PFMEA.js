@@ -200,7 +200,7 @@ function ConversionPreview({ conversion, confirmed, onConfirm, onDiscard }) {
         <table className="pfmea-table">
           <thead>
             <tr>
-              <th>Src row</th><th>Step</th><th>Work element (inferred 6M)</th><th>Failure Effect (original → Nashik)</th><th>S</th>
+              <th>Src row</th><th>Step</th><th>Failure Effect (original → Nashik)</th><th>S</th>
               <th>Failure Mode</th><th>Failure Cause</th><th>Prevention</th><th>O</th>
               <th>Detection control</th><th>D</th><th>AP</th>
             </tr>
@@ -210,7 +210,6 @@ function ConversionPreview({ conversion, confirmed, onConfirm, onDiscard }) {
               <tr key={i}>
                 <td>{r.source_row}</td>
                 <td>{r.step}</td>
-                <td>{r.work_element}</td>
                 <td>
                   <div className="pfmea-before">{r.effect_before}</div>
                   <div className="pfmea-after">{r.effect_after}</div>
