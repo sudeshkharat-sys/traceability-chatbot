@@ -38,9 +38,11 @@ _WORKERS = 4
 _SYSTEM = (
     "You are an automotive process-FMEA engineer (AIAG-VDA). You complete blank "
     "columns of a PFMEA that is being migrated from an older plant format. "
-    "Use ONLY what the supplied rows imply; be concise and concrete (one short "
-    "sentence or phrase per cell, no marketing language). Never invent part "
-    "numbers, values or standards. Reply with a single JSON object and nothing else."
+    "STRICT RULES: use ONLY what the supplied text clearly states or directly implies. "
+    "If you are not sure about a cell, return null for it - an empty cell is far better than a guess. "
+    "Never invent part names, numbers, values, tools, standards or specifications that are not in the text; "
+    "reuse the plant's own wording where possible. Keep each cell to one short phrase or sentence. "
+    "Reply with a single JSON object and nothing else."
 )
 
 
@@ -62,6 +64,27 @@ def _clean(value):
     return text or None
 
 
+_CATEGORIES = ("man", "machine", "method", "material", "measurement", "environment")
+_NUM_RE = re.compile(r"\d+(?:\.\d+)?")
+
+
+def _grounded(text, source):
+    """Reject AI text that introduces numbers not present in the source rows
+    (invented torque values, part numbers, ...)."""
+    if not text:
+        return None
+    allowed = set(_NUM_RE.findall(source or ""))
+    return text if all(n in allowed for n in _NUM_RE.findall(text)) else None
+
+
+def _valid_work_element(text):
+    text = _clean(text)
+    if not text or ":" not in text:
+        return None
+    cat, _sep, name = text.partition(":")
+    return text if cat.strip().lower() in _CATEGORIES and name.strip() else None
+
+
 def _json_call(llm, prompt):
     from app.pfmea_engine.step5_severity_llm import call_llm
     return call_llm(llm, prompt)
@@ -73,8 +96,8 @@ def _sheet_prompt(info, steps):
     return (
         f"{_SYSTEM}\n\nProcess steps of this PFMEA (step -> its function, if given):\n{lines}\n"
         f"Part / process hint from the sheet header: {known or 'none'}\n\n"
-        "Return JSON: {\"process_item\": <name of the system / subsystem / process this PFMEA covers, "
-        "short>, \"function_of_process_item\": <what that process item must achieve overall, one sentence>}"
+        "Return JSON: {\"process_item\": <name of the system / process this PFMEA covers, taken from the hints/steps, "
+        "or null>, \"function_of_process_item\": <what it must achieve overall, one sentence, or null>}"
     )
 
 
@@ -89,10 +112,10 @@ def _step_prompt(step, fn, process_item, rows):
         f"{_SYSTEM}\n\nProcess item: {process_item or 'n/a'}\nProcess step: {step}\n"
         f"Function of the step: {fn or '(blank - please propose)'}\n\nFailure causes:\n{body}\n\n"
         "For each cause give the Process Work Element in 6M form \"<Category>: <specific element>\" where "
-        "Category is one of Man, Machine, Method, Material, Measurement, Environment (e.g. "
-        "\"Machine: Barcode scanner\", \"Man: Operator\"), and the function of that work element incl. the "
-        "process characteristic it controls (one short sentence).\n"
-        "Return JSON: {\"function_of_step\": <one sentence>, \"causes\": [{\"i\": <number>, "
+        "Category is one of Man, Machine, Method, Material, Measurement, Environment, ONLY when the cause/controls "
+        "clearly point to it (e.g. cause mentions a scanner -> \"Machine: Barcode scanner\"); otherwise null. "
+        "Give the function of that work element (what it must do, reusing the step's function) only if clear, else null.\n"
+        "Return JSON: {\"function_of_step\": <one sentence, or null if the step name alone does not make it clear>, \"causes\": [{\"i\": <number>, "
         "\"work_element\": <str>, \"function\": <str>}, ...]}"
     )
 
@@ -123,8 +146,9 @@ def fill_blanks(records, info, llm, log=print):
     fn_item = None
     try:
         data = _json_call(llm, _sheet_prompt(info, steps))
-        process_item = process_item or _clean(data.get("process_item"))
-        fn_item = _clean(data.get("function_of_process_item"))
+        hint = " ".join(str(v) for v in info.values() if v) + " " + " ".join(f"{x['step']} {x['fn'] or ''}" for x in steps)
+        process_item = process_item or _grounded(_clean(data.get("process_item")), hint)
+        fn_item = _grounded(_clean(data.get("function_of_process_item")), hint)
     except Exception as exc:  # noqa: BLE001 - never fail the whole conversion on AI
         note_failure(exc)
 
@@ -134,6 +158,8 @@ def fill_blanks(records, info, llm, log=print):
             ai[COL_PROCESS_ITEM] = process_item
         if fn_item:
             ai[COL_FN_ITEM] = fn_item
+
+    fn_src = {s: _clean(_get(records[ix[0]], _FN_STEP_KEY)) for s, ix in groups.items()}
 
     # 2) per step (chunked): Work Element, its function, step function
     jobs = []
@@ -158,17 +184,22 @@ def fill_blanks(records, info, llm, log=print):
             except Exception as exc:  # noqa: BLE001
                 note_failure(exc)
                 continue
-            fn_step = _clean(data.get("function_of_step"))
+            fn_step = _grounded(_clean(data.get("function_of_step")), step)
             for item in data.get("causes") or []:
                 try:
                     ix = idxs[int(item["i"])]
                 except (KeyError, ValueError, TypeError, IndexError):
                     continue
                 ai = records[ix].setdefault("_ai", {})
-                if _clean(item.get("work_element")):
-                    ai[COL_WORK_ELEMENT] = _clean(item["work_element"])
-                if _clean(item.get("function")):
-                    ai[COL_FN_WORK_ELEMENT] = _clean(item["function"])
+                source = " ".join(str(v) for v in (step, fn_src[step], _get(records[ix], _MODE_KEY),
+                                                   _get(records[ix], _CAUSE_KEY), _get(records[ix], _PREVENTION_KEY),
+                                                   _get(records[ix], _DETECTION_KEY)) if v)
+                we = _grounded(_valid_work_element(item.get("work_element")), source)
+                fn_we = _grounded(_clean(item.get("function")), source)
+                if we:
+                    ai[COL_WORK_ELEMENT] = we
+                if fn_we:
+                    ai[COL_FN_WORK_ELEMENT] = fn_we
             if fn_step:
                 for ix in idxs:
                     if _blank(_get(records[ix], _FN_STEP_KEY)):

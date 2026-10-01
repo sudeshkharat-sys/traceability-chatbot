@@ -270,8 +270,12 @@ def _write_nashik_sheet(ws, records, info=None):
 
 def _get_llm_or_none(log):
     try:
+        import os
         from app.pfmea_engine.step5_severity_llm import get_llm
-        return get_llm()
+        # Own setting, independent of the scoring model: GPT-5 (default) is
+        # better at leaving a cell empty when unsure; gpt4omini also works.
+        return get_llm(profile=os.environ.get("PFMEA_CONVERT_LLM_PROFILE", "gpt5"),
+                       reasoning_effort=os.environ.get("PFMEA_CONVERT_REASONING_EFFORT", "low"))
     except Exception as exc:  # noqa: BLE001 - missing credentials etc. must not block conversion
         log(f"AI gap-fill unavailable ({exc}); blank columns left empty.")
         return None

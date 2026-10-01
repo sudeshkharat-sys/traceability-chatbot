@@ -441,7 +441,7 @@ def _load_dotenv_into_environ():
             os.environ.setdefault(key, value)
 
 
-def get_llm():
+def get_llm(profile=None, reasoning_effort=None):
     """Build the chat model for whichever profile LLM_MODEL_PROFILE selects.
 
     The pipeline started out hardcoded to the single Azure "gpt-5" reasoning
@@ -458,7 +458,7 @@ def get_llm():
 
     _load_dotenv_into_environ()
 
-    profile = os.environ.get("LLM_MODEL_PROFILE", "gpt5").strip().lower()
+    profile = (profile or os.environ.get("LLM_MODEL_PROFILE", "gpt5")).strip().lower()
     api_key = os.environ.get("AZURE_API_KEY")
 
     if profile == "gpt5":
@@ -527,7 +527,7 @@ def get_llm():
     if profile == "gpt5":
         # reasoning_effort is a GPT-5-reasoning-only parameter; other
         # deployments (non-reasoning models like Llama) reject it.
-        kwargs["reasoning_effort"] = os.environ.get("REASONING_EFFORT", "medium")
+        kwargs["reasoning_effort"] = reasoning_effort or os.environ.get("REASONING_EFFORT", "medium")
 
     return AzureChatOpenAI(**kwargs)
 
