@@ -331,3 +331,32 @@ def convert_workbook_to_nashik(source_path, dest_path, layout="auto", log=print,
     if info_out is not None:
         info_out.extend({"title": t, "label": l, "records": r, "ai": ai_status.get(t)} for t, l, r, _i in plan)
     return [t for t, _l, _r, _i in plan]
+
+
+def sheet_grid(ws, first_row=18):
+    """The converted sheet as a plain grid the UI can draw like Excel:
+    headers (group band + field names) and rows of cells with rowspan, so the
+    merged Nashik blocks look the same in the browser as in the file."""
+    merged = {(m.min_row, m.min_col): m for m in ws.merged_cells.ranges if m.min_row >= first_row}
+    covered = set()
+    for m in merged.values():
+        for r in range(m.min_row + 1, m.max_row + 1):
+            covered.add((r, m.min_col))
+    groups = []
+    for name, g_first, g_last in _GROUPS:
+        n = sum(1 for first, _l, _t in _FIELDS if g_first <= first <= g_last)
+        groups.append({"text": name.split(" (")[0], "span": n})
+    headers = [" ".join(text.split()) for _f, _l, text in _FIELDS]
+    rows = []
+    for r in range(first_row, ws.max_row + 1):
+        cells = []
+        for first, _last, _t in _FIELDS:
+            if (r, first) in covered:
+                continue
+            cell = ws.cell(row=r, column=first)
+            m = merged.get((r, first))
+            color = getattr(getattr(cell.font, "color", None), "rgb", None)
+            cells.append({"v": cell.value, "rs": (m.max_row - m.min_row + 1) if m else 1,
+                          "ai": color == _AI_COLOR and cell.value not in (None, "")})
+        rows.append(cells)
+    return {"groups": groups, "headers": headers, "rows": rows}

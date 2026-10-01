@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, UploadCloud, Download, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, XCircle, Loader2, RefreshCw, Maximize2, X } from 'lucide-react';
+import { ArrowLeft, UploadCloud, Download, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, XCircle, Loader2, RefreshCw, Maximize2, Minimize2, Eye, X } from 'lucide-react';
 import { pfmeaApi } from '../../services/api/pfmeaApi';
 import './PFMEA.css';
 
@@ -187,34 +187,25 @@ function shortFileName(name, max = 38) {
   return `${name.slice(0, max - ext.length - 3)}...${ext}`;
 }
 
-function ConversionTable({ sheet }) {
+function ConvertedGrid({ grid }) {
   return (
-    <table className="pfmea-table">
+    <table className="pfmea-table pfmea-grid">
       <thead>
         <tr>
-          <th>Src row</th><th>Step</th><th>Work Element (6M)</th><th>Function of Work Element</th>
-          <th>Failure Effect (original → Nashik)</th><th>S</th><th>Failure Mode</th><th>Failure Cause</th>
-          <th>Prevention</th><th>O</th><th>Detection control</th><th>D</th>
+          {grid.groups.map((g, i) => (
+            <th key={i} colSpan={g.span} className="pfmea-grid-group">{g.text}</th>
+          ))}
+        </tr>
+        <tr>
+          {grid.headers.map((h, i) => <th key={i}>{h}</th>)}
         </tr>
       </thead>
       <tbody>
-        {sheet.rows.map((r, i) => (
-          <tr key={i}>
-            <td>{r.source_row}</td>
-            <td>{r.step}</td>
-            <td className="pfmea-ai-cell">{r.work_element}</td>
-            <td className="pfmea-ai-cell">{r.function_of_work_element}</td>
-            <td>
-              <div className="pfmea-before">{r.effect_before}</div>
-              <div className="pfmea-after">{r.effect_after}</div>
-            </td>
-            <td>{r.severity}</td>
-            <td>{r.mode}</td>
-            <td>{r.cause}</td>
-            <td>{r.prevention}</td>
-            <td>{r.occurrence}</td>
-            <td>{r.detection_ctrl}</td>
-            <td>{r.detection}</td>
+        {grid.rows.map((cells, r) => (
+          <tr key={r}>
+            {cells.map((c, i) => (
+              <td key={i} rowSpan={c.rs} className={c.ai ? 'pfmea-ai-cell' : ''}>{c.v}</td>
+            ))}
           </tr>
         ))}
       </tbody>
@@ -224,63 +215,61 @@ function ConversionTable({ sheet }) {
 
 function ConversionPreview({ conversion, confirmed, onConfirm, onDiscard }) {
   const [active, setActive] = useState(conversion.sheets[0]?.name);
-  const [expanded, setExpanded] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [large, setLarge] = useState(false);
   const sheet = conversion.sheets.find((s) => s.name === active) || conversion.sheets[0];
-  const tabs = (
-    <div className="pfmea-sheet-tabs">
-      {conversion.sheets.map((s) => (
-        <button
-          key={s.name}
-          className={`pfmea-sheet-tab ${active === s.name ? 'active' : ''}`}
-          onClick={() => setActive(s.name)}
-        >
-          {s.name} ({s.rows.length} rows)
-        </button>
-      ))}
-    </div>
-  );
-  const aiNote = sheet.ai_filled > 0
-    ? `${sheet.ai_filled} blank cells were proposed by AI (blue italics) - please review.`
-    : sheet.ai_error
-    ? `AI fill was not available (${sheet.ai_error}); blank columns were left empty.`
-    : null;
+  const totalRows = conversion.sheets.reduce((n, s) => n + s.row_count, 0);
+  const aiFilled = conversion.sheets.reduce((n, s) => n + (s.ai_filled || 0), 0);
+  const aiError = conversion.sheets.find((s) => s.ai_error)?.ai_error;
   return (
     <div className="pfmea-convert-preview">
       <div className="pfmea-convert-summary">
         <CheckCircle2 size={16} />
-        <span>Converted {conversion.sheets.reduce((n, s) => n + s.rows.length, 0)} rows to Nashik AIAG-VDA format.</span>
-        {aiNote && <span className="pfmea-ai-note">{aiNote}</span>}
-      </div>
-      {tabs}
-      <div className="pfmea-table-wrap pfmea-table-wrap-small">
-        <ConversionTable sheet={sheet} />
+        <span>Converted {totalRows} rows to AIAG-VDA (Nashik) format.</span>
+        {aiFilled > 0 && <span className="pfmea-ai-note">Blue italic cells were blank in the old format and filled by AI — please review.</span>}
+        {aiError && <span className="pfmea-ai-note">AI fill not available ({aiError}); blank columns left empty.</span>}
       </div>
       <div className="pfmea-convert-actions">
+        <button className="pfmea-analyze-btn" onClick={() => setOpen(true)}>
+          <Eye size={16} /> View converted sheet
+        </button>
         {confirmed ? (
-          <span className="pfmea-agree-badge agree"><CheckCircle2 size={14} /> Conversion confirmed — you can run the AI</span>
+          <span className="pfmea-agree-badge agree"><CheckCircle2 size={14} /> Confirmed — you can run the AI</span>
         ) : (
           <>
-            <button className="pfmea-analyze-btn" onClick={onConfirm}>Looks right — confirm</button>
+            <button className="pfmea-cancel-btn" onClick={onConfirm}>Looks right — confirm</button>
             <button className="pfmea-cancel-btn" onClick={onDiscard}>Discard</button>
           </>
         )}
-        <button className="pfmea-cancel-btn" onClick={() => setExpanded(true)}>
-          <Maximize2 size={14} /> Expand
-        </button>
-        <a className="pfmea-download-btn" href={pfmeaApi.convertedUrl(conversion.convert_token)} download>
-          <Download size={16} /> Download converted Excel
-        </a>
       </div>
-      {expanded && (
-        <div className="pfmea-modal-backdrop" onClick={() => setExpanded(false)}>
-          <div className="pfmea-modal" onClick={(e) => e.stopPropagation()}>
+      {open && (
+        <div className="pfmea-modal-backdrop" onClick={() => setOpen(false)}>
+          <div className={`pfmea-modal ${large ? 'large' : ''}`} onClick={(e) => e.stopPropagation()}>
             <div className="pfmea-modal-head">
-              <strong>Converted sheet preview</strong>
-              <button className="pfmea-cancel-btn" onClick={() => setExpanded(false)}><X size={14} /> Close</button>
+              <strong>Converted sheet</strong>
+              <div className="pfmea-modal-tools">
+                <a className="pfmea-icon-btn" title="Download as Excel (opens in Excel or Google Sheets)"
+                   href={pfmeaApi.convertedUrl(conversion.convert_token)} download>
+                  <Download size={16} />
+                </a>
+                <button className="pfmea-icon-btn" title={large ? 'Smaller window' : 'Full screen'} onClick={() => setLarge(!large)}>
+                  {large ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                </button>
+                <button className="pfmea-icon-btn" title="Close" onClick={() => setOpen(false)}><X size={16} /></button>
+              </div>
             </div>
-            {tabs}
-            <div className="pfmea-table-wrap pfmea-table-wrap-full">
-              <ConversionTable sheet={sheet} />
+            {conversion.sheets.length > 1 && (
+              <div className="pfmea-sheet-tabs">
+                {conversion.sheets.map((s) => (
+                  <button key={s.name} className={`pfmea-sheet-tab ${active === s.name ? 'active' : ''}`}
+                          onClick={() => setActive(s.name)}>
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="pfmea-modal-body">
+              <ConvertedGrid grid={sheet.grid} />
             </div>
           </div>
         </div>
@@ -566,8 +555,10 @@ function PFMEA() {
               <span>Format check</span>
             </div>
             <p className="pfmea-convert-msg">
-              <strong title={file?.name}>{shortFileName(file?.name)}</strong> is not in the AIAG-VDA (Nashik) format.
-              Convert it first, check the result, then run the AI.
+              <strong title={file?.name}>{shortFileName(file?.name)}</strong> is in{' '}
+              {[...new Set(nonNashikSheets.map((n) => (layouts.find((l) => l.id === sheetLayouts[n]) || {}).label))]
+                .filter(Boolean).join(' / ') || 'an older'}{' '}
+              format, not the AIAG-VDA (Nashik) format. Convert it, check the result, then run.
             </p>
             {!conversion && (
               <button className="pfmea-analyze-btn" onClick={handleConvert} disabled={converting}>
@@ -657,9 +648,6 @@ function PFMEA() {
                     onClick={() => toggleSheet(name)}
                   >
                     {name}
-                    <span className="pfmea-sheet-format">
-                      {(layouts.find((l) => l.id === sheetLayouts[name]) || {}).label || 'not recognized'}
-                    </span>
                   </button>
                 ))}
               </div>
