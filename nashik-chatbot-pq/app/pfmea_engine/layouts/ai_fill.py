@@ -20,8 +20,14 @@ Scores (S/O/D), controls and Action Priority are never touched. Every
 generated cell is flagged (record["_ai"]) so the writer can colour it.
 """
 
+import hashlib
+import json
 import logging
+import os
 import re
+import tempfile
+import threading
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
@@ -124,7 +130,57 @@ def grounded(text, source):
     return bool(meaningful) and all(_stem(w) in src_stems for w in meaningful)
 
 
+_CACHE_LOCK = threading.Lock()
+
+
+def _cache_path():
+    return Path(os.environ.get("PFMEA_AI_CACHE_FILE") or Path(tempfile.gettempdir()) / "pfmea_ai_fill_cache.json")
+
+
+def _cache_key(prompt):
+    model = os.environ.get("PFMEA_CONVERT_LLM_PROFILE", "gpt5") + os.environ.get("PFMEA_CONVERT_REASONING_EFFORT", "low")
+    return hashlib.sha256((model + "\n" + prompt).encode("utf-8")).hexdigest()
+
+
+def _cache_get(key):
+    if os.environ.get("PFMEA_AI_CACHE", "1") == "0":
+        return None
+    try:
+        with _CACHE_LOCK:
+            return json.loads(_cache_path().read_text(encoding="utf-8")).get(key)
+    except Exception:  # noqa: BLE001 - no/corrupt cache is just a miss
+        return None
+
+
+def _cache_put(key, value):
+    if os.environ.get("PFMEA_AI_CACHE", "1") == "0":
+        return
+    try:
+        with _CACHE_LOCK:
+            path = _cache_path()
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:  # noqa: BLE001
+                data = {}
+            data[key] = value
+            path.write_text(json.dumps(data), encoding="utf-8")
+    except Exception:  # noqa: BLE001 - caching must never break a conversion
+        pass
+
+
 def _json_call(llm, prompt, attempts=3):
+    """Same prompt (same file, same model settings) -> saved answer, no new AI call.
+    Set PFMEA_AI_CACHE=0 to always call the model."""
+    key = _cache_key(prompt)
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+    value = _json_call_uncached(llm, prompt, attempts)
+    _cache_put(key, value)
+    return value
+
+
+def _json_call_uncached(llm, prompt, attempts=3):
     """Ask for strict JSON (response_format) and retry when the model's answer
     is not parseable - reasoning models occasionally emit a stray character."""
     from app.pfmea_engine.step5_severity_llm import call_llm
