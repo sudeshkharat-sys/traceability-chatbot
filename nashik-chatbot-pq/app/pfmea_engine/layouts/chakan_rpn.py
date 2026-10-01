@@ -23,6 +23,7 @@ from app.pfmea_engine.step2_normalize import (
 
 LAYOUT_ID = "chakan_rpn"
 LABEL = "Chakan (RPN format)"
+SHORT_LABEL = "old RPN"  # used in the UI sentence "... is in old RPN format"
 
 _EFFECT_FIELD = "1. Failure Effects (FE) to the Next Higher Level Element and/or End User"
 _STEP_FIELD = "2. Process Step Station No. and Name of\nFocus Element"

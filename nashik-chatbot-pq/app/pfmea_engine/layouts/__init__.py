@@ -23,7 +23,7 @@ class LayoutMismatch(ValueError):
 
 
 def available_layouts():
-    return [{"id": m.LAYOUT_ID, "label": m.LABEL} for m in LAYOUTS]
+    return [{"id": m.LAYOUT_ID, "label": m.LABEL, "short_label": getattr(m, "SHORT_LABEL", m.LABEL)} for m in LAYOUTS]
 
 
 def detect_layout(ws):

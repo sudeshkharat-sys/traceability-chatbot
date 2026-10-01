@@ -556,9 +556,9 @@ function PFMEA() {
             </div>
             <p className="pfmea-convert-msg">
               <strong title={file?.name}>{shortFileName(file?.name)}</strong> is in{' '}
-              {[...new Set(nonNashikSheets.map((n) => (layouts.find((l) => l.id === sheetLayouts[n]) || {}).label))]
+              {[...new Set(nonNashikSheets.map((n) => (layouts.find((l) => l.id === sheetLayouts[n]) || {}).short_label))]
                 .filter(Boolean).join(' / ') || 'an older'}{' '}
-              format, not the AIAG-VDA (Nashik) format. Convert it, check the result, then run.
+              format, not the AIAG-VDA format. Convert it, check the result, then run.
             </p>
             {!conversion && (
               <button className="pfmea-analyze-btn" onClick={handleConvert} disabled={converting}>
