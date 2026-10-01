@@ -292,26 +292,7 @@ def _apply_rich_text(ws, first_row, last_row, ai_cells):
                 ws.cell(row=r, column=c).value = rich
 
 
-_FN_STEP_FIELD = "2. Function of the Process Step and Product Characteristic\n(Quantitative value is optional)"
 _STEP_FIELD = "2. Process Step Station No. and Name of\nFocus Element"
-
-
-def _function_of_item_by_step(records):
-    """Function of the Process Item for each step, from the step's own
-    requirements (the old form's "Requirements" column): the plant-side
-    purpose of that step. Code only - nothing is invented; End User and Ship
-    to Plant are left for the plant to fill."""
-    by_step = {}
-    for rec in records:
-        step = next((v for k, v in rec.items() if isinstance(k, tuple) and k[1] == _STEP_FIELD), None)
-        req = next((v for k, v in rec.items() if isinstance(k, tuple) and k[1] == _FN_STEP_FIELD), None)
-        if step and req:
-            items = by_step.setdefault(step, [])
-            text = " ".join(str(req).split())
-            if text not in items:
-                items.append(text)
-    return {step: "Your Plant :\n" + "\n".join(f"{i}. {t}" for i, t in enumerate(items, 1))
-            for step, items in by_step.items()}
 
 
 def _write_nashik_sheet(ws, records, info=None):
@@ -319,7 +300,6 @@ def _write_nashik_sheet(ws, records, info=None):
     data row per record from row 18."""
     info = info or {}
     ai_cells = []
-    fn_item_by_step = _function_of_item_by_step(records)
     ws.cell(row=1, column=1, value="Process Failure Mode and Effects Analysis (Process FMEA)")
     ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=20)
     ws.cell(row=1, column=1).font = Font(name="Arial", bold=True, size=14)
@@ -374,9 +354,10 @@ def _write_nashik_sheet(ws, records, info=None):
                           ("sev_after", 35), ("occ_after", 36), ("det_after", 37)):
             if extra.get(role) is not None:
                 ws.cell(row=row, column=col, value=extra[role])
-        step_name = next((v for k, v in record.items() if isinstance(k, tuple) and k[1] == _STEP_FIELD), None)
-        if fn_item_by_step.get(step_name):
-            ws.cell(row=row, column=7, value=fn_item_by_step[step_name])
+        # Process Step: the plant's own Operation No goes in front of the name, in the
+        # same "Operation No: / Stage:" layout the newer Nashik sheets use.
+        if record.get("_op_no") not in (None, "") and ws.cell(row=row, column=3).value:
+            ws.cell(row=row, column=3, value=f"Operation No: {record['_op_no']}\n\nStage:\n{ws.cell(row=row, column=3).value}")
         # AI-proposed text for columns the old form had no data for; only
         # where the plant left the cell blank, and visibly marked.
         for col, text in (record.get("_ai") or {}).items():

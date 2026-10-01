@@ -1,5 +1,5 @@
 """Gap-fill for the Nashik converter: Process Item, Work Element (6M) and Function
-of Work Element (Function of Process Item is built per step by convert.py, code only).
+of Work Element and Function of Process Item (Your Plant line only; End User / Ship to Plant stay for the plant).
 
 The older plant forms (e.g. Chakan RPN) have none of these, so a straight
 column mapping leaves them blank. In a real Nashik sheet they are NOT per-row
@@ -139,7 +139,7 @@ def build_block(by_category):
     return "\n\n".join(parts) or None
 
 
-def _step_prompt(step, fn, process_item, items):
+def _step_prompt(step, fns, process_item, items):
     body = "\n".join(
         f"{n}. cause: {it['cause']}" + (f" | category: {it['cat']}" if it["cat"] else " | category: ?")
         + (f" | prevention: {it['prev']}" if it["prev"] else "")
@@ -148,7 +148,7 @@ def _step_prompt(step, fn, process_item, items):
     )
     return (
         f"{_SYSTEM}\n\nProcess item: {process_item or 'n/a'}\nProcess step: {step}\n"
-        f"Function of the step: {fn or 'n/a'}\n\nFailure causes (6M category already assigned by rules; '?' = unknown):\n{body}\n\n"
+        f"Requirements / functions of the step: {'; '.join(fns) if fns else 'n/a'}\n\nFailure causes (6M category already assigned by rules; '?' = unknown):\n{body}\n\n"
         "Task: list the work elements this step uses, per 6M category, taken from the CAUSES and the step "
         "(e.g. cause 'Wrong tool used' with control 'Nutrunner...' -> Machine: 'Nutrunner'). Prevention/detection "
         "controls are given only to help you identify equipment: NEVER output a control, check, audit, training, "
@@ -157,8 +157,10 @@ def _step_prompt(step, fn, process_item, items):
         "gauges/instruments (Measurement), conditions (Environment), people (Man). For each category also give "
         "the function of that group in one short phrase from the step function/causes. "
         "Omit a category if nothing in the causes supports it.\n"
+        "Also give \"your_plant\": one short sentence saying what this operation achieves in the plant, using "
+        "ONLY the step name and its requirements above (no new facts), or null if unclear.\n"
         "Return JSON: {\"elements\": {\"<Category>\": [\"<name>\", ...]}, \"functions\": {\"<Category>\": "
-        "[\"<function>\", ...]}}"
+        "[\"<function>\", ...]}, \"your_plant\": <sentence or null>}"
     )
 
 
@@ -188,6 +190,14 @@ def fill_blanks(records, info, llm, log=print):
     for idx, rec in enumerate(records):
         groups.setdefault(_clean(_get(rec, _STEP_KEY)) or "", []).append(idx)
     step_fn = {s: _clean(_get(records[ix[0]], _FN_STEP_KEY)) for s, ix in groups.items()}
+    step_reqs = {}
+    for s_, ix in groups.items():
+        seen = []
+        for i_ in ix:
+            r_ = _clean(_get(records[i_], _FN_STEP_KEY))
+            if r_ and r_ not in seen:
+                seen.append(r_)
+        step_reqs[s_] = seen
     steps = [{"step": s, "fn": step_fn[s]} for s in groups if s]
 
     # ---- sheet level: Process Item (Function of Process Item is built per step by the converter, code only) ----
@@ -215,28 +225,32 @@ def fill_blanks(records, info, llm, log=print):
                               "prev": _clean(_get(rec, _PREVENTION_KEY)), "det": _clean(_get(rec, _DETECTION_KEY))})
         items = items[:_MAX_CAUSES_PER_CALL]
         # Names must be grounded in the step and its CAUSES (controls are not a source of work elements).
-        src = " ".join([step, step_fn[step] or ""] + [i["cause"] for i in items])
+        src = " ".join([step] + step_reqs[step] + [i["cause"] for i in items])
         src_all = src + " " + " ".join(f"{i['prev'] or ''} {i['det'] or ''}" for i in items)
         found_cats = {i["cat"] for i in items if i["cat"]}
         elements = {c: [] for c in CATEGORIES}
         functions = {c: [] for c in CATEGORIES}
+        your_plant = None
         # deterministic: Man -> Operator, only if the text itself says so
         if any(i["cat"] == "Man" for i in items) and re.search(r"operator|associate", src.lower()):
             elements["Man"].append("Operator")
         if llm is not None and items:
-            data = _json_call(llm, _step_prompt(step, step_fn[step], process_item, items))
+            data = _json_call(llm, _step_prompt(step, step_reqs[step], process_item, items))
             for cat, names in (data.get("elements") or {}).items():
                 if cat in elements and cat in found_cats:  # category must be evidenced by a cause
                     for n in _as_list(names):
                         if (grounded(n, src_all) and not _CONTROL_WORDS.search(n)
                                 and n not in elements[cat]):
                             elements[cat].append(n)
+            plant_text = _clean(data.get("your_plant"))
+            if plant_text and grounded(plant_text, " ".join([step] + step_reqs[step])):
+                your_plant = f"Your Plant:\n{plant_text}"
             for cat, fns in (data.get("functions") or {}).items():
                 if cat in functions:
                     functions[cat] += [f for f in _as_list(fns) if grounded(f, src) and f not in functions[cat]]
         # Function block only for categories that actually have elements
         functions = {c: f for c, f in functions.items() if elements.get(c)}
-        return idxs, build_block(elements), build_block(functions)
+        return idxs, build_block(elements), build_block(functions), your_plant
 
     steps_with_ids = [s for s in groups if s]
     with ThreadPoolExecutor(max_workers=_WORKERS) as pool:
@@ -249,9 +263,9 @@ def fill_blanks(records, info, llm, log=print):
             note_failure(exc)
 
     for step, idxs in groups.items():
-        we_block = fn_block = None
+        we_block = fn_block = plant_block = None
         if step in results:
-            _i, we_block, fn_block = results[step]
+            _i, we_block, fn_block, plant_block = results[step]
         for ix in idxs:
             ai = records[ix].setdefault("_ai", {})
             if process_item and not info.get("aggregatepartdescrptn"):
@@ -260,6 +274,8 @@ def fill_blanks(records, info, llm, log=print):
                 ai[COL_WORK_ELEMENT] = we_block
             if fn_block:
                 ai[COL_FN_WORK_ELEMENT] = fn_block
+            if plant_block:
+                ai[COL_FN_ITEM] = plant_block
 
     status["filled"] = sum(len(r.get("_ai", {})) for r in records)
     log(f"AI gap-fill: {status['filled']} cells proposed"
