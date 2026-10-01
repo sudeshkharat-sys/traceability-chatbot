@@ -142,7 +142,7 @@ def convert_to_nashik(file_bytes: bytes, layout: str = "auto") -> dict:
             sheets.append({"name": name, "from_label": item["label"],
                            "row_count": len(item["records"]) if is_main else 0,
                            "ai_filled": ai.get("filled", 0) if is_main else 0,
-                           "ai_error": ai.get("error") if is_main else None,
+                           "ai_error": ai.get("message") if is_main else None,
                            "grid": grids[name]})
     return {"converted": True, "convert_token": token, "sheets": sheets, "all_sheets": all_sheets}
 

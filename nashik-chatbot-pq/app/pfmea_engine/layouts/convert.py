@@ -453,9 +453,9 @@ def convert_workbook_to_nashik(source_path, dest_path, layout="auto", log=print,
             # llm=None still runs the rule-based part (6M classification, Operator)
             ai_status[title] = ai_fill_mod.fill_blanks(records, info, llm, log=log)
             if llm is None:
-                ai_status[title]["error"] = "AI model not available"
+                ai_status[title]["error"] = ai_status[title]["message"] = "AI model is not configured"
         else:
-            ai_status[title] = {"filled": 0, "failed": 0, "error": None}
+            ai_status[title] = {"filled": 0, "failed": 0, "error": None, "message": None}
 
     out = load_workbook(source_path, rich_text=True)
     new_tabs = []  # (PFMEA tab title, label, records, ai status)

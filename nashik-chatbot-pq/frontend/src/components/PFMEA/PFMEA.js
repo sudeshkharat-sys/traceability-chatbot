@@ -229,7 +229,7 @@ function ConversionPreview({ conversion, onDiscard }) {
         <CheckCircle2 size={16} />
         <span>Converted {totalRows} rows to AIAG-VDA format.</span>
         {aiFilled > 0 && <span className="pfmea-ai-note">Blue italic cells were blank in the old format and filled by AI — please review.</span>}
-        {aiError && <span className="pfmea-ai-note">AI fill not available ({aiError}); blank columns left empty.</span>}
+        {aiError && <span className="pfmea-ai-note">{aiError}</span>}
       </div>
       <div className="pfmea-convert-actions">
         <button className="pfmea-analyze-btn" onClick={() => setOpen(true)}>

@@ -124,9 +124,24 @@ def grounded(text, source):
     return bool(meaningful) and all(_stem(w) in src_stems for w in meaningful)
 
 
-def _json_call(llm, prompt):
+def _json_call(llm, prompt, attempts=3):
+    """Ask for strict JSON (response_format) and retry when the model's answer
+    is not parseable - reasoning models occasionally emit a stray character."""
     from app.pfmea_engine.step5_severity_llm import call_llm
-    return call_llm(llm, prompt)
+    json_llm = llm
+    try:
+        json_llm = llm.bind(response_format={"type": "json_object"})
+    except Exception:  # noqa: BLE001 - not every client supports binding
+        pass
+    last = None
+    for attempt in range(attempts):
+        try:
+            return call_llm(json_llm, prompt)
+        except Exception as exc:  # noqa: BLE001
+            last = exc
+            if json_llm is not llm and "json" not in str(exc).lower():
+                json_llm = llm  # the endpoint rejected JSON mode: retry plain
+    raise last
 
 
 def _as_list(value):
@@ -183,7 +198,7 @@ def _sheet_prompt(hint, steps):
 def fill_blanks(records, info, llm, log=print):
     """Fill record["_ai"] = {nashik_col: text} in place. `llm=None` runs the
     rule-based part only. Returns {"filled", "failed", "error"}."""
-    status = {"filled": 0, "failed": 0, "error": None}
+    status = {"filled": 0, "failed": 0, "calls": 0, "error": None, "message": None}
     if not records:
         return status
     info = info or {}
@@ -284,6 +299,10 @@ def fill_blanks(records, info, llm, log=print):
             if plant_block:
                 ai[COL_FN_ITEM] = plant_block
 
+    status["calls"] = len(steps_with_ids) + (1 if llm is not None else 0)
+    if status["failed"]:
+        status["message"] = (f"AI could not complete {status['failed']} of {status['calls']} requests "
+                             "(unreadable answer); those cells were left empty.")
     status["filled"] = sum(len(r.get("_ai", {})) for r in records)
     log(f"AI gap-fill: {status['filled']} cells proposed"
         + (f" ({status['failed']} call(s) failed: {status['error']})" if status["failed"] else ""))
