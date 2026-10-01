@@ -4,7 +4,8 @@ Nashik AIAG-VDA sheet, so the rest of the pipeline only ever sees Nashik.
 The plant's own values are copied as-is (Chakan's IC:/EC: effect text becomes
 the Your Plant / End User sections, see chakan_rpn.translate_effect). The
 Nashik form has more columns than the old form (work element, functions,
-optimization block); those are left blank for the plant to fill. Output is
+optimization block); the AI gap-fill (ai_fill.py) proposes the descriptive
+ones from the sheet's own text, flagged in blue italics. Output is
 one unmerged row per failure cause with context repeated on every row, which
 the Nashik reader handles the same as merged cells.
 """
@@ -14,6 +15,7 @@ from openpyxl.styles import Alignment, Border, PatternFill, Side, Font
 from openpyxl.utils import get_column_letter
 
 from app.pfmea_engine.layouts import LAYOUTS, get_layout, nashik_vda
+from app.pfmea_engine.layouts import ai_fill as ai_fill_mod
 
 _GROUPS = [
     ("Structure Analysis (Step2)", 1, 6),
@@ -60,6 +62,8 @@ _BORDER = Border(left=_THIN, right=_THIN, top=_THIN, bottom=_THIN)
 _WRAP = Alignment(wrap_text=True, vertical="center", horizontal="center")
 _PINK, _GREEN = "FFF769BE", "FF009900"
 _GROUP_FILL = "FFFFC000"
+_AI_COLOR = "FF1D4ED8"
+_AI_FONT = Font(italic=True, color=_AI_COLOR)
 
 
 # Nashik title block: (label cell, value cell) pairs; A-C / D-F / G-H are merged
@@ -178,6 +182,7 @@ def _write_nashik_sheet(ws, records, info=None):
     """Fill an empty worksheet with the Nashik header (rows 13-17) and one
     data row per record from row 18."""
     info = info or {}
+    ai_cells = []
     ws.cell(row=1, column=1, value="Process Failure Mode and Effects Analysis")
     ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=20)
     ws.cell(row=1, column=1).font = Font(bold=True, size=14)
@@ -221,7 +226,7 @@ def _write_nashik_sheet(ws, records, info=None):
                 continue
             ws.cell(row=row, column=col, value=value)
         # Process Item comes from the source's own "Aggregate Part Descrptn".
-        # Work Element (6M) is left blank: the source has no such data.
+        # Work Element (6M) and the Function columns come from the AI gap-fill below.
         if info.get("aggregatepartdescrptn"):
             ws.cell(row=row, column=1, value=info["aggregatepartdescrptn"])
         # Action Priority is left blank: the source has RPN, not AP, and only
@@ -232,11 +237,26 @@ def _write_nashik_sheet(ws, records, info=None):
                           ("sev_after", 35), ("occ_after", 36), ("det_after", 37)):
             if extra.get(role) is not None:
                 ws.cell(row=row, column=col, value=extra[role])
+        # AI-proposed text for columns the old form had no data for; only
+        # where the plant left the cell blank, and visibly marked.
+        for col, text in (record.get("_ai") or {}).items():
+            if ws.cell(row=row, column=col).value in (None, ""):
+                ws.cell(row=row, column=col, value=text)
+                ai_cells.append((row, col))
         for first, last, _t in _FIELDS:
             for c in range(first, last + 1):
                 cell = ws.cell(row=row, column=c)
                 cell.border = _BORDER
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
+        for r_, c_ in [x for x in ai_cells if x[0] == row]:
+            ws.cell(row=r_, column=c_).font = _AI_FONT
+
+    if ai_cells:
+        note = ws.cell(row=3, column=10, value="Blue italic cells were left blank in the source form and "
+                       "proposed by AI from the sheet's own text - please review.")
+        note.font = Font(italic=True, color=_AI_COLOR)
+        note.alignment = Alignment(wrap_text=True, vertical="center")
+        ws.merge_cells(start_row=3, start_column=10, end_row=4, end_column=20)
 
     _merge_like_nashik(ws, 18, 18 + len(records) - 1)
 
@@ -248,13 +268,25 @@ def _write_nashik_sheet(ws, records, info=None):
 
     _fit_row_heights(ws, 18, 18 + len(records) - 1)
 
-def convert_workbook_to_nashik(source_path, dest_path, layout="auto", log=print, info_out=None):
+def _get_llm_or_none(log):
+    try:
+        from app.pfmea_engine.step5_severity_llm import get_llm
+        return get_llm()
+    except Exception as exc:  # noqa: BLE001 - missing credentials etc. must not block conversion
+        log(f"AI gap-fill unavailable ({exc}); blank columns left empty.")
+        return None
+
+
+def convert_workbook_to_nashik(source_path, dest_path, layout="auto", log=print, info_out=None,
+                               ai_fill=True, llm=None):
     """Save a copy of the workbook at dest_path where every PFMEA sheet that
     is not already Nashik format is rebuilt in Nashik format. Returns the
     list of converted sheet names (empty = nothing to convert; dest_path is
     then not written). If info_out is a list, one {title, label, records}
-    dict per converted sheet is appended (for the UI preview). The original
-    file is never modified."""
+    dict per converted sheet is appended (for the UI preview). With ai_fill,
+    columns the old form has no data for (Process Item, Work Element, the
+    Function columns) are proposed by the LLM instead of left blank. The
+    original file is never modified."""
     wb = load_workbook(source_path, data_only=True)
     plan = []
     for ws in wb.worksheets:
@@ -271,6 +303,15 @@ def convert_workbook_to_nashik(source_path, dest_path, layout="auto", log=print,
     if not plan:
         return []
 
+    ai_status = {}
+    if ai_fill:
+        llm = llm or _get_llm_or_none(log)
+    for title, _label, records, info in plan:
+        if ai_fill and llm is not None:
+            ai_status[title] = ai_fill_mod.fill_blanks(records, info, llm, log=log)
+        else:
+            ai_status[title] = {"filled": 0, "failed": 0, "error": "AI gap-fill not available" if ai_fill else None}
+
     out = load_workbook(source_path, rich_text=True)
     for title, label, records, info in plan:
         index = out.sheetnames.index(title)
@@ -280,5 +321,5 @@ def convert_workbook_to_nashik(source_path, dest_path, layout="auto", log=print,
         log(f"Converted '{title}' from {label} to Nashik AIAG-VDA format ({len(records)} rows)")
     out.save(dest_path)
     if info_out is not None:
-        info_out.extend({"title": t, "label": l, "records": r} for t, l, r, _i in plan)
+        info_out.extend({"title": t, "label": l, "records": r, "ai": ai_status.get(t)} for t, l, r, _i in plan)
     return [t for t, _l, _r, _i in plan]

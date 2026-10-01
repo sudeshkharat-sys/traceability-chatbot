@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, UploadCloud, Download, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, XCircle, Loader2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, UploadCloud, Download, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, XCircle, Loader2, RefreshCw, Maximize2, X } from 'lucide-react';
 import { pfmeaApi } from '../../services/api/pfmeaApi';
 import './PFMEA.css';
 
@@ -180,51 +180,80 @@ const CARD_FILTERS = [
   { key: 'ambiguous', label: 'Ambiguous' },
 ];
 
+function shortFileName(name, max = 38) {
+  if (!name || name.length <= max) return name;
+  const dot = name.lastIndexOf('.');
+  const ext = dot > 0 ? name.slice(dot) : '';
+  return `${name.slice(0, max - ext.length - 3)}...${ext}`;
+}
+
+function ConversionTable({ sheet }) {
+  return (
+    <table className="pfmea-table">
+      <thead>
+        <tr>
+          <th>Src row</th><th>Step</th><th>Work Element (6M)</th><th>Function of Work Element</th>
+          <th>Failure Effect (original → Nashik)</th><th>S</th><th>Failure Mode</th><th>Failure Cause</th>
+          <th>Prevention</th><th>O</th><th>Detection control</th><th>D</th>
+        </tr>
+      </thead>
+      <tbody>
+        {sheet.rows.map((r, i) => (
+          <tr key={i}>
+            <td>{r.source_row}</td>
+            <td>{r.step}</td>
+            <td className="pfmea-ai-cell">{r.work_element}</td>
+            <td className="pfmea-ai-cell">{r.function_of_work_element}</td>
+            <td>
+              <div className="pfmea-before">{r.effect_before}</div>
+              <div className="pfmea-after">{r.effect_after}</div>
+            </td>
+            <td>{r.severity}</td>
+            <td>{r.mode}</td>
+            <td>{r.cause}</td>
+            <td>{r.prevention}</td>
+            <td>{r.occurrence}</td>
+            <td>{r.detection_ctrl}</td>
+            <td>{r.detection}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function ConversionPreview({ conversion, confirmed, onConfirm, onDiscard }) {
   const [active, setActive] = useState(conversion.sheets[0]?.name);
+  const [expanded, setExpanded] = useState(false);
   const sheet = conversion.sheets.find((s) => s.name === active) || conversion.sheets[0];
+  const tabs = (
+    <div className="pfmea-sheet-tabs">
+      {conversion.sheets.map((s) => (
+        <button
+          key={s.name}
+          className={`pfmea-sheet-tab ${active === s.name ? 'active' : ''}`}
+          onClick={() => setActive(s.name)}
+        >
+          {s.name} ({s.rows.length} rows)
+        </button>
+      ))}
+    </div>
+  );
+  const aiNote = sheet.ai_filled > 0
+    ? `${sheet.ai_filled} blank cells were proposed by AI (blue italics) - please review.`
+    : sheet.ai_error
+    ? `AI fill was not available (${sheet.ai_error}); blank columns were left empty.`
+    : null;
   return (
     <div className="pfmea-convert-preview">
-      <div className="pfmea-sheet-tabs">
-        {conversion.sheets.map((s) => (
-          <button
-            key={s.name}
-            className={`pfmea-sheet-tab ${active === s.name ? 'active' : ''}`}
-            onClick={() => setActive(s.name)}
-          >
-            {s.name} ({s.rows.length} rows · {s.from_label} → Nashik)
-          </button>
-        ))}
+      <div className="pfmea-convert-summary">
+        <CheckCircle2 size={16} />
+        <span>Converted {conversion.sheets.reduce((n, s) => n + s.rows.length, 0)} rows to Nashik AIAG-VDA format.</span>
+        {aiNote && <span className="pfmea-ai-note">{aiNote}</span>}
       </div>
-      <div className="pfmea-table-wrap">
-        <table className="pfmea-table">
-          <thead>
-            <tr>
-              <th>Src row</th><th>Step</th><th>Failure Effect (original → Nashik)</th><th>S</th>
-              <th>Failure Mode</th><th>Failure Cause</th><th>Prevention</th><th>O</th>
-              <th>Detection control</th><th>D</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sheet.rows.map((r, i) => (
-              <tr key={i}>
-                <td>{r.source_row}</td>
-                <td>{r.step}</td>
-                <td>
-                  <div className="pfmea-before">{r.effect_before}</div>
-                  <div className="pfmea-after">{r.effect_after}</div>
-                </td>
-                <td>{r.severity}</td>
-                <td>{r.mode}</td>
-                <td>{r.cause}</td>
-                <td>{r.prevention}</td>
-                <td>{r.occurrence}</td>
-                <td>{r.detection_ctrl}</td>
-                <td>{r.detection}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {tabs}
+      <div className="pfmea-table-wrap pfmea-table-wrap-small">
+        <ConversionTable sheet={sheet} />
       </div>
       <div className="pfmea-convert-actions">
         {confirmed ? (
@@ -235,10 +264,27 @@ function ConversionPreview({ conversion, confirmed, onConfirm, onDiscard }) {
             <button className="pfmea-cancel-btn" onClick={onDiscard}>Discard</button>
           </>
         )}
+        <button className="pfmea-cancel-btn" onClick={() => setExpanded(true)}>
+          <Maximize2 size={14} /> Expand
+        </button>
         <a className="pfmea-download-btn" href={pfmeaApi.convertedUrl(conversion.convert_token)} download>
-          <Download size={16} /> Open converted Excel
+          <Download size={16} /> Download converted Excel
         </a>
       </div>
+      {expanded && (
+        <div className="pfmea-modal-backdrop" onClick={() => setExpanded(false)}>
+          <div className="pfmea-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="pfmea-modal-head">
+              <strong>Converted sheet preview</strong>
+              <button className="pfmea-cancel-btn" onClick={() => setExpanded(false)}><X size={14} /> Close</button>
+            </div>
+            {tabs}
+            <div className="pfmea-table-wrap pfmea-table-wrap-full">
+              <ConversionTable sheet={sheet} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -292,7 +338,6 @@ function PFMEA() {
   const [sheetNames, setSheetNames] = useState([]);
   const [selectedSheets, setSelectedSheets] = useState([]);
   const [scope, setScope] = useState('all'); // 'all' | 'select'
-  const [layout, setLayout] = useState('auto'); // 'auto' | a layout id from the backend registry
   const [layouts, setLayouts] = useState([]); // [{ id, label }] selectable sheet formats
   const [sheetLayouts, setSheetLayouts] = useState({}); // { sheetName: layoutId | null } as auto-detected
   const [repeat, setRepeat] = useState(3); // 1 ("None") - 5 independent AI passes per row
@@ -317,7 +362,7 @@ function PFMEA() {
   const nonNashikSheets = sheetNames.filter(
     (n) => sheetLayouts[n] && sheetLayouts[n] !== 'nashik_vda'
   );
-  const needsConversion = layout === 'auto' && nonNashikSheets.length > 0 && !conversionConfirmed;
+  const needsConversion = nonNashikSheets.length > 0 && !conversionConfirmed;
 
   // Restore the last saved run once, on first mount - e.g. after an
   // accidental refresh or a nav-away-and-back, rather than losing paid-for
@@ -344,7 +389,6 @@ function PFMEA() {
     setError('');
     setSheetNames([]);
     setSelectedSheets([]);
-    setLayout('auto');
     setSheetLayouts({});
     setScope('all');
     setConversion(null);
@@ -422,7 +466,7 @@ function PFMEA() {
     setConverting(true);
     setError('');
     try {
-      const res = await pfmeaApi.convertToNashik(file, layout);
+      const res = await pfmeaApi.convertToNashik(file);
       setConversion(res.data);
       if (!res.data.converted) setConversionConfirmed(true); // nothing to convert
     } catch (err) {
@@ -447,7 +491,6 @@ function PFMEA() {
         file,
         sheetsToRun,
         repeat,
-        layout,
         conversionConfirmed && conversion?.converted ? conversion.convert_token : null
       );
       setRunToken(res.data.token);
@@ -516,23 +559,20 @@ function PFMEA() {
           {loadingSheets && <p className="pfmea-hint">Reading sheet names…</p>}
         </div>
 
-        {nonNashikSheets.length > 0 && layout === 'auto' && (
+        {nonNashikSheets.length > 0 && (
           <div className="pfmea-step-card pfmea-convert-card">
             <div className="pfmea-step-heading">
               <StepBadge n="↻" />
               <span>Format check</span>
             </div>
             <p className="pfmea-convert-msg">
-              {nonNashikSheets.map((n) => {
-                const label = (layouts.find((l) => l.id === sheetLayouts[n]) || {}).label;
-                return `"${n}" is ${label}`;
-              }).join('; ')}
-              {' '}— not the Nashik AIAG-VDA format. Convert it first, check the result, then run the AI.
+              <strong title={file?.name}>{shortFileName(file?.name)}</strong> is not in the AIAG-VDA (Nashik) format.
+              Convert it first, check the result, then run the AI.
             </p>
             {!conversion && (
               <button className="pfmea-analyze-btn" onClick={handleConvert} disabled={converting}>
                 {converting ? <Loader2 size={16} className="pfmea-spin" /> : <RefreshCw size={16} />}
-                {converting ? 'Converting…' : 'Convert to Nashik format'}
+                {converting ? 'Converting and filling blanks with AI…' : 'Convert to Nashik format'}
               </button>
             )}
             {conversion?.converted && (
@@ -572,22 +612,6 @@ function PFMEA() {
                     Choose tabs
                   </button>
                 </div>
-              </div>
-
-              <div className="pfmea-option-group">
-                <label className="pfmea-option-label" htmlFor="pfmea-layout-select">Sheet format</label>
-                <select
-                  id="pfmea-layout-select"
-                  className="pfmea-repeat-select"
-                  value={layout}
-                  onChange={(e) => setLayout(e.target.value)}
-                  disabled={analyzing}
-                >
-                  <option value="auto">Auto-detect (recommended)</option>
-                  {layouts.map((l) => (
-                    <option key={l.id} value={l.id}>{l.label}</option>
-                  ))}
-                </select>
               </div>
 
               <div className="pfmea-option-group">

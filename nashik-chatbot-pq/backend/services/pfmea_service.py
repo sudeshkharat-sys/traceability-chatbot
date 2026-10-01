@@ -143,9 +143,16 @@ def convert_to_nashik(file_bytes: bytes, layout: str = "auto") -> dict:
                    "effect_before": rec.get("_raw_effect")}
             for key, field in _PREVIEW_FIELDS:
                 row[key] = next((v for k, v in rec.items() if isinstance(k, tuple) and k[1] == field), None)
+            ai = rec.get("_ai") or {}
+            row["work_element"] = ai.get(5)
+            row["function_of_step"] = ai.get(9) or next(
+                (v for k, v in rec.items() if isinstance(k, tuple) and k[1].startswith("2. Function of the Process Step")), None)
+            row["function_of_work_element"] = ai.get(11)
             row["effect_after"] = next((v for k, v in rec.items() if isinstance(k, tuple) and k[1] == _EFFECT_KEY), None)
             rows.append(row)
-        sheets.append({"name": item["title"], "from_label": item["label"], "rows": rows})
+        ai = item.get("ai") or {}
+        sheets.append({"name": item["title"], "from_label": item["label"], "rows": rows,
+                       "ai_filled": ai.get("filled", 0), "ai_error": ai.get("error")})
     return {"converted": True, "convert_token": token, "sheets": sheets}
 
 

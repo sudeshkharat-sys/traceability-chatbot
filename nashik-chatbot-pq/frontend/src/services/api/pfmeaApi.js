@@ -18,23 +18,21 @@ export const pfmeaApi = {
   // "cancelled" by dropping the connection.
   // Converts non-Nashik sheets to Nashik format (no AI calls) and returns a
   // before/after preview + convert_token to confirm and then run on.
-  convertToNashik: (file, layout = 'auto') => {
+  convertToNashik: (file) => {
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('layout', layout);
     return axios.post(`${BASE_URL}/convert`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
   convertedUrl: (token) => `${BASE_URL}/converted/${token}`,
-  startAnalysis: (file, sheetNames, repeat = 3, layout = 'auto', convertToken = null) => {
+  startAnalysis: (file, sheetNames, repeat = 3, convertToken = null) => {
     const formData = new FormData();
     formData.append('file', file);
     if (sheetNames && sheetNames.length) {
       formData.append('sheet_names', sheetNames.join(','));
     }
     formData.append('repeat', repeat);
-    formData.append('layout', layout);
     if (convertToken) formData.append('convert_token', convertToken);
     return axios.post(`${BASE_URL}/analyze`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
