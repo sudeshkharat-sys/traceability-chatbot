@@ -72,6 +72,12 @@ _CONTROL_WORDS = re.compile(
     r"check|audit|training|calibrat|record|buy ?off|inspect|verif|sop\b|instruction|awareness|"
     r"observ|clita|\bpm\b|maintenance|sticker\b.*(torque|daily)|coding|\btest\b|review|approval", re.I)
 
+# Connecting words that never count as "new facts" in the grounding check.
+_STOPWORDS = {"with", "that", "this", "from", "into", "onto", "over", "under", "each", "when", "while",
+              "which", "their", "there", "than", "then", "also", "only", "used", "using", "ensure",
+              "ensures", "proper", "properly", "correct", "correctly", "after", "before", "during",
+              "based", "within", "without", "such", "these", "those", "have", "been", "will", "shall"}
+
 _NUM_RE = re.compile(r"\d+(?:\.\d+)?")
 _WORD_RE = re.compile(r"[a-z0-9]+")
 
@@ -113,7 +119,8 @@ def grounded(text, source):
     src_stems = {_stem(w) for w in _WORD_RE.findall(src)}
     if any(n not in set(_NUM_RE.findall(src)) for n in _NUM_RE.findall(text)):
         return False
-    meaningful = [w for w in _WORD_RE.findall(text.lower()) if not w.isdigit() and len(w) > 3]
+    meaningful = [w for w in _WORD_RE.findall(text.lower())
+                  if not w.isdigit() and len(w) > 3 and w not in _STOPWORDS]
     return bool(meaningful) and all(_stem(w) in src_stems for w in meaningful)
 
 
