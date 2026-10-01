@@ -203,6 +203,20 @@ def _merge_like_nashik(ws, first_row, last_row):
                            end_row=first_row + end, end_column=last)
 
 
+def _wrapped_lines(paragraph, chars):
+    """Lines a paragraph takes when word-wrapped at `chars` characters."""
+    lines, current = 1, 0
+    for word in paragraph.split(" "):
+        need = len(word) + (1 if current else 0)
+        if current and current + need > chars:
+            lines, current = lines + 1, len(word)
+        else:
+            current += need
+        while current > chars:  # a single very long word breaks across lines
+            lines, current = lines + 1, current - chars
+    return lines
+
+
 def _fit_row_heights(ws, first_row, last_row):
     """Excel never auto-grows rows that hold merged cells, so wrapped text
     (Failure Effect's "Your Plant: ... End User: ..." etc.) would show only its
@@ -223,9 +237,10 @@ def _fit_row_heights(ws, first_row, last_row):
                 continue
             merged = spans.get((r, c))
             r_end, c_end = (merged.max_row, merged.max_col) if merged else (r, c)
-            chars = max(8, int(width_of(c, c_end) * 1.05))
-            lines = sum(max(1, -(-len(part) // chars)) for part in str(value).split("\n"))
-            needed = lines * 12.5 + 3
+            bold = bool(ws.cell(row=r, column=c).font.b)
+            chars = max(6, int(width_of(c, c_end) * (0.88 if bold else 0.93)))
+            lines = sum(_wrapped_lines(part, chars) for part in str(value).split("\n"))
+            needed = lines * 13.0 + 5
             have = sum(height[x] for x in range(r, r_end + 1))
             if needed > have:
                 extra = (needed - have) / (r_end - r + 1)
@@ -370,10 +385,10 @@ def _write_nashik_sheet(ws, records, info=None):
                           ("sev_after", 35), ("occ_after", 36), ("det_after", 37)):
             if extra.get(role) is not None:
                 ws.cell(row=row, column=col, value=extra[role])
-        # Process Step: the plant's own Operation No goes in front of the name, in the
-        # same "Operation No: / Stage:" layout the newer Nashik sheets use.
+        # Process Step: the form's header is "Station No. and Name of Focus Element", so the
+        # plant's own Operation No goes in front of the name on one line ("10 - NAME").
         if record.get("_op_no") not in (None, "") and ws.cell(row=row, column=3).value:
-            ws.cell(row=row, column=3, value=f"Operation No: {record['_op_no']}\n\nStage:\n{ws.cell(row=row, column=3).value}")
+            ws.cell(row=row, column=3, value=f"{record['_op_no']} - {ws.cell(row=row, column=3).value}")
         after = [extra.get(r) for r in ("sev_after", "occ_after", "det_after")]
         ap_after = action_priority(*after)
         if ap_after:
@@ -403,8 +418,8 @@ def _write_nashik_sheet(ws, records, info=None):
         if first in (13, 18, 20, 23):
             ws.column_dimensions[get_column_letter(first)].width = 40
 
-    _fit_row_heights(ws, 18, 18 + len(records) - 1)
     _apply_rich_text(ws, 18, 18 + len(records) - 1, set(ai_cells))
+    _fit_row_heights(ws, 18, 18 + len(records) - 1)  # after rich text: counts the added labels
 
 def _get_llm_or_none(log):
     try:
