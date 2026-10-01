@@ -67,6 +67,11 @@ _SYSTEM = (
     "Reply with a single JSON object and nothing else."
 )
 
+# Things that are CONTROLS or records, never work elements.
+_CONTROL_WORDS = re.compile(
+    r"check|audit|training|calibrat|record|buy ?off|inspect|verif|sop\b|instruction|awareness|"
+    r"observ|clita|\bpm\b|maintenance|sticker\b.*(torque|daily)|coding|\btest\b|review|approval", re.I)
+
 _NUM_RE = re.compile(r"\d+(?:\.\d+)?")
 _WORD_RE = re.compile(r"[a-z0-9]+")
 
@@ -144,11 +149,14 @@ def _step_prompt(step, fn, process_item, items):
     return (
         f"{_SYSTEM}\n\nProcess item: {process_item or 'n/a'}\nProcess step: {step}\n"
         f"Function of the step: {fn or 'n/a'}\n\nFailure causes (6M category already assigned by rules; '?' = unknown):\n{body}\n\n"
-        "Task: list the physical work elements this step uses, per 6M category, ONLY those named or clearly "
-        "implied by the causes/controls above (e.g. cause 'Wrong tool used' + control 'Nutrunner...' -> Machine: "
-        "'Nutrunner'). For each category also give the function of that group in one short phrase taken from the "
-        "step function/causes. Categories: Man, Machine, Method, Material (Indirect), Measurement, Environment. "
-        "Omit a category if nothing in the text supports it.\n"
+        "Task: list the work elements this step uses, per 6M category, taken from the CAUSES and the step "
+        "(e.g. cause 'Wrong tool used' with control 'Nutrunner...' -> Machine: 'Nutrunner'). Prevention/detection "
+        "controls are given only to help you identify equipment: NEVER output a control, check, audit, training, "
+        "calibration, record, buy-off or SOP as a work element - those are controls, not work elements. Only "
+        "physical equipment/tools (Machine), parts/consumables (Material), the way the work is done (Method), "
+        "gauges/instruments (Measurement), conditions (Environment), people (Man). For each category also give "
+        "the function of that group in one short phrase from the step function/causes. "
+        "Omit a category if nothing in the causes supports it.\n"
         "Return JSON: {\"elements\": {\"<Category>\": [\"<name>\", ...]}, \"functions\": {\"<Category>\": "
         "[\"<function>\", ...]}}"
     )
@@ -215,8 +223,10 @@ def fill_blanks(records, info, llm, log=print):
                 items.append({"ix": ix, "cause": cause, "cat": classify_6m(cause),
                               "prev": _clean(_get(rec, _PREVENTION_KEY)), "det": _clean(_get(rec, _DETECTION_KEY))})
         items = items[:_MAX_CAUSES_PER_CALL]
-        src = " ".join([step, step_fn[step] or ""] + [
-            f"{i['cause']} {i['prev'] or ''} {i['det'] or ''}" for i in items])
+        # Names must be grounded in the step and its CAUSES (controls are not a source of work elements).
+        src = " ".join([step, step_fn[step] or ""] + [i["cause"] for i in items])
+        src_all = src + " " + " ".join(f"{i['prev'] or ''} {i['det'] or ''}" for i in items)
+        found_cats = {i["cat"] for i in items if i["cat"]}
         elements = {c: [] for c in CATEGORIES}
         functions = {c: [] for c in CATEGORIES}
         # deterministic: Man -> Operator, only if the text itself says so
@@ -225,13 +235,14 @@ def fill_blanks(records, info, llm, log=print):
         if llm is not None and items:
             data = _json_call(llm, _step_prompt(step, step_fn[step], process_item, items))
             for cat, names in (data.get("elements") or {}).items():
-                if cat in elements:
+                if cat in elements and cat in found_cats:  # category must be evidenced by a cause
                     for n in _as_list(names):
-                        if grounded(n, src) and n not in elements[cat]:
+                        if (grounded(n, src_all) and not _CONTROL_WORDS.search(n)
+                                and n not in elements[cat]):
                             elements[cat].append(n)
             for cat, fns in (data.get("functions") or {}).items():
                 if cat in functions:
-                    functions[cat] += [f for f in _as_list(fns) if grounded(f, src)]
+                    functions[cat] += [f for f in _as_list(fns) if grounded(f, src) and f not in functions[cat]]
         # Function block only for categories that actually have elements
         functions = {c: f for c, f in functions.items() if elements.get(c)}
         return idxs, build_block(elements), build_block(functions)
