@@ -11,6 +11,10 @@ the Nashik reader handles the same as merged cells.
 """
 
 from openpyxl import load_workbook
+import re
+
+from openpyxl.cell.rich_text import CellRichText, TextBlock
+from openpyxl.cell.text import InlineFont
 from openpyxl.styles import Alignment, Border, PatternFill, Side, Font
 from openpyxl.utils import get_column_letter
 
@@ -58,12 +62,41 @@ _COL_FOR_FIELD = {text: first for first, _last, text in _FIELDS}
 _COL_FOR_FIELD["Special Characteristics"] = 27  # Chakan spelling of the Nashik header
 
 _THIN = Side(style="thin")
+_MEDIUM = Side(style="medium")
 _BORDER = Border(left=_THIN, right=_THIN, top=_THIN, bottom=_THIN)
+_DATA_BORDER = Border(left=_MEDIUM, right=_MEDIUM, top=_MEDIUM, bottom=_MEDIUM)
 _WRAP = Alignment(wrap_text=True, vertical="center", horizontal="center")
-_PINK, _GREEN = "FFF769BE", "FF009900"
-_GROUP_FILL = "FFFFC000"
 _AI_COLOR = "FF1D4ED8"
-_AI_FONT = Font(italic=True, color=_AI_COLOR)
+_RED = "FFFF0000"
+
+# Colours and fonts taken from the Nashik plant sheet (Arial throughout).
+_GREY, _BLUE, _PINK, _GREEN, _PURPLE = "FFD9D9D9", "FF00B0F0", "FFF769BE", "FF009900", "FF7030A0"
+_GROUP_FILL_BY_NAME = {  # band over each group of columns; Optimization has no fill
+    "Structure Analysis (Step2)": "FFFFC000", "Function Analysis (Step3)": "FFFFC000",
+    "Failure Analysis (Step4)": "FFFFC000", "Risk Analysis (Step5)": "FFE2EFDA",
+}
+_HEADER_FILL = {}
+for _c in (1, 7, 13):
+    _HEADER_FILL[_c] = _GREY
+for _c in (3, 9, 16):
+    _HEADER_FILL[_c] = _BLUE
+for _c in (5, 11, 18):
+    _HEADER_FILL[_c] = _PINK
+for _c in (15, 20, 22, 23, 25, 26, 35, 36, 37, 38):
+    _HEADER_FILL[_c] = _GREEN
+_HEADER_FILL[27] = _PURPLE
+# column -> (horizontal, vertical, bold) for data cells, as on the plant sheet
+_DATA_STYLE = {1: ("left", "top", True), 3: ("left", "top", True), 5: ("left", "top", False),
+               7: ("left", "top", False), 9: ("left", "center", True), 11: ("left", "top", False),
+               13: ("center", "center", False), 15: ("center", "center", True), 16: ("center", "center", True),
+               18: ("left", "center", True), 20: ("center", "center", True), 22: ("center", "center", True),
+               23: ("center", "center", True), 25: ("center", "center", True), 26: ("center", "center", True),
+               27: ("center", "center", False)}
+for _c in range(28, 35):
+    _DATA_STYLE[_c] = ("left", "top", False)
+for _c in range(35, 39):
+    _DATA_STYLE[_c] = ("center", "center", True)
+_AI_FONT = Font(name="Arial", size=10, italic=True, color=_AI_COLOR)
 
 
 # Nashik title block: (label cell, value cell) pairs; A-C / D-F / G-H are merged
@@ -93,7 +126,7 @@ def _write_title_block(ws, info):
         info["responsibility"] = "; ".join(
             x for x in (f"Reviewed by: {reviewed}" if reviewed else None,
                         f"Approved by: {approved}" if approved else None) if x)
-    ws.cell(row=3, column=1, value="Planning and Preparation (Step1)")
+    ws.cell(row=3, column=1, value="Planning and Preparation (Step1)").font = Font(name="Arial", size=12, bold=True)
     ws.merge_cells("A3:H4")
     for label_ref, label, value_ref, key in _TITLE_BLOCK:
         width = 3 if label_ref[0] in "AD" else 2
@@ -102,8 +135,9 @@ def _write_title_block(ws, info):
             cell.value = text
             cell.alignment = Alignment(wrap_text=True, vertical="center")
             cell.border = _BORDER
+            cell.font = Font(name="Arial", size=10, bold=True)
             if text is not None and ref == label_ref:
-                cell.font = Font(bold=True)
+                cell.font = Font(name="Arial", size=10, bold=True)
             end = cell.column + width - 1
             ws.merge_cells(start_row=cell.row, start_column=cell.column, end_row=cell.row, end_column=end)
 
@@ -199,6 +233,64 @@ def _fit_row_heights(ws, first_row, last_row):
         ws.row_dimensions[r].height = min(h, 409)
 
 
+_AUDIENCE = re.compile(r"^(Your Plant|Ship to Plant|End User)\s*:?\s*(.*)$", re.I)
+_SIX_M = re.compile(r"^(Man|Machine|Method|Material(?: \(Indirect\))?|Measurement|Environment)\s*:\s*$")
+
+
+def _font(bold=False, color=None, italic=False):
+    return InlineFont(rFont="Arial", sz=10, b=bold, i=italic, color=color)
+
+
+def _audience_runs(text, ai):
+    """Failure Effect / Function of Process Item the way the plant writes it:
+    "Your Plant :", "Ship to Plant :", "End User :" as red bold labels, the
+    text under each in black. The Ship to Plant label is always shown (empty
+    when the source has nothing), as on the plant sheet."""
+    parts, current = {}, None
+    for line in str(text).splitlines():
+        m = _AUDIENCE.match(line.strip())
+        if m:
+            current = m.group(1).lower().replace("ship to plant", "ship")
+            parts.setdefault(current, [])
+            if m.group(2).strip():
+                parts[current].append(m.group(2).strip())
+        elif current and line.strip():
+            parts[current].append(line.strip())
+    if not parts:
+        return None
+    body_color = _AI_COLOR if ai else None
+    runs = []
+    for key, label in (("your plant", "Your Plant :"), ("ship", "Ship to Plant :"), ("end user", "End User :")):
+        if key not in parts and key != "ship":
+            continue
+        runs.append(TextBlock(_font(True, _RED, ai), label + "\n"))
+        content = "\n".join(parts.get(key, []))
+        runs.append(TextBlock(_font(False, body_color, ai), content + ("\n\n" if key == "your plant" else "\n" if key == "ship" else "")))
+    return CellRichText(*runs)
+
+
+def _block_runs(text, ai):
+    """Work Element / Function of Work Element: 6M headings bold, items plain."""
+    color = _AI_COLOR if ai else None
+    runs = []
+    for line in str(text).splitlines(keepends=True):
+        bold = bool(_SIX_M.match(line.strip()))
+        runs.append(TextBlock(_font(bold, color, ai), line))
+    return CellRichText(*runs)
+
+
+def _apply_rich_text(ws, first_row, last_row, ai_cells):
+    for r in range(first_row, last_row + 1):
+        for c in (5, 7, 11, 13):
+            value = ws.cell(row=r, column=c).value
+            if not isinstance(value, str) or not value:
+                continue
+            ai = (r, c) in ai_cells
+            rich = _block_runs(value, ai) if c in (5, 11) else _audience_runs(value, ai)
+            if rich is not None:
+                ws.cell(row=r, column=c).value = rich
+
+
 def _write_nashik_sheet(ws, records, info=None):
     """Fill an empty worksheet with the Nashik header (rows 13-17) and one
     data row per record from row 18."""
@@ -206,7 +298,7 @@ def _write_nashik_sheet(ws, records, info=None):
     ai_cells = []
     ws.cell(row=1, column=1, value="Process Failure Mode and Effects Analysis (Process FMEA)")
     ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=20)
-    ws.cell(row=1, column=1).font = Font(bold=True, size=14)
+    ws.cell(row=1, column=1).font = Font(name="Arial", bold=True, size=14)
 
     _write_title_block(ws, info or {})
     _write_history_block(ws, info or {})
@@ -214,23 +306,22 @@ def _write_nashik_sheet(ws, records, info=None):
     for name, first, last in _GROUPS:
         ws.merge_cells(start_row=13, start_column=first, end_row=14, end_column=last)
         cell = ws.cell(row=13, column=first, value=name)
-        cell.font = Font(bold=True)
+        cell.font = Font(name="Arial", size=10, bold=True)
+        band = _GROUP_FILL_BY_NAME.get(name)
         for r in (13, 14):
             for c in range(first, last + 1):
-                ws.cell(row=r, column=c).fill = PatternFill("solid", fgColor=_GROUP_FILL)
+                if band:
+                    ws.cell(row=r, column=c).fill = PatternFill("solid", fgColor=band)
                 ws.cell(row=r, column=c).border = _BORDER
         cell.alignment = _WRAP
 
     for first, last, text in _FIELDS:
         ws.merge_cells(start_row=15, start_column=first, end_row=17, end_column=last)
         cell = ws.cell(row=15, column=first, value=text)
-        cell.font = Font(bold=True)
+        cell.font = Font(name="Arial", bold=True, size=8 if first < 20 else 9,
+                         color="FFFFF2CC" if first == 27 else None)
         cell.alignment = _WRAP
-        fill = None
-        if text.startswith("3. Process Work Element") or text.startswith("3. Function of the Process Work") or text.startswith("3. Failure Cause"):
-            fill = _PINK
-        elif first in (15, 20, 22, 23, 25, 26, 35, 36, 37, 38):
-            fill = _GREEN
+        fill = _HEADER_FILL.get(first)
         for r in range(15, 18):
             for c in range(first, last + 1):
                 ws.cell(row=r, column=c).border = _BORDER
@@ -266,12 +357,15 @@ def _write_nashik_sheet(ws, records, info=None):
                 ws.cell(row=row, column=col, value=text)
                 ai_cells.append((row, col))
         for first, last, _t in _FIELDS:
+            horizontal, vertical, bold = _DATA_STYLE.get(first, ("left", "top", False))
             for c in range(first, last + 1):
                 cell = ws.cell(row=row, column=c)
-                cell.border = _BORDER
-                cell.alignment = Alignment(wrap_text=True, vertical="top")
+                cell.border = _DATA_BORDER
+                cell.alignment = Alignment(wrap_text=True, horizontal=horizontal, vertical=vertical)
+                cell.font = Font(name="Arial", size=10, bold=bold)
         for r_, c_ in [x for x in ai_cells if x[0] == row]:
-            ws.cell(row=r_, column=c_).font = _AI_FONT
+            ws.cell(row=r_, column=c_).font = Font(name="Arial", size=10, italic=True, color=_AI_COLOR,
+                                                   bold=_DATA_STYLE.get(c_, ("", "", False))[2])
 
     _merge_like_nashik(ws, 18, 18 + len(records) - 1)
 
@@ -282,6 +376,7 @@ def _write_nashik_sheet(ws, records, info=None):
             ws.column_dimensions[get_column_letter(first)].width = 40
 
     _fit_row_heights(ws, 18, 18 + len(records) - 1)
+    _apply_rich_text(ws, 18, 18 + len(records) - 1, set(ai_cells))
 
 def _get_llm_or_none(log):
     try:

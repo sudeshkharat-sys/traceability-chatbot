@@ -207,8 +207,8 @@ def fill_blanks(records, info, llm, log=print):
             plant = plant if grounded(plant, sheet_src) else None
             user = user if grounded(user, sheet_src) else None
             if plant or user:
-                fn_item = "\n\n".join(x for x in (f"Your Plant- {plant}" if plant else None,
-                                                  f"End user- {user}" if user else None) if x)
+                fn_item = "\n".join(x for x in (f"Your Plant:\n{plant}" if plant else None,
+                                               f"End User:\n{user}" if user else None) if x)
         except Exception as exc:  # noqa: BLE001 - AI must never fail the conversion
             note_failure(exc)
 

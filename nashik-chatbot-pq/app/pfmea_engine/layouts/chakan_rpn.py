@@ -149,15 +149,20 @@ def normalize(ws, layout=None):
     carry = {"step": None, "requirements": None, "effect": None, "mode": None, "severity": None, "special": None}
     for row in range(band_end + 1, ws.max_row + 1):
         if cell(row, "step") is not None:
+            if cell(row, "step") != carry["step"]:
+                carry["requirements"] = None  # a new step starts with no requirement of its own yet
             carry["step"] = cell(row, "step")
         mode, cause = cell(row, "mode"), cell(row, "cause")
         if mode is not None:
-            # A new Failure Mode row owns its own requirement/effect/severity/
-            # class (even if blank); a blank-mode row is another Cause of the
-            # mode above and inherits them.
+            # A new Failure Mode row owns its own effect/severity/class (even if
+            # blank); a blank-mode row is another Cause of the mode above and
+            # inherits them.
+            # A blank Requirement under a new mode of the SAME step means "same
+            # requirement as above" (e.g. "Plug missing" under "Firm Fitment").
+            req = cell(row, "requirements")
             carry.update(
                 mode=mode,
-                requirements=cell(row, "requirements"),
+                requirements=req if req is not None else carry["requirements"],
                 effect=cell(row, "effect"),
                 severity=cell(row, "severity"),
                 special=cell(row, "special"),
