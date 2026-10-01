@@ -20,6 +20,8 @@ from openpyxl.utils import get_column_letter
 
 from app.pfmea_engine.layouts import LAYOUTS, get_layout, nashik_vda
 from app.pfmea_engine.layouts import ai_fill as ai_fill_mod
+from app.pfmea_engine.layouts.ai_fill import classify_6m
+from app.pfmea_engine.layouts.ap import action_priority
 
 _GROUPS = [
     ("Structure Analysis (Step2)", 1, 6),
@@ -293,6 +295,9 @@ def _apply_rich_text(ws, first_row, last_row, ai_cells):
 
 
 _STEP_FIELD = "2. Process Step Station No. and Name of\nFocus Element"
+_SEV_FIELD = "Severity (S) of FE\n"
+_OCC_FIELD = "Occurrence (O) of FC"
+_DET_FIELD = "Detection (D) of FC/FM"
 
 
 def _write_nashik_sheet(ws, records, info=None):
@@ -346,8 +351,18 @@ def _write_nashik_sheet(ws, records, info=None):
         # Work Element (6M) and the Function columns come from the AI gap-fill below.
         if info.get("aggregatepartdescrptn"):
             ws.cell(row=row, column=1, value=info["aggregatepartdescrptn"])
-        # Action Priority is left blank: the source has RPN, not AP, and only
-        # data present in the input is filled.
+        # Action Priority from the plant's own S / O / D via the AIAG-VDA AP table (code only).
+        sod = [next((v for k, v in record.items() if isinstance(k, tuple) and k[1] == f), None)
+               for f in (_SEV_FIELD, _OCC_FIELD, _DET_FIELD)]
+        ap = action_priority(*sod)
+        if ap:
+            ws.cell(row=row, column=26, value=ap)
+        # Failure Cause: Nashik writes the 6M category in front ("Man- ..."). Added only when
+        # a keyword clearly places the cause; the plant's own wording is kept untouched.
+        cause = ws.cell(row=row, column=18).value
+        category = classify_6m(cause)
+        if cause and category and not re.match(rf"^\s*{re.escape(category.split(' ')[0])}\b", str(cause), re.I):
+            ws.cell(row=row, column=18, value=f"{category.split(' ')[0]}- {cause}")
         # The plant's own action tracking, into the matching optimization columns.
         extra = record.get("_extra") or {}
         for role, col in (("recommended", 28), ("responsibility", 30), ("action_taken", 33),
@@ -358,6 +373,10 @@ def _write_nashik_sheet(ws, records, info=None):
         # same "Operation No: / Stage:" layout the newer Nashik sheets use.
         if record.get("_op_no") not in (None, "") and ws.cell(row=row, column=3).value:
             ws.cell(row=row, column=3, value=f"Operation No: {record['_op_no']}\n\nStage:\n{ws.cell(row=row, column=3).value}")
+        after = [extra.get(r) for r in ("sev_after", "occ_after", "det_after")]
+        ap_after = action_priority(*after)
+        if ap_after:
+            ws.cell(row=row, column=38, value=ap_after)
         # AI-proposed text for columns the old form had no data for; only
         # where the plant left the cell blank, and visibly marked.
         for col, text in (record.get("_ai") or {}).items():
@@ -438,16 +457,55 @@ def convert_workbook_to_nashik(source_path, dest_path, layout="auto", log=print,
             ai_status[title] = {"filled": 0, "failed": 0, "error": None}
 
     out = load_workbook(source_path, rich_text=True)
+    new_tabs = []  # (tab title, label, records, ai status)
     for title, label, records, info in plan:
         index = out.sheetnames.index(title)
         del out[title]
-        new_ws = out.create_sheet(title, index)
-        _write_nashik_sheet(new_ws, records, info)
-        log(f"Converted '{title}' from {label} to Nashik AIAG-VDA format ({len(records)} rows)")
+        groups = _split_by_operation(records)
+        used = set(out.sheetnames)
+        for n, (name, recs) in enumerate(groups):
+            tab = title if len(groups) == 1 else _unique_title(name or f"{title} {n + 1}", used)
+            used.add(tab)
+            new_ws = out.create_sheet(tab, index + n)
+            _write_nashik_sheet(new_ws, recs, info)
+            filled = sum(len(r.get("_ai", {})) for r in recs)
+            status = dict(ai_status.get(title) or {}, filled=filled)
+            new_tabs.append((tab, label, recs, status))
+        log(f"Converted '{title}' from {label} to Nashik AIAG-VDA format ({len(records)} rows, {len(groups)} tab(s))")
     out.save(dest_path)
     if info_out is not None:
-        info_out.extend({"title": t, "label": l, "records": r, "ai": ai_status.get(t)} for t, l, r, _i in plan)
-    return [t for t, _l, _r, _i in plan]
+        info_out.extend({"title": t, "label": l, "records": r, "ai": a_} for t, l, r, a_ in new_tabs)
+    return [t for t, _l, _r, _a in new_tabs]
+
+
+_BAD_TITLE = re.compile(r"[\[\]:*?/\\]")
+
+
+def _unique_title(name, used):
+    """Excel tab name: no []:*?/\\, at most 31 characters, unique in the workbook."""
+    base = _BAD_TITLE.sub(" ", " ".join(str(name).split()))[:31].strip() or "Sheet"
+    title, n = base, 2
+    while title in used:
+        suffix = f" ({n})"
+        title, n = base[:31 - len(suffix)] + suffix, n + 1
+    return title
+
+
+def _split_by_operation(records):
+    """Nashik keeps ONE station (operation) per tab; the old form lists every
+    operation in one sheet. Split into consecutive runs of the same Operation
+    No / step, each named like "10 VEHICLE BARCODE SCANNING"."""
+    groups, key = [], object()
+    for rec in records:
+        step = next((v for k, v in rec.items() if isinstance(k, tuple) and k[1] == _STEP_FIELD), None)
+        this = (rec.get("_op_no"), step)
+        if this != key:
+            name = " ".join(x for x in (str(rec["_op_no"]) if rec.get("_op_no") not in (None, "") else None,
+                                        " ".join(str(step).split()) if step else None) if x)
+            groups.append([name, []])
+            key = this
+        groups[-1][1].append(rec)
+    return [(n, r) for n, r in groups]
 
 
 def sheet_grid(ws, first_row=18):

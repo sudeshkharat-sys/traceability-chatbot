@@ -345,6 +345,8 @@ function PFMEA() {
     (n) => sheetLayouts[n] && sheetLayouts[n] !== 'nashik_vda'
   );
   const needsConversion = nonNashikSheets.length > 0 && !conversionConfirmed;
+  // After conversion the workbook has one tab per operation - show those, not the old tab name.
+  const tabNames = conversionConfirmed && conversion?.all_sheets ? conversion.all_sheets : sheetNames;
 
   // Restore the last saved run once, on first mount - e.g. after an
   // accidental refresh or a nav-away-and-back, rather than losing paid-for
@@ -568,7 +570,7 @@ function PFMEA() {
           </div>
         )}
 
-        {sheetNames.length > 0 && !needsConversion && (
+        {tabNames.length > 0 && !needsConversion && (
           <div className="pfmea-step-card">
             <div className="pfmea-step-heading">
               <StepBadge n={2} />
@@ -584,7 +586,7 @@ function PFMEA() {
                     className={`pfmea-scope-btn ${scope === 'all' ? 'active' : ''}`}
                     onClick={() => setScope('all')}
                   >
-                    Full sheet ({sheetNames.length})
+                    Full sheet ({tabNames.length})
                   </button>
                   <button
                     type="button"
@@ -632,7 +634,7 @@ function PFMEA() {
 
             {scope === 'select' && (
               <div className="pfmea-sheet-chips">
-                {sheetNames.map((name) => (
+                {tabNames.map((name) => (
                   <button
                     key={name}
                     className={`pfmea-sheet-chip ${selectedSheets.includes(name) ? 'selected' : ''}`}

@@ -124,6 +124,7 @@ def convert_to_nashik(file_bytes: bytes, layout: str = "auto") -> dict:
         _converted_cache[token] = dst.read_bytes()
         out_wb = load_workbook(dst, data_only=True)
         try:
+            all_sheets = list(out_wb.sheetnames)
             grids = {name: sheet_grid(out_wb[name]) for name in converted}
         finally:
             out_wb.close()
@@ -133,7 +134,7 @@ def convert_to_nashik(file_bytes: bytes, layout: str = "auto") -> dict:
         sheets.append({"name": item["title"], "from_label": item["label"], "row_count": len(item["records"]),
                        "ai_filled": ai.get("filled", 0), "ai_error": ai.get("error"),
                        "grid": grids[item["title"]]})
-    return {"converted": True, "convert_token": token, "sheets": sheets}
+    return {"converted": True, "convert_token": token, "sheets": sheets, "all_sheets": all_sheets}
 
 
 def get_converted(token: str) -> Optional[bytes]:
