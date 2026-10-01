@@ -225,7 +225,7 @@ function ConversionPreview({ conversion, onDiscard }) {
     <div className="pfmea-convert-preview">
       <div className="pfmea-convert-summary">
         <CheckCircle2 size={16} />
-        <span>Converted {totalRows} rows to AIAG-VDA (Nashik) format.</span>
+        <span>Converted {totalRows} rows to AIAG-VDA format.</span>
         {aiFilled > 0 && <span className="pfmea-ai-note">Blue italic cells were blank in the old format and filled by AI — please review.</span>}
         {aiError && <span className="pfmea-ai-note">AI fill not available ({aiError}); blank columns left empty.</span>}
       </div>

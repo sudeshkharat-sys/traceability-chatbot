@@ -185,13 +185,10 @@ def start_analysis(
         get_layout(layout)  # raises LayoutMismatch for an unknown id
     total_rows = _count_total_rows(source_path, sheet_names, layout)
     if total_rows == 0:
-        detected = inspect_workbook(file_bytes)["sheet_layouts"]
-        summary = ", ".join(f"'{n}': {l or 'not recognized'}" for n, l in detected.items())
         raise LayoutMismatch(
             "No failure-mode rows were found in the selected sheet(s). "
-            f"Selected format: {layout or 'auto'}. Detected per sheet - {summary}. "
             "Check that this is a PFMEA sheet (not a Control Plan / process flow) "
-            "and that the plant format matches."
+            "in the old RPN format or the AIAG-VDA format."
         )
 
     token = uuid.uuid4().hex

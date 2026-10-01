@@ -93,7 +93,7 @@ def _write_title_block(ws, info):
         info["responsibility"] = "; ".join(
             x for x in (f"Reviewed by: {reviewed}" if reviewed else None,
                         f"Approved by: {approved}" if approved else None) if x)
-    ws.cell(row=3, column=1, value="Planning and Preparation (Step 1)")
+    ws.cell(row=3, column=1, value="Planning and Preparation (Step1)")
     ws.merge_cells("A3:H4")
     for label_ref, label, value_ref, key in _TITLE_BLOCK:
         width = 3 if label_ref[0] in "AD" else 2
@@ -106,6 +106,26 @@ def _write_title_block(ws, info):
                 cell.font = Font(bold=True)
             end = cell.column + width - 1
             ws.merge_cells(start_row=cell.row, start_column=cell.column, end_row=cell.row, end_column=end)
+
+
+def _write_history_block(ws, info):
+    """Nashik's revision table (I3:T12) from the source's own Rev No / date;
+    skipped when the source carries neither."""
+    if not (info.get("revno") or info.get("revdate")):
+        return
+    ws.cell(row=3, column=9, value="History / Change Authorization")
+    ws.merge_cells("I3:T4")
+    ws["I3"].font = Font(bold=True)
+    ws["I3"].alignment = Alignment(wrap_text=True, vertical="center")
+    for col, text in ((9, "Rev no"), (10, "Date:"), (11, "Remarks")):
+        ws.cell(row=5, column=col, value=text).font = Font(bold=True)
+    ws.merge_cells("K5:T5")
+    ws.cell(row=6, column=9, value=info.get("revno"))
+    ws.cell(row=6, column=10, value=info.get("revdate"))
+    ws.merge_cells("K6:T6")
+    for r in range(3, 7):
+        for c in range(9, 21):
+            ws.cell(row=r, column=c).border = _BORDER
 
 
 def _runs(values):
@@ -184,11 +204,12 @@ def _write_nashik_sheet(ws, records, info=None):
     data row per record from row 18."""
     info = info or {}
     ai_cells = []
-    ws.cell(row=1, column=1, value="Process Failure Mode and Effects Analysis")
+    ws.cell(row=1, column=1, value="Process Failure Mode and Effects Analysis (Process FMEA)")
     ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=20)
     ws.cell(row=1, column=1).font = Font(bold=True, size=14)
 
     _write_title_block(ws, info or {})
+    _write_history_block(ws, info or {})
 
     for name, first, last in _GROUPS:
         ws.merge_cells(start_row=13, start_column=first, end_row=14, end_column=last)
@@ -251,13 +272,6 @@ def _write_nashik_sheet(ws, records, info=None):
                 cell.alignment = Alignment(wrap_text=True, vertical="top")
         for r_, c_ in [x for x in ai_cells if x[0] == row]:
             ws.cell(row=r_, column=c_).font = _AI_FONT
-
-    if ai_cells:
-        note = ws.cell(row=3, column=10, value="Blue italic cells were left blank in the source form and "
-                       "proposed by AI from the sheet's own text - please review.")
-        note.font = Font(italic=True, color=_AI_COLOR)
-        note.alignment = Alignment(wrap_text=True, vertical="center")
-        ws.merge_cells(start_row=3, start_column=10, end_row=4, end_column=20)
 
     _merge_like_nashik(ws, 18, 18 + len(records) - 1)
 
