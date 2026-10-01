@@ -186,9 +186,9 @@ def _merge_like_nashik(ws, first_row, last_row):
     mode_block = list(zip(col_values(16), col_values(13), col_values(15)))
     # field first-col -> grouping key per row (None = never merge vertically)
     keys = {
-        1: [0] * len(rows), 7: [0] * len(rows),
+        1: [0] * len(rows),
         3: col_values(3), 9: list(zip(col_values(3), col_values(9))),
-        5: col_values(3), 11: col_values(3),  # Work Element blocks are per step, like the Nashik form
+        5: col_values(3), 7: col_values(3), 11: col_values(3),  # per-step blocks, like the Nashik form
         13: mode_block, 15: mode_block, 16: mode_block, 27: mode_block,
     }
     for first, last, _t in _FIELDS:
@@ -258,6 +258,7 @@ def _audience_runs(text, ai):
             parts[current].append(line.strip())
     if not parts:
         return None
+    parts.setdefault("end user", [])
     body_color = _AI_COLOR if ai else None
     runs = []
     for key, label in (("your plant", "Your Plant :"), ("ship", "Ship to Plant :"), ("end user", "End User :")):
@@ -291,11 +292,34 @@ def _apply_rich_text(ws, first_row, last_row, ai_cells):
                 ws.cell(row=r, column=c).value = rich
 
 
+_FN_STEP_FIELD = "2. Function of the Process Step and Product Characteristic\n(Quantitative value is optional)"
+_STEP_FIELD = "2. Process Step Station No. and Name of\nFocus Element"
+
+
+def _function_of_item_by_step(records):
+    """Function of the Process Item for each step, from the step's own
+    requirements (the old form's "Requirements" column): the plant-side
+    purpose of that step. Code only - nothing is invented; End User and Ship
+    to Plant are left for the plant to fill."""
+    by_step = {}
+    for rec in records:
+        step = next((v for k, v in rec.items() if isinstance(k, tuple) and k[1] == _STEP_FIELD), None)
+        req = next((v for k, v in rec.items() if isinstance(k, tuple) and k[1] == _FN_STEP_FIELD), None)
+        if step and req:
+            items = by_step.setdefault(step, [])
+            text = " ".join(str(req).split())
+            if text not in items:
+                items.append(text)
+    return {step: "Your Plant :\n" + "\n".join(f"{i}. {t}" for i, t in enumerate(items, 1))
+            for step, items in by_step.items()}
+
+
 def _write_nashik_sheet(ws, records, info=None):
     """Fill an empty worksheet with the Nashik header (rows 13-17) and one
     data row per record from row 18."""
     info = info or {}
     ai_cells = []
+    fn_item_by_step = _function_of_item_by_step(records)
     ws.cell(row=1, column=1, value="Process Failure Mode and Effects Analysis (Process FMEA)")
     ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=20)
     ws.cell(row=1, column=1).font = Font(name="Arial", bold=True, size=14)
@@ -350,6 +374,9 @@ def _write_nashik_sheet(ws, records, info=None):
                           ("sev_after", 35), ("occ_after", 36), ("det_after", 37)):
             if extra.get(role) is not None:
                 ws.cell(row=row, column=col, value=extra[role])
+        step_name = next((v for k, v in record.items() if isinstance(k, tuple) and k[1] == _STEP_FIELD), None)
+        if fn_item_by_step.get(step_name):
+            ws.cell(row=row, column=7, value=fn_item_by_step[step_name])
         # AI-proposed text for columns the old form had no data for; only
         # where the plant left the cell blank, and visibly marked.
         for col, text in (record.get("_ai") or {}).items():

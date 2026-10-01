@@ -1,5 +1,5 @@
-"""Gap-fill for the Nashik converter: Process Item, Work Element (6M), Function
-of Process Item and Function of Work Element.
+"""Gap-fill for the Nashik converter: Process Item, Work Element (6M) and Function
+of Work Element (Function of Process Item is built per step by convert.py, code only).
 
 The older plant forms (e.g. Chakan RPN) have none of these, so a straight
 column mapping leaves them blank. In a real Nashik sheet they are NOT per-row
@@ -167,9 +167,7 @@ def _sheet_prompt(hint, steps):
     return (
         f"{_SYSTEM}\n\nHeader details from the sheet: {hint or 'none'}\nProcess steps (step -> function):\n{lines}\n\n"
         "Return JSON: {\"process_item\": <short name of the station/process this PFMEA covers, using the header "
-        "or step names, or null>, \"your_plant\": <what the process item must achieve in the plant, one sentence "
-        "taken from the step functions, or null>, \"end_user\": <what it must achieve for the end user, one "
-        "sentence, ONLY if stated or obvious from the text, else null>}"
+        "or step names, or null>}"
     )
 
 
@@ -192,9 +190,8 @@ def fill_blanks(records, info, llm, log=print):
     step_fn = {s: _clean(_get(records[ix[0]], _FN_STEP_KEY)) for s, ix in groups.items()}
     steps = [{"step": s, "fn": step_fn[s]} for s in groups if s]
 
-    # ---- sheet level: Process Item + Function of Process Item ----------
+    # ---- sheet level: Process Item (Function of Process Item is built per step by the converter, code only) ----
     process_item = _clean(info.get("aggregatepartdescrptn"))
-    fn_item = None
     hint = " ".join(str(v) for v in info.values() if v)
     sheet_src = hint + " " + " ".join(f"{s['step']} {s['fn'] or ''}" for s in steps)
     if llm is not None:
@@ -203,12 +200,6 @@ def fill_blanks(records, info, llm, log=print):
             if not process_item:
                 cand = _clean(data.get("process_item"))
                 process_item = cand if grounded(cand, sheet_src) else None
-            plant, user = _clean(data.get("your_plant")), _clean(data.get("end_user"))
-            plant = plant if grounded(plant, sheet_src) else None
-            user = user if grounded(user, sheet_src) else None
-            if plant or user:
-                fn_item = "\n".join(x for x in (f"Your Plant:\n{plant}" if plant else None,
-                                               f"End User:\n{user}" if user else None) if x)
         except Exception as exc:  # noqa: BLE001 - AI must never fail the conversion
             note_failure(exc)
 
@@ -265,8 +256,6 @@ def fill_blanks(records, info, llm, log=print):
             ai = records[ix].setdefault("_ai", {})
             if process_item and not info.get("aggregatepartdescrptn"):
                 ai[COL_PROCESS_ITEM] = process_item
-            if fn_item:
-                ai[COL_FN_ITEM] = fn_item
             if we_block:
                 ai[COL_WORK_ELEMENT] = we_block
             if fn_block:
