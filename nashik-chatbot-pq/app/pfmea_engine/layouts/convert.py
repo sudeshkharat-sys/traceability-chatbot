@@ -132,8 +132,9 @@ def _merge_like_nashik(ws, first_row, last_row):
     mode_block = list(zip(col_values(16), col_values(13), col_values(15)))
     # field first-col -> grouping key per row (None = never merge vertically)
     keys = {
-        1: [0] * len(rows), 7: [0] * len(rows), 11: None,
-        3: col_values(3), 9: list(zip(col_values(3), col_values(9))), 5: None,
+        1: [0] * len(rows), 7: [0] * len(rows),
+        3: col_values(3), 9: list(zip(col_values(3), col_values(9))),
+        5: col_values(3), 11: col_values(3),  # Work Element blocks are per step, like the Nashik form
         13: mode_block, 15: mode_block, 16: mode_block, 27: mode_block,
     }
     for first, last, _t in _FIELDS:
@@ -311,10 +312,13 @@ def convert_workbook_to_nashik(source_path, dest_path, layout="auto", log=print,
     if ai_fill:
         llm = llm or _get_llm_or_none(log)
     for title, _label, records, info in plan:
-        if ai_fill and llm is not None:
+        if ai_fill:
+            # llm=None still runs the rule-based part (6M classification, Operator)
             ai_status[title] = ai_fill_mod.fill_blanks(records, info, llm, log=log)
+            if llm is None:
+                ai_status[title]["error"] = "AI model not available"
         else:
-            ai_status[title] = {"filled": 0, "failed": 0, "error": "AI gap-fill not available" if ai_fill else None}
+            ai_status[title] = {"filled": 0, "failed": 0, "error": None}
 
     out = load_workbook(source_path, rich_text=True)
     for title, label, records, info in plan:
