@@ -27,7 +27,7 @@ from typing import Optional
 from openpyxl import load_workbook
 
 from app.pfmea_engine.run_pipeline import run_pipeline
-from app.pfmea_engine.layouts.convert import convert_workbook_to_nashik, sheet_grid
+from app.pfmea_engine.layouts.convert import convert_workbook_to_nashik, sheet_grid, pfd_grid, page2_grid
 from app.pfmea_engine.layouts import LayoutMismatch, available_layouts, detect_layout, get_layout
 from app.pfmea_engine.step2_normalize import normalize_sheet
 
@@ -124,16 +124,26 @@ def convert_to_nashik(file_bytes: bytes, layout: str = "auto") -> dict:
         _converted_cache[token] = dst.read_bytes()
         out_wb = load_workbook(dst, data_only=True)
         try:
-            all_sheets = list(out_wb.sheetnames)
-            grids = {name: sheet_grid(out_wb[name]) for name in converted}
+            aux = {x for i in info for x in (i["pfd_title"], i["page2_title"])}
+            all_sheets = [n for n in out_wb.sheetnames if n not in aux]  # tabs the AI can run on
+            grids = {}
+            for i in info:
+                grids[i["pfd_title"]] = pfd_grid(out_wb[i["pfd_title"]])
+                grids[i["title"]] = sheet_grid(out_wb[i["title"]])
+                grids[i["page2_title"]] = page2_grid(out_wb[i["page2_title"]])
         finally:
             out_wb.close()
     sheets = []
     for item in info:
         ai = item.get("ai") or {}
-        sheets.append({"name": item["title"], "from_label": item["label"], "row_count": len(item["records"]),
-                       "ai_filled": ai.get("filled", 0), "ai_error": ai.get("error"),
-                       "grid": grids[item["title"]]})
+        for key in ("pfd_title", "title", "page2_title"):
+            name = item[key]
+            is_main = key == "title"
+            sheets.append({"name": name, "from_label": item["label"],
+                           "row_count": len(item["records"]) if is_main else 0,
+                           "ai_filled": ai.get("filled", 0) if is_main else 0,
+                           "ai_error": ai.get("error") if is_main else None,
+                           "grid": grids[name]})
     return {"converted": True, "convert_token": token, "sheets": sheets, "all_sheets": all_sheets}
 
 

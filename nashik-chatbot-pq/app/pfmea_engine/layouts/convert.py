@@ -295,6 +295,7 @@ def _apply_rich_text(ws, first_row, last_row, ai_cells):
 
 
 _STEP_FIELD = "2. Process Step Station No. and Name of\nFocus Element"
+_FN_STEP_FIELD = "2. Function of the Process Step and Product Characteristic\n(Quantitative value is optional)"
 _SEV_FIELD = "Severity (S) of FE\n"
 _OCC_FIELD = "Occurrence (O) of FC"
 _DET_FIELD = "Detection (D) of FC/FM"
@@ -457,27 +458,32 @@ def convert_workbook_to_nashik(source_path, dest_path, layout="auto", log=print,
             ai_status[title] = {"filled": 0, "failed": 0, "error": None}
 
     out = load_workbook(source_path, rich_text=True)
-    new_tabs = []  # (tab title, label, records, ai status)
+    new_tabs = []  # (PFMEA tab title, label, records, ai status)
     for title, label, records, info in plan:
         index = out.sheetnames.index(title)
         del out[title]
-        groups = _split_by_operation(records)
         used = set(out.sheetnames)
-        for n, (name, recs) in enumerate(groups):
-            tab = title if len(groups) == 1 else _unique_title(name or f"{title} {n + 1}", used)
-            used.add(tab)
-            new_ws = out.create_sheet(tab, index + n)
-            _write_nashik_sheet(new_ws, recs, info)
-            filled = sum(len(r.get("_ai", {})) for r in recs)
-            status = dict(ai_status.get(title) or {}, filled=filled)
-            new_tabs.append((tab, label, recs, status))
-        log(f"Converted '{title}' from {label} to Nashik AIAG-VDA format ({len(records)} rows, {len(groups)} tab(s))")
+        suffix = "" if len(plan) == 1 else f" - {title}"
+        names = [_unique_title(base + suffix, used) for base in (PFD_TITLE, PAGE1_TITLE, PAGE2_TITLE)]
+        used.update(names)
+        # A Nashik workbook is three tabs: PFD, PFMEA page 1, PFMEA page 2 (Step 7 results).
+        _write_pfd_sheet(out.create_sheet(names[0], index), records)
+        page1 = out.create_sheet(names[1], index + 1)
+        _write_nashik_sheet(page1, records, info)
+        _write_page2_sheet(out.create_sheet(names[2], index + 2), records, info)
+        status = dict(ai_status.get(title) or {}, filled=sum(len(r.get("_ai", {})) for r in records))
+        new_tabs.append((names[1], label, records, status, names[0], names[2]))
+        log(f"Converted '{title}' from {label} to AIAG-VDA format ({len(records)} rows): {', '.join(names)}")
     out.save(dest_path)
     if info_out is not None:
-        info_out.extend({"title": t, "label": l, "records": r, "ai": a_} for t, l, r, a_ in new_tabs)
-    return [t for t, _l, _r, _a in new_tabs]
+        info_out.extend({"title": t, "label": l, "records": r, "ai": a_, "pfd_title": pf, "page2_title": p2}
+                        for t, l, r, a_, pf, p2 in new_tabs)
+    return [t[0] for t in new_tabs]
 
 
+PFD_TITLE = "PFD"
+PAGE1_TITLE = "PFMEA- AIAG VDA Page 1"
+PAGE2_TITLE = "PFMEA Page 2"
 _BAD_TITLE = re.compile(r"[\[\]:*?/\\]")
 
 
@@ -491,21 +497,124 @@ def _unique_title(name, used):
     return title
 
 
-def _split_by_operation(records):
-    """Nashik keeps ONE station (operation) per tab; the old form lists every
-    operation in one sheet. Split into consecutive runs of the same Operation
-    No / step, each named like "10 VEHICLE BARCODE SCANNING"."""
-    groups, key = [], object()
+def _by_operation(records):
+    """[(operation no, step name, [unique requirements])] in sheet order."""
+    ops, key = [], object()
     for rec in records:
         step = next((v for k, v in rec.items() if isinstance(k, tuple) and k[1] == _STEP_FIELD), None)
+        req = next((v for k, v in rec.items() if isinstance(k, tuple) and k[1] == _FN_STEP_FIELD), None)
         this = (rec.get("_op_no"), step)
         if this != key:
-            name = " ".join(x for x in (str(rec["_op_no"]) if rec.get("_op_no") not in (None, "") else None,
-                                        " ".join(str(step).split()) if step else None) if x)
-            groups.append([name, []])
+            ops.append((rec.get("_op_no"), step, []))
             key = this
-        groups[-1][1].append(rec)
-    return [(n, r) for n, r in groups]
+        text = " ".join(str(req).split()) if req else None
+        if text and text not in ops[-1][2]:
+            ops[-1][2].append(text)
+    return ops
+
+
+def _write_pfd_sheet(ws, records):
+    """Process Flow Diagram tab: one row per operation from the old form's own
+    Operation No, step name and requirements (Product Characteristics). Flow
+    symbols and Process Characteristics are not in the old form - left empty."""
+    ws.cell(row=1, column=2, value="PROCESS FLOW DIAGRAM").font = Font(name="Calibri", bold=True, size=16)
+    ws.merge_cells("B1:F1")
+    for col, text in enumerate(("Operation No.", "Operation Description", "Flow", "Product Characteristics",
+                                "Process Characteristics"), start=2):
+        c = ws.cell(row=2, column=col, value=text)
+        c.font = Font(name="Calibri", bold=True, size=11)
+        c.alignment = Alignment(wrap_text=True, vertical="center", horizontal="center")
+        c.border = _DATA_BORDER
+    for i, (op, step, reqs) in enumerate(_by_operation(records)):
+        row = 3 + i
+        values = (op, " ".join(str(step).split()) if step else None, None, "\n".join(reqs) or None, None)
+        for col, value in enumerate(values, start=2):
+            c = ws.cell(row=row, column=col, value=value)
+            c.font = Font(name="Arial", size=11)
+            c.alignment = Alignment(wrap_text=True, vertical="top")
+            c.border = _DATA_BORDER
+    for letter, width in (("A", 4), ("B", 18.5), ("C", 46.8), ("D", 18.5), ("E", 42.2), ("F", 34.2)):
+        ws.column_dimensions[letter].width = width
+
+
+def _ap_rows(records):
+    """[(failure mode, S, O, D, AP, has_action)] per cause row, AP from the plant's S/O/D."""
+    rows = []
+    for rec in records:
+        get = lambda f: next((v for k, v in rec.items() if isinstance(k, tuple) and k[1] == f), None)
+        s_, o_, d_ = get(_SEV_FIELD), get(_OCC_FIELD), get(_DET_FIELD)
+        extra = rec.get("_extra") or {}
+        rows.append((get("2. Failure Mode (FM) of the\nFocus Element"), s_, o_, d_,
+                     action_priority(s_, o_, d_), bool(extra.get("recommended"))))
+    return rows
+
+
+def _write_page2_sheet(ws, records, info):
+    """PFMEA Page 2 (Step 7 Result Documentation): AP summary, justification list
+    for Medium/High without action, team members. Counts come from the converted
+    rows in code; justification text and team details the old form lacks stay empty."""
+    info = info or {}
+    ws.cell(row=1, column=1, value="Process Failure Mode and Effects Analysis (Process FMEA)").font = Font(name="Arial", bold=True, size=14)
+    ws.merge_cells(start_row=1, start_column=1, end_row=2, end_column=20)
+    _write_title_block(ws, info)
+    _write_history_block(ws, info)
+
+    def put(ref, value, bold=True, size=10, merge=None, border=True, wrap=True):
+        c = ws[ref]
+        c.value = value
+        c.font = Font(name="Arial", bold=bold, size=size)
+        c.alignment = Alignment(wrap_text=wrap, vertical="center")
+        if merge:
+            ws.merge_cells(merge)
+        if border:
+            area = ws[merge or ref]
+            cells = [area] if not isinstance(area, tuple) else [x for row in area for x in (row if isinstance(row, tuple) else (row,))]
+            for cell in cells:
+                cell.border = _BORDER
+
+    put("A13", "Result Documentation (Step7)", size=12, merge="A13:H14", border=False)
+    put("I13", "Justification", border=False)
+    put("I14", "In case of AP medium or High but team decided no action required", border=False)
+    put("A15", "Action Priority summary", size=9, merge="A15:H15")
+    put("A16", "Opn no", merge="A16:B16")
+    put("C16", "Priority", merge="C16:D16")
+    put("E16", "No of Failure modes", merge="E16:F16")
+    put("G16", "No of Actions Identified", size=9, merge="G16:H16")
+    rows = _ap_rows(records)
+    for i, (label, letter) in enumerate((("High", "H"), ("Moderate", "M"), ("Low", "L"))):
+        r = 17 + i
+        put(f"A{r}", None, merge=f"A{r}:B{r}")
+        put(f"C{r}", label)
+        put(f"D{r}", letter)
+        put(f"E{r}", sum(1 for x in rows if x[4] == letter) or None, merge=f"E{r}:F{r}")
+        put(f"G{r}", sum(1 for x in rows if x[4] == letter and x[5]) or None, merge=f"G{r}:H{r}")
+
+    put("A20", "Team Member details", merge="A20:H20")
+    for ref, text, merge in (("A21", "S.no", None), ("B21", "Dept", "B21:C21"), ("D21", "Emp Id no", None),
+                             ("E21", "Letter Code", None), ("F21", "Employee Name", "F21:H21")):
+        put(ref, text, merge=merge)
+    team = [n.strip() for n in str(info.get("team") or "").split(",") if n.strip()]
+    for i in range(max(len(team), 14)):
+        r = 22 + i
+        put(f"A{r}", i + 1 if i < len(team) else None)
+        put(f"B{r}", None, merge=f"B{r}:C{r}")
+        put(f"D{r}", None)
+        put(f"E{r}", None)
+        put(f"F{r}", team[i] if i < len(team) else None, merge=f"F{r}:H{r}")
+
+    for col, text in (("I", "S.no"), ("J", "Failure Mode (FM) of the\nFocus Element"), ("M", "Severity"),
+                      ("N", "Occurrence"), ("O", "Detection"), ("P", "AP"), ("Q", "Justification")):
+        put(f"{col}15", text, merge="J15:L15" if col == "J" else None)
+    need = [x for x in rows if x[4] in ("H", "M") and not x[5]]
+    for i, (fm, s_, o_, d_, ap, _a) in enumerate(need):
+        r = 16 + i
+        put(f"I{r}", i + 1)
+        put(f"J{r}", fm, bold=False, merge=f"J{r}:L{r}")
+        for col, v in (("M", s_), ("N", o_), ("O", d_), ("P", ap), ("Q", None)):
+            put(f"{col}{r}", v, bold=False)
+    for letter, width in (("A", 10.3), ("D", 12.2), ("E", 12.0), ("F", 10.3), ("H", 11.3), ("I", 10.3), ("J", 12.2),
+                          ("K", 10.3), ("N", 11.8), ("O", 12.0), ("P", 10.3), ("Q", 30)):
+        ws.column_dimensions[letter].width = width
 
 
 def sheet_grid(ws, first_row=18):
@@ -535,3 +644,19 @@ def sheet_grid(ws, first_row=18):
                           "ai": color == _AI_COLOR and cell.value not in (None, "")})
         rows.append(cells)
     return {"groups": groups, "headers": headers, "rows": rows}
+
+
+def _plain_grid(headers, rows):
+    return {"groups": [], "headers": headers,
+            "rows": [[{"v": v, "rs": 1, "ai": False} for v in row] for row in rows]}
+
+
+def pfd_grid(ws):
+    rows = [[ws.cell(row=r, column=c).value for c in range(2, 7)] for r in range(3, ws.max_row + 1)]
+    return _plain_grid([ws.cell(row=2, column=c).value for c in range(2, 7)], [r for r in rows if any(r)])
+
+
+def page2_grid(ws):
+    """The Step 7 summary (AP counts) plus the justification list, as plain rows."""
+    rows = [[ws.cell(row=r, column=c).value for c in (3, 4, 5, 7)] for r in (17, 18, 19)]
+    return _plain_grid(["Priority", "AP", "No of Failure modes", "No of Actions Identified"], rows)

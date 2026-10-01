@@ -191,11 +191,13 @@ function ConvertedGrid({ grid }) {
   return (
     <table className="pfmea-table pfmea-grid">
       <thead>
-        <tr>
-          {grid.groups.map((g, i) => (
-            <th key={i} colSpan={g.span} className="pfmea-grid-group">{g.text}</th>
-          ))}
-        </tr>
+        {grid.groups.length > 0 && (
+          <tr>
+            {grid.groups.map((g, i) => (
+              <th key={i} colSpan={g.span} className="pfmea-grid-group">{g.text}</th>
+            ))}
+          </tr>
+        )}
         <tr>
           {grid.headers.map((h, i) => <th key={i}>{h}</th>)}
         </tr>
