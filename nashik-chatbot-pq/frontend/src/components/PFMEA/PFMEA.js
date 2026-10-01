@@ -213,7 +213,7 @@ function ConvertedGrid({ grid }) {
   );
 }
 
-function ConversionPreview({ conversion, confirmed, onConfirm, onDiscard }) {
+function ConversionPreview({ conversion, onDiscard }) {
   const [active, setActive] = useState(conversion.sheets[0]?.name);
   const [open, setOpen] = useState(false);
   const [large, setLarge] = useState(false);
@@ -233,14 +233,7 @@ function ConversionPreview({ conversion, confirmed, onConfirm, onDiscard }) {
         <button className="pfmea-analyze-btn" onClick={() => setOpen(true)}>
           <Eye size={16} /> View converted sheet
         </button>
-        {confirmed ? (
-          <span className="pfmea-agree-badge agree"><CheckCircle2 size={14} /> Confirmed — you can run the AI</span>
-        ) : (
-          <>
-            <button className="pfmea-cancel-btn" onClick={onConfirm}>Looks right — confirm</button>
-            <button className="pfmea-cancel-btn" onClick={onDiscard}>Discard</button>
-          </>
-        )}
+        <button className="pfmea-cancel-btn" onClick={onDiscard}>Convert again</button>
       </div>
       {open && (
         <div className="pfmea-modal-backdrop" onClick={() => setOpen(false)}>
@@ -457,7 +450,7 @@ function PFMEA() {
     try {
       const res = await pfmeaApi.convertToNashik(file);
       setConversion(res.data);
-      if (!res.data.converted) setConversionConfirmed(true); // nothing to convert
+      setConversionConfirmed(true); // Run appears right after conversion; the user can still View it first
     } catch (err) {
       setError(err?.response?.data?.detail || 'Conversion failed.');
     } finally {
@@ -558,26 +551,24 @@ function PFMEA() {
               <strong title={file?.name}>{shortFileName(file?.name)}</strong> is in{' '}
               {[...new Set(nonNashikSheets.map((n) => (layouts.find((l) => l.id === sheetLayouts[n]) || {}).short_label))]
                 .filter(Boolean).join(' / ') || 'an older'}{' '}
-              format, not the AIAG-VDA format. Convert it, check the result, then run.
+              format, not the AIAG-VDA format. Convert it, then run.
             </p>
             {!conversion && (
               <button className="pfmea-analyze-btn" onClick={handleConvert} disabled={converting}>
                 {converting ? <Loader2 size={16} className="pfmea-spin" /> : <RefreshCw size={16} />}
-                {converting ? 'Converting and filling blanks with AI…' : 'Convert to Nashik format'}
+                {converting ? 'Converting and filling blanks with AI…' : 'Convert to AIAG-VDA format'}
               </button>
             )}
             {conversion?.converted && (
               <ConversionPreview
                 conversion={conversion}
-                confirmed={conversionConfirmed}
-                onConfirm={() => setConversionConfirmed(true)}
                 onDiscard={() => { setConversion(null); setConversionConfirmed(false); }}
               />
             )}
           </div>
         )}
 
-        {sheetNames.length > 0 && (
+        {sheetNames.length > 0 && !needsConversion && (
           <div className="pfmea-step-card">
             <div className="pfmea-step-heading">
               <StepBadge n={2} />
@@ -626,7 +617,7 @@ function PFMEA() {
                   className={`pfmea-analyze-btn ${analyzing ? 'running' : ''}`}
                   onClick={handleAnalyze}
                   disabled={analyzing || needsConversion || (scope === 'select' && selectedSheets.length === 0)}
-                  title={needsConversion ? 'Convert to Nashik format and confirm first' : undefined}
+                  
                 >
                   {analyzing ? <Loader2 size={16} className="pfmea-spin" /> : null}
                   {analyzing ? 'Running…' : 'Run'}
