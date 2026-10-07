@@ -25,7 +25,7 @@ export const pfmeaApi = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
-  convertedUrl: (token) => `${BASE_URL}/converted/${token}`,
+  convertedUrl: (token, name) => `${BASE_URL}/converted/${token}${name ? `?name=${encodeURIComponent(name)}` : ''}`,
   startAnalysis: (file, sheetNames, repeat = 3, convertToken = null) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -41,5 +41,5 @@ export const pfmeaApi = {
   getProgress: (token) => axios.get(`${BASE_URL}/progress/${token}`),
   getResult: (token) => axios.get(`${BASE_URL}/result/${token}`),
   cancelRun: (token) => axios.post(`${BASE_URL}/cancel/${token}`),
-  downloadUrl: (token) => `${BASE_URL}/download/${token}`,
+  downloadUrl: (token, name) => `${BASE_URL}/download/${token}${name ? `?name=${encodeURIComponent(name)}` : ''}`,
 };

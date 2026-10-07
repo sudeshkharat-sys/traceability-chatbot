@@ -215,7 +215,7 @@ function ConvertedGrid({ grid }) {
   );
 }
 
-function ConversionPreview({ conversion, onDiscard }) {
+function ConversionPreview({ conversion, fileName, onDiscard }) {
   const [active, setActive] = useState(conversion.sheets[0]?.name);
   const [open, setOpen] = useState(false);
   const [large, setLarge] = useState(false);
@@ -244,7 +244,7 @@ function ConversionPreview({ conversion, onDiscard }) {
               <strong>Converted sheet</strong>
               <div className="pfmea-modal-tools">
                 <a className="pfmea-icon-btn" title="Download as Excel (opens in Excel or Google Sheets)"
-                   href={pfmeaApi.convertedUrl(conversion.convert_token)} download>
+                   href={pfmeaApi.convertedUrl(conversion.convert_token, fileName)} download>
                   <Download size={16} />
                 </a>
                 <button className="pfmea-icon-btn" title={large ? 'Smaller window' : 'Full screen'} onClick={() => setLarge(!large)}>
@@ -565,6 +565,7 @@ function PFMEA() {
             )}
             {conversion?.converted && (
               <ConversionPreview
+                fileName={file?.name}
                 conversion={conversion}
                 onDiscard={() => { setConversion(null); setConversionConfirmed(false); }}
               />
@@ -720,7 +721,7 @@ function PFMEA() {
               <div className="pfmea-results-summary">
                 <a
                   className="pfmea-download-btn"
-                  href={pfmeaApi.downloadUrl(result.download_token)}
+                  href={pfmeaApi.downloadUrl(result.download_token, file?.name)}
                   download
                 >
                   <Download size={16} /> Download annotated Excel

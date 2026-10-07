@@ -14,7 +14,8 @@ const BASE_ENABLED = ["traceability", "guideline", "part-labeler", "part-labeler
 const PART_LABELER_ALLOWED = ["part-labeler", "part-labeler-plant", "part-labeler-ev"];
 
 const ROLE_ALLOWED = {
-  user:               ["part-labeler", "guideline", "z-stage", "pfmea"],
+  user:               ["part-labeler", "guideline", "z-stage"],
+  pfmea_advisor:      ["pfmea"],
   part_labeler:       ["part-labeler", "part-labeler-plant", "guideline"],
   part_labeler_field: ["part-labeler", "guideline"],
   part_labeler_plant: ["part-labeler-plant", "z-stage", "guideline"],

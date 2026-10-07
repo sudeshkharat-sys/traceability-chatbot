@@ -11,6 +11,8 @@ being scored instead of just abandoning an open HTTP request.
 """
 
 import logging
+import re
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
@@ -21,6 +23,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["pfmea"])
 
 _service = None
+
+
+def _download_name(prefix: str, original: Optional[str]) -> str:
+    """"<prefix>_<original name>.xlsx" so the prefix sorts first and the
+    user's own file name stays recognisable."""
+    stem = re.sub(r"[^A-Za-z0-9._ -]", "_", Path(original or "").stem).strip(" ._")[:80]
+    return f"{prefix}_{stem}.xlsx" if stem else f"{prefix}.xlsx"
 
 
 def get_service():
@@ -59,7 +68,7 @@ async def convert(file: UploadFile = File(...), layout: str = Form("auto")):
 
 
 @router.get("/converted/{token}")
-async def converted(token: str):
+async def converted(token: str, name: Optional[str] = None):
     """The converted Nashik-format .xlsx, to open in Excel and check."""
     data = get_service().get_converted(token)
     if data is None:
@@ -67,7 +76,7 @@ async def converted(token: str):
     return Response(
         content=data,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=pfmea_nashik_format.xlsx"},
+        headers={"Content-Disposition": "attachment; filename=" + _download_name("pfmea_converted", name)},
     )
 
 
@@ -160,7 +169,7 @@ async def cancel(token: str):
 
 
 @router.get("/download/{token}")
-async def download(token: str):
+async def download(token: str, name: Optional[str] = None):
     """The annotated .xlsx produced by a previous analysis run."""
     output_bytes = get_service().get_download(token)
     if output_bytes is None:
@@ -168,5 +177,5 @@ async def download(token: str):
     return Response(
         content=output_bytes,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        headers={"Content-Disposition": "attachment; filename=pfmea_with_suggestions.xlsx"},
+        headers={"Content-Disposition": "attachment; filename=" + _download_name("ai_suggested_pfmea", name)},
     )
