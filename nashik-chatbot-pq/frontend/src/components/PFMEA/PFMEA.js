@@ -513,7 +513,7 @@ function PFMEA() {
             <ArrowLeft size={16} /><span>Dashboard</span>
           </button>
           <div className="header-title">
-            <h1>PFMEA Assistant</h1>
+            <h1>PFMEA APEX Advisor</h1>
             <p>AI-reviewed Severity and Detection suggestions for your PFMEA sheet</p>
           </div>
         </div>

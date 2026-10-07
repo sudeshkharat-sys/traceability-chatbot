@@ -1,6 +1,6 @@
 """
 Trim a real PFMEA input workbook down to its first N Failure Mode rows, so
-you can smoke-test the PFMEA Assistant (concurrency, cancel, repeat slider,
+you can smoke-test the PFMEA APEX Advisor (concurrency, cancel, repeat slider,
 etc.) for a few cents/seconds instead of paying for every row on a real
 14+-row sheet every time you want to check something changed.
 

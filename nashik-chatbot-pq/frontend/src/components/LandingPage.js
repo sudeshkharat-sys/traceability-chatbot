@@ -92,7 +92,7 @@ function LandingPage() {
     },
     {
       id: "pfmea",
-      title: "PFMEA Assistant",
+      title: "PFMEA APEX Advisor",
       icon: dashboardIcon,
       description: "AI-reviewed Severity and Detection suggestions for your PFMEA sheet",
       route: "/pfmea",

@@ -490,7 +490,7 @@ def get_llm(profile=None, reasoning_effort=None):
                 f"AZURE_{profile.upper()}_API_KEY (or shared AZURE_API_KEY)"
             )
         # Deliberately NOT sys.exit(1): that raises SystemExit, which is a
-        # BaseException, not an Exception - the PFMEA Assistant's background
+        # BaseException, not an Exception - the PFMEA APEX Advisor's background
         # worker thread (backend/services/pfmea_service.py) only catches
         # `except Exception`, and Python's threading module silently
         # swallows an uncaught SystemExit in a non-main thread (no

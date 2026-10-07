@@ -1,5 +1,5 @@
 """
-PFMEA Assistant API Routes
+PFMEA APEX Advisor API Routes
 Upload a PFMEA Excel sheet, get back AI Severity/Detection review cards
 plus a downloadable annotated workbook.
 

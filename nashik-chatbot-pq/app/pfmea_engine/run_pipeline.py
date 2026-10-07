@@ -398,7 +398,7 @@ def run_pipeline(
     {sheet_name: rows} - the same per-row Severity/Detection/reasoning
     dicts score_entries() produces, before they're flattened into Excel
     cells by apply_suggestions_to_sheet(). This is what a caller building a
-    JSON API response (e.g. the PFMEA Assistant card's backend route) reads
+    JSON API response (e.g. the PFMEA APEX Advisor card's backend route) reads
     to render one card per row, without re-parsing the output .xlsx.
 
     max_concurrent_rows caps how many rows are scored at once within a

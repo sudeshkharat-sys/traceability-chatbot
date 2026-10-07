@@ -1,9 +1,9 @@
 """
-PFMEA Assistant Service
+PFMEA APEX Advisor Service
 Wraps app.pfmea_engine.run_pipeline (the AI Severity/Detection review
 pipeline, ported in from the standalone pfmea_ai/ prototype - that folder
 is kept as-is for CLI-only testing, this is the real integration used by
-the PFMEA Assistant card) for use behind a request/response API: takes an
+the PFMEA APEX Advisor card) for use behind a request/response API: takes an
 uploaded workbook's bytes in, returns per-row card data plus the
 annotated workbook's bytes back out, with no file paths the caller has to
 manage themselves.
