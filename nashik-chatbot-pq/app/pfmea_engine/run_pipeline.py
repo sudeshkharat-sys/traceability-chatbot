@@ -27,7 +27,6 @@ Example:
     python run_pipeline.py NEW_PFMEA.xlsx --handbook-index aiag-vda-fmea-handbook-1__handbook_index.json
 """
 
-import os
 import sys
 import threading
 from collections import Counter, defaultdict
@@ -66,8 +65,7 @@ CHECKPOINT_EVERY_ROWS = 5
 # kept modest so a big full-sheet run doesn't blow past the Azure OpenAI
 # deployment's per-minute rate limit and start getting 429s. Raise this
 # only alongside a check of the deployment's actual TPM/RPM quota.
-# Override without a code change via the PFMEA_MAX_CONCURRENT_ROWS env var.
-MAX_CONCURRENT_ROWS = max(1, int(os.environ.get("PFMEA_MAX_CONCURRENT_ROWS", "10")))
+MAX_CONCURRENT_ROWS = 6
 
 
 def make_row_checkpoint(out_wb, out_ws, output_path, cause_to_modes, cause_by_mode, merge_mode, log, block_start_col):
