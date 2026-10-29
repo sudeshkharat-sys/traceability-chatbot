@@ -157,8 +157,8 @@ async def upload_image(
         result = get_service().upload_image(filename, userId, displayName)
         return result
     except Exception as e:
-        logger.error(f"Upload error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to upload image")
+        logger.error(f"Upload error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to upload image: {type(e).__name__}: {e}")
 
 @router.delete("/images/{image_id}")
 async def delete_image(image_id: int, userId: int = Query(...)):
