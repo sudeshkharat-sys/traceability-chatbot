@@ -136,13 +136,16 @@ class StateDBConnector:
             with self.get_session() as session:
                 result = session.execute(text(query), params)
 
-                # Get the last inserted ID if available
-                if result.lastrowid:
-                    return result.lastrowid
+                # PostgreSQL: the ID comes from the RETURNING clause
+                if result.returns_rows:
+                    row = result.fetchone()
+                    return row[0] if row else None
 
-                # For RETURNING clauses
-                row = result.fetchone()
-                return row[0] if row else None
+                # Other dialects: fall back to lastrowid when supported
+                try:
+                    return result.lastrowid or None
+                except AttributeError:
+                    return None
 
         except Exception as e:
             logger.error(f"Error executing insert: {e}")
