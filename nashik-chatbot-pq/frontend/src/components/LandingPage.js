@@ -9,18 +9,11 @@ import dashboardIcon from "../assests/dashboard.png";
 import utilityLogo from "../assests/image.png";
 import mahindraRiseLogo from "../assests/mahindra_rise_logo.png";
 import { authService } from "../services/api";
+import { ROLE_ALLOWED } from "../services/api/authService";
 
 const BASE_ENABLED = ["traceability", "guideline", "part-labeler", "part-labeler-plant", "part-labeler-ev", "z-stage", "pfmea", "qlense"];
 const PART_LABELER_ALLOWED = ["part-labeler", "part-labeler-plant", "part-labeler-ev"];
 
-const ROLE_ALLOWED = {
-  user:               ["part-labeler", "guideline", "z-stage"],
-  pfmea_advisor:      ["pfmea"],
-  part_labeler:       ["part-labeler", "part-labeler-plant", "guideline"],
-  part_labeler_field: ["part-labeler", "guideline"],
-  part_labeler_plant: ["part-labeler-plant", "z-stage", "guideline"],
-  part_labeler_ev:    ["part-labeler-ev", "z-stage", "guideline"],
-};
 
 function LandingPage() {
   const navigate = useNavigate();

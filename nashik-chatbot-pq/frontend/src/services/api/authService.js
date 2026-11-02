@@ -5,6 +5,33 @@
 
 import { backend_url } from "./config";
 
+// Single source of truth for which modules each role may open.
+// New signups get "user" (minimal); an admin then assigns the real role.
+export const ROLE_ALLOWED = {
+  user:               ["part-labeler", "guideline"],
+  pfmea_advisor:      ["pfmea", "part-labeler-plant"],
+  part_labeler:       ["part-labeler", "part-labeler-plant", "guideline"],
+  part_labeler_field: ["part-labeler", "guideline"],
+  part_labeler_plant: ["part-labeler-plant", "z-stage", "guideline", "pfmea"],
+  part_labeler_ev:    ["part-labeler-ev", "z-stage", "guideline"],
+};
+
+// Map a route (path + query) to a module id from the landing page.
+function moduleIdForPath(path) {
+  const [pathname, query = ""] = path.split("?");
+  const params = new URLSearchParams(query);
+  if (pathname.startsWith("/part-labeler")) {
+    const mode = params.get("mode");
+    if (mode === "plant") return "part-labeler-plant";
+    if (mode === "ev") return "part-labeler-ev";
+    return "part-labeler";
+  }
+  if (pathname.startsWith("/z-stage")) return "z-stage";
+  if (pathname.startsWith("/pfmea")) return "pfmea";
+  if (pathname.startsWith("/chat")) return params.get("feature");
+  return null;
+}
+
 class AuthService {
   /**
    * Sign up a new user
@@ -164,11 +191,11 @@ class AuthService {
 
   canAccess(path) {
     const role = this.getUserRole();
-    if (role === "admin" || role === "user") return true;
-    if (role === "part_labeler") return path.startsWith("/part-labeler");
-    if (role === "part_labeler_field") return path.startsWith("/part-labeler") && !path.includes("mode=plant");
-    if (role === "part_labeler_plant") return (path.startsWith("/part-labeler") && path.includes("mode=plant")) || path.startsWith("/z-stage");
-    return false;
+    if (role === "admin") return true;
+    const allowed = ROLE_ALLOWED[role];
+    if (!allowed) return false;
+    const id = moduleIdForPath(path);
+    return id !== null && allowed.includes(id);
   }
 }
 
