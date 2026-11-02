@@ -85,6 +85,7 @@ class AuthService {
     const data = await response.json();
 
     // Save session to sessionStorage
+    sessionStorage.setItem("token", data.token || "");
     sessionStorage.setItem("user_id", data.user_id);
     sessionStorage.setItem("username", data.username);
     sessionStorage.setItem("first_name", data.first_name || "");
@@ -114,6 +115,7 @@ class AuthService {
     sessionStorage.removeItem("first_name");
     sessionStorage.removeItem("last_name");
     sessionStorage.removeItem("role");
+    sessionStorage.removeItem("token");
     sessionStorage.removeItem("isLoggedIn");
   }
 
@@ -187,6 +189,20 @@ class AuthService {
       throw new Error(error.detail || "Password reset failed");
     }
     return response.json();
+  }
+
+  getToken() {
+    return sessionStorage.getItem("token") || "";
+  }
+
+  /**
+   * Append the access token to a URL that the browser (not fetch/axios) will
+   * request, e.g. file downloads and 3D-model loaders, which cannot send headers.
+   */
+  withToken(url) {
+    const t = this.getToken();
+    if (!t) return url;
+    return url + (url.includes("?") ? "&" : "?") + "access_token=" + encodeURIComponent(t);
   }
 
   canAccess(path) {

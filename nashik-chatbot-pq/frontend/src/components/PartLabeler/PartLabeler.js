@@ -2551,7 +2551,7 @@ function PartLabeler() {
                                                     filterMIS.forEach(m => params.append('misBucket', m));
                                                     filterMfgQtr.forEach(m => params.append('mfgQtr', m));
                                                     params.append('format', 'csv');
-                                                    window.open(`${API_BASE}/download-warranty?${params.toString()}`, '_blank');
+                                                    window.open(authService.withToken(`${API_BASE}/download-warranty?${params.toString()}`), '_blank');
                                                   }}><Download size={14} /><span>CSV</span></button>
                                                 </div>
                                               </div>

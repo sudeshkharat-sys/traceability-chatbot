@@ -7,6 +7,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 import hashlib
+from backend.services.auth.token import create_token
 from backend.models.schemas.auth_schemas import SignupDto, LoginDto, ResetPasswordDto
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,7 @@ async def login(payload: LoginDto):
                 "first_name": result["first_name"],
                 "last_name": result["last_name"],
                 "role": result["role"],
+                "token": create_token(result["user_id"]),
                 "message": "Login successful",
             }
         )

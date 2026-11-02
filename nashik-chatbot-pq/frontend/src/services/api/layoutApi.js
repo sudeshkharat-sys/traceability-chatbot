@@ -1,5 +1,7 @@
 import axios from 'axios';
 import { backend_url } from "./config";
+import authService from "./authService";
+import { attachAuth } from "./authFetch";
 
 const BASE_URL = `${backend_url}/z-stage`;
 
@@ -7,6 +9,8 @@ const api = axios.create({
   baseURL: BASE_URL,
   headers: { 'Content-Type': 'application/json' },
 });
+
+attachAuth(api);
 
 export const layoutApi = {
   getLayouts: (userId) => api.get('/layouts/', { params: userId != null ? { user_id: userId } : {} }),
@@ -151,7 +155,7 @@ export const docApi = {
     if (layoutId != null) params.layout_id = layoutId;
     return api.get('/docs/list', { params });
   },
-  getDownloadUrl: (docId) => `${BASE_URL}/docs/${docId}/download`,
+  getDownloadUrl: (docId) => authService.withToken(`${BASE_URL}/docs/${docId}/download`),
   deleteDoc: (docId) => api.delete(`/docs/${docId}`),
 };
 export const z3dModelApi = {
@@ -174,7 +178,7 @@ export const z3dModelApi = {
 
   deleteLibraryModel: (name) => api.delete(`/3d-models/library/${encodeURIComponent(name)}`),
 
-  getDownloadUrl: (name) => `${BASE_URL}/3d-models/library/${encodeURIComponent(name)}/download`,
+  getDownloadUrl: (name) => authService.withToken(`${BASE_URL}/3d-models/library/${encodeURIComponent(name)}/download`),
 
   // ── Per-layout placements ───────────────────────────────────────────────────
   listPlacements: (layoutId) => api.get(`/3d-models/placements/layout/${layoutId}`),
