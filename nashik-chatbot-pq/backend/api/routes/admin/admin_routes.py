@@ -104,7 +104,8 @@ async def create_user(
     existing_email = db.execute_query(AuthQueries.CHECK_EMAIL_EXISTS, {"email": payload.email})
     if existing_email:
         raise HTTPException(status_code=409, detail="Email already registered")
-    password_hash = hashlib.sha256(payload.password.encode()).hexdigest()
+    from backend.services.auth.passwords import hash_password
+    password_hash = hash_password(payload.password)
     rows = db.execute_query(
         AuthQueries.REGISTER_USER,
         {

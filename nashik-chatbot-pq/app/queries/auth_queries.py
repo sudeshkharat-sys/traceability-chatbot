@@ -26,6 +26,12 @@ class AuthQueries:
         WHERE username = :username AND password_hash = :password_hash
     """
 
+    GET_USER_FOR_LOGIN = """
+        SELECT user_id, username, first_name, last_name, role, password_hash
+        FROM users
+        WHERE username = :username
+    """
+
     # ==================== INSERT QUERIES ====================
 
     REGISTER_USER = """

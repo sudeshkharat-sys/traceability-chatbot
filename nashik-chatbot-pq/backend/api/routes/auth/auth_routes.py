@@ -8,6 +8,8 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 import hashlib
 from backend.services.auth.token import create_token
+from backend.services.auth.passwords import hash_password, verify_password
+from backend.services.auth import rate_limit
 from backend.models.schemas.auth_schemas import SignupDto, LoginDto, ResetPasswordDto
 
 logger = logging.getLogger(__name__)
@@ -55,8 +57,12 @@ async def signup(payload: SignupDto):
 @router.post("/login")
 async def login(payload: LoginDto):
     """Authenticate a user"""
+    wait = rate_limit.seconds_locked(payload.username)
+    if wait:
+        raise HTTPException(status_code=429, detail=f"Too many failed attempts. Try again in {wait // 60 + 1} minute(s).")
     try:
         result = get_auth_service().login(payload.username, payload.password)
+        rate_limit.clear(payload.username)
         return JSONResponse(
             content={
                 "user_id": result["user_id"],
@@ -69,6 +75,7 @@ async def login(payload: LoginDto):
             }
         )
     except ValueError as e:
+        rate_limit.record_failure(payload.username)
         raise HTTPException(status_code=401, detail=str(e))
     except Exception as e:
         logger.error(f"Login error: {e}", exc_info=True)
@@ -82,6 +89,9 @@ async def reset_password(payload: ResetPasswordDto):
     from app.connectors.state_db_connector import StateDBConnector
     if not payload.new_password:
         raise HTTPException(status_code=400, detail="New password cannot be empty")
+    wait = rate_limit.seconds_locked(payload.username)
+    if wait:
+        raise HTTPException(status_code=429, detail=f"Too many failed attempts. Try again in {wait // 60 + 1} minute(s).")
     db = StateDBConnector()
     existing = db.execute_query(AuthQueries.CHECK_USERNAME_EXISTS, {"username": payload.username})
     if not existing:
@@ -89,10 +99,12 @@ async def reset_password(payload: ResetPasswordDto):
     # Verify current password
     rows = db.execute_query(AuthQueries.GET_PASSWORD_HASH, {"username": payload.username})
     stored_hash = rows[0][0] if rows else None
-    current_hash = hashlib.sha256(payload.current_password.encode()).hexdigest()
-    if stored_hash != current_hash:
+    valid, _ = verify_password(payload.current_password, stored_hash)
+    if not valid:
+        rate_limit.record_failure(payload.username)
         raise HTTPException(status_code=401, detail="Current password is incorrect. Please contact your admin.")
-    new_hash = hashlib.sha256(payload.new_password.encode()).hexdigest()
+    rate_limit.clear(payload.username)
+    new_hash = hash_password(payload.new_password)
     db.execute_update(AuthQueries.RESET_PASSWORD, {"username": payload.username, "password_hash": new_hash})
     logger.info(f"Password reset for user '{payload.username}'")
     return JSONResponse(content={"message": "Password reset successful"})

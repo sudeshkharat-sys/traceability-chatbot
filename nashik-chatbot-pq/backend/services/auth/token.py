@@ -20,12 +20,46 @@ from app.config.config import get_settings
 
 TOKEN_TTL_SECONDS = 8 * 60 * 60  # 8 hours
 
-if get_settings().SESSION_SECRET == "change-me-in-production":
-    import logging
-    logging.getLogger(__name__).warning(
-        "SESSION_SECRET is the default value - set a long random value in .env; "
-        "tokens can be forged otherwise."
-    )
+_DEFAULT_SECRET = "change-me-in-production"
+_secret_cache = None
+
+
+def _secret() -> bytes:
+    """
+    Use SESSION_SECRET from the environment if an operator set one. Otherwise
+    generate a random secret once and keep it in the database, so every install
+    gets its own unguessable key without any manual configuration.
+    """
+    global _secret_cache
+    if _secret_cache:
+        return _secret_cache
+    configured = get_settings().SESSION_SECRET
+    if configured and configured != _DEFAULT_SECRET:
+        _secret_cache = configured.encode()
+        return _secret_cache
+    try:
+        import secrets
+        from app.connectors.state_db_connector import StateDBConnector
+
+        db = StateDBConnector()
+        db.execute_update(
+            "CREATE TABLE IF NOT EXISTS app_secrets "
+            "(name VARCHAR(50) PRIMARY KEY, value VARCHAR(255) NOT NULL)"
+        )
+        db.execute_update(
+            "INSERT INTO app_secrets (name, value) VALUES ('session_secret', :v) "
+            "ON CONFLICT (name) DO NOTHING",
+            {"v": secrets.token_urlsafe(48)},
+        )
+        rows = db.execute_query("SELECT value FROM app_secrets WHERE name = 'session_secret'")
+        _secret_cache = rows[0][0].encode()
+    except Exception as e:  # never fall back to the public default
+        import logging, secrets
+        logging.getLogger(__name__).error(
+            "Could not persist session secret (%s); using a temporary random one "
+            "- users will have to log in again after a restart.", e)
+        _secret_cache = secrets.token_urlsafe(48).encode()
+    return _secret_cache
 
 
 def _b64(data: bytes) -> str:
@@ -37,7 +71,7 @@ def _unb64(s: str) -> bytes:
 
 
 def _sign(body: str) -> str:
-    key = get_settings().SESSION_SECRET.encode()
+    key = _secret()
     return _b64(hmac.new(key, body.encode(), hashlib.sha256).digest())
 
 

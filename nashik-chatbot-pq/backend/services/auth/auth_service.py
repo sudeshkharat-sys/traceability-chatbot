@@ -3,12 +3,12 @@ Authentication Service
 Handles user signup, login, and session management
 """
 
-import hashlib
 import logging
 import datetime
 
 from app.connectors.state_db_connector import StateDBConnector
 from app.queries import AuthQueries
+from backend.services.auth.passwords import hash_password, verify_password
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ class AuthService:
 
     @staticmethod
     def _hash_password(password: str) -> str:
-        return hashlib.sha256(password.encode()).hexdigest()
+        return hash_password(password)
 
     def signup(self, username: str, first_name: str, last_name: str, email: str, password: str) -> dict:
         """
@@ -77,15 +77,17 @@ class AuthService:
         Raises:
             ValueError if credentials are invalid
         """
-        password_hash = self._hash_password(password)
-
-        rows = self.db.execute_query(
-            AuthQueries.AUTHENTICATE_USER,
-            {"username": username, "password_hash": password_hash},
-        )
-
-        if not rows:
+        rows = self.db.execute_query(AuthQueries.GET_USER_FOR_LOGIN, {"username": username})
+        ok, needs_upgrade = verify_password(password, rows[0][5]) if rows else (False, False)
+        if not ok:
             raise ValueError("Invalid username or password")
+
+        if needs_upgrade:
+            # Legacy unsalted SHA-256 hash: transparently move to salted PBKDF2.
+            self.db.execute_update(
+                AuthQueries.RESET_PASSWORD,
+                {"username": username, "password_hash": hash_password(password)},
+            )
 
         row = rows[0]
         logger.info(f"User logged in: {row[1]} (id={row[0]}) role={row[4]}")
