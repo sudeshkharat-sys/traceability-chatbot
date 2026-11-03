@@ -74,6 +74,12 @@ class Settings(BaseSettings):
     # Session Configuration
     SESSION_SECRET: str = "change-me-in-production"
 
+    # Phase 2 switch: when True, new/changed passwords are stored with salted
+    # PBKDF2 and old SHA-256 hashes are upgraded at login. Leave False until the
+    # token/role changes are proven in UAT (False = identical to the old format,
+    # so rolling back never locks users out).
+    PASSWORD_HASH_UPGRADE: bool = False
+
     # OpenSearch Configuration (for document embeddings)
     OPENSEARCH_HOST: str = "localhost"
     OPENSEARCH_PORT: int = 9200

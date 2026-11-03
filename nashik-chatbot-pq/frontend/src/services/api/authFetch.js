@@ -9,7 +9,9 @@ import authService from "./authService";
 function handleUnauthorized(url) {
   // A wrong password on /auth/login is also a 401: don't bounce the login form.
   if (String(url).includes("/auth/")) return;
-  if (!authService.getToken()) return;
+  // No token and not logged in: nothing to clear. Otherwise (e.g. a session
+  // that started before tokens existed) send the user back to log in.
+  if (!authService.getToken() && !authService.isLoggedIn()) return;
   authService.logout();
   window.location.assign("/");
 }

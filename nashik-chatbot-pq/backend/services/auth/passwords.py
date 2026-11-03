@@ -20,6 +20,14 @@ def _b64(b: bytes) -> str:
 
 
 def hash_password(password: str) -> str:
+    """Store a password. Uses the legacy format until PASSWORD_HASH_UPGRADE is on."""
+    from app.config.config import get_settings
+    if not get_settings().PASSWORD_HASH_UPGRADE:
+        return hashlib.sha256(password.encode()).hexdigest()
+    return hash_password_pbkdf2(password)
+
+
+def hash_password_pbkdf2(password: str) -> str:
     salt = os.urandom(16)
     dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, ITERATIONS)
     return f"{PREFIX}${ITERATIONS}${_b64(salt)}${_b64(dk)}"

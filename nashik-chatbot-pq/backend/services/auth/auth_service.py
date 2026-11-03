@@ -82,7 +82,8 @@ class AuthService:
         if not ok:
             raise ValueError("Invalid username or password")
 
-        if needs_upgrade:
+        from app.config.config import get_settings
+        if needs_upgrade and get_settings().PASSWORD_HASH_UPGRADE:
             # Legacy unsalted SHA-256 hash: transparently move to salted PBKDF2.
             self.db.execute_update(
                 AuthQueries.RESET_PASSWORD,
