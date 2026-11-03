@@ -85,6 +85,25 @@ class AdminService {
     }
     return res.json();
   }
+
+  /**
+   * Set a new password for a user (admin only)
+   */
+  async setPassword(userId, newPassword) {
+    const res = await fetch(
+      `${backend_url}/admin/users/${userId}/password?requester_id=${this._adminId()}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ new_password: newPassword }),
+      }
+    );
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || "Failed to set password");
+    }
+    return res.json();
+  }
 }
 
 const adminService = new AdminService();

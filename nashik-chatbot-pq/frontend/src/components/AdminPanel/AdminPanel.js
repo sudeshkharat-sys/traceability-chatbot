@@ -20,6 +20,9 @@ function AdminPanel() {
   const [showAddUser, setShowAddUser] = useState(false);
   const [addForm, setAddForm] = useState(EMPTY_FORM);
   const [addLoading, setAddLoading] = useState(false);
+  const [pwUser, setPwUser] = useState(null); // user whose password is being set
+  const [pwValue, setPwValue] = useState("");
+  const [pwLoading, setPwLoading] = useState(false);
 
   const currentUserId = authService.getUserId();
 
@@ -67,6 +70,22 @@ function AdminPanel() {
       setError(e.message);
     } finally {
       setAddLoading(false);
+    }
+  };
+
+  const handleSetPassword = async (e) => {
+    e.preventDefault();
+    setPwLoading(true);
+    setError("");
+    try {
+      await adminService.setPassword(pwUser.user_id, pwValue);
+      setActionMsg(`Password updated for "${pwUser.username}".`);
+      setPwUser(null);
+      setPwValue("");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPwLoading(false);
     }
   };
 
@@ -190,6 +209,15 @@ function AdminPanel() {
                       ))}
                     </select>
 
+                    {/* Set password button */}
+                    <button
+                      className="modal-cancel"
+                      title="Set a new password for this user"
+                      onClick={() => { setPwUser(u); setPwValue(""); setError(""); }}
+                    >
+                      Set Password
+                    </button>
+
                     {/* Delete button */}
                     <button
                       className="delete-btn"
@@ -230,6 +258,37 @@ function AdminPanel() {
       )}
 
       </div>{/* end admin-body */}
+
+      {/* Set Password Modal */}
+      {pwUser && (
+        <div className="modal-overlay" onClick={() => setPwUser(null)}>
+          <div className="modal-box modal-box-form" onClick={(e) => e.stopPropagation()}>
+            <h2>Set Password</h2>
+            <p>New password for <strong>{pwUser.username}</strong> (minimum 8 characters).</p>
+            <form onSubmit={handleSetPassword} className="add-user-form">
+              <div className="form-field">
+                <label>New password</label>
+                <input
+                  type="password"
+                  value={pwValue}
+                  onChange={(e) => setPwValue(e.target.value)}
+                  minLength={8}
+                  autoFocus
+                  required
+                />
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="modal-cancel" onClick={() => setPwUser(null)}>
+                  Cancel
+                </button>
+                <button type="submit" className="modal-confirm" disabled={pwLoading}>
+                  {pwLoading ? "Saving…" : "Save Password"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Add User Modal */}
       {showAddUser && (

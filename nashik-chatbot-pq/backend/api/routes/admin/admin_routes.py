@@ -7,7 +7,7 @@ Authorization: caller must pass their user_id as query param; backend verifies a
 import logging
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
-from backend.models.schemas.auth_schemas import UpdateRoleDto, CreateUserDto
+from backend.models.schemas.auth_schemas import UpdateRoleDto, CreateUserDto, SetPasswordDto
 
 logger = logging.getLogger(__name__)
 
@@ -146,3 +146,26 @@ async def update_user_role(
     db.execute_update(AuthQueries.UPDATE_USER_ROLE, {"user_id": user_id, "role": payload.role})
     logger.info(f"User {user_id} role updated to '{payload.role}' by admin {requester_id}")
     return JSONResponse(content={"message": f"Role updated to '{payload.role}'"})
+
+
+@router.put("/users/{user_id}/password")
+async def set_user_password(
+    user_id: int,
+    payload: SetPasswordDto,
+    requester_id: int = Query(..., description="user_id of the admin making the request"),
+):
+    """Set a new password for a user (e.g. forgotten password) — admin only."""
+    require_admin(requester_id)
+    if len(payload.new_password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters")
+    from app.queries.auth_queries import AuthQueries
+    from backend.services.auth.passwords import hash_password
+    db = get_db()
+    if not db.execute_query(AuthQueries.GET_USER_ROLE, {"user_id": user_id}):
+        raise HTTPException(status_code=404, detail="User not found")
+    db.execute_update(
+        AuthQueries.SET_PASSWORD_BY_ID,
+        {"user_id": user_id, "password_hash": hash_password(payload.new_password)},
+    )
+    logger.info(f"Password for user {user_id} set by admin {requester_id}")
+    return JSONResponse(content={"message": "Password updated"})

@@ -42,6 +42,11 @@ class UserDto(BaseModel):
     created_at: str
 
 
+class SetPasswordDto(BaseModel):
+    """Request model for an admin setting a user's password"""
+    new_password: str
+
+
 class UpdateRoleDto(BaseModel):
     """Request model for updating a user's role"""
     role: str
