@@ -2019,7 +2019,13 @@ function useThreeScene(canvasRef, layout, statusMapProp, zeMapProp, walkMode, on
             // "already has a model" forever, even though it visually looks
             // completely empty. Deleting it lets the line self-heal and
             // become eligible for auto-fill again on the next load.
-            recs.forEach(r => { if (r.id) z3dModelApi.deletePlacement(r.id).catch(() => {}); });
+            // Only self-heal when the file is genuinely missing (404). A 401/403
+            // (expired login, no access) or a network error must never delete
+            // saved placements.
+            const fileMissing = err?.response?.status === 404 || /\b404\b/.test(String(err?.message || ''));
+            if (fileMissing) {
+              recs.forEach(r => { if (r.id) z3dModelApi.deletePlacement(r.id).catch(() => {}); });
+            }
             loadedModels += 1;
             reportProgress();
             checkDone();
