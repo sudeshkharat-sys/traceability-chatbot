@@ -21,7 +21,7 @@ ROLE_ALLOWED = {
     "part_labeler":       {"part-labeler", "part-labeler-plant", "guideline"},
     "part_labeler_field": {"part-labeler", "guideline"},
     "part_labeler_plant": {"part-labeler-plant", "z-stage", "guideline", "pfmea"},
-    "part_labeler_ev":    {"part-labeler-ev", "z-stage", "guideline"},
+    "part_labeler_ev":    {"part-labeler-ev", "z-stage", "guideline", "pfmea"},
 }
 
 PART_LABELER_MODULES = {"part-labeler", "part-labeler-plant", "part-labeler-ev"}

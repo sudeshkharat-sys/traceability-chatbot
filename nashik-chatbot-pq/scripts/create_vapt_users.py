@@ -35,7 +35,7 @@ ACCOUNTS = [
     ("vapt_part_labeler",  "part_labeler",       "Part Sense Field + Plant, Guidelines"),
     ("vapt_pl_field",      "part_labeler_field", "Part Sense Field, Guidelines"),
     ("vapt_pl_plant",      "part_labeler_plant", "Part Sense Plant, Z-Stage, Guidelines, PFMEA"),
-    ("vapt_pl_ev",         "part_labeler_ev",    "Part Sense EV, Z-Stage, Guidelines"),
+    ("vapt_pl_ev",         "part_labeler_ev",    "Part Sense EV, Z-Stage, Guidelines, PFMEA"),
     ("vapt_pfmea",         "pfmea_advisor",      "PFMEA, Part Sense Plant"),
 ]
 
