@@ -690,6 +690,7 @@ function PartLabeler() {
   const [partNotes, setPartNotes] = useState({});
   const [labelFailures, setLabelFailures] = useState({});
   const [labelFailuresBySource, setLabelFailuresBySource] = useState({});
+  const [lookupError, setLookupError] = useState('');
   const [allModeActiveSource, setAllModeActiveSource] = useState(null); // { label, src } when drilling into a source in All mode
   const [showInput, setShowInput] = useState(null);
   const [activePopup, setActivePopup] = useState(null);
@@ -1090,6 +1091,7 @@ function PartLabeler() {
     if (!userId) return;
     const src_ = src || dataSource;
     const counts = {};
+    const failed = [];
     await Promise.all(currentLabels.map(async (label) => {
       try {
         const params = new URLSearchParams();
@@ -1109,14 +1111,23 @@ function PartLabeler() {
         }
 
         const res = await fetch(`${API_BASE}/warranty-lookup?${params.toString()}`);
-        const data = await res.json();
+        const data = await res.json().catch(() => null);
+        if (!res.ok || !data || data.error || data.detail) {
+          throw new Error((data && (data.error || data.detail)) || `HTTP ${res.status}`);
+        }
         const records = Array.isArray(data) ? data : [data];
         const count = records.reduce((sum, r) => sum + (r.failureCount || 0), 0);
         counts[label.id] = count;
       } catch (err) {
+        // Don't hide failures as a real 0 - surface them to the user
+        console.error(`Failure count lookup failed for "${label.partName}":`, err);
+        failed.push(`${label.partName} (${err.message})`);
         counts[label.id] = 0;
       }
     }));
+    setLookupError(failed.length
+      ? `Could not load failure counts for: ${failed.join(', ')}. Counts shown as 0 may be wrong - check the server logs.`
+      : '');
     setLabelFailures(counts);
   };
 
@@ -1125,6 +1136,7 @@ function PartLabeler() {
   const updateAllLabelFailuresAllSources = async (currentLabels) => {
     if (!userId) return;
     const bySource = {};
+    const failed = [];
     await Promise.all(currentLabels.map(async (label) => {
       bySource[label.id] = {};
       await Promise.all(REAL_SOURCES.map(async (src) => {
@@ -1138,14 +1150,22 @@ function PartLabeler() {
           params.append('misBucket', 'All');
           params.append('mfgQtr', 'All');
           const res = await fetch(`${API_BASE}/warranty-lookup?${params.toString()}`);
-          const data = await res.json();
+          const data = await res.json().catch(() => null);
+          if (!res.ok || !data || data.error || data.detail) {
+            throw new Error((data && (data.error || data.detail)) || `HTTP ${res.status}`);
+          }
           const records = Array.isArray(data) ? data : [data];
           bySource[label.id][src] = records.reduce((sum, r) => sum + (r.failureCount || 0), 0);
-        } catch {
+        } catch (err) {
+          console.error(`Failure count lookup failed for "${label.partName}" (${src}):`, err);
+          failed.push(`${label.partName} [${src}] (${err.message})`);
           bySource[label.id][src] = 0;
         }
       }));
     }));
+    setLookupError(failed.length
+      ? `Could not load failure counts for: ${failed.join(', ')}. Counts shown as 0 may be wrong - check the server logs.`
+      : '');
     setLabelFailuresBySource(bySource);
   };
 
@@ -2383,6 +2403,12 @@ function PartLabeler() {
             })()}
           </div>
 
+          {lookupError && (
+            <div role="alert" style={{ background: '#fdecea', color: '#a12622', border: '1px solid #f5c2c0', borderRadius: 6, padding: '8px 12px', margin: '8px 12px', fontSize: 13, display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+              <span>{lookupError}</span>
+              <button onClick={() => setLookupError('')} style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontWeight: 700 }} aria-label="Dismiss">x</button>
+            </div>
+          )}
           <div ref={workspaceCaptureRef} className={`workspace-scroll-container ${!selectedImage ? 'empty-state' : ''}`}>
             <div className="top-visual-section">
               {!selectedImage ? (
