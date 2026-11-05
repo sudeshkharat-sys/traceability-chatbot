@@ -105,10 +105,10 @@ class PartLabelerQueries:
         SELECT * FROM raw_warranty_data
         WHERE (LOWER(REPLACE(material_description, ' ', '')) LIKE :search_term
            OR LOWER(REPLACE(complaint_code_desc, ' ', '')) LIKE :search_term)
-           AND (:base_model IS NULL OR base_model = ANY(:base_model))
-           AND (:mis_bucket IS NULL OR mis_bucket = ANY(:mis_bucket))
-           AND (:mfg_qtr IS NULL OR new_manufacturing_quater = ANY(:mfg_qtr))
-           AND (:month_val IS NULL OR manufac_yr_mon = ANY(:month_val))
+           AND (CAST(:base_model AS text[]) IS NULL OR base_model = ANY(CAST(:base_model AS text[])))
+           AND (CAST(:mis_bucket AS text[]) IS NULL OR mis_bucket = ANY(CAST(:mis_bucket AS text[])))
+           AND (CAST(:mfg_qtr AS text[]) IS NULL OR new_manufacturing_quater = ANY(CAST(:mfg_qtr AS text[])))
+           AND (CAST(:month_val AS text[]) IS NULL OR manufac_yr_mon = ANY(CAST(:month_val AS text[])))
            AND user_id = :user_id
         ORDER BY failure_date DESC
     """
@@ -122,9 +122,9 @@ class PartLabelerQueries:
             mode() WITHIN GROUP (ORDER BY COALESCE(NULLIF(complaint_code_desc, ''), dealer_verbatim)) as "description"
         FROM raw_warranty_data
         WHERE manufac_yr_mon IS NOT NULL AND manufac_yr_mon != ''
-          AND (:base_model IS NULL OR base_model = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR mis_bucket = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR new_manufacturing_quater = ANY(:mfg_qtr))
+          AND (CAST(:base_model AS text[]) IS NULL OR base_model = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR mis_bucket = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR new_manufacturing_quater = ANY(CAST(:mfg_qtr AS text[])))
           AND user_id = :user_id
         GROUP BY manufac_yr_mon
         ORDER BY manufac_yr_mon DESC
@@ -140,9 +140,9 @@ class PartLabelerQueries:
         WHERE (LOWER(REPLACE(material_description, ' ', '')) LIKE :search_term
            OR LOWER(REPLACE(complaint_code_desc, ' ', '')) LIKE :search_term)
           AND manufac_yr_mon IS NOT NULL AND manufac_yr_mon != ''
-          AND (:base_model IS NULL OR base_model = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR mis_bucket = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR new_manufacturing_quater = ANY(:mfg_qtr))
+          AND (CAST(:base_model AS text[]) IS NULL OR base_model = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR mis_bucket = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR new_manufacturing_quater = ANY(CAST(:mfg_qtr AS text[])))
           AND user_id = :user_id
         GROUP BY manufac_yr_mon
         ORDER BY manufac_yr_mon DESC
@@ -173,11 +173,11 @@ class PartLabelerQueries:
         FROM raw_warranty_data
         WHERE user_id = :user_id
           AND manufac_yr_mon IS NOT NULL AND manufac_yr_mon != ''
-          AND (:search_terms IS NULL OR LOWER(REPLACE(material_description, ' ', '')) LIKE ANY(:search_terms) OR LOWER(REPLACE(complaint_code_desc, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR manufac_yr_mon = ANY(:month_val))
-          AND (:base_model IS NULL OR base_model = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR mis_bucket = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR new_manufacturing_quater = ANY(:mfg_qtr))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(material_description, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])) OR LOWER(REPLACE(complaint_code_desc, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR manufac_yr_mon = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR base_model = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR mis_bucket = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR new_manufacturing_quater = ANY(CAST(:mfg_qtr AS text[])))
         GROUP BY manufac_yr_mon
         ORDER BY TO_DATE(manufac_yr_mon, 'Mon-YYYY') ASC
     """
@@ -186,11 +186,11 @@ class PartLabelerQueries:
         SELECT TO_CHAR(TO_DATE(claim_date, 'YYYY-MM-DD'), 'Mon-YY') as label, COUNT(*) as value
         FROM raw_warranty_data
         WHERE user_id = :user_id AND claim_date IS NOT NULL AND claim_date != ''
-          AND (:search_terms IS NULL OR LOWER(REPLACE(material_description, ' ', '')) LIKE ANY(:search_terms) OR LOWER(REPLACE(complaint_code_desc, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR manufac_yr_mon = ANY(:month_val))
-          AND (:base_model IS NULL OR base_model = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR mis_bucket = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR new_manufacturing_quater = ANY(:mfg_qtr))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(material_description, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])) OR LOWER(REPLACE(complaint_code_desc, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR manufac_yr_mon = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR base_model = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR mis_bucket = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR new_manufacturing_quater = ANY(CAST(:mfg_qtr AS text[])))
         GROUP BY 1
         ORDER BY MIN(TO_DATE(claim_date, 'YYYY-MM-DD')) ASC
     """
@@ -209,11 +209,11 @@ class PartLabelerQueries:
             COUNT(*) as value
         FROM raw_warranty_data
         WHERE user_id = :user_id AND failure_kms IS NOT NULL AND failure_kms != ''
-          AND (:search_terms IS NULL OR LOWER(REPLACE(material_description, ' ', '')) LIKE ANY(:search_terms) OR LOWER(REPLACE(complaint_code_desc, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR manufac_yr_mon = ANY(:month_val))
-          AND (:base_model IS NULL OR base_model = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR mis_bucket = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR new_manufacturing_quater = ANY(:mfg_qtr))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(material_description, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])) OR LOWER(REPLACE(complaint_code_desc, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR manufac_yr_mon = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR base_model = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR mis_bucket = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR new_manufacturing_quater = ANY(CAST(:mfg_qtr AS text[])))
         GROUP BY 1
         ORDER BY MIN(CASE 
             WHEN CAST(NULLIF(REGEXP_REPLACE(failure_kms, '[^0-9.]', '', 'g'), '') AS FLOAT) <= 1000 THEN 1
@@ -229,11 +229,11 @@ class PartLabelerQueries:
         SELECT region as label, COUNT(*) as value
         FROM raw_warranty_data
         WHERE user_id = :user_id AND region IS NOT NULL AND region != ''
-          AND (:search_terms IS NULL OR LOWER(REPLACE(material_description, ' ', '')) LIKE ANY(:search_terms) OR LOWER(REPLACE(complaint_code_desc, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR manufac_yr_mon = ANY(:month_val))
-          AND (:base_model IS NULL OR base_model = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR mis_bucket = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR new_manufacturing_quater = ANY(:mfg_qtr))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(material_description, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])) OR LOWER(REPLACE(complaint_code_desc, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR manufac_yr_mon = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR base_model = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR mis_bucket = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR new_manufacturing_quater = ANY(CAST(:mfg_qtr AS text[])))
         GROUP BY region
         ORDER BY value DESC
     """
@@ -299,13 +299,13 @@ class PartLabelerQueries:
         FROM raw_rpt_data
         WHERE LOWER(REPLACE(part_defect, ' ', '')) LIKE :search_term
           AND mfg_month IS NOT NULL AND mfg_month != ''
-          AND (:base_model IS NULL OR model = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR defect_category = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
-          AND (:buyoff_stage IS NULL OR buyoff_stage = ANY(:buyoff_stage))
-          AND (:online_offline IS NULL
-               OR ('Online' = ANY(:online_offline) AND COALESCE(TRIM(online_val), '') NOT IN ('', '0', '0.0', 'false', 'no'))
-               OR ('Offline' = ANY(:online_offline) AND COALESCE(TRIM(offline_val), '') NOT IN ('', '0', '0.0', 'false', 'no')))
+          AND (CAST(:base_model AS text[]) IS NULL OR model = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR defect_category = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
+          AND (CAST(:buyoff_stage AS text[]) IS NULL OR buyoff_stage = ANY(CAST(:buyoff_stage AS text[])))
+          AND (CAST(:online_offline AS text[]) IS NULL
+               OR ('Online' = ANY(CAST(:online_offline AS text[])) AND COALESCE(TRIM(online_val), '') NOT IN ('', '0', '0.0', 'false', 'no'))
+               OR ('Offline' = ANY(CAST(:online_offline AS text[])) AND COALESCE(TRIM(offline_val), '') NOT IN ('', '0', '0.0', 'false', 'no')))
           AND user_id = :user_id
         GROUP BY mfg_month
         ORDER BY mfg_month DESC
@@ -347,15 +347,15 @@ class PartLabelerQueries:
         SELECT mfg_month as label, COUNT(*) as value
         FROM raw_rpt_data
         WHERE user_id = :user_id AND mfg_month IS NOT NULL AND mfg_month != ''
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_defect, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR model = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR defect_category = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
-          AND (:buyoff_stage IS NULL OR buyoff_stage = ANY(:buyoff_stage))
-          AND (:online_offline IS NULL
-               OR ('Online' = ANY(:online_offline) AND COALESCE(TRIM(online_val), '') NOT IN ('', '0', '0.0', 'false', 'no'))
-               OR ('Offline' = ANY(:online_offline) AND COALESCE(TRIM(offline_val), '') NOT IN ('', '0', '0.0', 'false', 'no')))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_defect, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR model = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR defect_category = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
+          AND (CAST(:buyoff_stage AS text[]) IS NULL OR buyoff_stage = ANY(CAST(:buyoff_stage AS text[])))
+          AND (CAST(:online_offline AS text[]) IS NULL
+               OR ('Online' = ANY(CAST(:online_offline AS text[])) AND COALESCE(TRIM(online_val), '') NOT IN ('', '0', '0.0', 'false', 'no'))
+               OR ('Offline' = ANY(CAST(:online_offline AS text[])) AND COALESCE(TRIM(offline_val), '') NOT IN ('', '0', '0.0', 'false', 'no')))
         GROUP BY mfg_month
         ORDER BY mfg_month ASC
     """
@@ -364,15 +364,15 @@ class PartLabelerQueries:
         SELECT COALESCE(NULLIF(TRIM(attribute_name), ''), 'Unknown') as label, COUNT(*) as value
         FROM raw_rpt_data
         WHERE user_id = :user_id
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_defect, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR model = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR defect_category = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
-          AND (:buyoff_stage IS NULL OR buyoff_stage = ANY(:buyoff_stage))
-          AND (:online_offline IS NULL
-               OR ('Online' = ANY(:online_offline) AND COALESCE(TRIM(online_val), '') NOT IN ('', '0', '0.0', 'false', 'no'))
-               OR ('Offline' = ANY(:online_offline) AND COALESCE(TRIM(offline_val), '') NOT IN ('', '0', '0.0', 'false', 'no')))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_defect, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR model = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR defect_category = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
+          AND (CAST(:buyoff_stage AS text[]) IS NULL OR buyoff_stage = ANY(CAST(:buyoff_stage AS text[])))
+          AND (CAST(:online_offline AS text[]) IS NULL
+               OR ('Online' = ANY(CAST(:online_offline AS text[])) AND COALESCE(TRIM(online_val), '') NOT IN ('', '0', '0.0', 'false', 'no'))
+               OR ('Offline' = ANY(CAST(:online_offline AS text[])) AND COALESCE(TRIM(offline_val), '') NOT IN ('', '0', '0.0', 'false', 'no')))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 15
@@ -382,15 +382,15 @@ class PartLabelerQueries:
         SELECT COALESCE(NULLIF(TRIM(shift), ''), 'Unknown') as label, COUNT(*) as value
         FROM raw_rpt_data
         WHERE user_id = :user_id AND shift IS NOT NULL AND shift != ''
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_defect, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR model = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR defect_category = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
-          AND (:buyoff_stage IS NULL OR buyoff_stage = ANY(:buyoff_stage))
-          AND (:online_offline IS NULL
-               OR ('Online' = ANY(:online_offline) AND COALESCE(TRIM(online_val), '') NOT IN ('', '0', '0.0', 'false', 'no'))
-               OR ('Offline' = ANY(:online_offline) AND COALESCE(TRIM(offline_val), '') NOT IN ('', '0', '0.0', 'false', 'no')))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_defect, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR model = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR defect_category = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
+          AND (CAST(:buyoff_stage AS text[]) IS NULL OR buyoff_stage = ANY(CAST(:buyoff_stage AS text[])))
+          AND (CAST(:online_offline AS text[]) IS NULL
+               OR ('Online' = ANY(CAST(:online_offline AS text[])) AND COALESCE(TRIM(online_val), '') NOT IN ('', '0', '0.0', 'false', 'no'))
+               OR ('Offline' = ANY(CAST(:online_offline AS text[])) AND COALESCE(TRIM(offline_val), '') NOT IN ('', '0', '0.0', 'false', 'no')))
         GROUP BY 1
         ORDER BY value DESC
     """
@@ -399,15 +399,15 @@ class PartLabelerQueries:
         SELECT COALESCE(NULLIF(TRIM(location_name), ''), 'Unknown') as label, COUNT(*) as value
         FROM raw_rpt_data
         WHERE user_id = :user_id AND location_name IS NOT NULL AND location_name != ''
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_defect, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR model = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR defect_category = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
-          AND (:buyoff_stage IS NULL OR buyoff_stage = ANY(:buyoff_stage))
-          AND (:online_offline IS NULL
-               OR ('Online' = ANY(:online_offline) AND COALESCE(TRIM(online_val), '') NOT IN ('', '0', '0.0', 'false', 'no'))
-               OR ('Offline' = ANY(:online_offline) AND COALESCE(TRIM(offline_val), '') NOT IN ('', '0', '0.0', 'false', 'no')))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_defect, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR model = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR defect_category = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
+          AND (CAST(:buyoff_stage AS text[]) IS NULL OR buyoff_stage = ANY(CAST(:buyoff_stage AS text[])))
+          AND (CAST(:online_offline AS text[]) IS NULL
+               OR ('Online' = ANY(CAST(:online_offline AS text[])) AND COALESCE(TRIM(online_val), '') NOT IN ('', '0', '0.0', 'false', 'no'))
+               OR ('Offline' = ANY(CAST(:online_offline AS text[])) AND COALESCE(TRIM(offline_val), '') NOT IN ('', '0', '0.0', 'false', 'no')))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 15
@@ -469,9 +469,9 @@ class PartLabelerQueries:
         WHERE (LOWER(REPLACE(part_name, ' ', '')) LIKE :search_term
             OR LOWER(REPLACE(defect_name, ' ', '')) LIKE :search_term)
           AND mfg_month IS NOT NULL AND mfg_month != ''
-          AND (:base_model IS NULL OR model_code = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR pointer = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (CAST(:base_model AS text[]) IS NULL OR model_code = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR pointer = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
           AND user_id = :user_id
         GROUP BY mfg_month
         ORDER BY mfg_month DESC
@@ -481,11 +481,11 @@ class PartLabelerQueries:
         SELECT mfg_month as label, COUNT(*) as value
         FROM raw_gnovac_data
         WHERE user_id = :user_id AND mfg_month IS NOT NULL AND mfg_month != ''
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(:search_terms) OR LOWER(REPLACE(defect_name, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR model_code = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR pointer = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])) OR LOWER(REPLACE(defect_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR model_code = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR pointer = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
         GROUP BY mfg_month
         ORDER BY mfg_month ASC
     """
@@ -494,11 +494,11 @@ class PartLabelerQueries:
         SELECT COALESCE(NULLIF(TRIM(attribution), ''), 'Unknown') as label, COUNT(*) as value
         FROM raw_gnovac_data
         WHERE user_id = :user_id
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(:search_terms) OR LOWER(REPLACE(defect_name, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR model_code = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR pointer = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])) OR LOWER(REPLACE(defect_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR model_code = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR pointer = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 15
@@ -508,11 +508,11 @@ class PartLabelerQueries:
         SELECT COALESCE(NULLIF(TRIM(pointer), ''), 'Unknown') as label, COUNT(*) as value
         FROM raw_gnovac_data
         WHERE user_id = :user_id AND pointer IS NOT NULL AND pointer != ''
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(:search_terms) OR LOWER(REPLACE(defect_name, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR model_code = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR pointer = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])) OR LOWER(REPLACE(defect_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR model_code = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR pointer = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 15
@@ -522,11 +522,11 @@ class PartLabelerQueries:
         SELECT COALESCE(NULLIF(TRIM(location_name), ''), 'Unknown') as label, COUNT(*) as value
         FROM raw_gnovac_data
         WHERE user_id = :user_id AND location_name IS NOT NULL AND location_name != ''
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(:search_terms) OR LOWER(REPLACE(defect_name, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR model_code = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR pointer = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])) OR LOWER(REPLACE(defect_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR model_code = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR pointer = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 15
@@ -596,10 +596,10 @@ class PartLabelerQueries:
         WHERE (LOWER(REPLACE(part_name, ' ', '')) LIKE :search_term
             OR LOWER(REPLACE(defect_name, ' ', '')) LIKE :search_term)
           AND mfg_month IS NOT NULL AND mfg_month != ''
-          AND (:base_model IS NULL OR model_name = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR severity_name = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
-          AND (:defect_type IS NULL OR defect_type_name = ANY(:defect_type))
+          AND (CAST(:base_model AS text[]) IS NULL OR model_name = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR severity_name = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
+          AND (CAST(:defect_type AS text[]) IS NULL OR defect_type_name = ANY(CAST(:defect_type AS text[])))
           AND user_id = :user_id
         GROUP BY mfg_month
         ORDER BY mfg_month DESC
@@ -609,12 +609,12 @@ class PartLabelerQueries:
         SELECT mfg_month as label, COUNT(*) as value
         FROM raw_rfi_data
         WHERE user_id = :user_id AND mfg_month IS NOT NULL AND mfg_month != ''
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(:search_terms) OR LOWER(REPLACE(defect_name, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR model_name = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR severity_name = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
-          AND (:defect_type IS NULL OR defect_type_name = ANY(:defect_type))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])) OR LOWER(REPLACE(defect_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR model_name = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR severity_name = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
+          AND (CAST(:defect_type AS text[]) IS NULL OR defect_type_name = ANY(CAST(:defect_type AS text[])))
         GROUP BY mfg_month
         ORDER BY mfg_month ASC
     """
@@ -623,12 +623,12 @@ class PartLabelerQueries:
         SELECT COALESCE(NULLIF(TRIM(attribution_name), ''), 'Unknown') as label, COUNT(*) as value
         FROM raw_rfi_data
         WHERE user_id = :user_id
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(:search_terms) OR LOWER(REPLACE(defect_name, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR model_name = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR severity_name = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
-          AND (:defect_type IS NULL OR defect_type_name = ANY(:defect_type))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])) OR LOWER(REPLACE(defect_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR model_name = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR severity_name = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
+          AND (CAST(:defect_type AS text[]) IS NULL OR defect_type_name = ANY(CAST(:defect_type AS text[])))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 15
@@ -638,12 +638,12 @@ class PartLabelerQueries:
         SELECT COALESCE(NULLIF(TRIM(defect_type_name), ''), 'Unknown') || ' / ' || COALESCE(NULLIF(TRIM(severity_name), ''), 'Unknown') as label, COUNT(*) as value
         FROM raw_rfi_data
         WHERE user_id = :user_id
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(:search_terms) OR LOWER(REPLACE(defect_name, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR model_name = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR severity_name = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
-          AND (:defect_type IS NULL OR defect_type_name = ANY(:defect_type))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])) OR LOWER(REPLACE(defect_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR model_name = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR severity_name = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
+          AND (CAST(:defect_type AS text[]) IS NULL OR defect_type_name = ANY(CAST(:defect_type AS text[])))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 15
@@ -653,12 +653,12 @@ class PartLabelerQueries:
         SELECT COALESCE(NULLIF(TRIM(area_name), ''), 'Unknown') as label, COUNT(*) as value
         FROM raw_rfi_data
         WHERE user_id = :user_id AND area_name IS NOT NULL AND area_name != ''
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(:search_terms) OR LOWER(REPLACE(defect_name, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR model_name = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR severity_name = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
-          AND (:defect_type IS NULL OR defect_type_name = ANY(:defect_type))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])) OR LOWER(REPLACE(defect_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR model_name = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR severity_name = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
+          AND (CAST(:defect_type AS text[]) IS NULL OR defect_type_name = ANY(CAST(:defect_type AS text[])))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 15
@@ -728,9 +728,9 @@ class PartLabelerQueries:
         WHERE (LOWER(REPLACE(part_name, ' ', '')) LIKE :search_term
             OR LOWER(REPLACE(concern_description, ' ', '')) LIKE :search_term)
           AND mfg_month IS NOT NULL AND mfg_month != ''
-          AND (:base_model IS NULL OR vehicle_model = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR concern_category = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (CAST(:base_model AS text[]) IS NULL OR vehicle_model = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR concern_category = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
           AND user_id = :user_id
         GROUP BY mfg_month
         ORDER BY mfg_month DESC
@@ -740,11 +740,11 @@ class PartLabelerQueries:
         SELECT mfg_month as label, COUNT(*) as value
         FROM raw_esqa_data
         WHERE user_id = :user_id AND mfg_month IS NOT NULL AND mfg_month != ''
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(:search_terms) OR LOWER(REPLACE(concern_description, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR vehicle_model = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR concern_category = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])) OR LOWER(REPLACE(concern_description, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR vehicle_model = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR concern_category = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
         GROUP BY mfg_month
         ORDER BY mfg_month ASC
     """
@@ -753,11 +753,11 @@ class PartLabelerQueries:
         SELECT COALESCE(NULLIF(TRIM(commodity), ''), 'Unknown') as label, COUNT(*) as value
         FROM raw_esqa_data
         WHERE user_id = :user_id
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(:search_terms) OR LOWER(REPLACE(concern_description, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR vehicle_model = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR concern_category = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])) OR LOWER(REPLACE(concern_description, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR vehicle_model = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR concern_category = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 15
@@ -767,11 +767,11 @@ class PartLabelerQueries:
         SELECT COALESCE(NULLIF(TRIM(concern_source), ''), 'Unknown') as label, COUNT(*) as value
         FROM raw_esqa_data
         WHERE user_id = :user_id AND concern_source IS NOT NULL AND concern_source != ''
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(:search_terms) OR LOWER(REPLACE(concern_description, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR vehicle_model = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR concern_category = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])) OR LOWER(REPLACE(concern_description, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR vehicle_model = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR concern_category = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 15
@@ -781,11 +781,11 @@ class PartLabelerQueries:
         SELECT COALESCE(NULLIF(TRIM(concern_severity), ''), 'Unknown') as label, COUNT(*) as value
         FROM raw_esqa_data
         WHERE user_id = :user_id AND concern_severity IS NOT NULL AND concern_severity != ''
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(:search_terms) OR LOWER(REPLACE(concern_description, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR vehicle_model = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR concern_category = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_name, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])) OR LOWER(REPLACE(concern_description, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR vehicle_model = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR concern_category = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 15
@@ -854,10 +854,10 @@ class PartLabelerQueries:
         FROM raw_ev_data
         WHERE LOWER(REPLACE(part_updated, ' ', '')) LIKE :search_term
           AND mfg_month IS NOT NULL AND mfg_month != ''
-          AND (:base_model IS NULL OR TRIM(model) = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR mis = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
-          AND (:battery_motor IS NULL OR battery_motor = ANY(:battery_motor))
+          AND (CAST(:base_model AS text[]) IS NULL OR TRIM(model) = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR mis = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
+          AND (CAST(:battery_motor AS text[]) IS NULL OR battery_motor = ANY(CAST(:battery_motor AS text[])))
           AND user_id = :user_id
         GROUP BY mfg_month
         ORDER BY mfg_month DESC
@@ -867,12 +867,12 @@ class PartLabelerQueries:
         SELECT mfg_month as label, COUNT(*) as value
         FROM raw_ev_data
         WHERE user_id = :user_id AND mfg_month IS NOT NULL AND mfg_month != ''
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_updated, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR TRIM(model) = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR mis = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
-          AND (:battery_motor IS NULL OR battery_motor = ANY(:battery_motor))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_updated, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR TRIM(model) = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR mis = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
+          AND (CAST(:battery_motor AS text[]) IS NULL OR battery_motor = ANY(CAST(:battery_motor AS text[])))
         GROUP BY mfg_month
         ORDER BY mfg_month ASC
     """
@@ -881,12 +881,12 @@ class PartLabelerQueries:
         SELECT COALESCE(NULLIF(TRIM(reporting_month), ''), 'Unknown') as label, COUNT(*) as value
         FROM raw_ev_data
         WHERE user_id = :user_id AND reporting_month IS NOT NULL AND reporting_month != ''
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_updated, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR TRIM(model) = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR mis = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
-          AND (:battery_motor IS NULL OR battery_motor = ANY(:battery_motor))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_updated, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR TRIM(model) = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR mis = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
+          AND (CAST(:battery_motor AS text[]) IS NULL OR battery_motor = ANY(CAST(:battery_motor AS text[])))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 15
@@ -896,12 +896,12 @@ class PartLabelerQueries:
         SELECT COALESCE(NULLIF(TRIM(km_range), ''), 'Unknown') as label, COUNT(*) as value
         FROM raw_ev_data
         WHERE user_id = :user_id AND km_range IS NOT NULL AND km_range != ''
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_updated, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR TRIM(model) = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR mis = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
-          AND (:battery_motor IS NULL OR battery_motor = ANY(:battery_motor))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_updated, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR TRIM(model) = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR mis = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
+          AND (CAST(:battery_motor AS text[]) IS NULL OR battery_motor = ANY(CAST(:battery_motor AS text[])))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 20
@@ -911,12 +911,12 @@ class PartLabelerQueries:
         SELECT COALESCE(NULLIF(TRIM(state), ''), 'Unknown') as label, COUNT(*) as value
         FROM raw_ev_data
         WHERE user_id = :user_id AND state IS NOT NULL AND state != ''
-          AND (:search_terms IS NULL OR LOWER(REPLACE(part_updated, ' ', '')) LIKE ANY(:search_terms))
-          AND (:month_val IS NULL OR mfg_month = ANY(:month_val))
-          AND (:base_model IS NULL OR TRIM(model) = ANY(:base_model))
-          AND (:mis_bucket IS NULL OR mis = ANY(:mis_bucket))
-          AND (:mfg_qtr IS NULL OR mfg_quarter = ANY(:mfg_qtr))
-          AND (:battery_motor IS NULL OR battery_motor = ANY(:battery_motor))
+          AND (CAST(:search_terms AS text[]) IS NULL OR LOWER(REPLACE(part_updated, ' ', '')) LIKE ANY(CAST(:search_terms AS text[])))
+          AND (CAST(:month_val AS text[]) IS NULL OR mfg_month = ANY(CAST(:month_val AS text[])))
+          AND (CAST(:base_model AS text[]) IS NULL OR TRIM(model) = ANY(CAST(:base_model AS text[])))
+          AND (CAST(:mis_bucket AS text[]) IS NULL OR mis = ANY(CAST(:mis_bucket AS text[])))
+          AND (CAST(:mfg_qtr AS text[]) IS NULL OR mfg_quarter = ANY(CAST(:mfg_qtr AS text[])))
+          AND (CAST(:battery_motor AS text[]) IS NULL OR battery_motor = ANY(CAST(:battery_motor AS text[])))
         GROUP BY 1
         ORDER BY value DESC
         LIMIT 30
