@@ -14,6 +14,32 @@ NEO4J_USERNAME = os.environ.get("NEO4J_USERNAME", "neo4j")
 NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD")
 if not NEO4J_PASSWORD:
     raise SystemExit("NEO4J_PASSWORD environment variable is not set (same value as in .env / docker-compose).")
+
+
+def _confirm_destructive_run():
+    """This script DELETES every node and relationship in Neo4j before reloading.
+    Require three separate, explicit confirmations. Any wrong answer aborts."""
+    print("=" * 80)
+    print("WARNING: this script will DELETE ALL existing nodes and relationships")
+    print(f"in the Neo4j database at {NEO4J_URI} and rebuild it from the CSV files.")
+    print("Make sure you have a backup of the Neo4j data first.")
+    print("=" * 80)
+    try:
+        a1 = input("1/3  Do you want to delete and reload ALL Neo4j data? Type YES: ").strip()
+        if a1 != "YES":
+            raise SystemExit("Aborted. Nothing was changed.")
+        a2 = input("2/3  Have you taken a Neo4j backup? Type BACKUP-DONE: ").strip()
+        if a2 != "BACKUP-DONE":
+            raise SystemExit("Aborted. Nothing was changed.")
+        a3 = input("3/3  Final check. Type DELETE-ALL-DATA to start: ").strip()
+        if a3 != "DELETE-ALL-DATA":
+            raise SystemExit("Aborted. Nothing was changed.")
+    except (EOFError, KeyboardInterrupt):
+        raise SystemExit("\nAborted (no interactive terminal or cancelled). Nothing was changed.")
+    print("Confirmed. Starting...\n")
+
+
+_confirm_destructive_run()
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USERNAME, NEO4J_PASSWORD))
 
 # Pre-compile regex patterns for performance (avoid re-compiling per row)
