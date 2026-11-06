@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
+from fastapi import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from backend.api.endpoints import router as api_router
 from app.config.config import get_settings
@@ -148,6 +149,10 @@ def create_app() -> FastAPI:
         # This serves files if they exist (favicon.ico, etc.), otherwise index.html
         @app.get("/{full_path:path}")
         async def serve_spa(full_path: str):
+            # API docs / schema paths must be a real 404, not the SPA page (soft-404)
+            if full_path.strip("/").lower() in {"docs", "redoc", "openapi.json", "docs/oauth2-redirect"} \
+                    and os.getenv("ENABLE_API_DOCS", "false").lower() != "true":
+                raise HTTPException(status_code=404, detail="Not Found")
             # Check if actual file exists in build dir
             file_path = frontend_path / full_path
             if file_path.is_file():

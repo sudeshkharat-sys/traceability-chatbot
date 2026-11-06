@@ -1535,12 +1535,16 @@ function PartLabeler() {
     setModalType(null);
     try {
       const res = await fetch(`${API_BASE}/upload?userId=${userId}&displayName=${encodeURIComponent(customImageName || pendingFile.name)}`, { method: 'POST', body: formData });
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || data.detail || data.error) {
+        throw new Error((data && (data.detail || data.error)) || `HTTP ${res.status}`);
+      }
       setSelectedImage(data);
       setLabels([]);
       fetchImages();
     } catch (err) {
       console.error("Upload failed", err);
+      alert("Failed to upload the drawing. Please try again or contact support.");
     } finally {
       setIsLoading(false);
       setPendingFile(null);
