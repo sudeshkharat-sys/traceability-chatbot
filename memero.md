@@ -65,3 +65,43 @@ workspace listing the parts/sources that failed, so an error is never shown as a
   `backend/api/deps.py` (`ROLE_ALLOWED`) and `frontend/src/services/api/authService.js`.
 - The user works on Windows PowerShell locally (no `grep`; use `Select-String` or `findstr`)
   and the server is Linux over Azure Bastion.
+
+## VAPT work (Nov 2026) - branch `vapt-fixes` (working branch stays `ccr-e3f750a0-2ix3pe`)
+
+**Two scans:** (1) Checkmarx code scan, report `pfmea_ai/report_updated.pdf` (216 pages, 237 issues:
+4 Critical, 12 Medium, 221 Low). (2) Acunetix live scan, run by the testers against UAT
+(`https://mai-quality-bot-uat.m-devsecops.com/`, Azure VM private IP 10.226.0.19). Test accounts: see
+`pfmea_ai/aiagvda_updated.pdf` and `nashik-chatbot-pq/scripts/create_vapt_users.py`.
+
+**Done on `vapt-fixes`** (commits 9cf54fd, 4de22de):
+- `scripts/create_users.py`: username/email validated (Checkmarx "command injection" = false positive on `input()`).
+- `scripts/data_loading.py`: Neo4j password now from env `NEO4J_PASSWORD` (no hardcoded value).
+  Also asks 3 confirmations (YES / BACKUP-DONE / DELETE-ALL-DATA) because it DELETES the whole Neo4j graph.
+- `main.py`: `/docs` and `/openapi.json` off unless env `ENABLE_API_DOCS=true`.
+- `nginx.conf`: login/signup rate limit (10/min/IP, 429), `server_tokens off`, CORS on `/documents/` = own host only.
+- Error leaks: API routes, health routes, `part_labeler_service` return a generic message; details go to server log.
+  Left alone on purpose: `app/tools` and `app/agents` (errors are fed back to the LLM so it can retry) and
+  user-facing ValueError messages (username taken, invalid credentials, PFMEA 400s).
+- Logs: no usernames/query text in `state_db_connector.py` / `auth_service.py` logs.
+
+**NOT done yet / open:**
+- Token in `sessionStorage` (10 Medium Checkmarx findings, `authService.js`): proper fix = httpOnly cookie. Risky
+  (login, every API call, logout, /ws, downloads, CSRF). Plan: do it behind an off-by-default switch, only if
+  the testers insist. Ask them whether Medium findings must be zero.
+- CSP in `nginx.conf` still has `'unsafe-inline' 'unsafe-eval'` and `http:`. Tightening can blank the React/Three.js UI. Test on UAT only.
+- PDF viewer (`PdfViewerModal.js` line 9) loads pdf.worker from `unpkg.com`. May fail with no internet / strict CSP;
+  better to serve the worker locally.
+- Frontend Low findings not fixed: Secret Leak / Privacy Violation in error messages (`deleteUser`, `updateRole`, `signup`).
+- Missing HSTS finding is probably a false positive (nginx already sends the header).
+- Old Neo4j password was hardcoded in `data_loading.py` and is still in git history (see
+  `git show 6ff0b03:nashik-chatbot-pq/scripts/data_loading.py`). Rotate it if it is the live one. Do NOT write it in code or in this file.
+
+**Data safety facts:**
+- Postgres = users/passwords, chat history, labels, warranty tables. Neo4j = traceability graph built from CSVs.
+  OpenSearch = vectors (rebuildable). `uploads_data` volume = 3D models and station docs.
+- `docker compose down` keeps data (named volumes). NEVER use `down -v`: it deletes all volumes.
+- `data_loading.py` reads CSVs from `/app/csv-data` inside the container. That path is NOT mounted in
+  `docker-compose.yml` or copied in the Dockerfile, so where the CSVs live on the server is UNKNOWN. Find out before ever running it.
+
+**Caution about my earlier advice:** the user has no Docker/sudo on the server and deploys through Bitbucket `main`
+(see Deployment facts). Backup/deploy commands that need `docker` must be run by whoever has server access.
