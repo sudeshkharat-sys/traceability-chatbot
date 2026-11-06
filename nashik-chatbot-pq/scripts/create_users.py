@@ -27,6 +27,7 @@ Usage:
         --password "Labeler@1"
 """
 
+import re
 import sys
 import os
 import argparse
@@ -76,17 +77,17 @@ def main():
 
     # Prompt for any missing fields interactively
     username = args.username or input("Username: ").strip()
-    if not username:
-        print("Error: username cannot be empty.", file=sys.stderr)
+    if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", username):
+        print("Error: username must be 1-64 chars of letters, digits, '.', '_' or '-'.", file=sys.stderr)
         sys.exit(1)
 
     email = args.email or input("Email: ").strip()
-    if not email:
-        print("Error: email cannot be empty.", file=sys.stderr)
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        print("Error: please enter a valid email address.", file=sys.stderr)
         sys.exit(1)
 
-    first_name = args.first_name or input("First name [Admin]: ").strip() or "Admin"
-    last_name  = args.last_name  or input("Last name  [User]:  ").strip() or "User"
+    first_name = args.first_name or re.sub(r"[^\w .'-]", "", input("First name [Admin]: ")).strip() or "Admin"
+    last_name  = args.last_name  or re.sub(r"[^\w .'-]", "", input("Last name  [User]:  ")).strip() or "User"
 
     password = args.password
     if not password:

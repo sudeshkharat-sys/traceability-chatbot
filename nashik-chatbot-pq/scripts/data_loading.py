@@ -9,9 +9,11 @@ import gc
 import os
 import re
 
-NEO4J_URI = "neo4j://neo4j:7687"
-NEO4J_USERNAME = "neo4j"
-NEO4J_PASSWORD = "dataeaze@12345"
+NEO4J_URI = os.environ.get("NEO4J_URI", "neo4j://neo4j:7687")
+NEO4J_USERNAME = os.environ.get("NEO4J_USERNAME", "neo4j")
+NEO4J_PASSWORD = os.environ.get("NEO4J_PASSWORD")
+if not NEO4J_PASSWORD:
+    raise SystemExit("NEO4J_PASSWORD environment variable is not set (same value as in .env / docker-compose).")
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USERNAME, NEO4J_PASSWORD))
 
 # Pre-compile regex patterns for performance (avoid re-compiling per row)

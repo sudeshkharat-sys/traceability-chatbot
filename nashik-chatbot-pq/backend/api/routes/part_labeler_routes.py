@@ -85,7 +85,7 @@ async def upload_warranty_file(file: UploadFile = File(...)):
         return {"tempFilePath": file_path, "headers": headers}
     except Exception as e:
         logger.error(f"Warranty upload error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong. Please try again or contact support.")
 
 @router.post("/warranty-confirm-mapping")
 async def confirm_warranty_mapping(payload: MappingRequest):
@@ -98,7 +98,7 @@ async def confirm_warranty_mapping(payload: MappingRequest):
         return {"success": True, "count": count}
     except Exception as e:
         logger.error(f"Mapping confirmation error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Something went wrong. Please try again or contact support.")
 
 @router.get("/filter-options")
 async def get_filter_options(userId: int = Query(...), dataSource: Optional[str] = Query("warranty")):
@@ -158,7 +158,7 @@ async def upload_image(
         return result
     except Exception as e:
         logger.error(f"Upload error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Failed to upload image: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to upload image. Please try again.")
 
 @router.delete("/images/{image_id}")
 async def delete_image(image_id: int, userId: int = Query(...)):

@@ -3,6 +3,7 @@ Main FastAPI Application
 Thar Roxx Quality Intelligence API
 """
 
+import os
 import logging
 from fastapi.staticfiles import StaticFiles
 import uvicorn
@@ -83,7 +84,9 @@ def create_app() -> FastAPI:
         title="Thar Roxx Quality Intelligence API",
         description="Neo4j-powered automotive quality and traceability analysis system",
         version="1.0.0",
-        docs_url="/docs",
+        docs_url="/docs" if os.getenv("ENABLE_API_DOCS", "false").lower() == "true" else None,
+        redoc_url=None,
+        openapi_url="/openapi.json" if os.getenv("ENABLE_API_DOCS", "false").lower() == "true" else None,
         lifespan=lifespan,  # Register lifespan manager for startup/shutdown
     )
     app.add_middleware(

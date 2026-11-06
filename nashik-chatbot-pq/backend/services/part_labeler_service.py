@@ -112,7 +112,7 @@ class PartLabelerService:
             return df.columns.tolist()
         except Exception as e:
             logger.error(f"Error extracting headers: {e}")
-            raise Exception(f"Failed to read file headers: {str(e)}")
+            raise Exception("Failed to read file headers")
 
     def process_mapped_warranty_data(self, file_path: str, mapping: Dict[str, str], user_id: int) -> int:
         """
@@ -181,7 +181,7 @@ class PartLabelerService:
             return len(df)
         except Exception as e:
             logger.error(f"Error processing mapped data: {e}")
-            raise Exception(f"Failed to process data: {str(e)}")
+            raise Exception("Failed to process data")
 
     def _insert_batch(self, records):
         with self.db.get_session() as session:
@@ -228,7 +228,7 @@ class PartLabelerService:
             return data
         except Exception as e:
             logger.error(f"Error fetching warranty data from DB: {e}")
-            return {"error": str(e)}
+            return {"error": "Something went wrong. Please try again or contact support."}
 
     def get_filter_options(self, user_id: int) -> Dict[str, List[str]]:
         """Fetch unique models, MIS buckets, Mfg Quarters, and Months for filters"""
@@ -291,7 +291,7 @@ class PartLabelerService:
             return output.getvalue()
         except Exception as e:
             logger.error(f"Error generating CSV: {e}")
-            return f"Error generating CSV: {str(e)}"
+            return "Error generating CSV. Please try again."
 
     def upload_image(self, filename: str, user_id: int, display_name: Optional[str] = None) -> Dict[str, Any]:
         """Save image record to database"""
@@ -528,7 +528,7 @@ class PartLabelerService:
             return data
         except Exception as e:
             logger.error(f"RPT data lookup error: {e}")
-            return {"error": str(e)}
+            return {"error": "Something went wrong. Please try again or contact support."}
 
     def get_rpt_dashboard_data(self, user_id: int, part_name=None, month=None, base_model=None, mis_bucket=None, mfg_qtr=None, buyoff_stage=None, online_offline=None) -> Dict[str, Any]:
         result = {"mfgMonth": [], "reportingMonth": [], "kms": [], "region": []}
@@ -635,7 +635,7 @@ class PartLabelerService:
             return data
         except Exception as e:
             logger.error(f"GNOVAC data lookup error: {e}")
-            return {"error": str(e)}
+            return {"error": "Something went wrong. Please try again or contact support."}
 
     def get_gnovac_dashboard_data(self, user_id: int, part_name=None, month=None, base_model=None, mis_bucket=None, mfg_qtr=None) -> Dict[str, Any]:
         result = {"mfgMonth": [], "reportingMonth": [], "kms": [], "region": []}
@@ -743,7 +743,7 @@ class PartLabelerService:
             return data
         except Exception as e:
             logger.error(f"RFI data lookup error: {e}")
-            return {"error": str(e)}
+            return {"error": "Something went wrong. Please try again or contact support."}
 
     def get_rfi_dashboard_data(self, user_id: int, part_name=None, month=None, base_model=None, mis_bucket=None, mfg_qtr=None, defect_type=None) -> Dict[str, Any]:
         result = {"mfgMonth": [], "reportingMonth": [], "kms": [], "region": []}
@@ -853,7 +853,7 @@ class PartLabelerService:
             return data
         except Exception as e:
             logger.error(f"e-SQA data lookup error: {e}")
-            return {"error": str(e)}
+            return {"error": "Something went wrong. Please try again or contact support."}
 
     def get_esqa_dashboard_data(self, user_id: int, part_name=None, month=None, base_model=None, mis_bucket=None, mfg_qtr=None) -> Dict[str, Any]:
         result = {"mfgMonth": [], "reportingMonth": [], "kms": [], "region": []}
@@ -1038,7 +1038,7 @@ class PartLabelerService:
             return data
         except Exception as e:
             logger.error(f"EV data lookup error: {e}")
-            return {"error": str(e)}
+            return {"error": "Something went wrong. Please try again or contact support."}
 
     def get_ev_dashboard_data(self, user_id: int, part_name=None, month=None, base_model=None, mis_bucket=None, mfg_qtr=None, battery_motor=None) -> Dict[str, Any]:
         result = {"mfgMonth": [], "reportingMonth": [], "kms": [], "region": []}

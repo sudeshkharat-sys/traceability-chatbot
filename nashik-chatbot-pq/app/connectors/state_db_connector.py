@@ -97,7 +97,7 @@ class StateDBConnector:
                 return rows
 
         except Exception as e:
-            logger.error(f"Error executing query: {e}")
+            logger.error("Error executing query: %s (details withheld - may contain user data)", type(e).__name__)
             raise
 
     def execute_query_with_headers(self, query: str, params: Dict[str, Any] = None) -> tuple:
@@ -118,7 +118,7 @@ class StateDBConnector:
                 return headers, rows
 
         except Exception as e:
-            logger.error(f"Error executing query with headers: {e}")
+            logger.error("Error executing query with headers: %s (details withheld - may contain user data)", type(e).__name__)
             raise
 
     def execute_insert(self, query: str, params: Dict[str, Any] = None) -> Any:

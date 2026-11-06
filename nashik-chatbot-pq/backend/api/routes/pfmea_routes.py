@@ -64,7 +64,7 @@ async def convert(file: UploadFile = File(...), layout: str = Form("auto")):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("PFMEA conversion failed")
-        raise HTTPException(status_code=500, detail=f"Conversion failed: {e}")
+        raise HTTPException(status_code=500, detail="Conversion failed. Please check the file and try again.")
 
 
 @router.get("/converted/{token}")
@@ -127,7 +127,7 @@ async def analyze(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.exception("PFMEA analysis failed to start")
-        raise HTTPException(status_code=500, detail=f"PFMEA analysis failed to start: {e}")
+        raise HTTPException(status_code=500, detail="PFMEA analysis failed to start. Please try again.")
 
 
 @router.get("/progress/{token}")

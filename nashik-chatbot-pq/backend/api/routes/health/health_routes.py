@@ -48,7 +48,8 @@ async def detailed_health_check():
                 neo4j_status = "disconnected"
         except Exception as e:
             neo4j_status = "error"
-            neo4j_error = str(e)
+            logger.exception("Request failed")
+            neo4j_error = "connection failed"
 
         # Check PostgreSQL
         postgres_status = "unknown"
@@ -61,7 +62,8 @@ async def detailed_health_check():
                 postgres_status = "disconnected"
         except Exception as e:
             postgres_status = "error"
-            postgres_error = str(e)
+            logger.exception("Request failed")
+            postgres_error = "connection failed"
 
         overall_status = (
             "healthy"
@@ -82,7 +84,7 @@ async def detailed_health_check():
 
     except Exception as e:
         logger.error(f"Error in detailed health check: {e}")
-        return JSONResponse({"status": "error", "error": str(e)}, status_code=500)
+        return JSONResponse({"status": "error", "error": "internal error"}, status_code=500)
 
 
 @router.get("/stats")
@@ -112,7 +114,7 @@ async def get_stats():
 
     except Exception as e:
         logger.error(f"Error getting stats: {e}")
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return JSONResponse({"error": "internal error"}, status_code=500)
 
 
 @router.get("/initialization")
@@ -143,7 +145,7 @@ async def get_initialization_status(request: Request):
 
     except Exception as e:
         logger.error(f"Error getting initialization status: {e}")
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return JSONResponse({"error": "internal error"}, status_code=500)
 
 
 @router.get("/prompts")
@@ -180,7 +182,7 @@ async def list_prompts():
 
     except Exception as e:
         logger.error(f"Error listing prompts: {e}")
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return JSONResponse({"error": "internal error"}, status_code=500)
 
 
 @router.get("/prompts/{prompt_key}")
@@ -220,4 +222,4 @@ async def get_prompt(prompt_key: str):
 
     except Exception as e:
         logger.error(f"Error getting prompt {prompt_key}: {e}")
-        return JSONResponse({"error": str(e)}, status_code=500)
+        return JSONResponse({"error": "internal error"}, status_code=500)
