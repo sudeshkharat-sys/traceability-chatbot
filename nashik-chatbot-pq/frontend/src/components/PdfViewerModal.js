@@ -5,8 +5,9 @@ import "react-pdf/dist/Page/TextLayer.css";
 import "./PdfViewerModal.css";
 
 // Set up the worker
-// Using unpkg with the exact version matching the library
-pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+// Worker file is copied from node_modules into public/ by scripts/copy-pdf-worker.js
+// (runs before start/build), so no external CDN is needed.
+pdfjs.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL || ""}/pdf.worker.min.mjs`;
 
 const HighlightOverlay = ({ bbox, pageHeight, scale }) => {
   if (!bbox || !pageHeight) return null;

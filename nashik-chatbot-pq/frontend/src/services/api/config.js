@@ -37,7 +37,6 @@ if (environment === "development") {
     backendDomain,
     backend_url,
     backend_url_ws,
-    userId: CURRENT_USER_ID,
   });
 }
 
