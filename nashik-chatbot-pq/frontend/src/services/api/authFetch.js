@@ -17,6 +17,9 @@ function handleUnauthorized(url) {
 }
 
 export function attachAuth(instance) {
+  // Send the httpOnly session cookie (if any) and the CSRF marker header.
+  instance.defaults.withCredentials = true;
+  instance.defaults.headers.common["X-Requested-With"] = "XMLHttpRequest";
   instance.interceptors.request.use((config) => {
     const token = authService.getToken();
     if (token) {
@@ -43,7 +46,8 @@ window.fetch = async (input, init = {}) => {
   const token = authService.getToken();
   const headers = new Headers(init.headers || (typeof input !== "string" ? input.headers : undefined));
   if (token && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${token}`);
-  const res = await origFetch(input, { ...init, headers });
+  headers.set("X-Requested-With", "XMLHttpRequest");
+  const res = await origFetch(input, { ...init, headers, credentials: init.credentials || "include" });
   if (res.status === 401) handleUnauthorized(url);
   return res;
 };

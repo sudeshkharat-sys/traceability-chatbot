@@ -31,6 +31,15 @@ def _extract_token(request: Request) -> Optional[str]:
     auth = request.headers.get("authorization", "")
     if auth.lower().startswith("bearer "):
         return auth[7:].strip()
+    # httpOnly session cookie (AUTH_COOKIE_MODE). Browsers attach cookies on
+    # their own, so a state-changing request must also carry X-Requested-With,
+    # a header a cross-site form or image tag cannot add (CSRF defence).
+    cookie = request.cookies.get("session")
+    if cookie and (
+        request.method in ("GET", "HEAD", "OPTIONS")
+        or request.headers.get("x-requested-with")
+    ):
+        return cookie
     # Query-param fallback for GET only: browser-driven downloads and 3D model
     # loaders cannot set headers.
     if request.method == "GET":

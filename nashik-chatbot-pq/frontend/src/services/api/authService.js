@@ -74,6 +74,7 @@ class AuthService {
     const response = await fetch(`${backend_url}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      credentials: "include",
       body: JSON.stringify({ username, password }),
     });
 
@@ -84,8 +85,10 @@ class AuthService {
 
     const data = await response.json();
 
-    // Save session to sessionStorage
-    sessionStorage.setItem("token", data.token || "");
+    // Save session to sessionStorage. With cookie sessions (AUTH_COOKIE_MODE
+    // on the server) the token is in an httpOnly cookie and the reply has no
+    // token, so nothing secret is stored here.
+    if (data.token) sessionStorage.setItem("token", data.token);
     sessionStorage.setItem("user_id", data.user_id);
     sessionStorage.setItem("username", data.username);
     sessionStorage.setItem("first_name", data.first_name || "");
@@ -103,7 +106,8 @@ class AuthService {
     try {
       await fetch(`${backend_url}/auth/logout`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        credentials: "include",
       });
     } catch (e) {
       console.error("Logout API call failed:", e);

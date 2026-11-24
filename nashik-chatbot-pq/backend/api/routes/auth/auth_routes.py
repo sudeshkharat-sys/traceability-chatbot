@@ -4,10 +4,11 @@ Handles signup, login, and logout endpoints
 """
 
 import logging
+import os
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 import hashlib
-from backend.services.auth.token import create_token
+from backend.services.auth.token import create_token, TOKEN_TTL_SECONDS
 from backend.services.auth.passwords import hash_password, verify_password
 from backend.services.auth import rate_limit
 from backend.models.schemas.auth_schemas import SignupDto, LoginDto, ResetPasswordDto
@@ -15,6 +16,25 @@ from backend.models.schemas.auth_schemas import SignupDto, LoginDto, ResetPasswo
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["auth"])
+
+# --- httpOnly-cookie sessions (VAPT: "sensitive data in web storage") -------
+# Off by default. With AUTH_COOKIE_MODE=true the signed token is sent as an
+# httpOnly cookie and left OUT of the JSON body, so browser JavaScript never
+# sees it and the frontend has nothing to put in sessionStorage. The frontend
+# needs no rebuild flag: it only stores a token when the login reply has one.
+# Rollback: set AUTH_COOKIE_MODE=false and restart the app container.
+AUTH_COOKIE_NAME = "session"
+
+
+def cookie_auth_enabled() -> bool:
+    return os.getenv("AUTH_COOKIE_MODE", "false").lower() == "true"
+
+
+def _cookie_samesite() -> str:
+    # "lax" for normal browser use. "none" is only needed if the app is used
+    # inside a Microsoft Teams iframe (cross-site).
+    v = os.getenv("AUTH_COOKIE_SAMESITE", "lax").lower()
+    return v if v in ("lax", "strict", "none") else "lax"
 
 _auth_service = None
 
@@ -63,17 +83,29 @@ async def login(payload: LoginDto):
     try:
         result = get_auth_service().login(payload.username, payload.password)
         rate_limit.clear(payload.username)
-        return JSONResponse(
+        token = create_token(result["user_id"])
+        response = JSONResponse(
             content={
                 "user_id": result["user_id"],
                 "username": result["username"],
                 "first_name": result["first_name"],
                 "last_name": result["last_name"],
                 "role": result["role"],
-                "token": create_token(result["user_id"]),
+                "token": "" if cookie_auth_enabled() else token,
                 "message": "Login successful",
             }
         )
+        if cookie_auth_enabled():
+            response.set_cookie(
+                AUTH_COOKIE_NAME,
+                token,
+                max_age=TOKEN_TTL_SECONDS,
+                httponly=True,
+                secure=True,
+                samesite=_cookie_samesite(),
+                path="/",
+            )
+        return response
     except ValueError as e:
         rate_limit.record_failure(payload.username)
         raise HTTPException(status_code=401, detail=str(e))
@@ -117,4 +149,6 @@ async def logout():
     Session is managed on the frontend via sessionStorage.
     This endpoint confirms logout on the server side.
     """
-    return JSONResponse(content={"message": "Logout successful"})
+    response = JSONResponse(content={"message": "Logout successful"})
+    response.delete_cookie(AUTH_COOKIE_NAME, path="/")
+    return response
