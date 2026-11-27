@@ -85,10 +85,9 @@ class AuthService {
 
     const data = await response.json();
 
-    // Save session to sessionStorage. With cookie sessions (AUTH_COOKIE_MODE
-    // on the server) the token is in an httpOnly cookie and the reply has no
-    // token, so nothing secret is stored here.
-    if (data.token) sessionStorage.setItem("token", data.token);
+    // The session token lives only in the httpOnly cookie (AUTH_COOKIE_MODE on
+    // the server), so it is never saved in browser storage. Only non-secret
+    // profile details are kept in sessionStorage for the UI.
     sessionStorage.setItem("user_id", data.user_id);
     sessionStorage.setItem("username", data.username);
     sessionStorage.setItem("first_name", data.first_name || "");
